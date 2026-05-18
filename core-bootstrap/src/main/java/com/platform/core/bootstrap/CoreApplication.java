@@ -7,7 +7,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@ComponentScan("com.platform.core")
+@ComponentScan("com.platform")
 @EnableAsync
 @EnableScheduling
 public class CoreApplication {
