@@ -1,7 +1,7 @@
 package com.platform.core.bootstrap.startup;
 
-import com.platform.core.bootstrap.auth.entity.UserEntity;
-import com.platform.core.bootstrap.auth.mapper.UserMapper;
+import com.platform.system.auth.entity.UserEntity;
+import com.platform.system.auth.mapper.UserMapper;
 import com.platform.core.common.id.IdGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -19,10 +19,6 @@
             <groupId>com.platform</groupId>
             <artifactId>core-common</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.platform</groupId>
-            <artifactId>core-domain</artifactId>
-        </dependency>
 
         <!-- Spring Boot 4 starters -->
         <dependency>

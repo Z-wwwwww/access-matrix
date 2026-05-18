@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Configuration;
 import java.util.Set;
 
 @Configuration
-@MapperScan("com.platform.core.**.mapper")
+@MapperScan("com.platform.**.mapper")
 public class MybatisPlusConfig {
 
     private static final Set<String> TENANT_EXCLUDED_TABLES = Set.of(

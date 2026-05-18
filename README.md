@@ -37,15 +37,33 @@ or other domain code.
 
 ```
 core-parent  (pom)
-├── core-common         JsonResult / PageResult / ErrorCode / BusinessException
-│                       RequestContext (ThreadLocal, virtual-thread safe) / IdGenerator
-├── core-domain         placeholder for business aggregates
-├── core-infrastructure security / web / persistence / cache / numbering / config
-└── core-bootstrap      Spring Boot entrypoint, controllers, services, mappers,
-                        application*.yml, log4j2-spring.xml, Flyway V1–V4
+├── core-common          JsonResult / PageResult / ErrorCode / BusinessException
+│                        RequestContext (ThreadLocal, virtual-thread safe) / IdGenerator
+├── core-infrastructure  security / web / persistence / cache / numbering / config
+├── core-system          system functions: auth (login / refresh / admin unlock-reset /
+│                        user lookup), health endpoint. Future: user mgmt, role,
+│                        menu, dict, schedule, oplog, file, tenant
+├── business-pms         PMS business: reservation, room, facility, guest, rate,
+│                        housekeeping (currently placeholder)
+└── core-bootstrap       Spring Boot entrypoint (main, ComponentScan, application*.yml,
+                         log4j2-spring.xml, Flyway V1–V4, startup banner + admin seeder)
 ```
 
-Dependency direction is strict: `bootstrap → infrastructure → domain → common`.
+Dependency direction is strict:
+
+```
+core-bootstrap
+   ↓ depends on
+core-system, business-pms          (siblings; do not depend on each other)
+   ↓ depends on
+core-infrastructure
+   ↓ depends on
+core-common
+```
+
+Future business modules (e.g. `business-iot`) slot in as siblings of `business-pms`.
+Future system functions (user / role / menu / dict / schedule / oplog…) become
+subpackages of `core-system`.
 
 ## Profiles
 

@@ -20,8 +20,9 @@
 
     <modules>
         <module>core-common</module>
-        <module>core-domain</module>
         <module>core-infrastructure</module>
+        <module>core-system</module>
+        <module>business-pms</module>
         <module>core-bootstrap</module>
     </modules>
 
@@ -55,12 +56,17 @@
             </dependency>
             <dependency>
                 <groupId>com.platform</groupId>
-                <artifactId>core-domain</artifactId>
+                <artifactId>core-infrastructure</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.platform</groupId>
-                <artifactId>core-infrastructure</artifactId>
+                <artifactId>core-system</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.platform</groupId>
+                <artifactId>business-pms</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
