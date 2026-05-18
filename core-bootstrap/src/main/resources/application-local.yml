@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/new_inntouch_core?stringtype=unspecified
+    username: postgres
+    password: abcd@1234
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: ${REDIS_PASSWORD:abcd@1234}
+      database: 1
+
+app:
+  security:
+    mode: permit-all
+    refresh-cookie:
+      secure: false
+      same-site: Lax
+  cors:
+    allowed-origins:
+      - "*"
+  debug:
+    expose-error-details: true

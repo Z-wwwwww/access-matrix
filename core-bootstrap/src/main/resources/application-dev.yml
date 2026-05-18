@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: ${CORE_DB_URL}
+    username: ${CORE_DB_USERNAME}
+    password: ${CORE_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${CORE_REDIS_HOST}
+      port: ${CORE_REDIS_PORT:6379}
+      password: ${CORE_REDIS_PASSWORD:}
+      database: ${CORE_REDIS_DB:0}
+
+app:
+  security:
+    mode: jwt
+    jwt:
+      secret: ${CORE_JWT_SECRET}
+  cors:
+    allowed-origins: ${CORE_CORS_ALLOWED_ORIGINS}
+  debug:
+    expose-error-details: false
