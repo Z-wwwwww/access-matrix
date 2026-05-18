@@ -1,0 +1,120 @@
+server:
+  port: 9135
+  servlet:
+    context-path: /api
+  compression:
+    enabled: true
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: core-service
+  profiles:
+    active: local
+  jackson:
+    time-zone: Asia/Tokyo
+    datatype:
+      datetime:
+        write-dates-as-timestamps: false
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    hikari:
+      pool-name: core-hikari
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    repair-on-migrate: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 50
+          max-idle: 10
+          min-idle: 2
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+  global-config:
+    db-config:
+      id-type: assign_id
+      logic-delete-field: mark
+      logic-delete-value: 0
+      logic-not-delete-value: 1
+  mapper-locations: classpath*:mapper/**/*.xml
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info,metrics,prometheus,caches,loggers
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+app:
+  security:
+    mode: permit-all
+    jwt:
+      secret: ${CORE_JWT_SECRET:dev-placeholder-secret-please-override-32bytes!}
+      tenant-claim: tid
+      user-id-claim: sub
+      username-claim: preferred_username
+      authorities-claim: scope
+    rate-limit:
+      enabled: true
+      requests-per-minute: 30
+      refill-period: 1m
+    lockout:
+      enabled: true
+      max-failures: 5
+      window: 15m
+      lock-duration: 15m
+    password-policy:
+      min-length: 8
+      max-length: 128
+      require-digit: true
+      require-upper: true
+      require-lower: true
+      require-symbol: true
+      hibp-enabled: true
+      hibp-base-url: https://api.pwnedpasswords.com
+      hibp-timeout: 3s
+      fail-open-on-hibp-error: true
+    refresh-cookie:
+      name: core_refresh
+      path: /api/auth
+      secure: true
+      same-site: Strict
+  mybatis:
+    tenant:
+      enabled: false
+  cache:
+    default-spec: "maximumSize=10000,expireAfterWrite=10m,recordStats"
+    specs: {}
+  cors:
+    allowed-origins: []
+  debug:
+    expose-error-details: false
