@@ -192,6 +192,51 @@ public class AuthSchemaBootstrap {
                     ON CONFLICT DO NOTHING
                     """);
 
+            // ---------- V6 menu tables ----------
+            jdbc.execute("""
+                    CREATE TABLE IF NOT EXISTS core_rbac_menu (
+                        id CHAR(26) PRIMARY KEY,
+                        tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                        parent_id CHAR(26),
+                        code VARCHAR(64) NOT NULL,
+                        title VARCHAR(128) NOT NULL,
+                        menu_type SMALLINT NOT NULL,
+                        path VARCHAR(255),
+                        component VARCHAR(255),
+                        icon VARCHAR(64),
+                        sort_order INTEGER NOT NULL DEFAULT 0,
+                        hide SMALLINT NOT NULL DEFAULT 0,
+                        hide_footer SMALLINT NOT NULL DEFAULT 0,
+                        hide_sidebar SMALLINT NOT NULL DEFAULT 0,
+                        tab_unique VARCHAR(64),
+                        redirect VARCHAR(255),
+                        permission_code VARCHAR(128),
+                        status SMALLINT NOT NULL DEFAULT 1,
+                        mark SMALLINT NOT NULL DEFAULT 1,
+                        create_user VARCHAR(64),
+                        update_user VARCHAR(64),
+                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_menu_code ON core_rbac_menu (tenant_id, code) WHERE mark = 1");
+            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_core_rbac_menu_parent ON core_rbac_menu (tenant_id, parent_id, sort_order) WHERE mark = 1");
+
+            jdbc.execute("""
+                    CREATE TABLE IF NOT EXISTS core_rbac_role_menu (
+                        id CHAR(26) PRIMARY KEY,
+                        tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                        role_id CHAR(26) NOT NULL,
+                        menu_id CHAR(26) NOT NULL,
+                        mark SMALLINT NOT NULL DEFAULT 1,
+                        create_user VARCHAR(64),
+                        update_user VARCHAR(64),
+                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_role_menu ON core_rbac_role_menu (tenant_id, role_id, menu_id) WHERE mark = 1");
+
             log.info("AuthSchemaBootstrap ensured schema integrity (idempotent).");
         } catch (Exception e) {
             log.error("AuthSchemaBootstrap failed", e);
