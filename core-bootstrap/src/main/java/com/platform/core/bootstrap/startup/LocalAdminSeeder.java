@@ -45,6 +45,16 @@ public class LocalAdminSeeder {
     public void seed() {
         UserEntity admin = ensureAdminUser();
         ensureSuperAdminLink(admin);
+        ensureHqDeptLink(admin);
+    }
+
+    private void ensureHqDeptLink(UserEntity admin) {
+        // Stage 3 seed: link admin to HQ dept so DEPT/DEPT_AND_SUB scopes can demo against it.
+        if ("00000000000000000000DEPT01".equals(admin.getDeptId())) return;
+        admin.setDeptId("00000000000000000000DEPT01");
+        // Same warning as ensureAdminUser: leave update_time alone, OptimisticLocker manages it.
+        userMapper.updateById(admin);
+        log.info("LocalAdminSeeder: bound admin user to HQ department");
     }
 
     private UserEntity ensureAdminUser() {
@@ -94,8 +104,9 @@ public class LocalAdminSeeder {
             dirty = true;
         }
         if (dirty) {
-            existing.setUpdateTime(now);
-            existing.setUpdateUser("system");
+            // Do NOT touch update_time — it is the @Version column. Setting it manually
+            // breaks OptimisticLocker's WHERE clause and silently no-ops the update.
+            // MyBatis-Plus's OptimisticLockerInnerInterceptor handles the version bump itself.
             userMapper.updateById(existing);
             log.info("LocalAdminSeeder: refreshed admin user fields");
         }

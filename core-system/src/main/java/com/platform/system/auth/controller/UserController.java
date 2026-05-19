@@ -63,6 +63,7 @@ public class UserController {
                 u.getEmail(),
                 u.getDisplayName(),
                 u.getTenantId(),
+                u.getDeptId(),
                 roleCodes,
                 new ArrayList<>(perms)
         );

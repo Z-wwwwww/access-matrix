@@ -237,6 +237,45 @@ public class AuthSchemaBootstrap {
                     """);
             jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_role_menu ON core_rbac_role_menu (tenant_id, role_id, menu_id) WHERE mark = 1");
 
+            // ---------- V7 dept tables + dept_id column ----------
+            jdbc.execute("""
+                    CREATE TABLE IF NOT EXISTS core_rbac_dept (
+                        id CHAR(26) PRIMARY KEY,
+                        tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                        parent_id CHAR(26),
+                        code VARCHAR(64) NOT NULL,
+                        name VARCHAR(128) NOT NULL,
+                        path VARCHAR(1024) NOT NULL,
+                        level SMALLINT NOT NULL DEFAULT 1,
+                        sort_order INTEGER NOT NULL DEFAULT 0,
+                        leader_user_id CHAR(26),
+                        status SMALLINT NOT NULL DEFAULT 1,
+                        mark SMALLINT NOT NULL DEFAULT 1,
+                        create_user VARCHAR(64),
+                        update_user VARCHAR(64),
+                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_dept_code ON core_rbac_dept (tenant_id, code) WHERE mark = 1");
+            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_core_rbac_dept_path ON core_rbac_dept (tenant_id, path text_pattern_ops) WHERE mark = 1");
+            jdbc.execute("ALTER TABLE core_auth_user ADD COLUMN IF NOT EXISTS dept_id CHAR(26)");
+
+            jdbc.execute("""
+                    CREATE TABLE IF NOT EXISTS core_rbac_role_dept (
+                        id CHAR(26) PRIMARY KEY,
+                        tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                        role_id CHAR(26) NOT NULL,
+                        dept_id CHAR(26) NOT NULL,
+                        mark SMALLINT NOT NULL DEFAULT 1,
+                        create_user VARCHAR(64),
+                        update_user VARCHAR(64),
+                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_role_dept ON core_rbac_role_dept (tenant_id, role_id, dept_id) WHERE mark = 1");
+
             log.info("AuthSchemaBootstrap ensured schema integrity (idempotent).");
         } catch (Exception e) {
             log.error("AuthSchemaBootstrap failed", e);
