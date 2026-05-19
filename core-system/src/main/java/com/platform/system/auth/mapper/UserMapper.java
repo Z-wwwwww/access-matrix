@@ -10,7 +10,7 @@ import org.apache.ibatis.annotations.Select;
 public interface UserMapper extends BaseMapper<UserEntity> {
 
     @Select("""
-            SELECT * FROM pms_auth_user
+            SELECT * FROM core_auth_user
              WHERE mark = 1
                AND (username = #{identifier} OR email = #{identifier} OR user_no = #{identifier})
              LIMIT 1

@@ -32,7 +32,7 @@ public class NumberingService {
             def = jdbc.queryForMap(
                     "SELECT format_sentence, recycle_division, zero_insert, seq_id_digit, " +
                     "       date_format_sentence, min_value, max_value, step_value, seq_id " +
-                    "  FROM sys_numbering_management WHERE code_kbn = ? LIMIT 1",
+                    "  FROM core_numbering_management WHERE code_kbn = ? LIMIT 1",
                     codeKbn);
         } catch (org.springframework.dao.EmptyResultDataAccessException e) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Numbering definition not found: " + codeKbn);
@@ -57,23 +57,23 @@ public class NumberingService {
             long current = ((Number) def.get("seq_id")).longValue();
             nextSeq = current + step;
             if (nextSeq > maxVal) nextSeq = minVal;
-            jdbc.update("UPDATE sys_numbering_management SET seq_id = ? WHERE code_kbn = ?",
+            jdbc.update("UPDATE core_numbering_management SET seq_id = ? WHERE code_kbn = ?",
                     nextSeq, codeKbn);
         } else {
             jdbc.update(
-                    "INSERT INTO sys_numbering_key (tenant_id, code_kbn, numbering_key, seq_id) " +
+                    "INSERT INTO core_numbering_key (tenant_id, code_kbn, numbering_key, seq_id) " +
                     "VALUES (?, ?, ?, ?) " +
                     "ON CONFLICT (tenant_id, code_kbn, numbering_key) DO NOTHING",
                     tenantId == null ? "default" : tenantId, codeKbn, expandedKey, minVal - step);
             Long current = jdbc.queryForObject(
-                    "SELECT seq_id FROM sys_numbering_key " +
+                    "SELECT seq_id FROM core_numbering_key " +
                     "WHERE tenant_id = ? AND code_kbn = ? AND numbering_key = ? FOR UPDATE",
                     Long.class,
                     tenantId == null ? "default" : tenantId, codeKbn, expandedKey);
             nextSeq = (current == null ? minVal - step : current) + step;
             if (nextSeq > maxVal) nextSeq = minVal;
             jdbc.update(
-                    "UPDATE sys_numbering_key SET seq_id = ? " +
+                    "UPDATE core_numbering_key SET seq_id = ? " +
                     "WHERE tenant_id = ? AND code_kbn = ? AND numbering_key = ?",
                     nextSeq,
                     tenantId == null ? "default" : tenantId, codeKbn, expandedKey);

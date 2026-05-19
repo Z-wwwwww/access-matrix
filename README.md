@@ -179,12 +179,22 @@ Flyway migrations (under `core-bootstrap/src/main/resources/db/migration/`):
 | Version | Tables created                                                |
 | ------- | ------------------------------------------------------------- |
 | V1      | `core_meta`                                                   |
-| V2      | `pms_auth_user` (username / email / user_no login, JSONB roles & authorities) |
-| V3      | `pms_auth_login_log` (async audit)                            |
-| V4      | `sys_numbering_management`, `sys_numbering_key`, `USER` seed  |
+| V2      | `core_auth_user` (username / email / user_no login, JSONB roles & authorities) |
+| V3      | `core_auth_login_log` (async audit)                           |
+| V4      | `core_numbering_management`, `core_numbering_key`, `USER` seed |
 
 `AuthSchemaBootstrap` runs the same DDL idempotently as a safety net
 for dirty `flyway_schema_history` situations.
+
+### Table naming convention
+
+| Prefix | Owner | Examples |
+| ------ | ----- | -------- |
+| `core_` | platform (`core-system`, `core-infrastructure`) | `core_auth_user`, `core_auth_login_log`, `core_numbering_management`, `core_meta` |
+| `pms_`  | PMS business (`business-pms`) | `pms_reservation`, `pms_room`, `pms_facility`, … (future) |
+| `iot_`  | IoT business (future module) | `iot_device`, `iot_telemetry`, … |
+
+`flyway_schema_history` is Flyway-managed and exempt.
 
 ## JVM flags
 

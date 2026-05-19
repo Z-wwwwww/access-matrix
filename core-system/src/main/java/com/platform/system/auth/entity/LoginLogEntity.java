@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @Setter
-@TableName("pms_auth_login_log")
+@TableName("core_auth_login_log")
 public class LoginLogEntity {
 
     @TableId(type = IdType.ASSIGN_ID)
