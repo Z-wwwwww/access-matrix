@@ -21,11 +21,15 @@ import java.util.Set;
 @MapperScan("com.platform.**.mapper")
 public class MybatisPlusConfig {
 
+    /**
+     * Tables that hold platform-global state (not per-tenant), so the tenant filter must skip them.
+     * NOTE: `core_auth_user` / `core_auth_login_log` ARE tenant-scoped — they stay subject to the filter.
+     */
     private static final Set<String> TENANT_EXCLUDED_TABLES = Set.of(
             "flyway_schema_history",
-            "sys_numbering_management",
-            "sys_numbering_key",
-            "core_meta"
+            "core_meta",
+            "core_numbering_management",
+            "core_numbering_key"
     );
 
     private final AppMybatisProperties props;
@@ -50,7 +54,7 @@ public class MybatisPlusConfig {
                 public boolean ignoreTable(String tableName) {
                     if (tableName == null) return true;
                     String lower = tableName.toLowerCase();
-                    if (lower.startsWith("sys_") || lower.startsWith("flyway_")) return true;
+                    if (lower.startsWith("flyway_")) return true;
                     return TENANT_EXCLUDED_TABLES.contains(lower);
                 }
             }));

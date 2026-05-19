@@ -8,7 +8,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-@TableName("pms_auth_user")
+@TableName("core_auth_user")
 public class UserEntity extends BaseEntity {
 
     @TableField("username")

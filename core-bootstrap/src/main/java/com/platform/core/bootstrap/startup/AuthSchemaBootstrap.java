@@ -34,7 +34,7 @@ public class AuthSchemaBootstrap {
                     """);
 
             jdbc.execute("""
-                    CREATE TABLE IF NOT EXISTS pms_auth_user (
+                    CREATE TABLE IF NOT EXISTS core_auth_user (
                         id CHAR(26) PRIMARY KEY,
                         tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
                         username VARCHAR(64) NOT NULL,
@@ -53,15 +53,15 @@ public class AuthSchemaBootstrap {
                     )
                     """);
 
-            jdbc.execute("ALTER TABLE pms_auth_user ADD COLUMN IF NOT EXISTS user_no VARCHAR(32)");
-            jdbc.execute("ALTER TABLE pms_auth_user ADD COLUMN IF NOT EXISTS email VARCHAR(255)");
-            jdbc.execute("ALTER TABLE pms_auth_user ADD COLUMN IF NOT EXISTS display_name VARCHAR(128)");
-            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_pms_auth_user_username ON pms_auth_user (username) WHERE mark = 1");
-            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_pms_auth_user_email ON pms_auth_user (email) WHERE mark = 1 AND email IS NOT NULL");
-            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_pms_auth_user_user_no ON pms_auth_user (user_no) WHERE mark = 1 AND user_no IS NOT NULL");
+            jdbc.execute("ALTER TABLE core_auth_user ADD COLUMN IF NOT EXISTS user_no VARCHAR(32)");
+            jdbc.execute("ALTER TABLE core_auth_user ADD COLUMN IF NOT EXISTS email VARCHAR(255)");
+            jdbc.execute("ALTER TABLE core_auth_user ADD COLUMN IF NOT EXISTS display_name VARCHAR(128)");
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_auth_user_username ON core_auth_user (username) WHERE mark = 1");
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_auth_user_email ON core_auth_user (email) WHERE mark = 1 AND email IS NOT NULL");
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_auth_user_user_no ON core_auth_user (user_no) WHERE mark = 1 AND user_no IS NOT NULL");
 
             jdbc.execute("""
-                    CREATE TABLE IF NOT EXISTS pms_auth_login_log (
+                    CREATE TABLE IF NOT EXISTS core_auth_login_log (
                         id CHAR(26) PRIMARY KEY,
                         tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
                         user_id CHAR(26),
@@ -73,11 +73,11 @@ public class AuthSchemaBootstrap {
                         login_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                     )
                     """);
-            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_pms_auth_login_log_user_id ON pms_auth_login_log (user_id)");
-            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_pms_auth_login_log_login_time ON pms_auth_login_log (login_time)");
+            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_core_auth_login_log_user_id ON core_auth_login_log (user_id)");
+            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_core_auth_login_log_login_time ON core_auth_login_log (login_time)");
 
             jdbc.execute("""
-                    CREATE TABLE IF NOT EXISTS sys_numbering_management (
+                    CREATE TABLE IF NOT EXISTS core_numbering_management (
                         code_kbn VARCHAR(64) PRIMARY KEY,
                         format_sentence VARCHAR(255) NOT NULL,
                         recycle_division SMALLINT NOT NULL DEFAULT 0,
@@ -93,12 +93,12 @@ public class AuthSchemaBootstrap {
                     """);
 
             jdbc.execute("""
-                    CREATE TABLE IF NOT EXISTS sys_numbering_key (
+                    CREATE TABLE IF NOT EXISTS core_numbering_key (
                         tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
                         code_kbn VARCHAR(64) NOT NULL,
                         numbering_key VARCHAR(255) NOT NULL,
                         seq_id BIGINT NOT NULL DEFAULT 0,
-                        CONSTRAINT pk_sys_numbering_key PRIMARY KEY (tenant_id, code_kbn, numbering_key)
+                        CONSTRAINT pk_core_numbering_key PRIMARY KEY (tenant_id, code_kbn, numbering_key)
                     )
                     """);
             log.info("AuthSchemaBootstrap ensured schema integrity (idempotent).");
