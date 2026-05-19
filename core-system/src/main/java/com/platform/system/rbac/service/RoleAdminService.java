@@ -85,6 +85,7 @@ public class RoleAdminService {
     @Transactional
     public void update(String id, RoleDto.UpdateRequest req) {
         RoleEntity r = requireRole(id);
+        assertNotBuiltIn(r, "update");
         if (req.name() != null) r.setName(req.name());
         if (req.description() != null) r.setDescription(req.description());
         if (req.dataScope() != null) r.setDataScope(req.dataScope());
@@ -97,9 +98,7 @@ public class RoleAdminService {
     @Transactional
     public void delete(String id) {
         RoleEntity r = requireRole(id);
-        if (Integer.valueOf(1).equals(r.getIsBuiltIn())) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Built-in role cannot be deleted: " + r.getCode());
-        }
+        assertNotBuiltIn(r, "delete");
         r.setMark(0);
         roleMapper.updateById(r);
         // Cascade soft-delete the link rows so future joins ignore them.
@@ -124,7 +123,7 @@ public class RoleAdminService {
 
     @Transactional
     public void bindPermissions(String roleId, List<String> permissionIds) {
-        requireRole(roleId);
+        assertNotBuiltIn(requireRole(roleId), "bind permissions");
         rolePermissionMapper.update(null,
                 new UpdateWrapper<RolePermissionEntity>().eq("role_id", roleId).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));
@@ -148,7 +147,7 @@ public class RoleAdminService {
 
     @Transactional
     public void bindMenus(String roleId, List<String> menuIds) {
-        requireRole(roleId);
+        assertNotBuiltIn(requireRole(roleId), "bind menus");
         roleMenuMapper.update(null,
                 new UpdateWrapper<RoleMenuEntity>().eq("role_id", roleId).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));
@@ -172,7 +171,7 @@ public class RoleAdminService {
 
     @Transactional
     public void bindDepts(String roleId, List<String> deptIds) {
-        requireRole(roleId);
+        assertNotBuiltIn(requireRole(roleId), "bind departments");
         roleDeptMapper.update(null,
                 new UpdateWrapper<RoleDeptEntity>().eq("role_id", roleId).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));
@@ -193,6 +192,18 @@ public class RoleAdminService {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Role not found: " + id);
         }
         return r;
+    }
+
+    /**
+     * Built-in roles (is_built_in=1) are platform-seeded and referenced by application code
+     * (e.g. {@code SUPER_ADMIN} is wired in {@code LocalAdminSeeder} and short-circuited in
+     * {@code MenuQueryService}). They must stay read-only at the admin-API layer.
+     */
+    private void assertNotBuiltIn(RoleEntity r, String op) {
+        if (Integer.valueOf(1).equals(r.getIsBuiltIn())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                    "Built-in role " + r.getCode() + " is read-only (rejected: " + op + ")");
+        }
     }
 
     private RoleDto.View toView(RoleEntity r) {
