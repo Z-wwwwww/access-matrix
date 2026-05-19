@@ -4,14 +4,17 @@ import com.platform.system.auth.dto.ResetPasswordRequest;
 import com.platform.system.auth.dto.UnlockRequest;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
+import com.platform.core.common.audit.OpLog;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
 import com.platform.core.common.security.RequiresPermission;
 import com.platform.core.infrastructure.security.AccountLockoutService;
+import com.platform.core.infrastructure.security.ForceLogoutService;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
 import jakarta.validation.Valid;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,17 +28,21 @@ public class AdminAuthController {
     private final AccountLockoutService lockoutService;
     private final PasswordPolicyService passwordPolicy;
     private final PasswordEncoder encoder;
+    private final ForceLogoutService forceLogoutService;
 
     public AdminAuthController(UserMapper userMapper, AccountLockoutService lockoutService,
-                               PasswordPolicyService passwordPolicy, PasswordEncoder encoder) {
+                               PasswordPolicyService passwordPolicy, PasswordEncoder encoder,
+                               ForceLogoutService forceLogoutService) {
         this.userMapper = userMapper;
         this.lockoutService = lockoutService;
         this.passwordPolicy = passwordPolicy;
         this.encoder = encoder;
+        this.forceLogoutService = forceLogoutService;
     }
 
     @PostMapping("/unlock")
     @RequiresPermission("auth:unlock")
+    @OpLog(module = "system", action = "auth.unlock", targetType = "user")
     public JsonResult<Void> unlock(@Valid @RequestBody UnlockRequest body) {
         UserEntity user = userMapper.findByIdentifier(body.username());
         if (user == null) {
@@ -49,6 +56,7 @@ public class AdminAuthController {
 
     @PostMapping("/reset-password")
     @RequiresPermission("auth:reset-password")
+    @OpLog(module = "system", action = "auth.resetPassword", targetType = "user")
     public JsonResult<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest body) {
         passwordPolicy.validate(body.newPassword());
         UserEntity user = userMapper.findByIdentifier(body.username());
@@ -57,6 +65,20 @@ public class AdminAuthController {
         }
         user.setPasswordHash(encoder.encode(body.newPassword()));
         userMapper.updateById(user);
+        return JsonResult.ok();
+    }
+
+    /**
+     * Force-logout a user — every in-flight access token issued <em>before</em>
+     * this call will be rejected by the permission aspect at next API hit.
+     * Requires the {@code *:*} super-permission so a kicked-out admin can't
+     * grant the kick-back via a low-tier permission.
+     */
+    @PostMapping("/force-logout/{userId}")
+    @RequiresPermission("*:*")
+    @OpLog(module = "system", action = "auth.forceLogout", targetType = "user")
+    public JsonResult<Void> forceLogout(@PathVariable String userId) {
+        forceLogoutService.kickOut(userId);
         return JsonResult.ok();
     }
 }
