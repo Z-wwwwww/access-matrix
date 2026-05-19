@@ -113,7 +113,8 @@ app:
       enabled: false
   cache:
     default-spec: "maximumSize=10000,expireAfterWrite=10m,recordStats"
-    specs: {}
+    specs:
+      userPermissions: "maximumSize=5000,expireAfterWrite=5m,recordStats"
   cors:
     allowed-origins: []
   debug:

@@ -101,6 +101,97 @@ public class AuthSchemaBootstrap {
                         CONSTRAINT pk_core_numbering_key PRIMARY KEY (tenant_id, code_kbn, numbering_key)
                     )
                     """);
+
+            // ---------- V5 RBAC tables (idempotent safety net) ----------
+            jdbc.execute("""
+                    CREATE TABLE IF NOT EXISTS core_rbac_role (
+                        id CHAR(26) PRIMARY KEY,
+                        tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                        code VARCHAR(64) NOT NULL,
+                        name VARCHAR(128) NOT NULL,
+                        description VARCHAR(512),
+                        data_scope SMALLINT NOT NULL DEFAULT 4,
+                        is_built_in SMALLINT NOT NULL DEFAULT 0,
+                        status SMALLINT NOT NULL DEFAULT 1,
+                        sort_order INTEGER NOT NULL DEFAULT 0,
+                        mark SMALLINT NOT NULL DEFAULT 1,
+                        create_user VARCHAR(64),
+                        update_user VARCHAR(64),
+                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_role_code ON core_rbac_role (tenant_id, code) WHERE mark = 1");
+
+            jdbc.execute("""
+                    CREATE TABLE IF NOT EXISTS core_rbac_permission (
+                        id CHAR(26) PRIMARY KEY,
+                        tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                        code VARCHAR(128) NOT NULL,
+                        name VARCHAR(128) NOT NULL,
+                        resource VARCHAR(64) NOT NULL,
+                        action VARCHAR(64) NOT NULL,
+                        module VARCHAR(32),
+                        description VARCHAR(512),
+                        is_built_in SMALLINT NOT NULL DEFAULT 0,
+                        mark SMALLINT NOT NULL DEFAULT 1,
+                        create_user VARCHAR(64),
+                        update_user VARCHAR(64),
+                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_perm_code ON core_rbac_permission (tenant_id, code) WHERE mark = 1");
+
+            jdbc.execute("""
+                    CREATE TABLE IF NOT EXISTS core_rbac_user_role (
+                        id CHAR(26) PRIMARY KEY,
+                        tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                        user_id CHAR(26) NOT NULL,
+                        role_id CHAR(26) NOT NULL,
+                        mark SMALLINT NOT NULL DEFAULT 1,
+                        create_user VARCHAR(64),
+                        update_user VARCHAR(64),
+                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_user_role ON core_rbac_user_role (tenant_id, user_id, role_id) WHERE mark = 1");
+
+            jdbc.execute("""
+                    CREATE TABLE IF NOT EXISTS core_rbac_role_permission (
+                        id CHAR(26) PRIMARY KEY,
+                        tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                        role_id CHAR(26) NOT NULL,
+                        permission_id CHAR(26) NOT NULL,
+                        mark SMALLINT NOT NULL DEFAULT 1,
+                        create_user VARCHAR(64),
+                        update_user VARCHAR(64),
+                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_role_perm ON core_rbac_role_permission (tenant_id, role_id, permission_id) WHERE mark = 1");
+
+            // Built-in seeds (idempotent ON CONFLICT)
+            jdbc.update("""
+                    INSERT INTO core_rbac_permission (id, tenant_id, code, name, resource, action, module, is_built_in)
+                    VALUES ('00000000000000000000PERM01', 'default', '*:*', 'Super Permission', '*', '*', 'system', 1)
+                    ON CONFLICT DO NOTHING
+                    """);
+            jdbc.update("""
+                    INSERT INTO core_rbac_role (id, tenant_id, code, name, description, data_scope, is_built_in)
+                    VALUES ('00000000000000000000ROLE01', 'default', 'SUPER_ADMIN', 'Super Administrator',
+                            'Built-in super admin role with *:* permission', 1, 1)
+                    ON CONFLICT DO NOTHING
+                    """);
+            jdbc.update("""
+                    INSERT INTO core_rbac_role_permission (id, tenant_id, role_id, permission_id)
+                    VALUES ('00000000000000000000RPM001', 'default',
+                            '00000000000000000000ROLE01', '00000000000000000000PERM01')
+                    ON CONFLICT DO NOTHING
+                    """);
+
             log.info("AuthSchemaBootstrap ensured schema integrity (idempotent).");
         } catch (Exception e) {
             log.error("AuthSchemaBootstrap failed", e);
