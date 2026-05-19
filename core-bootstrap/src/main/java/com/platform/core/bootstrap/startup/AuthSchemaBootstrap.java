@@ -276,6 +276,31 @@ public class AuthSchemaBootstrap {
                     """);
             jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_role_dept ON core_rbac_role_dept (tenant_id, role_id, dept_id) WHERE mark = 1");
 
+            // ---------- V8 oplog ----------
+            jdbc.execute("""
+                    CREATE TABLE IF NOT EXISTS core_oplog (
+                        id CHAR(26) PRIMARY KEY,
+                        tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                        user_id CHAR(26),
+                        username VARCHAR(64),
+                        module VARCHAR(32),
+                        action VARCHAR(64) NOT NULL,
+                        target_type VARCHAR(32),
+                        target_id VARCHAR(64),
+                        request_uri VARCHAR(512),
+                        method VARCHAR(8),
+                        client_ip VARCHAR(64),
+                        user_agent VARCHAR(512),
+                        request_body TEXT,
+                        success BOOLEAN NOT NULL,
+                        error_msg VARCHAR(512),
+                        cost_ms INTEGER,
+                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_core_oplog_user_time ON core_oplog (user_id, create_time DESC)");
+            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_core_oplog_target ON core_oplog (target_type, target_id)");
+
             log.info("AuthSchemaBootstrap ensured schema integrity (idempotent).");
         } catch (Exception e) {
             log.error("AuthSchemaBootstrap failed", e);
