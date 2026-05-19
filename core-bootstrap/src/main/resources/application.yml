@@ -116,6 +116,9 @@ app:
     specs:
       userPermissions: "maximumSize=5000,expireAfterWrite=5m,recordStats"
       userMenu:        "maximumSize=5000,expireAfterWrite=5m,recordStats"
+      userDataScope:   "maximumSize=5000,expireAfterWrite=5m,recordStats"
+      deptTree:        "maximumSize=64,expireAfterWrite=30m,recordStats"
+      deptSubtree:     "maximumSize=2000,expireAfterWrite=30m,recordStats"
   cors:
     allowed-origins: []
   debug:

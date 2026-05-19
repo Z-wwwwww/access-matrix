@@ -37,4 +37,8 @@ public class UserEntity extends BaseEntity {
     /** 1=enabled, 0=locked */
     @TableField("status")
     private Integer status;
+
+    /** Department the user belongs to — drives DEPT / DEPT_AND_SUB / SELF data scopes. */
+    @TableField("dept_id")
+    private String deptId;
 }

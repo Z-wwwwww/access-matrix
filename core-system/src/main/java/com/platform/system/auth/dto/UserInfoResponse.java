@@ -9,5 +9,6 @@ public record UserInfoResponse(
         String email,
         String displayName,
         String tenantId,
+        String deptId,
         List<String> roles,
         List<String> authorities) {}

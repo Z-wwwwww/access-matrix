@@ -28,6 +28,9 @@ public class PermissionCacheService {
     private static final Logger log = LoggerFactory.getLogger(PermissionCacheService.class);
     private static final String CACHE_PERMS = "userPermissions";
     private static final String CACHE_MENU  = "userMenu";
+    private static final String CACHE_SCOPE = "userDataScope";
+    private static final String CACHE_DEPT_TREE = "deptTree";
+    private static final String CACHE_DEPT_SUB  = "deptSubtree";
 
     private final CacheManager cacheManager;
     private final UserRoleMapper userRoleMapper;
@@ -40,18 +43,32 @@ public class PermissionCacheService {
     public void evictUser(String userId) {
         evictKey(CACHE_PERMS, userId);
         evictKey(CACHE_MENU, userId);
-        log.debug("Evicted userPermissions + userMenu for user {}", userId);
+        evictKey(CACHE_SCOPE, userId);
+        log.debug("Evicted userPermissions + userMenu + userDataScope for user {}", userId);
     }
 
     public void evictRole(String roleId) {
         List<String> userIds = userRoleMapper.findUserIdsByRoleId(roleId);
         Cache perms = cacheManager.getCache(CACHE_PERMS);
         Cache menu  = cacheManager.getCache(CACHE_MENU);
+        Cache scope = cacheManager.getCache(CACHE_SCOPE);
         for (String uid : userIds) {
             if (perms != null) perms.evict(uid);
             if (menu  != null) menu.evict(uid);
+            if (scope != null) scope.evict(uid);
         }
-        log.debug("Evicted userPermissions + userMenu for {} users impacted by role {}", userIds.size(), roleId);
+        log.debug("Evicted perm + menu + scope caches for {} users impacted by role {}", userIds.size(), roleId);
+    }
+
+    /** Dept tree change → evict whole-tenant tree, all subtrees, and every user's data-scope. */
+    public void evictAllDepts() {
+        Cache tree = cacheManager.getCache(CACHE_DEPT_TREE);
+        Cache sub  = cacheManager.getCache(CACHE_DEPT_SUB);
+        Cache scope = cacheManager.getCache(CACHE_SCOPE);
+        if (tree != null)  tree.clear();
+        if (sub != null)   sub.clear();
+        if (scope != null) scope.clear();
+        log.debug("Cleared deptTree + deptSubtree + userDataScope caches");
     }
 
     /** Menu changes affect every user that holds any role linked to the menu. Used by Stage 4 menu CRUD. */
@@ -64,11 +81,11 @@ public class PermissionCacheService {
     }
 
     public void evictAll() {
-        Cache perms = cacheManager.getCache(CACHE_PERMS);
-        Cache menu  = cacheManager.getCache(CACHE_MENU);
-        if (perms != null) perms.clear();
-        if (menu  != null) menu.clear();
-        log.debug("Cleared userPermissions + userMenu cache entirely");
+        for (String name : new String[]{CACHE_PERMS, CACHE_MENU, CACHE_SCOPE, CACHE_DEPT_TREE, CACHE_DEPT_SUB}) {
+            Cache c = cacheManager.getCache(name);
+            if (c != null) c.clear();
+        }
+        log.debug("Cleared all RBAC caches");
     }
 
     private void evictKey(String cacheName, String key) {
