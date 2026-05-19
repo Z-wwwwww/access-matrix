@@ -3,8 +3,11 @@ package com.platform.system.auth.service;
 import com.platform.system.auth.dto.TokenResponse;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
+import com.platform.system.rbac.mapper.RoleMapper;
+import com.platform.system.rbac.service.PermissionQueryService;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
+import com.platform.core.common.security.PermissionMatcher;
 import com.platform.core.infrastructure.security.AccountLockoutService;
 import com.platform.core.infrastructure.security.JwtIssuer;
 import com.platform.core.infrastructure.security.RefreshTokenStore;
@@ -16,8 +19,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class AuthService {
@@ -28,22 +31,33 @@ public class AuthService {
     private static final String DUMMY_BCRYPT =
             "$2a$12$abcdefghijklmnopqrstuu7K3jvA1nv/9p2eYJpZxRZ8ZeKbV.r4u";
 
+    /** Hard cap on inlining the user's permissions into the JWT scope claim. */
+    static final int SCOPE_INLINE_MAX_COUNT = 100;
+    static final int SCOPE_INLINE_MAX_BYTES = 2048;
+    static final String COMPACT_MARKER = "__compact__";
+
     private final UserMapper userMapper;
     private final PasswordEncoder encoder;
     private final JwtIssuer jwtIssuer;
     private final RefreshTokenStore refreshStore;
     private final AccountLockoutService lockoutService;
     private final LoginAuditService auditService;
+    private final PermissionQueryService permissionQueryService;
+    private final RoleMapper roleMapper;
 
     public AuthService(UserMapper userMapper, PasswordEncoder encoder, JwtIssuer jwtIssuer,
                        RefreshTokenStore refreshStore, AccountLockoutService lockoutService,
-                       LoginAuditService auditService) {
+                       LoginAuditService auditService,
+                       PermissionQueryService permissionQueryService,
+                       RoleMapper roleMapper) {
         this.userMapper = userMapper;
         this.encoder = encoder;
         this.jwtIssuer = jwtIssuer;
         this.refreshStore = refreshStore;
         this.lockoutService = lockoutService;
         this.auditService = auditService;
+        this.permissionQueryService = permissionQueryService;
+        this.roleMapper = roleMapper;
     }
 
     public LoginResult login(String identifier, String password, HttpServletRequest req) {
@@ -99,11 +113,31 @@ public class AuthService {
     }
 
     public TokenResponse issueTokens(UserEntity user) {
-        Collection<String> auths = parseJsonArray(user.getAuthorities());
+        Set<String> perms = permissionQueryService.loadUserPermissions(user.getId());
+        List<String> roleIds = roleMapper.findRoleIdsByUserId(user.getId());
+        String scopeClaim = chooseScopeClaim(perms);
+
         JwtIssuer.TokenIssue access = jwtIssuer.issue(
-                user.getId(), user.getTenantId(), user.getUsername(), auths);
+                user.getId(), user.getTenantId(), user.getUsername(), scopeClaim, roleIds);
         String refresh = refreshStore.issue(user.getId());
         return TokenResponse.of(access.token(), refresh, access.expiresInSec());
+    }
+
+    /**
+     * Decide how to encode the user's permissions into the JWT scope claim.
+     * <ul>
+     *   <li>Super admin → just {@code "*:*"} (tiny, no permission expansion needed)</li>
+     *   <li>Few permissions → inline space-separated codes (one HTTP round trip resolves auth)</li>
+     *   <li>Many permissions → {@link #COMPACT_MARKER}; resolver fetches via cache/DB</li>
+     * </ul>
+     */
+    static String chooseScopeClaim(Set<String> perms) {
+        if (perms == null || perms.isEmpty()) return "";
+        if (perms.contains(PermissionMatcher.SUPER)) return PermissionMatcher.SUPER;
+        if (perms.size() > SCOPE_INLINE_MAX_COUNT) return COMPACT_MARKER;
+        String joined = String.join(" ", perms);
+        if (joined.length() > SCOPE_INLINE_MAX_BYTES) return COMPACT_MARKER;
+        return joined;
     }
 
     public static List<String> parseJsonArray(String json) {

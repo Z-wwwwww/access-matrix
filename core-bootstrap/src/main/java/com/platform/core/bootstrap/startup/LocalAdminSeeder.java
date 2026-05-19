@@ -1,7 +1,12 @@
 package com.platform.core.bootstrap.startup;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
+import com.platform.system.rbac.entity.RoleEntity;
+import com.platform.system.rbac.entity.UserRoleEntity;
+import com.platform.system.rbac.mapper.RoleMapper;
+import com.platform.system.rbac.mapper.UserRoleMapper;
 import com.platform.core.common.id.IdGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,18 +25,29 @@ import java.time.LocalDateTime;
 public class LocalAdminSeeder {
 
     private static final Logger log = LoggerFactory.getLogger(LocalAdminSeeder.class);
+    private static final String SUPER_ADMIN_CODE = "SUPER_ADMIN";
 
     private final UserMapper userMapper;
+    private final RoleMapper roleMapper;
+    private final UserRoleMapper userRoleMapper;
     private final PasswordEncoder encoder;
 
-    public LocalAdminSeeder(UserMapper userMapper, PasswordEncoder encoder) {
+    public LocalAdminSeeder(UserMapper userMapper, RoleMapper roleMapper,
+                            UserRoleMapper userRoleMapper, PasswordEncoder encoder) {
         this.userMapper = userMapper;
+        this.roleMapper = roleMapper;
+        this.userRoleMapper = userRoleMapper;
         this.encoder = encoder;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public void seed() {
+        UserEntity admin = ensureAdminUser();
+        ensureSuperAdminLink(admin);
+    }
+
+    private UserEntity ensureAdminUser() {
         UserEntity existing = userMapper.findByIdentifier("admin");
         String adminHash = encoder.encode("admin");
         LocalDateTime now = LocalDateTime.now();
@@ -45,8 +61,9 @@ public class LocalAdminSeeder {
             u.setUserNo("U00000001");
             u.setDisplayName("Local Admin");
             u.setPasswordHash(adminHash);
-            u.setRoles("[\"ADMIN\"]");
-            u.setAuthorities("[\"*:*\"]");
+            // roles/authorities JSONB columns are deprecated by RBAC tables — leave defaults ([]).
+            u.setRoles("[]");
+            u.setAuthorities("[]");
             u.setStatus(1);
             u.setMark(1);
             u.setCreateUser("system");
@@ -55,7 +72,7 @@ public class LocalAdminSeeder {
             u.setUpdateTime(now);
             userMapper.insert(u);
             log.info("LocalAdminSeeder: inserted admin user (id={})", u.getId());
-            return;
+            return u;
         }
 
         boolean dirty = false;
@@ -82,5 +99,31 @@ public class LocalAdminSeeder {
             userMapper.updateById(existing);
             log.info("LocalAdminSeeder: refreshed admin user fields");
         }
+        return existing;
+    }
+
+    private void ensureSuperAdminLink(UserEntity admin) {
+        RoleEntity superAdmin = roleMapper.selectOne(
+                new QueryWrapper<RoleEntity>()
+                        .eq("code", SUPER_ADMIN_CODE)
+                        .eq("mark", 1)
+                        .last("LIMIT 1"));
+        if (superAdmin == null) {
+            log.warn("LocalAdminSeeder: SUPER_ADMIN role not found — Flyway V5 may not have run yet");
+            return;
+        }
+        Long existing = userRoleMapper.selectCount(
+                new QueryWrapper<UserRoleEntity>()
+                        .eq("user_id", admin.getId())
+                        .eq("role_id", superAdmin.getId())
+                        .eq("mark", 1));
+        if (existing != null && existing > 0) {
+            return;
+        }
+        UserRoleEntity link = new UserRoleEntity();
+        link.setUserId(admin.getId());
+        link.setRoleId(superAdmin.getId());
+        userRoleMapper.insert(link);
+        log.info("LocalAdminSeeder: linked admin user to SUPER_ADMIN role");
     }
 }
