@@ -84,6 +84,7 @@ public class UserAdminService {
     @Transactional
     public void update(String id, UserDto.UpdateRequest req) {
         UserEntity u = require(id);
+        assertNotBuiltInAdmin(u, "update");
         if (req.email() != null) u.setEmail(req.email());
         if (req.userNo() != null) u.setUserNo(req.userNo());
         if (req.displayName() != null) u.setDisplayName(req.displayName());
@@ -96,9 +97,7 @@ public class UserAdminService {
     @Transactional
     public void delete(String id) {
         UserEntity u = require(id);
-        if ("admin".equals(u.getUsername())) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "The default admin user cannot be deleted");
-        }
+        assertNotBuiltInAdmin(u, "delete");
         u.setMark(0);
         userMapper.updateById(u);
         userRoleMapper.update(null,
@@ -116,7 +115,8 @@ public class UserAdminService {
 
     @Transactional
     public void assignRoles(String userId, List<String> roleIds) {
-        require(userId);
+        UserEntity u = require(userId);
+        assertNotBuiltInAdmin(u, "assign roles");
         userRoleMapper.update(null,
                 new UpdateWrapper<UserRoleEntity>().eq("user_id", userId).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));
@@ -134,6 +134,7 @@ public class UserAdminService {
     @Transactional
     public void changeDept(String userId, String deptId) {
         UserEntity u = require(userId);
+        assertNotBuiltInAdmin(u, "change dept");
         u.setDeptId(deptId);
         userMapper.updateById(u);
         cacheService.evictUser(userId);
@@ -142,10 +143,26 @@ public class UserAdminService {
     @Transactional
     public void changeStatus(String userId, int status) {
         UserEntity u = require(userId);
+        assertNotBuiltInAdmin(u, "change status");
         u.setStatus(status);
         userMapper.updateById(u);
         cacheService.evictUser(userId);
     }
+
+    /**
+     * The default {@code admin} user is the project's "built-in" identity: it owns SUPER_ADMIN
+     * and is hardcoded in {@code LocalAdminSeeder}. We refuse to mutate its record / role-binding
+     * / status / dept through the admin API. Password resets are still allowed (they go through
+     * {@code AdminAuthController.resetPassword}, not this service).
+     */
+    private void assertNotBuiltInAdmin(UserEntity u, String op) {
+        if (BUILTIN_ADMIN_USERNAME.equalsIgnoreCase(u.getUsername())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                    "Built-in admin user is read-only — only password reset is allowed (rejected: " + op + ")");
+        }
+    }
+
+    private static final String BUILTIN_ADMIN_USERNAME = "admin";
 
     private UserEntity require(String id) {
         UserEntity u = userMapper.selectById(id);

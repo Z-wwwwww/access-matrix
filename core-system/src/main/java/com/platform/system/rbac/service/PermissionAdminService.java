@@ -75,6 +75,7 @@ public class PermissionAdminService {
     @Transactional
     public void update(String id, PermissionDto.UpdateRequest req) {
         PermissionEntity e = require(id);
+        assertNotBuiltIn(e, "update");
         if (req.name() != null) e.setName(req.name());
         if (req.module() != null) e.setModule(req.module());
         if (req.description() != null) e.setDescription(req.description());
@@ -86,12 +87,22 @@ public class PermissionAdminService {
     @Transactional
     public void delete(String id) {
         PermissionEntity e = require(id);
-        if (Integer.valueOf(1).equals(e.getIsBuiltIn())) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Built-in permission cannot be deleted: " + e.getCode());
-        }
+        assertNotBuiltIn(e, "delete");
         e.setMark(0);
         mapper.updateById(e);
         cacheService.evictAll();
+    }
+
+    /**
+     * Built-in permissions (is_built_in=1) are platform-seeded and referenced by application
+     * code via {@code @RequiresPermission} string literals. Mutating them at runtime would
+     * silently desync the AOP guard. Lock all writes — including cosmetic edits — for safety.
+     */
+    private void assertNotBuiltIn(PermissionEntity e, String op) {
+        if (Integer.valueOf(1).equals(e.getIsBuiltIn())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                    "Built-in permission " + e.getCode() + " is read-only (rejected: " + op + ")");
+        }
     }
 
     private PermissionEntity require(String id) {
