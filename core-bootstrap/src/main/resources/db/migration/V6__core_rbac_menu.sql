@@ -37,7 +37,7 @@ CREATE INDEX IF NOT EXISTS idx_core_rbac_menu_parent
 COMMENT ON TABLE  core_rbac_menu IS 'RBAC menu / button definitions';
 COMMENT ON COLUMN core_rbac_menu.menu_type       IS '1=directory 2=menu(page) 3=button';
 COMMENT ON COLUMN core_rbac_menu.path            IS 'vue-router path, e.g. /system/user';
-COMMENT ON COLUMN core_rbac_menu.component       IS 'relative .vue path or URL, e.g. /system/user/index';
+COMMENT ON COLUMN core_rbac_menu.component       IS 'relative .vue path or URL, e.g. /system/User/User';
 COMMENT ON COLUMN core_rbac_menu.hide            IS '1=hide from sidebar (still participates in routing)';
 COMMENT ON COLUMN core_rbac_menu.permission_code IS 'optional permission required to see this entry';
 
@@ -62,41 +62,22 @@ CREATE INDEX IF NOT EXISTS idx_core_rbac_role_menu_role
 COMMENT ON TABLE core_rbac_role_menu IS 'Role-Menu many-to-many';
 
 -- ============================================
--- Seed menus — using EXISTING frontend view paths so the demo just works.
---
--- Layout:
---   starryCommon/   directory  icon=home
---     dashboard       page     /starryCommon/dashboard
---     profile         page     /starryCommon/Profile
---   data/           directory  icon=database
---     city            page     /data/City
---     dictionary      page     /data/Dictionary
---   starryPms/      directory  icon=hotel
---     listingProperty page     /starryPms/ListingProperty
---     reservation     page     /starryPms/Reservation
+-- Seed: システム管理 directory + 6 admin pages.
+-- Component paths match the frontend's resolveComponent() (case-insensitive,
+-- prefix-stripped of "/src/views"), e.g. "/system/User/User" → /src/views/system/User/User.vue
+-- The permission_code column scopes who sees each menu entry on top of the
+-- backend's @RequiresPermission API enforcement.
 -- ============================================
 
--- Top-level directories
 INSERT INTO core_rbac_menu (id, tenant_id, parent_id, code, title, menu_type, path, icon, sort_order) VALUES
- ('00000000000000000000MENU01','default',NULL,'starryCommon','共通',1,'/starryCommon','home',10),
- ('00000000000000000000MENU10','default',NULL,'data',        'マスタ',1,'/data',        'database',20),
- ('00000000000000000000MENU20','default',NULL,'starryPms',   'PMS', 1,'/starryPms',   'hotel',   30)
+ ('00000000000000000000MENU01','default',NULL,'system','システム管理',1,'/system','settings',10)
 ON CONFLICT DO NOTHING;
 
--- starryCommon children
-INSERT INTO core_rbac_menu (id, tenant_id, parent_id, code, title, menu_type, path, component, icon, sort_order) VALUES
- ('00000000000000000000MENU02','default','00000000000000000000MENU01','starryCommon.dashboard','ダッシュボード',2,'/starryCommon/dashboard','/starryCommon/dashboard/dashboard','dashboard',1),
- ('00000000000000000000MENU03','default','00000000000000000000MENU01','starryCommon.profile',  'プロフィール',  2,'/starryCommon/Profile',  '/starryCommon/Profile/Profile',    'user-circle',2)
-ON CONFLICT DO NOTHING;
-
--- data children
-INSERT INTO core_rbac_menu (id, tenant_id, parent_id, code, title, menu_type, path, component, icon, sort_order) VALUES
- ('00000000000000000000MENU11','default','00000000000000000000MENU10','data.city',      '都市・地区',2,'/data/City',      '/data/City/City',            'map',1),
- ('00000000000000000000MENU12','default','00000000000000000000MENU10','data.dictionary','辞書管理',  2,'/data/Dictionary','/data/Dictionary/Dictionary','book',2)
-ON CONFLICT DO NOTHING;
-
--- starryPms children
-INSERT INTO core_rbac_menu (id, tenant_id, parent_id, code, title, menu_type, path, component, icon, sort_order) VALUES
- ('00000000000000000000MENU21','default','00000000000000000000MENU20','starryPms.listingProperty','宿泊施設',  2,'/starryPms/ListingProperty','/starryPms/ListingProperty/ListingProperty','building',1),
- ('00000000000000000000MENU22','default','00000000000000000000MENU20','starryPms.cleaningTask',   '清掃タスク',2,'/starryPms/cleaning/CleaningTask','/starryPms/cleaning/CleaningTask/CleaningTask','broom',2)
+INSERT INTO core_rbac_menu (id, tenant_id, parent_id, code, title, menu_type, path, component, icon, sort_order, permission_code) VALUES
+ ('00000000000000000000MENU02','default','00000000000000000000MENU01','system.user',       'ユーザー管理',2,'/system/user',      '/system/User/User',             'user',     1,'user:read'),
+ ('00000000000000000000MENU03','default','00000000000000000000MENU01','system.role',       'ロール管理', 2,'/system/role',      '/system/Role/Role',             'shield',   2,'role:read'),
+ ('00000000000000000000MENU04','default','00000000000000000000MENU01','system.permission', '権限管理',   2,'/system/permission','/system/Permission/Permission', 'key',      3,'permission:read'),
+ ('00000000000000000000MENU05','default','00000000000000000000MENU01','system.menu',       'メニュー管理',2,'/system/menu',     '/system/Menu/Menu',             'menu',     4,'menu:read'),
+ ('00000000000000000000MENU06','default','00000000000000000000MENU01','system.dept',       '部署管理',   2,'/system/dept',      '/system/Dept/Dept',             'tree',     5,'dept:read'),
+ ('00000000000000000000MENU07','default','00000000000000000000MENU01','system.oplog',      '操作ログ',   2,'/system/oplog',     '/system/OpLog/OpLog',           'log',      6,'oplog:read')
 ON CONFLICT DO NOTHING;
