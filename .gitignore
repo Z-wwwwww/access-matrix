@@ -1,77 +1,25 @@
-# ===== Maven =====
-target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-dependency-reduced-pom.xml
-buildNumber.properties
-.mvn/timing.properties
-.mvn/wrapper/maven-wrapper.jar
+# Root-level .gitignore — cross-stack only.
+# Each stack maintains its own under backend/.gitignore and frontend/.gitignore
+# (Maven targets / Node modules etc.) so the root stays small and language-neutral.
 
-# ===== Java =====
-*.class
-*.jar
-*.war
-*.ear
-*.nar
-hs_err_pid*
-replay_pid*
-
-# ===== IntelliJ IDEA =====
+# IDE
 .idea/
+.vscode/
 *.iml
 *.iws
 *.ipr
-out/
+.fleet/
 
-# ===== Eclipse =====
-.classpath
-.project
-.settings/
-.factorypath
-.springBeans
-.apt_generated/
-.sts4-cache/
-
-# ===== VS Code =====
-.vscode/
-*.code-workspace
-
-# ===== NetBeans =====
-nbproject/private/
-nbbuild/
-nbdist/
-.nb-gradle/
-
-# ===== OS =====
+# OS
 .DS_Store
 Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
+desktop.ini
 
-# ===== Logs =====
-logs/
-*.log
-*.log.gz
-*.log.*
+# Editor swap / backup
+*.swp
+*.swo
+*~
+.*.kate-swp
 
-# ===== Local env / secrets =====
-.env
-.env.local
-*.local.properties
-application-local-override.yml
-
-# ===== Claude Code local overrides =====
+# Claude Code per-user override (skill prompts under .claude/commands/ stay committed)
 .claude/settings.local.json
-
-# ===== Spring Boot Devtools =====
-.spring-boot-devtools.properties
-
-# ===== Test reports =====
-surefire-reports/
-failsafe-reports/
-*.coverage
-jacoco.exec

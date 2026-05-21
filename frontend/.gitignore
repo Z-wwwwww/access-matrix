@@ -1,0 +1,30 @@
+# Frontend-only (Vue / Vite / npm). Workspace-wide patterns (IDE / OS / logs /
+# env / .claude) live in the root .gitignore.
+
+# Dependencies & build output
+node_modules/
+dist/
+
+# npm / yarn / pnpm debug logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Vite / build caches
+.vite/
+.eslintcache
+coverage/
+
+# Per-mode local override (e.g. .env.development.local) — committed dev defaults
+# stay; only the .local override is ignored.
+.env.*.local
+
+# Trae / Cursor / Vim swap
+.trae
+*.swp
+
+# Claude Code per-user override (keep .claude/commands/* — committed AI skills)
+.claude/settings.local.json
+
+# Misc
+.ignore
