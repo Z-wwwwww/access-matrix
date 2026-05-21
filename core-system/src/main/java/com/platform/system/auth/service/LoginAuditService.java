@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 public class LoginAuditService {
 
     private static final Logger log = LoggerFactory.getLogger(LoginAuditService.class);
+    private static final String DEFAULT_TENANT = "default";
 
     private final LoginLogMapper mapper;
 
@@ -21,13 +22,19 @@ public class LoginAuditService {
         this.mapper = mapper;
     }
 
+    /**
+     * Persist a login attempt audit row. Callers must pass {@code tenantId}
+     * explicitly — the @Async dispatch runs on a worker thread that does not
+     * inherit {@code RequestContext}'s ThreadLocal.
+     */
     @Async
-    public void record(String userId, String identifier, String clientIp, String userAgent,
-                       boolean success, String failureReason) {
+    public void record(String tenantId, String userId, String identifier, String clientIp,
+                       String userAgent, boolean success, String failureReason) {
+        String tid = (tenantId == null || tenantId.isBlank()) ? DEFAULT_TENANT : tenantId;
         try {
             LoginLogEntity entity = new LoginLogEntity();
             entity.setId(IdGenerator.ulid());
-            entity.setTenantId("default");
+            entity.setTenantId(tid);
             entity.setUserId(userId);
             entity.setIdentifier(identifier);
             entity.setClientIp(clientIp);

@@ -5,10 +5,12 @@ import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
 import com.platform.system.rbac.mapper.RoleMapper;
 import com.platform.system.rbac.service.PermissionQueryService;
+import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.security.PermissionMatcher;
 import com.platform.core.infrastructure.security.AccountLockoutService;
+import com.platform.core.infrastructure.security.ForceLogoutService;
 import com.platform.core.infrastructure.security.JwtIssuer;
 import com.platform.core.infrastructure.security.RefreshTokenStore;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,9 +33,6 @@ public class AuthService {
     private static final String DUMMY_BCRYPT =
             "$2a$12$abcdefghijklmnopqrstuu7K3jvA1nv/9p2eYJpZxRZ8ZeKbV.r4u";
 
-    /** Hard cap on inlining the user's permissions into the JWT scope claim. */
-    static final int SCOPE_INLINE_MAX_COUNT = 100;
-    static final int SCOPE_INLINE_MAX_BYTES = 2048;
     static final String COMPACT_MARKER = "__compact__";
 
     private final UserMapper userMapper;
@@ -44,12 +43,14 @@ public class AuthService {
     private final LoginAuditService auditService;
     private final PermissionQueryService permissionQueryService;
     private final RoleMapper roleMapper;
+    private final ForceLogoutService forceLogoutService;
 
     public AuthService(UserMapper userMapper, PasswordEncoder encoder, JwtIssuer jwtIssuer,
                        RefreshTokenStore refreshStore, AccountLockoutService lockoutService,
                        LoginAuditService auditService,
                        PermissionQueryService permissionQueryService,
-                       RoleMapper roleMapper) {
+                       RoleMapper roleMapper,
+                       ForceLogoutService forceLogoutService) {
         this.userMapper = userMapper;
         this.encoder = encoder;
         this.jwtIssuer = jwtIssuer;
@@ -58,48 +59,70 @@ public class AuthService {
         this.auditService = auditService;
         this.permissionQueryService = permissionQueryService;
         this.roleMapper = roleMapper;
+        this.forceLogoutService = forceLogoutService;
     }
 
     public LoginResult login(String identifier, String password, HttpServletRequest req) {
         String clientIp = clientIp(req);
         String userAgent = req.getHeader("User-Agent");
+        // CoreRequestContextFilter has already resolved the tenant for this
+        // pre-auth request from X-Tenant-Id (or filled in "default"). We must
+        // pass it through the hand-written @Select since the MyBatis-Plus
+        // tenant interceptor does not rewrite raw SQL.
+        String tenantId = currentTenantOrDefault();
 
-        UserEntity user = userMapper.findByIdentifier(identifier);
+        UserEntity user = userMapper.findByIdentifier(tenantId, identifier);
         if (user == null) {
             encoder.matches(password, DUMMY_BCRYPT); // timing-safe dummy compare
-            auditService.record(null, identifier, clientIp, userAgent, false, "user-not-found");
+            auditService.record(tenantId, null, identifier, clientIp, userAgent, false, "user-not-found");
             throw new BusinessException(ErrorCode.BAD_CREDENTIALS, "Bad credentials");
         }
 
-        long remaining = lockoutService.remainingLockSeconds(identifier);
+        long remaining = lockoutService.remainingLockSeconds(tenantId, identifier);
         if (remaining > 0) {
-            auditService.record(user.getId(), identifier, clientIp, userAgent, false, "account-locked");
+            auditService.record(tenantId, user.getId(), identifier, clientIp, userAgent, false, "account-locked");
             throw new BusinessException(ErrorCode.ACCOUNT_LOCKED,
                     "Account locked. Try again in " + remaining + " seconds.");
         }
 
         if (!encoder.matches(password, user.getPasswordHash())) {
-            lockoutService.recordFailure(identifier);
-            auditService.record(user.getId(), identifier, clientIp, userAgent, false, "bad-credentials");
+            lockoutService.recordFailure(tenantId, identifier);
+            auditService.record(tenantId, user.getId(), identifier, clientIp, userAgent, false, "bad-credentials");
             throw new BusinessException(ErrorCode.BAD_CREDENTIALS, "Bad credentials");
         }
 
         if (user.getStatus() == null || user.getStatus() != 1) {
-            auditService.record(user.getId(), identifier, clientIp, userAgent, false, "account-disabled");
+            auditService.record(tenantId, user.getId(), identifier, clientIp, userAgent, false, "account-disabled");
             throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "Account is disabled");
         }
 
-        lockoutService.reset(identifier);
+        lockoutService.reset(tenantId, identifier);
         TokenResponse tokens = issueTokens(user);
-        auditService.record(user.getId(), identifier, clientIp, userAgent, true, null);
+        auditService.record(tenantId, user.getId(), identifier, clientIp, userAgent, true, null);
         return new LoginResult(user, tokens);
     }
 
     public TokenResponse refresh(String refreshToken) {
-        String userId = refreshStore.rotate(refreshToken)
+        RefreshTokenStore.Holder holder = refreshStore.rotate(refreshToken)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN, "Invalid refresh token"));
-        UserEntity user = userMapper.selectById(userId);
-        if (user == null || user.getMark() == null || user.getMark() != 1) {
+        String userId = holder.userId();
+        if (userId == null || userId.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_TOKEN, "Invalid refresh token");
+        }
+        // Force-logout cuts off /auth/refresh too — otherwise a kicked-out user
+        // could ride their old refresh token to a fresh access token. A legacy
+        // entry without issuedAt is treated as "issued before any conceivable
+        // kick" so it always loses to a non-zero kickOutAt.
+        long kickAt = forceLogoutService.kickOutAt(userId);
+        if (kickAt > 0 && holder.issuedAtEpochSec() <= kickAt) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Session terminated by administrator");
+        }
+        // Resolve the user under the tenant baked into the refresh token, not
+        // whatever X-Tenant-Id the refresh request happens to carry — otherwise
+        // a missing/mismatched header would silently invalidate a legitimate
+        // (already-rotated) token under the MyBatis-Plus tenant interceptor.
+        UserEntity user = userMapper.findByIdAndTenant(userId, holder.tenantId());
+        if (user == null) {
             throw new BusinessException(ErrorCode.INVALID_TOKEN, "User not found");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
@@ -119,25 +142,30 @@ public class AuthService {
 
         JwtIssuer.TokenIssue access = jwtIssuer.issue(
                 user.getId(), user.getTenantId(), user.getUsername(), scopeClaim, roleIds);
-        String refresh = refreshStore.issue(user.getId());
+        String refresh = refreshStore.issue(user.getId(), user.getTenantId());
         return TokenResponse.of(access.token(), refresh, access.expiresInSec());
     }
 
     /**
-     * Decide how to encode the user's permissions into the JWT scope claim.
+     * Encode the user's permissions into the JWT scope claim.
+     *
+     * <p>We deliberately never inline the actual permission codes:
      * <ul>
-     *   <li>Super admin → just {@code "*:*"} (tiny, no permission expansion needed)</li>
-     *   <li>Few permissions → inline space-separated codes (one HTTP round trip resolves auth)</li>
-     *   <li>Many permissions → {@link #COMPACT_MARKER}; resolver fetches via cache/DB</li>
+     *   <li>Super admin → {@code "*:*"} (zero permission lookup needed)</li>
+     *   <li>Empty set  → {@code ""} (caller has no authorities)</li>
+     *   <li>Anything else → {@link #COMPACT_MARKER}; resolver fetches via
+     *       {@code UserPermissionsLookup} (Caffeine-cached)</li>
      * </ul>
+     *
+     * <p>Reason for going compact-only: inlining freezes the permission set
+     * at token-issue time, so an admin's role/permission revoke can't take
+     * effect until the JWT expires. The cached lookup path lets
+     * {@code PermissionCacheService.evictRole} invalidate the next request.
      */
     static String chooseScopeClaim(Set<String> perms) {
         if (perms == null || perms.isEmpty()) return "";
         if (perms.contains(PermissionMatcher.SUPER)) return PermissionMatcher.SUPER;
-        if (perms.size() > SCOPE_INLINE_MAX_COUNT) return COMPACT_MARKER;
-        String joined = String.join(" ", perms);
-        if (joined.length() > SCOPE_INLINE_MAX_BYTES) return COMPACT_MARKER;
-        return joined;
+        return COMPACT_MARKER;
     }
 
     public static List<String> parseJsonArray(String json) {
@@ -155,6 +183,11 @@ public class AuthService {
             if (!s.isEmpty()) out.add(s);
         }
         return out;
+    }
+
+    private static String currentTenantOrDefault() {
+        String tid = RequestContext.tenantId();
+        return (tid == null || tid.isBlank()) ? "default" : tid;
     }
 
     public static String clientIp(HttpServletRequest req) {

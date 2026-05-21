@@ -15,6 +15,11 @@ public class DeptNode {
     private String path;
     private Integer level;
     private Integer sortOrder;
+    /**
+     * Department-leader user id. Memo / display only — does <b>not</b> grant
+     * permissions and does <b>not</b> affect data-scope visibility. Front-end
+     * resolves the id to a human label via the user-list endpoint.
+     */
     private String leaderUserId;
     private Integer status;
     private List<DeptNode> children = new ArrayList<>();

@@ -16,6 +16,9 @@ app:
     mode: jwt
     jwt:
       secret: ${CORE_JWT_SECRET}
+  mybatis:
+    tenant:
+      enabled: true
   cors:
     allowed-origins: ${CORE_CORS_ALLOWED_ORIGINS}
   debug:
