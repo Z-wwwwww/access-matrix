@@ -5,7 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { useMenuStore } from '@/stores/menu'
 import { useFavoriteMenus } from '@/composables/useFavoriteMenus'
 import { useMenuTitle } from '@/composables/useMenuTitle'
-import { Star } from 'lucide-vue-next'
+import { Star, Pin } from 'lucide-vue-next'
+import LucideIcon from '@/components/shared/LucideIcon.vue'
 import AppSidebarItem from './AppSidebarItem.vue'
 
 const props = defineProps({
@@ -27,19 +28,41 @@ const menuStore = useMenuStore()
 const menus = computed(() => menuStore.menus || [])
 const expandedKeys = ref(new Set())
 
-const { favoriteSet } = useFavoriteMenus()
+const { favoriteSet, toggleFavorite } = useFavoriteMenus()
 const { translate: translateMenu } = useMenuTitle()
 
 /**
- * 扁平遍历菜单，返回所有被标记为"常用"的节点（保留原菜单对象引用）
- * 排除隐藏项
+ * 置顶菜单：管理員在菜单管理页面勾选了 pinned 的项
+ * 递归遍历整棵树，深层节点也可以被置顶
+ */
+const pinnedMenus = computed(() => {
+  const result = []
+  function walk(items) {
+    for (const item of items) {
+      if (item.hide) continue
+      if (item.pinned === 1 || item.pinned === true) result.push(item)
+      if (item.children && item.children.length) walk(item.children)
+    }
+  }
+  walk(menus.value)
+  return result
+})
+
+/**
+ * 收藏菜单：递归遍历整棵树，找到所有用户收藏的项。
+ * 排除已置顶的菜单（置顶优先级高于收藏，避免同一菜单在置顶区和收藏区重复）。
  */
 const favoriteMenus = computed(() => {
   const result = []
   function walk(items) {
     for (const item of items) {
       if (item.hide) continue
-      if (item.id != null && favoriteSet.value.has(String(item.id))) {
+      if (item.pinned === 1 || item.pinned === true) {
+        // 置顶项跳过自身（已在置顶区展示），但仍递归找其子孙中的收藏
+        if (item.children && item.children.length) walk(item.children)
+        continue
+      }
+      if (item.id != null && favoriteSet.has(String(item.id))) {
         result.push(item)
       }
       if (item.children && item.children.length) walk(item.children)
@@ -47,6 +70,35 @@ const favoriteMenus = computed(() => {
   }
   walk(menus.value)
   return result
+})
+
+/**
+ * 渲染用菜单树：递归剔除所有 pinned 和已收藏的节点，并删除变空的目录。
+ * 下游 topLevelLeafs / remainingTopLevel / adminMenus / footerMenus 和
+ * AppSidebarItem 都基于这棵树渲染 —— 这样置顶/收藏的菜单不会同时出现
+ * 在顶部独立区域和它原所在目录里。
+ */
+const displayMenus = computed(() => {
+  function prune(items) {
+    const out = []
+    for (const item of items) {
+      if (item.pinned === 1 || item.pinned === true) continue
+      const idStr = item.id != null ? String(item.id) : null
+      if (idStr && favoriteSet.has(idStr)) continue
+      const hadChildren = item.children && item.children.length > 0
+      if (hadChildren) {
+        const prunedChildren = prune(item.children)
+        // 原本是目录，但所有子项都被剪除后变成空目录 → 整个跳过，
+        // 避免父目录被 topLevelLeafs 误识别为叶子按钮再渲染一次。
+        if (prunedChildren.length === 0) continue
+        out.push({ ...item, children: prunedChildren })
+      } else {
+        out.push({ ...item })
+      }
+    }
+    return out
+  }
+  return prune(menus.value)
 })
 
 /**
@@ -63,12 +115,11 @@ const FOOTER_MIN_SORT = 10000
  * 一级菜单中非隐藏、无子项、sort <= 9000、且未被收藏的项
  */
 const topLevelLeafs = computed(() =>
-  menus.value.filter(
+  displayMenus.value.filter(
     (m) =>
       !m.hide &&
       (!m.children || m.children.length === 0) &&
-      (m.sort ?? 0) <= ADMIN_GROUP_MIN_SORT &&
-      !favoriteSet.value.has(String(m.id))
+      (m.sort ?? 0) <= ADMIN_GROUP_MIN_SORT
   )
 )
 
@@ -76,7 +127,7 @@ const topLevelLeafs = computed(() =>
  * 顶部区域中的分组（带子项）一级菜单
  */
 const remainingTopLevel = computed(() =>
-  menus.value.filter((m) => {
+  displayMenus.value.filter((m) => {
     if (m.hide) return false
     if ((m.sort ?? 0) > ADMIN_GROUP_MIN_SORT) return false
     return m.children && m.children.length > 0
@@ -87,7 +138,7 @@ const remainingTopLevel = computed(() =>
  * 管理者設定 分组：9000 < sort <= 10000 的一级菜单
  */
 const adminMenus = computed(() =>
-  menus.value.filter((m) => {
+  displayMenus.value.filter((m) => {
     if (m.hide) return false
     const s = m.sort ?? 0
     return s > ADMIN_GROUP_MIN_SORT && s <= FOOTER_MIN_SORT
@@ -98,7 +149,9 @@ const adminMenus = computed(() =>
  * 固定底部菜单：sort > 10000 的一级菜单
  */
 const footerMenus = computed(() =>
-  menus.value.filter((m) => !m.hide && (m.sort ?? 0) > FOOTER_MIN_SORT)
+  displayMenus.value.filter(
+    (m) => !m.hide && (m.sort ?? 0) > FOOTER_MIN_SORT
+  )
 )
 
 /**
@@ -180,13 +233,13 @@ function navigate(item) {
   >
     <!-- Nav items -->
     <nav class="flex-1 overflow-y-auto scrollbar-none p-2 space-y-0.5">
-      <!-- Favorites (一级菜单样式，不展开子级) -->
+      <!-- Favorites (用户收藏，置于最顶部；右侧 Star 默认淡色，hover 显示完全) -->
       <template v-if="favoriteMenus.length">
         <button
           v-for="fav in favoriteMenus"
           :key="'fav-' + fav.id"
           :title="props.collapsed ? translateMenu(fav) : ''"
-          class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+          class="group w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
           :class="
             isActive(fav.path)
               ? 'bg-brand-orange text-white shadow-sm'
@@ -194,12 +247,69 @@ function navigate(item) {
           "
           @click="navigate(fav)"
         >
-          <Star :size="14" class="shrink-0 text-amber-400 fill-amber-400" />
+          <LucideIcon
+            v-if="fav.icon"
+            :name="fav.icon"
+            :size="16"
+            class="shrink-0"
+          />
+          <Star
+            v-else
+            :size="14"
+            class="shrink-0 text-amber-400 fill-amber-400"
+          />
           <span class="flex-1 truncate text-left" :class="props.collapsed ? 'sr-only' : ''">
             {{ translateMenu(fav) }}
           </span>
+          <span
+            v-if="!props.collapsed"
+            role="button"
+            :aria-label="t('layout.sidebar.unfavorite')"
+            :title="t('layout.sidebar.unfavorite')"
+            class="shrink-0 -mr-1 p-0.5 rounded inline-flex opacity-40 group-hover:opacity-100 transition-opacity hover:bg-foreground/10"
+            @click.stop="toggleFavorite(fav.id)"
+          >
+            <Star :size="14" class="fill-amber-400 text-amber-400" />
+          </span>
         </button>
-        <div class="my-2 border-t border-border" />
+        <div class="my-2 border-t-2 border-border/60" />
+      </template>
+
+      <!-- 置顶菜单 (admin 配置 pinned=1，放在收藏区下面、常规菜单上面) -->
+      <template v-if="pinnedMenus.length">
+        <button
+          v-for="p in pinnedMenus"
+          :key="'pin-' + p.id"
+          :title="props.collapsed ? translateMenu(p) : ''"
+          class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+          :class="
+            isActive(p.path)
+              ? 'bg-brand-orange text-white shadow-sm'
+              : 'text-foreground hover:bg-muted hover:text-foreground'
+          "
+          @click="navigate(p)"
+        >
+          <LucideIcon
+            v-if="p.icon"
+            :name="p.icon"
+            :size="16"
+            class="shrink-0"
+          />
+          <Pin
+            v-else
+            :size="14"
+            class="shrink-0"
+            :class="
+              isActive(p.path)
+                ? 'text-white fill-white'
+                : 'text-brand-orange fill-brand-orange'
+            "
+          />
+          <span class="flex-1 truncate text-left" :class="props.collapsed ? 'sr-only' : ''">
+            {{ translateMenu(p) }}
+          </span>
+        </button>
+        <div class="my-2 border-t-2 border-border/60" />
       </template>
 
       <!-- Top-level leaf items (一级菜单中无子项の按钮、AppSidebarItem に委譲して collapsed 時 flyout を共通化) -->
@@ -213,7 +323,7 @@ function navigate(item) {
           :expanded-keys="expandedKeys"
           @toggle="toggleExpand"
         />
-        <div v-if="remainingTopLevel.length" class="my-2 border-t border-border" />
+        <div v-if="remainingTopLevel.length" class="my-2 border-t-2 border-border/60" />
       </template>
 
       <AppSidebarItem
@@ -228,7 +338,7 @@ function navigate(item) {
 
       <!-- 管理者設定 分组 (9000 < sort <= 10000) -->
       <template v-if="adminMenus.length">
-        <div class="my-2 border-t border-border" />
+        <div class="my-2 border-t-2 border-border/60" />
         <div
           v-if="!props.collapsed"
           class="px-3 pt-1 pb-1.5 text-xs font-medium text-muted-foreground"
@@ -250,7 +360,7 @@ function navigate(item) {
     <!-- 固定底部菜单 (sort > 10000) -->
     <div
       v-if="footerMenus.length"
-      class="shrink-0 border-t border-border p-2 space-y-0.5"
+      class="shrink-0 border-t-2 border-border/60 p-2 space-y-0.5"
     >
       <AppSidebarItem
         v-for="item in footerMenus"

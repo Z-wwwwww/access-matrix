@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -15,6 +16,8 @@ import {
 } from '../../../../services/dept'
 import { getUserListApi } from '../../../../services/user'
 
+const { t } = useI18n()
+
 const loading = ref(false)
 const tree = ref([])
 const expanded = ref(new Set())
@@ -26,9 +29,10 @@ const editForm = reactive({
   sortOrder: 0, leaderUserId: '', status: 1
 })
 
-const statusOptions = [
-  { label: '有効', value: 1 }, { label: '無効', value: 0 }
-]
+const statusOptions = computed(() => [
+  { label: t('common.status.active'), value: 1 },
+  { label: t('common.status.inactive'), value: 0 }
+])
 
 // User pool — kept solely for the table column's id→label resolution.
 // The drawer dropdown is now <UserPicker/>, which fetches its own options;
@@ -49,14 +53,14 @@ async function loadUserPool() {
   } catch (e) {
     // Non-fatal: the dropdown stays empty and the user can still type-search
     // in other fields. We surface the failure but don't block the page.
-    toast.error('ユーザー一覧の取得に失敗しました')
+    toast.error(t('dept.message.loadUsersFailed'))
   }
 }
 
 function leaderLabel(id) {
   if (!id) return '-'
   const u = userMap.value.get(id)
-  if (!u) return `${id} (削除済)`
+  if (!u) return `${id} ${t('dept.message.userDeleted')}`
   return u.displayName ? `${u.displayName} (${u.username})` : u.username
 }
 
@@ -78,14 +82,14 @@ const flatTree = computed(() => {
 // rendered as a panel below the row), not parent/child rows, so we keep
 // the expanded-state and flattening logic local and hand DataTable a
 // pre-flattened list.
-const columns = [
-  { key: 'name',         title: '名称' },
-  { key: 'code',         title: 'コード' },
-  { key: 'level',        title: 'レベル', align: 'center' },
-  { key: 'leaderUserId', title: 'リーダー' },
-  { key: 'status',       title: '状態',   align: 'center' },
-  { key: 'actions',      title: '操作',   align: 'center' }
-]
+const columns = computed(() => [
+  { key: 'name',         title: t('dept.column.name') },
+  { key: 'code',         title: t('dept.column.code') },
+  { key: 'level',        title: t('dept.column.level'), align: 'center' },
+  { key: 'leaderUserId', title: t('dept.column.leader') },
+  { key: 'status',       title: t('dept.column.status'), align: 'center' },
+  { key: 'actions',      title: t('dept.column.actions'), align: 'center' }
+])
 
 async function fetchData() {
   loading.value = true
@@ -143,7 +147,7 @@ async function save() {
         status: editForm.status
       }
       const r = await updateDeptApi(editForm.id, body)
-      if (r.data.code !== 0) { toast.error(r.data.msg || '更新失敗'); return }
+      if (r.data.code !== 0) { toast.error(r.data.msg || t('dept.edit.message.updateFailed')); return }
     } else {
       const body = {
         parentId: editForm.parentId || null,
@@ -154,9 +158,9 @@ async function save() {
         status: editForm.status
       }
       const r = await addDeptApi(body)
-      if (r.data.code !== 0) { toast.error(r.data.msg || '作成失敗'); return }
+      if (r.data.code !== 0) { toast.error(r.data.msg || t('dept.edit.message.createFailed')); return }
     }
-    toast.success('保存しました')
+    toast.success(t('common.message.saveSuccessful'))
     showEdit.value = false
     fetchData()
   } catch (e) { toast.error(e.message) }
@@ -166,15 +170,15 @@ const { confirm } = useConfirm()
 
 async function handleDelete(row) {
   const ok = await confirm({
-    title: '部署削除',
-    message: `「${row.name}」を削除しますか？\n（子部署や所属ユーザーがある場合は拒否されます）`,
+    title: t('dept.confirm.deleteTitle'),
+    message: t('dept.confirm.deleteMessage', { name: row.name }),
     variant: 'destructive'
   })
   if (!ok) return
   try {
     const r = await deleteDeptApi(row.id)
-    if (r.data.code === 0) { toast.success('削除しました'); fetchData() }
-    else toast.error(r.data.msg || '削除失敗')
+    if (r.data.code === 0) { toast.success(t('common.message.deleteSuccessful')); fetchData() }
+    else toast.error(r.data.msg || t('dept.message.deleteFailed'))
   } catch (e) { toast.error(e.message) }
 }
 
@@ -187,10 +191,10 @@ onMounted(() => {
 <template>
   <div class="space-y-3">
     <Card class="p-4 flex items-center justify-between">
-      <h1 class="text-lg font-semibold">部署管理</h1>
+      <h1 class="text-lg font-semibold">{{ t('dept.title') }}</h1>
       <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
               @click="openCreate(null)">
-        <Plus class="size-4" /> ルート追加
+        <Plus class="size-4" /> {{ t('dept.button.addRoot') }}
       </button>
     </Card>
 
@@ -200,7 +204,7 @@ onMounted(() => {
         :data="flatTree"
         :loading="loading"
         :show-pagination="false"
-        empty-text="部署がありません"
+        :empty-text="t('dept.message.noDepts')"
       >
         <template #cell-name="{ row }">
           <div class="flex items-center gap-1" :style="{ paddingLeft: (row.level - 1) * 18 + 'px' }">
@@ -220,18 +224,18 @@ onMounted(() => {
         </template>
         <template #cell-status="{ row }">
           <Badge :variant="row.status === 1 ? 'default' : 'outline'">
-            {{ row.status === 1 ? '有効' : '無効' }}
+            {{ row.status === 1 ? t('common.status.active') : t('common.status.inactive') }}
           </Badge>
         </template>
         <template #cell-actions="{ row }">
           <div class="inline-flex gap-1">
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openCreate(row)" title="子追加">
+            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openCreate(row)" :title="t('dept.tooltip.addChild')">
               <Plus class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEdit(row)" title="編集">
+            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEdit(row)" :title="t('dept.tooltip.edit')">
               <Pencil class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs" @click="handleDelete(row)" title="削除">
+            <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs" @click="handleDelete(row)" :title="t('common.button.delete')">
               <Trash2 class="size-3.5" />
             </button>
           </div>
@@ -239,44 +243,44 @@ onMounted(() => {
       </DataTable>
     </Card>
 
-    <Drawer v-model:open="showEdit" :title="isEdit ? '部署編集' : '部署新規'" width="max-w-md">
+    <Drawer v-model:open="showEdit" :title="isEdit ? t('dept.edit.titleEdit') : t('dept.edit.titleCreate')" width="max-w-md">
       <div class="space-y-3">
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">親部署 ID</label>
-          <Input v-model="editForm.parentId" placeholder="ルートの場合は空" />
-          <p class="text-xs text-muted-foreground mt-1">空にするとルート部署になります</p>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('dept.edit.label.parentId') }}</label>
+          <Input v-model="editForm.parentId" :placeholder="t('dept.edit.placeholder.parentId')" />
+          <p class="text-xs text-muted-foreground mt-1">{{ t('dept.edit.hint.rootParent') }}</p>
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">コード <span class="text-destructive">*</span></label>
-          <Input v-model="editForm.code" :disabled="isEdit" placeholder="HQ / TOKYO" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('dept.edit.label.code') }} <span class="text-destructive">*</span></label>
+          <Input v-model="editForm.code" :disabled="isEdit" :placeholder="t('dept.edit.placeholder.code')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">名称 <span class="text-destructive">*</span></label>
-          <Input v-model="editForm.name" placeholder="本社" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('dept.edit.label.name') }} <span class="text-destructive">*</span></label>
+          <Input v-model="editForm.name" :placeholder="t('dept.edit.placeholder.name')" />
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">並び順</label>
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('dept.edit.label.sortOrder') }}</label>
             <Input v-model.number="editForm.sortOrder" type="number" />
           </div>
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">状態</label>
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('dept.edit.label.status') }}</label>
             <Select v-model="editForm.status" :options="statusOptions" />
           </div>
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">リーダー</label>
-          <UserPicker v-model="editForm.leaderUserId" placeholder="未指定" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('dept.edit.label.leader') }}</label>
+          <UserPicker v-model="editForm.leaderUserId" :placeholder="t('dept.edit.placeholder.leader')" />
           <p class="mt-1 flex items-start gap-1 text-xs text-muted-foreground">
             <Info class="size-3.5 shrink-0 mt-0.5" />
-            <span>表示用のメモです。権限・データ範囲には影響しません。</span>
+            <span>{{ t('dept.edit.hint.leaderInfo') }}</span>
           </p>
         </div>
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <button class="h-9 px-3 rounded border border-border text-sm" @click="showEdit = false">キャンセル</button>
-          <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm" @click="save">保存</button>
+          <button class="h-9 px-3 rounded border border-border text-sm" @click="showEdit = false">{{ t('common.button.cancel') }}</button>
+          <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm" @click="save">{{ t('common.button.save') }}</button>
         </div>
       </template>
     </Drawer>

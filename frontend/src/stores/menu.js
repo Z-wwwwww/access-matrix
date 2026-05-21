@@ -4,6 +4,7 @@ import { getMenuListApi } from '../../services/menu'
 import { useAuthStore } from './auth'
 import { useTabsStore } from './tabs'
 import { formatMenus, menuToRoutes } from '@/utils/menu-to-routes'
+import i18n from '@/lang'
 
 export const useMenuStore = defineStore('menu', () => {
   const menus = ref(null)
@@ -16,7 +17,9 @@ export const useMenuStore = defineStore('menu', () => {
     const resData = res.data
 
     if (resData.code !== 0) {
-      return Promise.reject(new Error(resData.msg || 'メニュー取得に失敗しました'))
+      // i18n.global.t is the imperative escape hatch outside of components.
+      // Store-thrown errors must still respect the current locale.
+      return Promise.reject(new Error(resData.msg || i18n.global.t('menu.message.fetchFailed')))
     }
 
     // 同时拉取用户信息（roles / authorities / permissionList）

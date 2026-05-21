@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Smartphone, Lock, Key, ShieldCheck } from 'lucide-vue-next'
 import Input from '@/components/ui/Input.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -8,6 +9,7 @@ import { toast } from '@/composables/useToast'
 import { getCaptchaApi } from '../../../services/auth'
 
 const router = useRouter()
+const { t } = useI18n()
 
 const form = reactive({
   mobile: '',
@@ -64,7 +66,7 @@ async function changeImgCode() {
 function showImgCodeCheck() {
   if (!form.mobile) {
     errors.mobile = true
-    toast.warning('携帯番号を入力してください')
+    toast.warning(t('forget.message.enterMobile'))
     return
   }
   imgCode.value = ''
@@ -79,12 +81,12 @@ function showImgCodeCheck() {
 async function sendCode() {
   if (!imgCode.value) {
     imgCodeError.value = true
-    toast.warning('画像認証コードを入力してください')
+    toast.warning(t('forget.message.enterImgCode'))
     return
   }
   codeLoading.value = true
   setTimeout(() => {
-    toast.success('SMS 認証コードを送信しました')
+    toast.success(t('forget.message.smsSent'))
     showImgCode.value = false
     codeLoading.value = false
     startCountdownTimer()
@@ -110,7 +112,7 @@ function doSubmit() {
   loading.value = true
   setTimeout(() => {
     loading.value = false
-    toast.success('パスワードを変更しました')
+    toast.success(t('forget.message.passwordReset'))
     router.push('/login')
   }, 1000)
 }
@@ -130,20 +132,20 @@ onBeforeUnmount(() => {
       <!-- Brand -->
       <div class="text-center mb-8">
         <h1 class="text-2xl font-bold text-foreground font-serif tracking-wide">Access Matrix</h1>
-        <p class="mt-1 text-sm text-muted-foreground">パスワード再設定</p>
+        <p class="mt-1 text-sm text-muted-foreground">{{ t('forget.title') }}</p>
       </div>
 
       <form class="space-y-4" @submit.prevent="doSubmit">
         <!-- mobile -->
         <div data-field="mobile">
-          <label class="block text-sm font-medium text-foreground mb-1.5">携帯番号</label>
+          <label class="block text-sm font-medium text-foreground mb-1.5">{{ t('forget.mobileLabel') }}</label>
           <div class="relative">
             <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10">
               <Smartphone :size="16" />
             </div>
             <Input
               v-model="form.mobile"
-              placeholder="バインド済みの携帯番号を入力"
+              :placeholder="t('forget.mobilePlaceholder')"
               class="pl-10"
               :error="!!errors.mobile"
               @update:model-value="clearError('mobile')"
@@ -153,7 +155,7 @@ onBeforeUnmount(() => {
 
         <!-- password -->
         <div data-field="password">
-          <label class="block text-sm font-medium text-foreground mb-1.5">新しいパスワード</label>
+          <label class="block text-sm font-medium text-foreground mb-1.5">{{ t('forget.newPasswordLabel') }}</label>
           <div class="relative">
             <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10">
               <Lock :size="16" />
@@ -161,7 +163,7 @@ onBeforeUnmount(() => {
             <Input
               v-model="form.password"
               type="password"
-              placeholder="新しいログインパスワードを入力"
+              :placeholder="t('forget.newPasswordPlaceholder')"
               class="pl-10"
               :error="!!errors.password"
               @update:model-value="clearError('password')"
@@ -171,7 +173,7 @@ onBeforeUnmount(() => {
 
         <!-- password2 -->
         <div data-field="password2">
-          <label class="block text-sm font-medium text-foreground mb-1.5">パスワード（確認）</label>
+          <label class="block text-sm font-medium text-foreground mb-1.5">{{ t('forget.confirmPasswordLabel') }}</label>
           <div class="relative">
             <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10">
               <Key :size="16" />
@@ -179,20 +181,20 @@ onBeforeUnmount(() => {
             <Input
               v-model="form.password2"
               type="password"
-              placeholder="もう一度パスワードを入力"
+              :placeholder="t('forget.confirmPasswordPlaceholder')"
               class="pl-10"
               :error="!!errors.password2"
               @update:model-value="clearError('password2')"
             />
           </div>
           <p v-if="errors.password2" class="mt-1 text-xs text-destructive">
-            {{ !form.password2 ? 'パスワード（確認）を入力してください' : '2 回入力したパスワードが一致しません' }}
+            {{ !form.password2 ? t('forget.message.enterConfirmPassword') : t('forget.message.passwordMismatch') }}
           </p>
         </div>
 
         <!-- captcha (SMS code) -->
         <div data-field="captcha">
-          <label class="block text-sm font-medium text-foreground mb-1.5">認証コード</label>
+          <label class="block text-sm font-medium text-foreground mb-1.5">{{ t('forget.captchaLabel') }}</label>
           <div class="flex items-stretch gap-2">
             <div class="relative flex-1">
               <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground z-10">
@@ -200,7 +202,7 @@ onBeforeUnmount(() => {
               </div>
               <Input
                 v-model="form.captcha"
-                placeholder="SMS 認証コード"
+                :placeholder="t('forget.captchaPlaceholder')"
                 class="pl-10"
                 :error="!!errors.captcha"
                 @update:model-value="clearError('captcha')"
@@ -212,8 +214,8 @@ onBeforeUnmount(() => {
               class="shrink-0 h-9 px-3 rounded-lg text-sm font-medium border border-input bg-card text-foreground hover:bg-muted disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
               @click="showImgCodeCheck"
             >
-              <span v-if="!countdownTimer">認証コード送信</span>
-              <span v-else>送信済み {{ countdownTime }}s</span>
+              <span v-if="!countdownTimer">{{ t('forget.sendCaptcha') }}</span>
+              <span v-else>{{ t('forget.sentCountdown', { n: countdownTime }) }}</span>
             </button>
           </div>
         </div>
@@ -224,7 +226,7 @@ onBeforeUnmount(() => {
             to="/login"
             class="text-sm text-primary hover:underline"
           >
-            ログインに戻る
+            {{ t('forget.backToLogin') }}
           </router-link>
         </div>
 
@@ -234,7 +236,7 @@ onBeforeUnmount(() => {
           :disabled="loading"
           class="w-full h-10 bg-primary text-primary-foreground font-medium rounded-lg text-sm hover:bg-primary/90 active:bg-primary/80 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {{ loading ? '処理中...' : 'パスワード変更' }}
+          {{ loading ? t('forget.submitting') : t('forget.submit') }}
         </button>
       </form>
     </div>
@@ -242,14 +244,14 @@ onBeforeUnmount(() => {
     <!-- 画像認証コードモーダル -->
     <Dialog
       :open="showImgCode"
-      title="認証コード送信"
+      :title="t('forget.imgCaptchaTitle')"
       width="max-w-sm"
       @update:open="(v) => (showImgCode = v)"
     >
       <div class="flex items-stretch gap-2 mb-4">
         <Input
           v-model="imgCode"
-          placeholder="画像認証コードを入力"
+          :placeholder="t('forget.imgCaptchaPlaceholder')"
           class="flex-1"
           :error="imgCodeError"
           @update:model-value="imgCodeError = false"
@@ -257,7 +259,7 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="shrink-0 h-9 w-[102px] rounded-lg border border-input bg-card hover:bg-muted transition-colors overflow-hidden"
-          title="更新"
+          :title="t('forget.refresh')"
           @click="changeImgCode"
         >
           <img
@@ -266,7 +268,7 @@ onBeforeUnmount(() => {
             :src="captchaSrc"
             class="w-full h-full object-cover"
           />
-          <span v-else class="text-xs text-muted-foreground">読込中...</span>
+          <span v-else class="text-xs text-muted-foreground">{{ t('forget.loading') }}</span>
         </button>
       </div>
       <button
@@ -275,7 +277,7 @@ onBeforeUnmount(() => {
         class="w-full h-10 bg-primary text-primary-foreground font-medium rounded-lg text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         @click="sendCode"
       >
-        {{ codeLoading ? '送信中...' : '今すぐ送信' }}
+        {{ codeLoading ? t('forget.sending') : t('forget.sendNow') }}
       </button>
     </Dialog>
   </div>

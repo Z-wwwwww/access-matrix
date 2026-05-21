@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { cn } from '@/lib/utils'
 import Select from '@/components/ui/Select.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
@@ -7,6 +8,8 @@ import ColumnFilter from './ColumnFilter.vue'
 import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Loader2
 } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 const props = defineProps({
   /**
@@ -54,15 +57,15 @@ const props = defineProps({
     type: Array,
     default: () => [10, 20, 50, 100]
   },
-  /** 空数据提示文字 */
+  /** 空数据提示文字。空文字列の場合は dataTable.emptyState の翻訳を使用 */
   emptyText: {
     type: String,
-    default: 'データなし'
+    default: ''
   },
-  /** 加载提示文字 */
+  /** 加载提示文字。空文字列の場合は dataTable.loading の翻訳を使用 */
   loadingText: {
     type: String,
-    default: '読み込み中...'
+    default: ''
   },
   /** 是否显示分页 */
   showPagination: {
@@ -188,8 +191,11 @@ const totalColSpan = computed(() => {
 const totalPages = computed(() => Math.max(1, Math.ceil(props.total / props.pageSize)))
 
 const pageSizeSelectOptions = computed(() =>
-  props.pageSizeOptions.map((v) => ({ label: `${v}件/ページ`, value: v }))
+  props.pageSizeOptions.map((v) => ({ label: t('dataTable.pagination.perPage', { n: v }), value: v }))
 )
+
+const emptyDisplay = computed(() => props.emptyText || t('dataTable.emptyState'))
+const loadingDisplay = computed(() => props.loadingText || t('dataTable.loading'))
 
 function goToPage(p) {
   if (p < 1 || p > totalPages.value) return
@@ -350,7 +356,7 @@ onBeforeUnmount(() => {
           <!-- Empty (loading 中は overlay が前面に出るので非表示) -->
           <tr v-if="!loading && data.length === 0">
             <td :colspan="totalColSpan" class="p-8 text-center text-muted-foreground">
-              <slot name="empty">{{ emptyText }}</slot>
+              <slot name="empty">{{ emptyDisplay }}</slot>
             </td>
           </tr>
           <!-- Loading 中で初回データ無し: overlay 用のスペースを確保 -->
@@ -419,7 +425,7 @@ onBeforeUnmount(() => {
         <div class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-card shadow-lg border border-border">
           <slot name="loading">
             <Loader2 :size="20" class="animate-spin text-brand-orange" />
-            <span class="text-sm text-foreground font-medium">{{ loadingText }}</span>
+            <span class="text-sm text-foreground font-medium">{{ loadingDisplay }}</span>
           </slot>
         </div>
       </div>
@@ -428,7 +434,7 @@ onBeforeUnmount(() => {
     <!-- Pagination -->
     <div v-if="showPagination" class="flex items-center justify-between px-4 py-2.5 border-t border-border gap-4">
       <span class="text-sm text-foreground font-medium whitespace-nowrap shrink-0">
-        全 {{ total }} 件
+        {{ t('dataTable.pagination.total', { n: total }) }}
       </span>
       <div class="flex items-center gap-1 shrink-0">
         <Select
@@ -457,7 +463,7 @@ onBeforeUnmount(() => {
             <button
               v-if="p === 'left' || p === 'right'"
               type="button"
-              :title="p === 'left' ? '5ページ前へ' : '5ページ後へ'"
+              :title="p === 'left' ? t('common.tooltip.pagePrevious5') : t('common.tooltip.pageNext5')"
               class="group h-8 w-8 inline-flex items-center justify-center rounded-md text-sm tabular-nums text-muted-foreground hover:bg-muted hover:text-primary transition-colors cursor-pointer"
               @click="jumpBy(p === 'left' ? -5 : 5)"
             >

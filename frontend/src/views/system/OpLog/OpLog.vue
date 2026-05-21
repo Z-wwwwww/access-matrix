@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -10,6 +11,8 @@ import UserPicker from '@/components/shared/UserPicker.vue'
 import { toast } from '@/composables/useToast'
 import { Search, RotateCcw, Eye } from 'lucide-vue-next'
 import { getOpLogListApi, getOpLogApi } from '../../../../services/oplog'
+
+const { t } = useI18n()
 
 const loading = ref(false)
 const list = ref([])
@@ -26,26 +29,26 @@ const search = reactive({
   success: ''
 })
 
-const successOptions = [
-  { label: 'すべて', value: '' },
-  { label: '成功', value: 'true' },
-  { label: '失敗', value: 'false' }
-]
+const successOptions = computed(() => [
+  { label: t('oplog.option.result.all'), value: '' },
+  { label: t('oplog.option.result.success'), value: 'true' },
+  { label: t('oplog.option.result.failure'), value: 'false' }
+])
 
 const showDetail = ref(false)
 const detail = ref(null)
 
-const columns = [
-  { key: 'createTime', title: '時刻', minWidth: '170px' },
-  { key: 'username', title: 'ユーザー', minWidth: '120px' },
-  { key: 'module', title: 'モジュール', minWidth: '100px' },
-  { key: 'action', title: 'アクション', minWidth: '160px' },
-  { key: 'targetType', title: '対象', minWidth: '100px' },
-  { key: 'clientIp', title: 'IP', minWidth: '120px' },
-  { key: 'success', title: '結果', minWidth: '80px', align: 'center' },
-  { key: 'costMs', title: 'ms', minWidth: '70px', align: 'right' },
-  { key: 'actions', title: '詳細', minWidth: '70px', align: 'center', sticky: 'right' }
-]
+const columns = computed(() => [
+  { key: 'createTime', title: t('oplog.column.createTime'), minWidth: '170px' },
+  { key: 'username', title: t('oplog.column.username'), minWidth: '120px' },
+  { key: 'module', title: t('oplog.column.module'), minWidth: '100px' },
+  { key: 'action', title: t('oplog.column.action'), minWidth: '160px' },
+  { key: 'targetType', title: t('oplog.column.targetType'), minWidth: '100px' },
+  { key: 'clientIp', title: t('oplog.column.clientIp'), minWidth: '120px' },
+  { key: 'success', title: t('oplog.column.success'), minWidth: '80px', align: 'center' },
+  { key: 'costMs', title: t('oplog.column.costMs'), minWidth: '70px', align: 'right' },
+  { key: 'actions', title: t('oplog.column.actions'), minWidth: '70px', align: 'center', sticky: 'right' }
+])
 
 async function fetchData() {
   loading.value = true
@@ -75,7 +78,7 @@ async function openDetail(row) {
       detail.value = res.data.data
       showDetail.value = true
     } else {
-      toast.error(res.data.msg || '取得失敗')
+      toast.error(res.data.msg || t('oplog.message.fetchFailed'))
     }
   } catch (e) { toast.error(e.message) }
 }
@@ -99,37 +102,37 @@ onMounted(fetchData)
     <Card class="p-4">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">モジュール</label>
-          <Input v-model="search.module" placeholder="system / pms / iot" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('oplog.search.label.module') }}</label>
+          <Input v-model="search.module" :placeholder="t('oplog.search.placeholder.module')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">アクション</label>
-          <Input v-model="search.action" placeholder="role.create" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('oplog.search.label.action') }}</label>
+          <Input v-model="search.action" :placeholder="t('oplog.search.placeholder.action')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">ユーザー</label>
-          <UserPicker v-model="search.userId" placeholder="全ユーザー" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('oplog.search.label.user') }}</label>
+          <UserPicker v-model="search.userId" :placeholder="t('oplog.search.placeholder.user')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">対象タイプ</label>
-          <Input v-model="search.targetType" placeholder="role / user" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('oplog.search.label.targetType') }}</label>
+          <Input v-model="search.targetType" :placeholder="t('oplog.search.placeholder.targetType')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">対象 ID</label>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('oplog.search.label.targetId') }}</label>
           <Input v-model="search.targetId" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">結果</label>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('oplog.search.label.result') }}</label>
           <Select v-model="search.success" :options="successOptions" />
         </div>
         <div class="flex items-end gap-2 col-span-2 md:col-span-2">
           <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                   @click="() => { page = 1; fetchData() }">
-            <Search class="size-4" /> 検索
+            <Search class="size-4" /> {{ t('common.button.search') }}
           </button>
           <button class="h-9 px-3 rounded border border-border text-sm inline-flex items-center gap-1"
                   @click="resetSearch">
-            <RotateCcw class="size-4" /> リセット
+            <RotateCcw class="size-4" /> {{ t('common.button.reset') }}
           </button>
         </div>
       </div>
@@ -164,7 +167,7 @@ onMounted(fetchData)
         </template>
         <template #cell-success="{ row }">
           <Badge :variant="row.success ? 'default' : 'destructive'">
-            {{ row.success ? '成功' : '失敗' }}
+            {{ row.success ? t('oplog.status.success') : t('oplog.status.failure') }}
           </Badge>
         </template>
         <template #cell-costMs="{ row }">
@@ -172,48 +175,48 @@ onMounted(fetchData)
         </template>
         <template #cell-actions="{ row }">
           <button class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center"
-                  @click="openDetail(row)" title="詳細">
+                  @click="openDetail(row)" :title="t('common.button.detail')">
             <Eye class="size-3.5" />
           </button>
         </template>
       </DataTable>
     </Card>
 
-    <Drawer v-model:open="showDetail" title="操作ログ詳細" width="max-w-2xl">
+    <Drawer v-model:open="showDetail" :title="t('oplog.detail.title')" width="max-w-2xl">
       <div v-if="detail" class="space-y-3 text-sm">
         <div class="grid grid-cols-2 gap-x-6 gap-y-2">
-          <div><span class="text-muted-foreground">時刻：</span><span class="font-mono">{{ formatTime(detail.createTime) }}</span></div>
-          <div><span class="text-muted-foreground">耗時：</span><span class="font-mono">{{ detail.costMs }} ms</span></div>
-          <div><span class="text-muted-foreground">ユーザー：</span><span>{{ detail.username || '-' }}</span></div>
-          <div><span class="text-muted-foreground">ユーザー ID：</span><span class="font-mono text-xs">{{ detail.userId || '-' }}</span></div>
-          <div><span class="text-muted-foreground">モジュール：</span><span>{{ detail.module || '-' }}</span></div>
-          <div><span class="text-muted-foreground">アクション：</span><span class="font-mono">{{ detail.action }}</span></div>
-          <div><span class="text-muted-foreground">対象タイプ：</span><span>{{ detail.targetType || '-' }}</span></div>
-          <div><span class="text-muted-foreground">対象 ID：</span><span class="font-mono text-xs">{{ detail.targetId || '-' }}</span></div>
-          <div><span class="text-muted-foreground">メソッド：</span><span class="font-mono">{{ detail.method || '-' }}</span></div>
-          <div><span class="text-muted-foreground">結果：</span>
+          <div><span class="text-muted-foreground">{{ t('oplog.detail.label.createTime') }}：</span><span class="font-mono">{{ formatTime(detail.createTime) }}</span></div>
+          <div><span class="text-muted-foreground">{{ t('oplog.detail.label.costMs') }}：</span><span class="font-mono">{{ detail.costMs }} ms</span></div>
+          <div><span class="text-muted-foreground">{{ t('oplog.detail.label.username') }}：</span><span>{{ detail.username || '-' }}</span></div>
+          <div><span class="text-muted-foreground">{{ t('oplog.detail.label.userId') }}：</span><span class="font-mono text-xs">{{ detail.userId || '-' }}</span></div>
+          <div><span class="text-muted-foreground">{{ t('oplog.detail.label.module') }}：</span><span>{{ detail.module || '-' }}</span></div>
+          <div><span class="text-muted-foreground">{{ t('oplog.detail.label.action') }}：</span><span class="font-mono">{{ detail.action }}</span></div>
+          <div><span class="text-muted-foreground">{{ t('oplog.detail.label.targetType') }}：</span><span>{{ detail.targetType || '-' }}</span></div>
+          <div><span class="text-muted-foreground">{{ t('oplog.detail.label.targetId') }}：</span><span class="font-mono text-xs">{{ detail.targetId || '-' }}</span></div>
+          <div><span class="text-muted-foreground">{{ t('oplog.detail.label.method') }}：</span><span class="font-mono">{{ detail.method || '-' }}</span></div>
+          <div><span class="text-muted-foreground">{{ t('oplog.detail.label.result') }}：</span>
             <Badge :variant="detail.success ? 'default' : 'destructive'">
-              {{ detail.success ? '成功' : '失敗' }}
+              {{ detail.success ? t('oplog.status.success') : t('oplog.status.failure') }}
             </Badge>
           </div>
-          <div class="col-span-2"><span class="text-muted-foreground">URI：</span><span class="font-mono text-xs break-all">{{ detail.requestUri || '-' }}</span></div>
-          <div class="col-span-2"><span class="text-muted-foreground">クライアント IP：</span><span class="font-mono">{{ detail.clientIp || '-' }}</span></div>
-          <div class="col-span-2"><span class="text-muted-foreground">User-Agent：</span><span class="text-xs break-all">{{ detail.userAgent || '-' }}</span></div>
+          <div class="col-span-2"><span class="text-muted-foreground">{{ t('oplog.detail.label.uri') }}：</span><span class="font-mono text-xs break-all">{{ detail.requestUri || '-' }}</span></div>
+          <div class="col-span-2"><span class="text-muted-foreground">{{ t('oplog.detail.label.clientIp') }}：</span><span class="font-mono">{{ detail.clientIp || '-' }}</span></div>
+          <div class="col-span-2"><span class="text-muted-foreground">{{ t('oplog.detail.label.userAgent') }}：</span><span class="text-xs break-all">{{ detail.userAgent || '-' }}</span></div>
         </div>
 
         <div v-if="detail.errorMsg">
-          <div class="text-xs text-muted-foreground mb-1">エラーメッセージ</div>
+          <div class="text-xs text-muted-foreground mb-1">{{ t('oplog.detail.section.errorMsg') }}</div>
           <pre class="bg-destructive/10 text-destructive text-xs p-2 rounded whitespace-pre-wrap break-all">{{ detail.errorMsg }}</pre>
         </div>
 
         <div>
-          <div class="text-xs text-muted-foreground mb-1">リクエスト本文（パスワード自動マスク済み）</div>
-          <pre class="bg-muted/30 text-xs p-2 rounded whitespace-pre-wrap break-all max-h-96 overflow-y-auto">{{ prettyJson(detail.requestBody) || '(なし)' }}</pre>
+          <div class="text-xs text-muted-foreground mb-1">{{ t('oplog.detail.section.requestBody') }}</div>
+          <pre class="bg-muted/30 text-xs p-2 rounded whitespace-pre-wrap break-all max-h-96 overflow-y-auto">{{ prettyJson(detail.requestBody) || t('oplog.detail.message.empty') }}</pre>
         </div>
       </div>
       <template #footer>
         <div class="flex justify-end">
-          <button class="h-9 px-3 rounded border border-border text-sm" @click="showDetail = false">閉じる</button>
+          <button class="h-9 px-3 rounded border border-border text-sm" @click="showDetail = false">{{ t('oplog.detail.button.close') }}</button>
         </div>
       </template>
     </Drawer>

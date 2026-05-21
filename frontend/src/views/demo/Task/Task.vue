@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -17,6 +18,7 @@ import {
 import { getDeptTreeApi } from '../../../../services/dept'
 import { getUserListApi } from '../../../../services/user'
 
+const { t } = useI18n()
 const { confirm } = useConfirm()
 
 const loading = ref(false)
@@ -34,24 +36,33 @@ const deptOptions = ref([])
 // user list → flat lookup for creator column rendering
 const userMap = ref(new Map())
 
-const STATUS_LABEL = { 1: '未着手', 2: '進行中', 3: '完了', 4: '取消' }
+const STATUS_LABEL = computed(() => ({
+  1: t('task.status.todo'),
+  2: t('task.status.doing'),
+  3: t('task.status.done'),
+  4: t('task.status.cancelled')
+}))
 const STATUS_VARIANT = { 1: 'outline', 2: 'default', 3: 'default', 4: 'destructive' }
-const PRIORITY_LABEL = { 1: '低', 2: '中', 3: '高' }
+const PRIORITY_LABEL = computed(() => ({
+  1: t('task.priority.low'),
+  2: t('task.priority.medium'),
+  3: t('task.priority.high')
+}))
 const PRIORITY_VARIANT = { 1: 'outline', 2: 'default', 3: 'destructive' }
 
-const statusOptions = [
-  { label: 'すべて', value: '' },
-  { label: '未着手', value: 1 },
-  { label: '進行中', value: 2 },
-  { label: '完了', value: 3 },
-  { label: '取消', value: 4 }
-]
-const statusFormOptions = statusOptions.filter(o => o.value !== '')
-const priorityOptions = [
-  { label: '低', value: 1 },
-  { label: '中', value: 2 },
-  { label: '高', value: 3 }
-]
+const statusOptions = computed(() => [
+  { label: t('task.option.statusAll'), value: '' },
+  { label: t('task.status.todo'), value: 1 },
+  { label: t('task.status.doing'), value: 2 },
+  { label: t('task.status.done'), value: 3 },
+  { label: t('task.status.cancelled'), value: 4 }
+])
+const statusFormOptions = computed(() => statusOptions.value.filter(o => o.value !== ''))
+const priorityOptions = computed(() => [
+  { label: t('task.priority.low'), value: 1 },
+  { label: t('task.priority.medium'), value: 2 },
+  { label: t('task.priority.high'), value: 3 }
+])
 
 const showEdit = ref(false)
 const isEdit = ref(false)
@@ -60,16 +71,16 @@ const editForm = reactive({
   status: 1, priority: 2, assigneeUserId: '', dueDate: ''
 })
 
-const columns = [
-  { key: 'title',          title: 'タイトル' },
-  { key: 'deptId',         title: '部署' },
-  { key: 'status',         title: '状態',   align: 'center' },
-  { key: 'priority',       title: '優先度', align: 'center' },
-  { key: 'assigneeUserId', title: '担当者' },
-  { key: 'createUser',     title: '作成者' },
-  { key: 'dueDate',        title: '期日',   align: 'center' },
-  { key: 'actions',        title: '操作',  align: 'center' }
-]
+const columns = computed(() => [
+  { key: 'title',          title: t('task.column.title') },
+  { key: 'deptId',         title: t('task.column.deptId') },
+  { key: 'status',         title: t('task.column.status'),   align: 'center' },
+  { key: 'priority',       title: t('task.column.priority'), align: 'center' },
+  { key: 'assigneeUserId', title: t('task.column.assignee') },
+  { key: 'createUser',     title: t('task.column.creator') },
+  { key: 'dueDate',        title: t('task.column.dueDate'),  align: 'center' },
+  { key: 'actions',        title: t('task.column.actions'),  align: 'center' }
+])
 
 async function fetchData() {
   loading.value = true
@@ -82,7 +93,7 @@ async function fetchData() {
       list.value = res.data.data?.records || []
       total.value = res.data.data?.total || 0
     } else {
-      toast.error(res.data.msg || '読み込み失敗')
+      toast.error(res.data.msg || t('task.message.loadFailed'))
     }
   } catch (e) {
     toast.error(e.message)
@@ -176,8 +187,8 @@ async function save() {
     const r = isEdit.value
       ? await updateDemoTaskApi(editForm.id, body)
       : await addDemoTaskApi(body)
-    if (r.data.code !== 0) { toast.error(r.data.msg || '保存失敗'); return }
-    toast.success('保存しました')
+    if (r.data.code !== 0) { toast.error(r.data.msg || t('task.message.saveFailed')); return }
+    toast.success(t('task.message.saveSuccess'))
     showEdit.value = false
     fetchData()
   } catch (e) { toast.error(e.message) }
@@ -185,15 +196,15 @@ async function save() {
 
 async function handleDelete(row) {
   const ok = await confirm({
-    title: 'タスク削除',
-    message: `「${row.title}」を削除しますか？`,
+    title: t('task.confirm.deleteTitle'),
+    message: t('task.confirm.deleteMessage', { title: row.title }),
     variant: 'destructive'
   })
   if (!ok) return
   try {
     const r = await deleteDemoTaskApi(row.id)
-    if (r.data.code === 0) { toast.success('削除しました'); fetchData() }
-    else toast.error(r.data.msg || '削除失敗')
+    if (r.data.code === 0) { toast.success(t('task.message.deleteSuccess')); fetchData() }
+    else toast.error(r.data.msg || t('task.message.deleteFailed'))
   } catch (e) { toast.error(e.message) }
 }
 
@@ -209,33 +220,33 @@ onMounted(() => {
     <Card class="p-4">
       <div class="flex items-center justify-between mb-3">
         <div>
-          <h1 class="text-lg font-semibold">タスク（データ範囲デモ）</h1>
+          <h1 class="text-lg font-semibold">{{ t('task.title') }}</h1>
           <p class="text-xs text-muted-foreground mt-0.5">
-            ロール毎に見えるタスクが変わります。詳細: <code class="text-foreground">docs/data-scope-demo.md</code>
+            {{ t('task.description') }} <code class="text-foreground">docs/data-scope-demo.md</code>
           </p>
         </div>
         <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                 @click="openCreate">
-          <Plus class="size-4" /> 新規
+          <Plus class="size-4" /> {{ t('common.button.new') }}
         </button>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">キーワード</label>
-          <Input v-model="search.keyword" placeholder="タイトル検索" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('task.search.label.keyword') }}</label>
+          <Input v-model="search.keyword" :placeholder="t('task.search.placeholder.keyword')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">状態</label>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('task.search.label.status') }}</label>
           <Select v-model="search.status" :options="statusOptions" />
         </div>
         <div class="flex gap-2">
           <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                   @click="() => { page = 1; fetchData() }">
-            <Search class="size-4" /> 検索
+            <Search class="size-4" /> {{ t('common.button.search') }}
           </button>
           <button class="h-9 px-3 rounded border border-border text-sm inline-flex items-center gap-1"
                   @click="resetSearch">
-            <RotateCcw class="size-4" /> リセット
+            <RotateCcw class="size-4" /> {{ t('common.button.reset') }}
           </button>
         </div>
       </div>
@@ -251,7 +262,7 @@ onMounted(() => {
         v-model:page-size="pageSize"
         @update:page="fetchData"
         @update:page-size="fetchData"
-        empty-text="該当データがありません"
+        :empty-text="t('task.emptyState')"
       >
         <template #cell-title="{ row }">
           <span class="font-medium">{{ row.title }}</span>
@@ -268,10 +279,10 @@ onMounted(() => {
         <template #cell-dueDate="{ row }">{{ row.dueDate || '-' }}</template>
         <template #cell-actions="{ row }">
           <div class="inline-flex gap-1">
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEdit(row)" title="編集">
+            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEdit(row)" :title="t('common.button.edit')">
               <Pencil class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs" @click="handleDelete(row)" title="削除">
+            <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs" @click="handleDelete(row)" :title="t('common.button.delete')">
               <Trash2 class="size-3.5" />
             </button>
           </div>
@@ -279,43 +290,43 @@ onMounted(() => {
       </DataTable>
     </Card>
 
-    <Drawer v-model:open="showEdit" :title="isEdit ? 'タスク編集' : 'タスク新規'" width="max-w-md">
+    <Drawer v-model:open="showEdit" :title="isEdit ? t('task.edit.titleEdit') : t('task.edit.titleCreate')" width="max-w-md">
       <div class="space-y-3">
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">タイトル <span class="text-destructive">*</span></label>
-          <Input v-model="editForm.title" placeholder="タスクタイトル" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('task.column.title') }} <span class="text-destructive">*</span></label>
+          <Input v-model="editForm.title" :placeholder="t('task.edit.placeholder.title')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">部署 <span class="text-destructive">*</span></label>
-          <Select v-model="editForm.deptId" :options="deptOptions" placeholder="部署を選択" :searchable="true" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('task.column.deptId') }} <span class="text-destructive">*</span></label>
+          <Select v-model="editForm.deptId" :options="deptOptions" :placeholder="t('task.edit.placeholder.deptSelect')" :searchable="true" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">内容</label>
-          <Input v-model="editForm.content" placeholder="任意" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('task.edit.label.content') }}</label>
+          <Input v-model="editForm.content" :placeholder="t('task.edit.placeholder.optional')" />
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">状態</label>
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('task.column.status') }}</label>
             <Select v-model="editForm.status" :options="statusFormOptions" />
           </div>
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">優先度</label>
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('task.column.priority') }}</label>
             <Select v-model="editForm.priority" :options="priorityOptions" />
           </div>
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">担当者</label>
-          <UserPicker v-model="editForm.assigneeUserId" placeholder="未指定" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('task.column.assignee') }}</label>
+          <UserPicker v-model="editForm.assigneeUserId" :placeholder="t('task.edit.placeholder.unassigned')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">期日</label>
-          <DatePicker v-model="editForm.dueDate" placeholder="期日を選択" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('task.column.dueDate') }}</label>
+          <DatePicker v-model="editForm.dueDate" :placeholder="t('task.edit.placeholder.dueDate')" />
         </div>
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <button class="h-9 px-3 rounded border border-border text-sm" @click="showEdit = false">キャンセル</button>
-          <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm" @click="save">保存</button>
+          <button class="h-9 px-3 rounded border border-border text-sm" @click="showEdit = false">{{ t('common.button.cancel') }}</button>
+          <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm" @click="save">{{ t('common.button.save') }}</button>
         </div>
       </template>
     </Drawer>

@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -8,6 +9,7 @@ import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { Plus, Search, RotateCcw, Pencil, Trash2 } from 'lucide-vue-next'
 
+const { t } = useI18n()
 const { confirm } = useConfirm()
 import {
   getPermissionListApi, addPermissionApi, updatePermissionApi, deletePermissionApi
@@ -25,14 +27,14 @@ const showEdit = ref(false)
 const editForm = reactive({ id: null, code: '', name: '', resource: '', action: '', module: '', description: '' })
 const isEdit = ref(false)
 
-const columns = [
-  { key: 'code', title: 'コード', minWidth: '220px' },
-  { key: 'name', title: '名称', minWidth: '160px' },
-  { key: 'module', title: 'モジュール', minWidth: '100px' },
-  { key: 'resource', title: 'リソース', minWidth: '100px' },
-  { key: 'action', title: 'アクション', minWidth: '120px' },
-  { key: 'actions', title: '操作', minWidth: '100px', align: 'center', sticky: 'right' }
-]
+const columns = computed(() => [
+  { key: 'code', title: t('permission.column.code'), minWidth: '220px' },
+  { key: 'name', title: t('permission.column.name'), minWidth: '160px' },
+  { key: 'module', title: t('permission.column.module'), minWidth: '100px' },
+  { key: 'resource', title: t('permission.column.resource'), minWidth: '100px' },
+  { key: 'action', title: t('permission.column.action'), minWidth: '120px' },
+  { key: 'actions', title: t('permission.column.actions'), minWidth: '100px', align: 'center', sticky: 'right' }
+])
 
 async function fetchData() {
   loading.value = true
@@ -68,23 +70,23 @@ async function save() {
       const r = await addPermissionApi(editForm)
       if (r.data.code !== 0) { toast.error(r.data.msg); return }
     }
-    toast.success('保存しました')
+    toast.success(t('common.message.saveSuccessful'))
     showEdit.value = false
     fetchData()
   } catch (e) { toast.error(e.message) }
 }
 
 async function handleDelete(row) {
-  if (row.isBuiltIn === 1) { toast.error('内蔵権限は削除できません'); return }
+  if (row.isBuiltIn === 1) { toast.error(t('permission.message.deleteBuiltInFailed')); return }
   const ok = await confirm({
-    title: '権限削除',
-    message: `「${row.code}」を削除しますか？`,
+    title: t('permission.confirm.deleteTitle'),
+    message: t('permission.confirm.deleteMessage', { code: row.code }),
     variant: 'destructive'
   })
   if (!ok) return
   try {
     const r = await deletePermissionApi(row.id)
-    if (r.data.code === 0) { toast.success('削除しました'); fetchData() }
+    if (r.data.code === 0) { toast.success(t('common.message.deleteSuccessful')); fetchData() }
     else toast.error(r.data.msg)
   } catch (e) { toast.error(e.message) }
 }
@@ -97,25 +99,25 @@ onMounted(fetchData)
     <Card class="p-4">
       <div class="flex flex-wrap items-end gap-3">
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">キーワード</label>
-          <Input v-model="search.keyword" placeholder="コード / 名称" class="w-60" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('common.label.keyword') }}</label>
+          <Input v-model="search.keyword" :placeholder="t('permission.search.placeholder.keyword')" class="w-60" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">モジュール</label>
-          <Input v-model="search.module" placeholder="system / pms / iot" class="w-40" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('permission.search.label.module') }}</label>
+          <Input v-model="search.module" :placeholder="t('permission.search.placeholder.module')" class="w-40" />
         </div>
         <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                 @click="() => { page = 1; fetchData() }">
-          <Search class="size-4" /> 検索
+          <Search class="size-4" /> {{ t('common.button.search') }}
         </button>
         <button class="h-9 px-3 rounded border border-border text-sm inline-flex items-center gap-1"
                 @click="resetSearch">
-          <RotateCcw class="size-4" /> リセット
+          <RotateCcw class="size-4" /> {{ t('common.button.reset') }}
         </button>
         <div class="ml-auto">
           <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                   @click="openCreate">
-            <Plus class="size-4" /> 新規
+            <Plus class="size-4" /> {{ t('common.button.new') }}
           </button>
         </div>
       </div>
@@ -134,19 +136,19 @@ onMounted(fetchData)
       >
         <template #cell-code="{ row }">
           <span class="font-mono text-xs">{{ row.code }}</span>
-          <Badge v-if="row.isBuiltIn === 1" variant="outline" class="ml-2 text-[10px]">内蔵</Badge>
+          <Badge v-if="row.isBuiltIn === 1" variant="outline" class="ml-2 text-[10px]">{{ t('common.status.builtIn') }}</Badge>
         </template>
         <template #cell-actions="{ row }">
           <div class="inline-flex gap-1">
             <button class="h-7 px-2 rounded hover:bg-muted text-xs disabled:opacity-40 disabled:cursor-not-allowed"
                     :disabled="row.isBuiltIn === 1"
-                    :title="row.isBuiltIn === 1 ? '内蔵権限は編集不可' : '編集'"
+                    :title="row.isBuiltIn === 1 ? t('permission.tooltip.editDisabled') : t('permission.tooltip.edit')"
                     @click="openEdit(row)">
               <Pencil class="size-3.5" />
             </button>
             <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs disabled:opacity-40 disabled:cursor-not-allowed"
                     :disabled="row.isBuiltIn === 1"
-                    :title="row.isBuiltIn === 1 ? '内蔵権限は削除不可' : '削除'"
+                    :title="row.isBuiltIn === 1 ? t('permission.tooltip.deleteDisabled') : t('common.button.delete')"
                     @click="handleDelete(row)">
               <Trash2 class="size-3.5" />
             </button>
@@ -155,39 +157,39 @@ onMounted(fetchData)
       </DataTable>
     </Card>
 
-    <Drawer v-model:open="showEdit" :title="isEdit ? '権限編集' : '権限新規'" width="max-w-md">
+    <Drawer v-model:open="showEdit" :title="isEdit ? t('permission.edit.titleEdit') : t('permission.edit.titleCreate')" width="max-w-md">
       <div class="space-y-3">
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">コード <span class="text-destructive">*</span></label>
-          <Input v-model="editForm.code" :disabled="isEdit" placeholder="resource:action" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('permission.edit.label.code') }} <span class="text-destructive">*</span></label>
+          <Input v-model="editForm.code" :disabled="isEdit" :placeholder="t('permission.edit.placeholder.code')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">名称 <span class="text-destructive">*</span></label>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('permission.edit.label.name') }} <span class="text-destructive">*</span></label>
           <Input v-model="editForm.name" />
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">リソース</label>
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('permission.edit.label.resource') }}</label>
             <Input v-model="editForm.resource" :disabled="isEdit" />
           </div>
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">アクション</label>
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('permission.edit.label.action') }}</label>
             <Input v-model="editForm.action" :disabled="isEdit" />
           </div>
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">モジュール</label>
-          <Input v-model="editForm.module" placeholder="system / pms / iot" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('permission.edit.label.module') }}</label>
+          <Input v-model="editForm.module" :placeholder="t('permission.edit.placeholder.module')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">説明</label>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('permission.edit.label.description') }}</label>
           <Input v-model="editForm.description" />
         </div>
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <button class="h-9 px-3 rounded border border-border text-sm" @click="showEdit = false">キャンセル</button>
-          <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm" @click="save">保存</button>
+          <button class="h-9 px-3 rounded border border-border text-sm" @click="showEdit = false">{{ t('common.button.cancel') }}</button>
+          <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm" @click="save">{{ t('common.button.save') }}</button>
         </div>
       </template>
     </Drawer>

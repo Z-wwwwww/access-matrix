@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useMenuStore } from '@/stores/menu'
 import { useTabsStore } from '@/stores/tabs'
@@ -8,6 +9,7 @@ import { User, Lock } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
+const { t } = useI18n()
 const authStore = useAuthStore()
 const menuStore = useMenuStore()
 const tabsStore = useTabsStore()
@@ -22,11 +24,11 @@ const errorMsg = ref('')
 
 async function handleLogin() {
   if (!form.value.username) {
-    errorMsg.value = 'ユーザー名を入力してください'
+    errorMsg.value = t('login.message.enterUsername')
     return
   }
   if (!form.value.password) {
-    errorMsg.value = 'パスワードを入力してください'
+    errorMsg.value = t('login.message.enterPassword')
     return
   }
 
@@ -52,10 +54,10 @@ async function handleLogin() {
       const redirect = route.query.from || '/'
       router.replace(redirect)
     } else {
-      errorMsg.value = res.data.msg || 'ログインに失敗しました'
+      errorMsg.value = res.data.msg || t('login.message.loginFailed')
     }
   } catch (err) {
-    errorMsg.value = err.message || 'ログインに失敗しました'
+    errorMsg.value = err.message || t('login.message.loginFailed')
   } finally {
     loading.value = false
   }
@@ -90,7 +92,7 @@ onMounted(() => {
       <form @submit.prevent="handleLogin" class="space-y-4">
         <!-- identifier (username / email / user_no) -->
         <div>
-          <label class="block text-sm font-medium text-foreground mb-1.5">ユーザー名 / メール / 番号</label>
+          <label class="block text-sm font-medium text-foreground mb-1.5">{{ t('login.identifierLabel') }}</label>
           <div class="relative">
             <div class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
               <User :size="16" />
@@ -98,7 +100,7 @@ onMounted(() => {
             <input
               v-model="form.username"
               type="text"
-              placeholder="ユーザー名・メール・ユーザー番号"
+              :placeholder="t('login.identifierPlaceholder')"
               class="w-full h-10 pl-10 pr-4 border border-input rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
             />
           </div>
@@ -106,7 +108,7 @@ onMounted(() => {
 
         <!-- password -->
         <div>
-          <label class="block text-sm font-medium text-foreground mb-1.5">パスワード</label>
+          <label class="block text-sm font-medium text-foreground mb-1.5">{{ t('login.passwordLabel') }}</label>
           <div class="relative">
             <div class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
               <Lock :size="16" />
@@ -114,7 +116,7 @@ onMounted(() => {
             <input
               v-model="form.password"
               type="password"
-              placeholder="パスワードを入力してください"
+              :placeholder="t('login.passwordPlaceholder')"
               class="w-full h-10 pl-10 pr-4 border border-input rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
             />
           </div>
@@ -126,13 +128,13 @@ onMounted(() => {
           :disabled="loading"
           class="w-full h-10 bg-primary text-primary-foreground font-medium rounded-lg text-sm hover:bg-primary/90 active:bg-primary/80 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {{ loading ? 'ログイン中...' : 'ログイン' }}
+          {{ loading ? t('login.submitting') : t('login.submit') }}
         </button>
       </form>
     </div>
     <!-- Footer -->
     <footer class="absolute bottom-3 left-0 right-0 text-center text-[11px] text-muted-foreground">
-      Copyright © 2026 SOZONEXT Co.,Ltd.
+      {{ t('layout.footer.copyright') }}
     </footer>
   </div>
 </template>

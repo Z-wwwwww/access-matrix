@@ -25,6 +25,8 @@ public class MenuNode {
     private Integer hide;
     private Integer hideFooter;
     private Integer hideSidebar;
+    /** 1 = pinned to the top of the sidebar (admin-controlled). */
+    private Integer pinned;
     private String tabUnique;
     private String redirect;
     private String permissionCode;
@@ -62,6 +64,9 @@ public class MenuNode {
 
     public Integer getHideSidebar() { return hideSidebar; }
     public void setHideSidebar(Integer hideSidebar) { this.hideSidebar = hideSidebar; }
+
+    public Integer getPinned() { return pinned; }
+    public void setPinned(Integer pinned) { this.pinned = pinned; }
 
     public String getTabUnique() { return tabUnique; }
     public void setTabUnique(String tabUnique) { this.tabUnique = tabUnique; }

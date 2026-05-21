@@ -1,18 +1,23 @@
 <script setup>
-import { onMounted, reactive, ref, computed } from 'vue'
+import { onMounted, reactive, ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
+import Switch from '@/components/ui/Switch.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Drawer from '@/components/ui/Drawer.vue'
+import IconPicker from '@/components/shared/IconPicker.vue'
+import LucideIcon from '@/components/shared/LucideIcon.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import { Plus, Pencil, Trash2, ChevronRight, ChevronDown } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, HelpCircle, Pin } from 'lucide-vue-next'
 import {
   getMenuIndexApi, addMenuApi, editMenuApi, deleteMenuApi
 } from '../../../../services/menu'
 
+const { t } = useI18n()
 const { confirm } = useConfirm()
 
 const list = ref([])
@@ -24,19 +29,29 @@ const isEdit = ref(false)
 const editForm = reactive({
   id: null, parentId: null, code: '', title: '', menuType: 2,
   path: '', component: '', icon: '', sortOrder: 0,
-  hide: 0, hideFooter: 0, hideSidebar: 0,
+  hide: 0, hideFooter: 0, hideSidebar: 0, pinned: 0,
   permissionCode: '', status: 1
 })
 
-const TYPE_LABEL = { 1: 'ディレクトリ', 2: 'メニュー', 3: 'ボタン' }
-const menuTypeOptions = [
-  { label: 'ディレクトリ', value: 1 },
-  { label: 'メニュー', value: 2 },
-  { label: 'ボタン', value: 3 }
-]
-const yesNoOptions = [
-  { label: 'いいえ', value: 0 }, { label: 'はい', value: 1 }
-]
+const TYPE_LABEL = computed(() => ({
+  1: t('menu.option.type.directory'),
+  2: t('menu.option.type.menu'),
+  3: t('menu.option.type.button')
+}))
+const menuTypeOptions = computed(() => [
+  { label: t('menu.option.type.directory'), value: 1 },
+  { label: t('menu.option.type.menu'), value: 2 },
+  { label: t('menu.option.type.button'), value: 3 }
+])
+
+// 只允许 menuType=2（页面/菜单）置顶 —— 目录和按钮置顶在 UI 上没意义
+const canPin = computed(() => editForm.menuType === 2)
+
+// menuType 切换离开 2 → 强制把 pinned 清零，避免历史脏数据保留
+watch(
+  () => editForm.menuType,
+  (t) => { if (t !== 2 && editForm.pinned) editForm.pinned = 0 }
+)
 
 const tree = computed(() => buildTree(list.value))
 
@@ -72,14 +87,14 @@ const flatTree = computed(() => {
 // rendered as a panel below the row), not parent/child indentation, so we
 // keep the expanded-state and flattening logic local and hand DataTable a
 // pre-flattened list.
-const columns = [
-  { key: 'title',          title: '名称 / パス' },
-  { key: 'menuType',       title: '種類' },
-  { key: 'component',      title: 'コンポーネント' },
-  { key: 'permissionCode', title: '権限' },
-  { key: 'hide',           title: '非表示', align: 'center' },
-  { key: 'actions',        title: '操作',  align: 'center' }
-]
+const columns = computed(() => [
+  { key: 'title',          title: t('menu.column.title') },
+  { key: 'menuType',       title: t('menu.column.type') },
+  { key: 'component',      title: t('menu.column.component') },
+  { key: 'permissionCode', title: t('menu.column.permission') },
+  { key: 'hide',           title: t('menu.column.hide'), align: 'center' },
+  { key: 'actions',        title: t('menu.column.actions'), align: 'center' }
+])
 
 async function fetchData() {
   loading.value = true
@@ -103,7 +118,7 @@ function openCreate(parent = null) {
   Object.assign(editForm, {
     id: null, parentId: parent?.id || null, code: '', title: '', menuType: parent ? 2 : 1,
     path: '', component: '', icon: '', sortOrder: 0,
-    hide: 0, hideFooter: 0, hideSidebar: 0,
+    hide: 0, hideFooter: 0, hideSidebar: 0, pinned: 0,
     permissionCode: '', status: 1
   })
   showEdit.value = true
@@ -111,10 +126,15 @@ function openCreate(parent = null) {
 function openEdit(row) {
   isEdit.value = true
   Object.assign(editForm, row)
+  // 防御：历史脏数据可能存在 menuType≠2 但 pinned=1 的记录，
+  // 进入编辑时直接清零，否则 switch 被 disabled 用户无法手动关掉。
+  if (editForm.menuType !== 2) editForm.pinned = 0
   showEdit.value = true
 }
 
 async function save() {
+  // 提交前再做一次保险：menuType 不是「メニュー」时不允许 pinned。
+  if (editForm.menuType !== 2) editForm.pinned = 0
   try {
     if (isEdit.value) {
       const r = await editMenuApi(editForm)
@@ -123,7 +143,7 @@ async function save() {
       const r = await addMenuApi(editForm)
       if (r.data.code !== 0) { toast.error(r.data.msg); return }
     }
-    toast.success('保存しました')
+    toast.success(t('common.message.saveSuccessful'))
     showEdit.value = false
     fetchData()
   } catch (e) { toast.error(e.message) }
@@ -131,14 +151,14 @@ async function save() {
 
 async function handleDelete(row) {
   const ok = await confirm({
-    title: 'メニュー削除',
-    message: `「${row.code}」を削除しますか？`,
+    title: t('menu.confirm.deleteTitle'),
+    message: t('menu.confirm.deleteMessage', { code: row.code }),
     variant: 'destructive'
   })
   if (!ok) return
   try {
     const r = await deleteMenuApi(row.id)
-    if (r.data.code === 0) { toast.success('削除しました'); fetchData() }
+    if (r.data.code === 0) { toast.success(t('common.message.deleteSuccessful')); fetchData() }
     else toast.error(r.data.msg)
   } catch (e) { toast.error(e.message) }
 }
@@ -149,10 +169,10 @@ onMounted(fetchData)
 <template>
   <div class="space-y-3">
     <Card class="p-4 flex items-center justify-between">
-      <h1 class="text-lg font-semibold">メニュー管理</h1>
+      <h1 class="text-lg font-semibold">{{ t('menu.title') }}</h1>
       <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
               @click="openCreate(null)">
-        <Plus class="size-4" /> ルート追加
+        <Plus class="size-4" /> {{ t('menu.button.addRoot') }}
       </button>
     </Card>
 
@@ -162,7 +182,7 @@ onMounted(fetchData)
         :data="flatTree"
         :loading="loading"
         :show-pagination="false"
-        empty-text="メニューがありません"
+        :empty-text="t('menu.message.noMenus')"
       >
         <template #cell-title="{ row }">
           <div class="flex items-center gap-1" :style="{ paddingLeft: row.level * 18 + 'px' }">
@@ -171,7 +191,13 @@ onMounted(fetchData)
               <ChevronRight v-else class="size-4" />
             </button>
             <span v-else class="inline-block size-4"></span>
+            <LucideIcon v-if="row.icon" :name="row.icon" :size="14" />
             <span class="font-medium">{{ row.title }}</span>
+            <Pin
+              v-if="row.pinned === 1"
+              class="size-3.5 text-brand-orange fill-brand-orange"
+              :title="t('menu.edit.tip.pinned')"
+            />
             <span class="text-xs text-muted-foreground font-mono ml-2">{{ row.path || '-' }}</span>
           </div>
         </template>
@@ -187,13 +213,13 @@ onMounted(fetchData)
         <template #cell-hide="{ row }">{{ row.hide === 1 ? '✓' : '' }}</template>
         <template #cell-actions="{ row }">
           <div class="inline-flex gap-1">
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openCreate(row)" title="子追加">
+            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openCreate(row)" :title="t('menu.tooltip.addChild')">
               <Plus class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEdit(row)" title="編集">
+            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEdit(row)" :title="t('menu.tooltip.edit')">
               <Pencil class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs" @click="handleDelete(row)" title="削除">
+            <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs" @click="handleDelete(row)" :title="t('common.button.delete')">
               <Trash2 class="size-3.5" />
             </button>
           </div>
@@ -201,69 +227,101 @@ onMounted(fetchData)
       </DataTable>
     </Card>
 
-    <Drawer v-model:open="showEdit" :title="isEdit ? 'メニュー編集' : 'メニュー新規'" width="max-w-lg">
+    <Drawer v-model:open="showEdit" :title="isEdit ? t('menu.edit.titleEdit') : t('menu.edit.titleCreate')" width="max-w-lg">
       <div class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">コード <span class="text-destructive">*</span></label>
-            <Input v-model="editForm.code" :disabled="isEdit" placeholder="system.user" />
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.code') }} <span class="text-destructive">*</span></label>
+            <Input v-model="editForm.code" :disabled="isEdit" :placeholder="t('menu.edit.placeholder.code')" />
           </div>
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">名称 <span class="text-destructive">*</span></label>
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.name') }} <span class="text-destructive">*</span></label>
             <Input v-model="editForm.title" />
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">種類</label>
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.type') }}</label>
             <Select v-model="editForm.menuType" :options="menuTypeOptions" />
           </div>
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">並び順</label>
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.sortOrder') }}</label>
             <Input v-model.number="editForm.sortOrder" type="number" />
           </div>
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">親メニュー ID</label>
-          <Input v-model="editForm.parentId" placeholder="ルートの場合は空" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.parentId') }}</label>
+          <Input v-model="editForm.parentId" :placeholder="t('menu.edit.placeholder.parentId')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">パス</label>
-          <Input v-model="editForm.path" placeholder="/system/user" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.path') }}</label>
+          <Input v-model="editForm.path" :placeholder="t('menu.edit.placeholder.path')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">コンポーネント</label>
-          <Input v-model="editForm.component" placeholder="/system/User/User" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.component') }}</label>
+          <Input v-model="editForm.component" :placeholder="t('menu.edit.placeholder.component')" />
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">アイコン</label>
-            <Input v-model="editForm.icon" placeholder="user / setting" />
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.icon') }}</label>
+            <IconPicker v-model="editForm.icon" />
           </div>
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">権限コード</label>
-            <Input v-model="editForm.permissionCode" placeholder="user:read" />
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.permissionCode') }}</label>
+            <Input v-model="editForm.permissionCode" :placeholder="t('menu.edit.placeholder.permissionCode')" />
           </div>
         </div>
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">非表示</label>
-            <Select v-model="editForm.hide" :options="yesNoOptions" />
+            <label class="text-xs text-muted-foreground block mb-1 flex items-center gap-1">
+              {{ t('menu.edit.label.pinned') }}
+              <span
+                class="inline-flex cursor-help text-muted-foreground/70 hover:text-foreground"
+                :title="canPin ? t('menu.edit.tip.pinned') : t('menu.edit.tip.pinnedDisabled')"
+              >
+                <HelpCircle class="size-3.5" />
+              </span>
+            </label>
+            <Switch
+              v-model="editForm.pinned"
+              :checked-value="1"
+              :unchecked-value="0"
+              :disabled="!canPin"
+            />
           </div>
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">サイドバー非表示</label>
-            <Select v-model="editForm.hideSidebar" :options="yesNoOptions" />
+            <label class="text-xs text-muted-foreground block mb-1 flex items-center gap-1">
+              {{ t('menu.edit.label.hide') }}
+              <span class="inline-flex cursor-help text-muted-foreground/70 hover:text-foreground" :title="t('menu.edit.tip.hide')">
+                <HelpCircle class="size-3.5" />
+              </span>
+            </label>
+            <Switch v-model="editForm.hide" :checked-value="1" :unchecked-value="0" />
           </div>
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">フッター非表示</label>
-            <Select v-model="editForm.hideFooter" :options="yesNoOptions" />
+            <label class="text-xs text-muted-foreground block mb-1 flex items-center gap-1">
+              {{ t('menu.edit.label.hideSidebar') }}
+              <span class="inline-flex cursor-help text-muted-foreground/70 hover:text-foreground" :title="t('menu.edit.tip.hideSidebar')">
+                <HelpCircle class="size-3.5" />
+              </span>
+            </label>
+            <Switch v-model="editForm.hideSidebar" :checked-value="1" :unchecked-value="0" />
+          </div>
+          <div>
+            <label class="text-xs text-muted-foreground block mb-1 flex items-center gap-1">
+              {{ t('menu.edit.label.hideFooter') }}
+              <span class="inline-flex cursor-help text-muted-foreground/70 hover:text-foreground" :title="t('menu.edit.tip.hideFooter')">
+                <HelpCircle class="size-3.5" />
+              </span>
+            </label>
+            <Switch v-model="editForm.hideFooter" :checked-value="1" :unchecked-value="0" />
           </div>
         </div>
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <button class="h-9 px-3 rounded border border-border text-sm" @click="showEdit = false">キャンセル</button>
-          <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm" @click="save">保存</button>
+          <button class="h-9 px-3 rounded border border-border text-sm" @click="showEdit = false">{{ t('common.button.cancel') }}</button>
+          <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm" @click="save">{{ t('common.button.save') }}</button>
         </div>
       </template>
     </Drawer>

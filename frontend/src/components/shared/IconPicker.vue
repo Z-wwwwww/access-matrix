@@ -1,7 +1,10 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { iconMap, iconCategories } from '@/utils/icon-registry'
 import { X, ChevronDown, Search } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 const props = defineProps({
   modelValue: {
@@ -84,7 +87,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
     >
       <component v-if="previewIcon" :is="previewIcon" :size="16" class="shrink-0 text-foreground" />
       <span v-if="modelValue" class="flex-1 truncate text-foreground text-left">{{ modelValue }}</span>
-      <span v-else class="flex-1 text-muted-foreground text-left">アイコンを選択</span>
+      <span v-else class="flex-1 text-muted-foreground text-left">{{ t('picker.icon.selectPlaceholder') }}</span>
       <button
         v-if="modelValue && !disabled"
         type="button"
@@ -109,7 +112,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
             <input
               v-model="searchQuery"
               type="text"
-              placeholder="アイコンを検索..."
+              :placeholder="t('picker.icon.searchPlaceholder')"
               class="w-full h-8 pl-8 pr-3 border border-input rounded-md bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
@@ -153,7 +156,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
               </button>
             </div>
             <div v-else class="p-4 text-center text-sm text-muted-foreground">
-              該当するアイコンがありません
+              {{ t('picker.icon.noResults') }}
             </div>
           </div>
         </div>

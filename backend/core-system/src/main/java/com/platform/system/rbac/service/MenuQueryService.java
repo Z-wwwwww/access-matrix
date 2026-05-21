@@ -163,6 +163,7 @@ public class MenuQueryService {
         n.setHide(m.getHide());
         n.setHideFooter(m.getHideFooter());
         n.setHideSidebar(m.getHideSidebar());
+        n.setPinned(m.getPinned());
         n.setTabUnique(m.getTabUnique());
         n.setRedirect(m.getRedirect());
         n.setPermissionCode(m.getPermissionCode());
