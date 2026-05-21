@@ -1,0 +1,28 @@
+# EditorConfig — keeps formatting consistent across both stacks
+# https://editorconfig.org/
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+# Java / Maven — 4 spaces
+[*.{java,xml,properties}]
+indent_size = 4
+
+# Frontend — 2 spaces (matches eslint / Vue / JS community default)
+[*.{js,mjs,cjs,jsx,ts,tsx,vue,json,yml,yaml,html,css,scss}]
+indent_size = 2
+
+# Markdown — preserve trailing spaces (line break syntax)
+[*.md]
+trim_trailing_whitespace = false
+indent_size = 2
+
+# Makefile — must use tabs
+[Makefile]
+indent_style = tab

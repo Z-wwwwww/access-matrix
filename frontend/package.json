@@ -1,0 +1,48 @@
+{
+  "name": "access-matrix-front",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "ai:generate": "node scripts/ai-cli.mjs generate",
+    "ai:inspect": "node scripts/ai-cli.mjs inspect",
+    "ai:create-component": "node scripts/ai-cli.mjs create-component",
+    "ai:create-page": "node scripts/ai-cli.mjs create-page",
+    "ai:update-page": "node scripts/ai-cli.mjs update-page",
+    "ai:analyze": "node scripts/ai-cli.mjs analyze",
+    "lint": "eslint \"src/**/*.{js,vue}\"",
+    "lint:fix": "eslint \"src/**/*.{js,vue}\" --fix"
+  },
+  "dependencies": {
+    "@tanstack/vue-query": "^5.60.0",
+    "axios": "^1.9.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "dayjs": "^1.11.20",
+    "echarts": "^6.0.0",
+    "lucide-vue-next": "^0.475.0",
+    "nprogress": "^0.2.0",
+    "pinia": "^3.0.2",
+    "qs": "^6.15.1",
+    "quill": "^2.0.3",
+    "quill-delta": "^5.1.0",
+    "radix-vue": "^1.9.17",
+    "tailwind-merge": "^3.3.0",
+    "vue": "^3.5.13",
+    "vue-echarts": "^8.0.1",
+    "vue-i18n": "^9.14.0",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.4",
+    "@vitejs/plugin-vue": "^5.2.0",
+    "eslint": "^10.3.0",
+    "eslint-plugin-vue": "^10.9.1",
+    "globals": "^17.6.0",
+    "tailwindcss": "^4.1.4",
+    "vite": "^6.3.0"
+  }
+}

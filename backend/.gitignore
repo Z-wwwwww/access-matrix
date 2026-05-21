@@ -1,0 +1,77 @@
+# ===== Maven =====
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# ===== Java =====
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+
+# ===== IntelliJ IDEA =====
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ===== Eclipse =====
+.classpath
+.project
+.settings/
+.factorypath
+.springBeans
+.apt_generated/
+.sts4-cache/
+
+# ===== VS Code =====
+.vscode/
+*.code-workspace
+
+# ===== NetBeans =====
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ===== Logs =====
+logs/
+*.log
+*.log.gz
+*.log.*
+
+# ===== Local env / secrets =====
+.env
+.env.local
+*.local.properties
+application-local-override.yml
+
+# ===== Claude Code local overrides =====
+.claude/settings.local.json
+
+# ===== Spring Boot Devtools =====
+.spring-boot-devtools.properties
+
+# ===== Test reports =====
+surefire-reports/
+failsafe-reports/
+*.coverage
+jacoco.exec
