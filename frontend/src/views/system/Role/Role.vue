@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -10,9 +11,16 @@ import { Plus, Search, RotateCcw, Pencil, Trash2 } from 'lucide-vue-next'
 import { getRoleListApi, deleteRoleApi } from '../../../../services/role'
 import RoleEdit from './RoleEdit.vue'
 
+const { t } = useI18n()
 const { confirm } = useConfirm()
 
-const SCOPE_LABEL = { 1: '全部', 2: '本部署+下位', 3: '本部署', 4: '本人のみ', 5: 'カスタム' }
+const SCOPE_LABEL = computed(() => ({
+  1: t('role.option.scope.all'),
+  2: t('role.option.scope.deptAndSub'),
+  3: t('role.option.scope.dept'),
+  4: t('role.option.scope.self'),
+  5: t('role.option.scope.custom')
+}))
 
 const loading = ref(false)
 const list = ref([])
@@ -23,13 +31,13 @@ const search = reactive({ keyword: '' })
 const showEdit = ref(false)
 const current = ref(null)
 
-const columns = [
-  { key: 'code', title: 'コード', minWidth: '200px' },
-  { key: 'name', title: '名称', minWidth: '160px' },
-  { key: 'dataScope', title: 'データスコープ', minWidth: '140px', align: 'center' },
-  { key: 'status', title: '状態', minWidth: '80px', align: 'center' },
-  { key: 'actions', title: '操作', minWidth: '120px', align: 'center', sticky: 'right' }
-]
+const columns = computed(() => [
+  { key: 'code', title: t('role.column.code'), minWidth: '200px' },
+  { key: 'name', title: t('role.column.name'), minWidth: '160px' },
+  { key: 'dataScope', title: t('role.column.dataScope'), minWidth: '140px', align: 'center' },
+  { key: 'status', title: t('role.column.status'), minWidth: '80px', align: 'center' },
+  { key: 'actions', title: t('role.column.actions'), minWidth: '120px', align: 'center', sticky: 'right' }
+])
 
 async function fetchData() {
   loading.value = true
@@ -47,17 +55,17 @@ function openCreate() { current.value = null; showEdit.value = true }
 function openEdit(row) { current.value = row; showEdit.value = true }
 
 async function handleDelete(row) {
-  if (row.isBuiltIn === 1) { toast.error('内蔵ロールは削除できません'); return }
+  if (row.isBuiltIn === 1) { toast.error(t('role.message.deleteBuiltInFailed')); return }
   const ok = await confirm({
-    title: 'ロール削除',
-    message: `「${row.code}」を削除しますか？`,
+    title: t('role.confirm.deleteTitle'),
+    message: t('role.confirm.deleteMessage', { code: row.code }),
     variant: 'destructive'
   })
   if (!ok) return
   try {
     const res = await deleteRoleApi(row.id)
-    if (res.data.code === 0) { toast.success('削除しました'); fetchData() }
-    else toast.error(res.data.msg || '削除失敗')
+    if (res.data.code === 0) { toast.success(t('common.message.deleteSuccessful')); fetchData() }
+    else toast.error(res.data.msg || t('role.message.deleteFailed'))
   } catch (e) { toast.error(e.message) }
 }
 
@@ -69,21 +77,21 @@ onMounted(fetchData)
     <Card class="p-4">
       <div class="flex flex-wrap items-end gap-3">
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">キーワード</label>
-          <Input v-model="search.keyword" placeholder="コード / 名称" class="w-60" />
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('common.label.keyword') }}</label>
+          <Input v-model="search.keyword" :placeholder="t('role.search.placeholder.keyword')" class="w-60" />
         </div>
         <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                 @click="() => { page = 1; fetchData() }">
-          <Search class="size-4" /> 検索
+          <Search class="size-4" /> {{ t('common.button.search') }}
         </button>
         <button class="h-9 px-3 rounded border border-border text-sm inline-flex items-center gap-1"
                 @click="resetSearch">
-          <RotateCcw class="size-4" /> リセット
+          <RotateCcw class="size-4" /> {{ t('common.button.reset') }}
         </button>
         <div class="ml-auto">
           <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                   @click="openCreate">
-            <Plus class="size-4" /> 新規
+            <Plus class="size-4" /> {{ t('common.button.new') }}
           </button>
         </div>
       </div>
@@ -102,24 +110,24 @@ onMounted(fetchData)
       >
         <template #cell-code="{ row }">
           <span class="font-mono">{{ row.code }}</span>
-          <Badge v-if="row.isBuiltIn === 1" variant="outline" class="ml-2 text-[10px]">内蔵</Badge>
+          <Badge v-if="row.isBuiltIn === 1" variant="outline" class="ml-2 text-[10px]">{{ t('common.status.builtIn') }}</Badge>
         </template>
         <template #cell-dataScope="{ row }">
           <Badge variant="outline">{{ SCOPE_LABEL[row.dataScope] || '-' }}</Badge>
         </template>
         <template #cell-status="{ row }">
-          <Badge :variant="row.status === 1 ? 'default' : 'outline'">{{ row.status === 1 ? '有効' : '無効' }}</Badge>
+          <Badge :variant="row.status === 1 ? 'default' : 'outline'">{{ row.status === 1 ? t('common.status.active') : t('common.status.inactive') }}</Badge>
         </template>
         <template #cell-actions="{ row }">
           <div class="inline-flex items-center gap-1">
             <button class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
-                    :title="row.isBuiltIn === 1 ? '内蔵ロールは閲覧のみ（編集ボタンで詳細表示）' : '編集'"
+                    :title="row.isBuiltIn === 1 ? t('role.tooltip.viewOnly') : t('role.tooltip.edit')"
                     @click="openEdit(row)">
               <Pencil class="size-3.5" />
             </button>
             <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                     :disabled="row.isBuiltIn === 1"
-                    :title="row.isBuiltIn === 1 ? '内蔵ロールは削除不可' : '削除'"
+                    :title="row.isBuiltIn === 1 ? t('role.tooltip.deleteDisabled') : t('common.button.delete')"
                     @click="handleDelete(row)">
               <Trash2 class="size-3.5" />
             </button>

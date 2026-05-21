@@ -294,7 +294,7 @@ const canCloseAll = canCloseOthers
     <div class="shrink-0 flex items-center pl-2 border-l border-border ml-1">
       <button
         type="button"
-        title="タブ操作"
+        :title="t('layout.tabs.tabAction')"
         class="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
         @click.stop="toggleDropdown"
       >
@@ -314,19 +314,19 @@ const canCloseAll = canCloseOthers
           class="w-full px-3 py-1.5 text-left text-foreground hover:bg-muted transition-colors"
           @click="ctxCloseCurrent"
         >
-          このタブを閉じる
+          {{ t('layout.tabs.closeCurrent') }}
         </button>
         <button
           class="w-full px-3 py-1.5 text-left text-foreground hover:bg-muted transition-colors"
           @click="tabsStore.closeOthers(contextMenu.key)"
         >
-          他のタブを閉じる
+          {{ t('layout.tabs.closeOthers') }}
         </button>
         <button
           class="w-full px-3 py-1.5 text-left text-foreground hover:bg-muted transition-colors"
           @click="tabsStore.closeAll()"
         >
-          すべてのタブを閉じる
+          {{ t('layout.tabs.closeAll') }}
         </button>
       </div>
     </Teleport>
@@ -344,7 +344,7 @@ const canCloseAll = canCloseOthers
           :disabled="!canCloseCurrent"
           @click="ddCloseCurrent"
         >
-          現在のタブを閉じる
+          {{ t('layout.tabs.closeCurrent') }}
         </button>
         <button
           class="w-full px-3 py-1.5 text-left transition-colors"
@@ -352,7 +352,7 @@ const canCloseAll = canCloseOthers
           :disabled="!canCloseOthers"
           @click="ddCloseOthers"
         >
-          他のタブを閉じる
+          {{ t('layout.tabs.closeOthers') }}
         </button>
         <button
           class="w-full px-3 py-1.5 text-left transition-colors"
@@ -360,7 +360,7 @@ const canCloseAll = canCloseOthers
           :disabled="!canCloseAll"
           @click="ddCloseAll"
         >
-          すべてのタブを閉じる
+          {{ t('layout.tabs.closeAll') }}
         </button>
       </div>
     </Teleport>

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Drawer from '@/components/ui/Drawer.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -16,6 +17,8 @@ import {
 import { getPermissionsByModuleApi } from '../../../../services/permission'
 import { getMenuIndexApi } from '../../../../services/menu'
 import { getDeptTreeApi } from '../../../../services/dept'
+
+const { t } = useI18n()
 
 const props = defineProps({
   open: Boolean,
@@ -36,16 +39,17 @@ const form = reactive({
   status: 1
 })
 
-const scopeOptions = [
-  { label: '全部 (ALL)', value: 1 },
-  { label: '本部署 + 下位 (DEPT_AND_SUB)', value: 2 },
-  { label: '本部署のみ (DEPT)', value: 3 },
-  { label: '本人のみ (SELF)', value: 4 },
-  { label: 'カスタム (CUSTOM)', value: 5 }
-]
-const statusOptions = [
-  { label: '有効', value: 1 }, { label: '無効', value: 0 }
-]
+const scopeOptions = computed(() => [
+  { label: t('role.edit.option.scope.all'), value: 1 },
+  { label: t('role.edit.option.scope.deptAndSub'), value: 2 },
+  { label: t('role.edit.option.scope.deptOnly'), value: 3 },
+  { label: t('role.edit.option.scope.self'), value: 4 },
+  { label: t('role.edit.option.scope.custom'), value: 5 }
+])
+const statusOptions = computed(() => [
+  { label: t('common.status.active'), value: 1 },
+  { label: t('common.status.inactive'), value: 0 }
+])
 
 const permsByModule = ref({})
 const selectedPermIds = ref([])
@@ -58,10 +62,10 @@ const selectedDeptIds = ref([])
 
 const saving = ref(false)
 const tabItems = computed(() => [
-  { value: 'basic',  label: '基本' },
-  { value: 'perms',  label: '権限' },
-  { value: 'menus',  label: 'メニュー' },
-  ...(form.dataScope === 5 ? [{ value: 'depts', label: '部署' }] : [])
+  { value: 'basic',  label: t('role.edit.tab.basic') },
+  { value: 'perms',  label: t('role.edit.tab.permissions') },
+  { value: 'menus',  label: t('role.edit.tab.menus') },
+  ...(form.dataScope === 5 ? [{ value: 'depts', label: t('role.edit.tab.depts') }] : [])
 ])
 
 watch(() => props.open, async (open) => {
@@ -120,11 +124,11 @@ async function save() {
     if (isEdit.value) {
       const body = { name: form.name, description: form.description, dataScope: form.dataScope, sortOrder: form.sortOrder, status: form.status }
       const r = await updateRoleApi(props.role.id, body)
-      if (r.data.code !== 0) { toast.error(r.data.msg || '更新失敗'); return }
+      if (r.data.code !== 0) { toast.error(r.data.msg || t('role.edit.message.updateFailed')); return }
       roleId = props.role.id
     } else {
       const r = await addRoleApi(form)
-      if (r.data.code !== 0) { toast.error(r.data.msg || '作成失敗'); return }
+      if (r.data.code !== 0) { toast.error(r.data.msg || t('role.edit.message.createFailed')); return }
       roleId = r.data.data
     }
     await Promise.all([
@@ -134,7 +138,7 @@ async function save() {
         ? bindRoleDeptsApi(roleId, selectedDeptIds.value)
         : Promise.resolve()
     ])
-    toast.success('保存しました')
+    toast.success(t('common.message.saveSuccessful'))
     emit('saved')
     emit('update:open', false)
   } catch (e) { toast.error(e.message) }
@@ -145,39 +149,38 @@ async function save() {
 <template>
   <Drawer
     :open="open"
-    :title="isEdit ? 'ロール編集' : 'ロール新規'"
+    :title="isEdit ? t('role.edit.titleEdit') : t('role.edit.titleCreate')"
     width="max-w-2xl"
     @update:open="(v) => emit('update:open', v)"
   >
     <div v-if="isLocked"
          class="mb-3 text-xs px-3 py-2 rounded bg-amber-100 border border-amber-300 text-amber-900">
-      内蔵ロールは読み取り専用です。コード・データスコープ・権限/メニュー/部署の割り当てを変更すると、
-      認証ループや権限のドリフトを引き起こす可能性があります。
+      {{ t('role.edit.lockedHint') }}
     </div>
     <Tabs v-model="tab" :items="tabItems">
       <TabsContent value="basic" force-mount>
         <div class="space-y-4 pt-2">
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="text-xs text-muted-foreground block mb-1">コード <span class="text-destructive">*</span></label>
+              <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.code') }} <span class="text-destructive">*</span></label>
               <Input v-model="form.code" :disabled="isEdit || isLocked" placeholder="PMS_FRONT_DESK" />
             </div>
             <div>
-              <label class="text-xs text-muted-foreground block mb-1">名称 <span class="text-destructive">*</span></label>
+              <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.name') }} <span class="text-destructive">*</span></label>
               <Input v-model="form.name" :disabled="isLocked" />
             </div>
           </div>
           <div>
-            <label class="text-xs text-muted-foreground block mb-1">説明</label>
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.description') }}</label>
             <Input v-model="form.description" :disabled="isLocked" />
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="text-xs text-muted-foreground block mb-1">データスコープ</label>
+              <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.dataScope') }}</label>
               <Select v-model="form.dataScope" :options="scopeOptions" :disabled="isLocked" />
             </div>
             <div>
-              <label class="text-xs text-muted-foreground block mb-1">状態</label>
+              <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.status') }}</label>
               <Select v-model="form.status" :options="statusOptions" :disabled="isLocked" />
             </div>
           </div>
@@ -197,7 +200,7 @@ async function save() {
             </div>
           </div>
           <div v-if="!Object.keys(permsByModule).length" class="text-sm text-muted-foreground p-4">
-            権限がありません
+            {{ t('role.edit.message.noPermissions') }}
           </div>
         </div>
       </TabsContent>
@@ -211,7 +214,7 @@ async function save() {
             <span class="text-muted-foreground">— {{ m.title }}</span>
           </Checkbox>
           <div v-if="!flatMenus.length" class="text-sm text-muted-foreground p-4">
-            メニューがありません
+            {{ t('role.edit.message.noMenus') }}
           </div>
         </div>
       </TabsContent>
@@ -226,7 +229,7 @@ async function save() {
             <span class="text-muted-foreground text-xs font-mono">{{ d.code }}</span>
           </Checkbox>
           <div v-if="!flatDepts.length" class="text-sm text-muted-foreground p-4">
-            部署がありません
+            {{ t('role.edit.message.noDepts') }}
           </div>
         </div>
       </TabsContent>
@@ -235,12 +238,12 @@ async function save() {
     <template #footer>
       <div class="flex justify-end gap-2">
         <button class="h-9 px-3 rounded border border-border text-sm"
-                @click="emit('update:open', false)">キャンセル</button>
+                @click="emit('update:open', false)">{{ t('common.button.cancel') }}</button>
         <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 :disabled="saving || isLocked"
-                :title="isLocked ? '内蔵ロールは編集不可' : ''"
+                :title="isLocked ? t('role.edit.tooltip.locked') : ''"
                 @click="save">
-          {{ saving ? '保存中...' : '保存' }}
+          {{ saving ? t('role.edit.message.saving') : t('common.button.save') }}
         </button>
       </div>
     </template>

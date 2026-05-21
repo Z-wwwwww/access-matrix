@@ -1,9 +1,12 @@
 <script setup>
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Dialog from '@/components/ui/Dialog.vue'
 import Input from '@/components/ui/Input.vue'
 import { toast } from '@/composables/useToast'
 import { resetPasswordApi } from '../../../../services/user'
+
+const { t } = useI18n()
 
 const props = defineProps({
   open: Boolean,
@@ -21,22 +24,22 @@ watch(() => props.open, (v) => {
 
 async function save() {
   if (!newPassword.value || newPassword.value.length < 8) {
-    toast.error('パスワードは 8 文字以上で入力してください')
+    toast.error(t('user.resetPassword.error.tooShort'))
     return
   }
   if (newPassword.value !== confirmPassword.value) {
-    toast.error('確認用パスワードが一致しません')
+    toast.error(t('user.resetPassword.error.mismatch'))
     return
   }
   saving.value = true
   try {
     const r = await resetPasswordApi({ username: props.user.username, newPassword: newPassword.value })
     if (r.data.code === 0) {
-      toast.success('パスワードをリセットしました')
+      toast.success(t('user.resetPassword.message.success'))
       emit('update:open', false)
     } else {
       // 700 / 701 etc → backend already supplies friendly message (HIBP, length, etc.)
-      toast.error(r.data.msg || '失敗')
+      toast.error(r.data.msg || t('user.resetPassword.message.failed'))
     }
   } catch (e) { toast.error(e.message) }
   finally { saving.value = false }
@@ -44,31 +47,31 @@ async function save() {
 </script>
 
 <template>
-  <Dialog :open="open" title="パスワードリセット" @update:open="(v) => emit('update:open', v)">
+  <Dialog :open="open" :title="t('user.resetPassword.title')" @update:open="(v) => emit('update:open', v)">
     <div class="space-y-3">
       <div class="text-sm text-muted-foreground">
-        ユーザー <span class="font-mono text-foreground">{{ user?.username }}</span> のパスワードを再設定します。
+        {{ t('user.resetPassword.label.user') }} <span class="font-mono text-foreground">{{ user?.username }}</span>
       </div>
       <div>
-        <label class="text-xs text-muted-foreground block mb-1">新しいパスワード <span class="text-destructive">*</span></label>
-        <Input v-model="newPassword" type="password" placeholder="8 文字以上 / 4 種類の文字種" />
+        <label class="text-xs text-muted-foreground block mb-1">{{ t('user.resetPassword.label.newPassword') }} <span class="text-destructive">*</span></label>
+        <Input v-model="newPassword" type="password" :placeholder="t('user.resetPassword.placeholder.value')" />
       </div>
       <div>
-        <label class="text-xs text-muted-foreground block mb-1">確認用パスワード <span class="text-destructive">*</span></label>
-        <Input v-model="confirmPassword" type="password" placeholder="同じパスワードを再入力" />
+        <label class="text-xs text-muted-foreground block mb-1">{{ t('user.resetPassword.label.confirmPassword') }} <span class="text-destructive">*</span></label>
+        <Input v-model="confirmPassword" type="password" :placeholder="t('user.resetPassword.placeholder.confirm')" />
       </div>
       <p class="text-xs text-muted-foreground">
-        ※ 公開侵害コーパス（HIBP）に登録されたパスワードは拒否されます。
+        {{ t('user.resetPassword.hint') }}
       </p>
     </div>
 
     <template #footer>
       <div class="flex justify-end gap-2">
         <button class="h-9 px-3 rounded border border-border text-sm"
-                @click="emit('update:open', false)">キャンセル</button>
+                @click="emit('update:open', false)">{{ t('common.button.cancel') }}</button>
         <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm disabled:opacity-50"
                 :disabled="saving" @click="save">
-          {{ saving ? '保存中...' : 'リセット' }}
+          {{ saving ? t('user.resetPassword.message.saving') : t('user.resetPassword.button.reset') }}
         </button>
       </div>
     </template>

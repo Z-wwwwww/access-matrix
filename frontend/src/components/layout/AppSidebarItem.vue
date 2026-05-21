@@ -1,12 +1,16 @@
 <script setup>
 import { computed, ref, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronDown, ChevronRight } from 'lucide-vue-next'
+import { useI18n } from 'vue-i18n'
+import { ChevronDown, ChevronRight, Star } from 'lucide-vue-next'
 import LucideIcon from '@/components/shared/LucideIcon.vue'
 import { useMenuTitle } from '@/composables/useMenuTitle'
+import { useFavoriteMenus } from '@/composables/useFavoriteMenus'
 import { getMenuItemColor } from '@/lib/menu-color'
 
+const { t } = useI18n()
 const { translate: translateMenu } = useMenuTitle()
+const { isFavorite, toggleFavorite } = useFavoriteMenus()
 
 defineOptions({ name: 'AppSidebarItem' })
 
@@ -28,6 +32,15 @@ function isActive(path) {
 
 function hasChildren(item) {
   return item.children && item.children.length > 0
+}
+
+// 收藏开关只在叶子菜单 + 非折叠状态 + 有 id 时显示
+const canFavorite = computed(
+  () => props.item.id != null && !hasChildren(props.item) && !props.collapsed
+)
+
+function onToggleFavorite() {
+  if (props.item.id != null) toggleFavorite(props.item.id)
 }
 
 // 後端 target: '_blank' / 2 → 外部リンク，'_self' / 0 → 通常路由
@@ -115,7 +128,7 @@ function onClick() {
   <div>
     <button
       ref="buttonRef"
-      class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+      class="group w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
       :class="[
         isActive(item.path) && !hasChildren(item)
           ? 'bg-brand-orange text-white shadow-sm'
@@ -135,6 +148,25 @@ function onClick() {
         <ChevronDown v-if="expandedKeys.has(item.path)" :size="16" class="opacity-50 shrink-0" />
         <ChevronRight v-else :size="16" class="opacity-50 shrink-0" />
       </template>
+      <!-- 收藏开关：未收藏时 hover 显示淡淡轮廓，鼠标落到星上才变清晰；已收藏则常驻金色 -->
+      <span
+        v-if="canFavorite"
+        role="button"
+        :aria-label="isFavorite(item.id) ? t('layout.sidebar.unfavorite') : t('layout.sidebar.favorite')"
+        :title="isFavorite(item.id) ? t('layout.sidebar.unfavorite') : t('layout.sidebar.favorite')"
+        class="shrink-0 -mr-1 p-0.5 rounded inline-flex transition-opacity hover:bg-foreground/10"
+        :class="
+          isFavorite(item.id)
+            ? 'opacity-100'
+            : 'opacity-0 group-hover:opacity-20 hover:!opacity-100'
+        "
+        @click.stop="onToggleFavorite"
+      >
+        <Star
+          :size="14"
+          :class="isFavorite(item.id) ? 'fill-amber-400 text-amber-400' : 'text-current'"
+        />
+      </span>
     </button>
 
     <div

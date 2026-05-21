@@ -58,6 +58,7 @@ public class MenuAdminService {
         m.setHide(req.hide() == null ? 0 : req.hide());
         m.setHideFooter(req.hideFooter() == null ? 0 : req.hideFooter());
         m.setHideSidebar(req.hideSidebar() == null ? 0 : req.hideSidebar());
+        m.setPinned(req.pinned() == null ? 0 : req.pinned());
         m.setTabUnique(req.tabUnique());
         m.setRedirect(req.redirect());
         m.setPermissionCode(req.permissionCode());
@@ -80,6 +81,7 @@ public class MenuAdminService {
         if (req.hide() != null) m.setHide(req.hide());
         if (req.hideFooter() != null) m.setHideFooter(req.hideFooter());
         if (req.hideSidebar() != null) m.setHideSidebar(req.hideSidebar());
+        if (req.pinned() != null) m.setPinned(req.pinned());
         if (req.tabUnique() != null) m.setTabUnique(req.tabUnique());
         if (req.redirect() != null) m.setRedirect(req.redirect());
         if (req.permissionCode() != null) m.setPermissionCode(req.permissionCode());
@@ -117,6 +119,6 @@ public class MenuAdminService {
                 m.getId(), m.getParentId(), m.getCode(), m.getTitle(),
                 m.getMenuType(), m.getPath(), m.getComponent(), m.getIcon(),
                 m.getSortOrder(), m.getHide(), m.getHideFooter(), m.getHideSidebar(),
-                m.getTabUnique(), m.getRedirect(), m.getPermissionCode(), m.getStatus());
+                m.getPinned(), m.getTabUnique(), m.getRedirect(), m.getPermissionCode(), m.getStatus());
     }
 }

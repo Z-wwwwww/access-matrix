@@ -49,6 +49,7 @@ export function formatMenus(data) {
         hide: menu.hide === 1,
         hideFooter: menu.hideFooter === 1,
         hideSidebar: menu.hideSidebar === 1,
+        pinned: menu.pinned === 1,
         tabUnique: menu.tabUnique
       }
 

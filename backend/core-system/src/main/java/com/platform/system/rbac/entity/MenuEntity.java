@@ -50,6 +50,10 @@ public class MenuEntity extends BaseEntity {
     @TableField("hide_sidebar")
     private Integer hideSidebar;
 
+    /** 1 = pin this menu to the top of the sidebar (admin-controlled). */
+    @TableField("pinned")
+    private Integer pinned;
+
     @TableField("tab_unique")
     private String tabUnique;
 

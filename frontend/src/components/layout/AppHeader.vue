@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
-import { Menu, LogOut, User, Sun, Moon, Languages, ChevronDown, Check, KeyRound } from 'lucide-vue-next'
+import { Menu, LogOut, User, Sun, Moon, Palette, Languages, ChevronDown, Check, KeyRound } from 'lucide-vue-next'
 import ChangePasswordDialog from './ChangePasswordDialog.vue'
 
 defineProps({
@@ -18,8 +18,33 @@ const emit = defineEmits(['toggle-sidebar'])
 
 const router = useRouter()
 const authStore = useAuthStore()
-const { theme, toggleTheme } = useTheme()
+const { theme, toggleTheme, palette, setPalette, palettes } = useTheme()
 const { locale, t } = useI18n()
+
+// ── Palette switcher ──
+const paletteOpen = ref(false)
+const palettePanelRef = ref(null)
+const paletteTriggerRef = ref(null)
+
+function togglePaletteMenu() {
+  paletteOpen.value = !paletteOpen.value
+  if (paletteOpen.value) {
+    setTimeout(() => document.addEventListener('mousedown', closePaletteMenu, true), 0)
+  }
+}
+
+function closePaletteMenu(e) {
+  if (palettePanelRef.value?.contains(e?.target)) return
+  if (paletteTriggerRef.value?.contains(e?.target)) return
+  paletteOpen.value = false
+  document.removeEventListener('mousedown', closePaletteMenu, true)
+}
+
+function pickPalette(value) {
+  setPalette(value)
+  paletteOpen.value = false
+  document.removeEventListener('mousedown', closePaletteMenu, true)
+}
 
 // ── Language switcher ──
 const langOpen = ref(false)
@@ -79,6 +104,7 @@ async function handleLogout() {
 
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', closeLangMenu, true)
+  document.removeEventListener('mousedown', closePaletteMenu, true)
 })
 </script>
 
@@ -103,8 +129,47 @@ onBeforeUnmount(() => {
         <Moon v-else :size="18" class="text-foreground" />
       </button>
 
-      <!-- Language switcher (暂时隐藏) -->
-      <div v-if="false" class="relative">
+      <!-- Palette switcher -->
+      <div class="relative">
+        <button
+          ref="paletteTriggerRef"
+          class="p-2 rounded-lg hover:bg-muted transition-colors"
+          :class="{ 'bg-muted': paletteOpen }"
+          @click="togglePaletteMenu"
+        >
+          <Palette :size="18" class="text-foreground" />
+        </button>
+        <div
+          v-if="paletteOpen"
+          ref="palettePanelRef"
+          class="absolute right-0 top-full mt-1 min-w-[180px] rounded-2xl border border-border bg-card shadow-xl z-50 overflow-hidden py-1"
+        >
+          <button
+            v-for="opt in palettes"
+            :key="opt.value"
+            class="flex items-center gap-2 w-[calc(100%-0.5rem)] mx-1 px-3 py-2 text-sm transition-colors text-left rounded-lg"
+            :class="opt.value === palette
+              ? 'bg-primary/10 text-primary font-medium'
+              : 'text-foreground hover:bg-muted'"
+            @click="pickPalette(opt.value)"
+          >
+            <span class="inline-flex shrink-0 rounded-md ring-1 ring-border overflow-hidden h-5 w-10">
+              <span class="h-full w-1/3" :style="{ backgroundColor: opt.swatch.bg }" />
+              <span class="h-full w-1/3" :style="{ backgroundColor: opt.swatch.card }" />
+              <span class="h-full w-1/3" :style="{ backgroundColor: opt.swatch.primary }" />
+            </span>
+            <span class="flex-1 truncate">{{ opt.label }}</span>
+            <Check
+              v-if="opt.value === palette"
+              :size="14"
+              class="shrink-0 text-primary"
+            />
+          </button>
+        </div>
+      </div>
+
+      <!-- Language switcher -->
+      <div class="relative">
         <button
           ref="langTriggerRef"
           class="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors text-sm"
@@ -152,7 +217,7 @@ onBeforeUnmount(() => {
               <User :size="16" class="text-muted-foreground" />
             </div>
             <span class="flex-1 text-sm font-medium text-foreground hidden sm:block text-left truncate">
-              {{ authStore.userInfo?.realname || 'ユーザー' }}
+              {{ authStore.userInfo?.realname || t('layout.header.userFallback') }}
             </span>
             <ChevronDown
               :size="14"

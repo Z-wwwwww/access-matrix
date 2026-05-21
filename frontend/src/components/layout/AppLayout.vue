@@ -51,6 +51,12 @@ const cacheKey = computed(() => {
   const v = tabsStore.refreshVersions[fp] || 0
   return v > 0 ? `${fp}#${v}` : fp
 })
+
+// 路由 meta 中的 hideSidebar / hideFooter 标志（菜单管理里配置，
+// 经 utils/menu-to-routes.js 写入 route.meta），允许某些页面（打印预览、
+// 全屏向导等）以更干净的形态展示。
+const hideSidebar = computed(() => route.meta?.hideSidebar === true)
+const hideFooter = computed(() => route.meta?.hideFooter === true)
 </script>
 
 <template>
@@ -61,13 +67,13 @@ const cacheKey = computed(() => {
     <div class="flex flex-1 relative">
       <!-- Mobile overlay -->
       <div
-        v-if="mobileOpen"
+        v-if="mobileOpen && !hideSidebar"
         class="fixed inset-0 z-40 bg-black/50 lg:hidden"
         @click="closeMobile"
       />
 
       <!-- Sidebar -->
-      <AppSidebar :collapsed="collapsed" :mobile-open="mobileOpen" />
+      <AppSidebar v-if="!hideSidebar" :collapsed="collapsed" :mobile-open="mobileOpen" />
 
       <!-- Right: tabs + content -->
       <div class="flex-1 flex flex-col min-w-0">
@@ -84,7 +90,10 @@ const cacheKey = computed(() => {
         </main>
 
         <!-- Footer (仅在主内容区下方，不延伸到 sidebar) -->
-        <footer class="text-center text-[11px] text-muted-foreground py-2 border-t border-border bg-background shrink-0">
+        <footer
+          v-if="!hideFooter"
+          class="text-center text-[11px] text-muted-foreground py-2 border-t border-border bg-background shrink-0"
+        >
           {{ t('layout.footer.copyright') }}
         </footer>
       </div>

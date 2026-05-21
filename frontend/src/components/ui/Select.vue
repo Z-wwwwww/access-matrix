@@ -1,8 +1,11 @@
 <script setup>
 import { ref, computed, nextTick, onBeforeUnmount, watch, inject } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { cn } from '@/lib/utils'
 import { ChevronDown, Check, X, Search } from 'lucide-vue-next'
 import { usePopupFollowTrigger, applyAbsolutePopupPosition } from '@/composables/usePopupFollowTrigger'
+
+const { t } = useI18n()
 
 const props = defineProps({
   modelValue: {
@@ -13,9 +16,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  /** Empty string = fall back to common.placeholder.pleaseSelect (locale-aware) */
   placeholder: {
     type: String,
-    default: '選択してください'
+    default: ''
   },
   disabled: {
     type: Boolean,
@@ -216,7 +220,7 @@ onBeforeUnmount(() => {
       @click="toggleOpen"
     >
       <span v-if="selectedLabel" class="text-foreground truncate">{{ selectedLabel }}</span>
-      <span v-else class="text-muted-foreground truncate">{{ placeholder }}</span>
+      <span v-else class="text-muted-foreground truncate">{{ placeholder || t('common.placeholder.pleaseSelect') }}</span>
       <!-- Chevron: always show when not clearable, or when no value -->
       <ChevronDown
         v-if="!clearable || !hasValue"
@@ -254,7 +258,7 @@ onBeforeUnmount(() => {
               ref="searchInputRef"
               v-model="searchKeyword"
               type="text"
-              placeholder="検索..."
+              :placeholder="t('common.placeholder.search')"
               class="w-full h-8 pl-8 pr-2 rounded-md border border-input bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               @click.stop
             />

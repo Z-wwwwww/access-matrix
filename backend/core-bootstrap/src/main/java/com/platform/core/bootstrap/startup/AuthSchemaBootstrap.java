@@ -208,6 +208,7 @@ public class AuthSchemaBootstrap {
                         hide SMALLINT NOT NULL DEFAULT 0,
                         hide_footer SMALLINT NOT NULL DEFAULT 0,
                         hide_sidebar SMALLINT NOT NULL DEFAULT 0,
+                        pinned SMALLINT NOT NULL DEFAULT 0,
                         tab_unique VARCHAR(64),
                         redirect VARCHAR(255),
                         permission_code VARCHAR(128),

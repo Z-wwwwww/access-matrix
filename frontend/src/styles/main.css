@@ -2,7 +2,29 @@
 
 /*
  * Access Matrix Design System Tokens
- * Light: Warm Neutral — Dark: Deep Navy
+ *
+ * Palettes (selectable at runtime via `data-palette` on <html>):
+ *   • warm      — Warm Neutral + Deep Navy             ← DEFAULT (no attribute)
+ *                 (original v1 design system)
+ *   • black     — Monochrome surfaces + Electric Blue  (Apple bg + Vercel blue)
+ *   • indigo    — Slate neutrals + Indigo accent       (shadcn/Linear style)
+ *   • sand      — Stone neutrals + Amber accent        (Notion style)
+ *   • mist      — Cool-slate neutrals + Sky accent     (Stripe/Vercel style)
+ *   • sage      — Zinc neutrals + Emerald accent       (Vercel-emerald style)
+ *   • graphite  — Pure neutral gray + Rose accent      (shadcn-zinc style)
+ *   • midnight  — Deep navy-black + Cyan accent        (dark-by-personality)
+ *
+ * Design rules applied to every palette:
+ *   1. Background / card / border stay on a NEUTRAL gray scale (saturation
+ *      mostly ≤ 10%). The accent color does not contaminate surfaces.
+ *   2. One chromatic accent is used for --primary, --accent, --ring, and
+ *      --brand-orange (the legacy name for the "selection signature" color
+ *      used on active tabs, sidebar items, IconPicker selection, and the
+ *      DataTable spinner).
+ *   3. Accents are picked so white-on-accent passes WCAG AA at typical text
+ *      sizes (contrast ≥ 4.5:1).
+ *   4. --signal-* (status colors) and --radius / fonts are global, never
+ *      shifted by palette — status semantics must stay stable.
  */
 
 :root {
@@ -12,7 +34,10 @@
      sticky 要素が固定ヘッダー群の真下に貼り付く際の基準オフセット。 */
   --app-scroll-offset: 100px;
 
-  /* Light theme */
+  /* ── Warm Classic palette — Light ──
+     The original v1 design system: warm beige neutrals with a deep
+     burnt-orange primary. Default rendered palette when no `data-palette`
+     attribute is set on <html>. */
   --background: hsl(30, 15%, 94%);
   --foreground: hsl(20, 15%, 12%);
   --card: hsl(30, 20%, 99%);
@@ -32,7 +57,7 @@
   --ring: hsl(16, 85%, 38%);
   --brand-orange: hsl(16, 85%, 52%);
 
-  /* Signal colors */
+  /* Signal colors (never shifted by palette) */
   --signal-blue: hsl(217, 91%, 60%);
   --signal-yellow: hsl(38, 92%, 50%);
   --signal-red: hsl(0, 84%, 60%);
@@ -40,6 +65,9 @@
 }
 
 .dark {
+  /* ── Warm Classic — Dark (Deep Navy) ──
+     Primary shifts to blue, accent to golden amber. --brand-orange keeps
+     the warm orange selection signature in both modes. */
   --background: hsl(222, 18%, 8%);
   --foreground: hsl(210, 30%, 95%);
   --card: hsl(222, 18%, 15%);
@@ -60,11 +88,292 @@
   --brand-orange: hsl(16, 85%, 52%);
 }
 
+/* ── Black — Monochrome surfaces + Electric Blue accent ──
+   Neutral grayscale bg/card/border (the "black" identity), with a vivid
+   blue only on primary/accent/ring/selection signature so the UI has
+   energy without becoming chromatic everywhere. */
+[data-palette="black"] {
+  --background: hsl(0, 0%, 98%);
+  --foreground: hsl(0, 0%, 9%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(0, 0%, 9%);
+  --primary: hsl(217, 91%, 50%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(217, 91%, 60%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(0, 0%, 96%);
+  --secondary-foreground: hsl(0, 0%, 9%);
+  --muted: hsl(0, 0%, 96%);
+  --muted-foreground: hsl(0, 0%, 40%);
+  --border: hsl(0, 0%, 89%);
+  --input: hsl(0, 0%, 89%);
+  --ring: hsl(217, 91%, 50%);
+  --brand-orange: hsl(217, 91%, 50%);
+}
+.dark[data-palette="black"] {
+  --background: hsl(0, 0%, 4%);
+  --foreground: hsl(0, 0%, 98%);
+  --card: hsl(0, 0%, 8%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --primary: hsl(217, 91%, 65%);
+  --primary-foreground: hsl(217, 30%, 12%);
+  --accent: hsl(213, 94%, 75%);
+  --accent-foreground: hsl(217, 30%, 12%);
+  --secondary: hsl(0, 0%, 14%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --muted: hsl(0, 0%, 16%);
+  --muted-foreground: hsl(0, 0%, 64%);
+  --border: hsl(0, 0%, 22%);
+  --input: hsl(0, 0%, 22%);
+  --ring: hsl(217, 91%, 65%);
+  --brand-orange: hsl(217, 91%, 50%);
+}
+
+/* ── Indigo — Slate neutrals + Indigo accent (was the v2 default) ── */
+[data-palette="indigo"] {
+  --background: hsl(210, 40%, 98%);
+  --foreground: hsl(222, 47%, 11%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(222, 47%, 11%);
+  --primary: hsl(244, 76%, 58%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(243, 75%, 65%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(210, 40%, 96%);
+  --secondary-foreground: hsl(222, 47%, 11%);
+  --muted: hsl(210, 40%, 96%);
+  --muted-foreground: hsl(215, 16%, 47%);
+  --border: hsl(214, 32%, 91%);
+  --input: hsl(214, 32%, 91%);
+  --ring: hsl(244, 76%, 58%);
+  --brand-orange: hsl(244, 76%, 58%);
+}
+.dark[data-palette="indigo"] {
+  --background: hsl(240, 10%, 4%);
+  --foreground: hsl(210, 40%, 96%);
+  --card: hsl(240, 8%, 9%);
+  --card-foreground: hsl(210, 40%, 96%);
+  --primary: hsl(234, 89%, 74%);
+  --primary-foreground: hsl(244, 35%, 12%);
+  --accent: hsl(234, 89%, 78%);
+  --accent-foreground: hsl(244, 35%, 12%);
+  --secondary: hsl(217, 19%, 17%);
+  --secondary-foreground: hsl(210, 40%, 96%);
+  --muted: hsl(217, 19%, 18%);
+  --muted-foreground: hsl(215, 20%, 65%);
+  --border: hsl(217, 19%, 22%);
+  --input: hsl(217, 19%, 22%);
+  --ring: hsl(234, 89%, 74%);
+  --brand-orange: hsl(244, 76%, 58%);
+}
+
+/* ── Sand — Stone neutrals + Amber accent ── */
+[data-palette="sand"] {
+  --background: hsl(60, 9%, 98%);
+  --foreground: hsl(20, 14%, 9%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14%, 9%);
+  --primary: hsl(28, 86%, 35%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(32, 95%, 44%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(60, 5%, 96%);
+  --secondary-foreground: hsl(20, 14%, 9%);
+  --muted: hsl(60, 5%, 96%);
+  --muted-foreground: hsl(25, 5%, 45%);
+  --border: hsl(20, 6%, 90%);
+  --input: hsl(20, 6%, 90%);
+  --ring: hsl(28, 86%, 35%);
+  --brand-orange: hsl(28, 86%, 40%);
+}
+.dark[data-palette="sand"] {
+  --background: hsl(20, 14%, 4%);
+  --foreground: hsl(60, 9%, 96%);
+  --card: hsl(20, 12%, 9%);
+  --card-foreground: hsl(60, 9%, 96%);
+  --primary: hsl(43, 96%, 56%);
+  --primary-foreground: hsl(20, 14%, 4%);
+  --accent: hsl(48, 96%, 60%);
+  --accent-foreground: hsl(20, 14%, 4%);
+  --secondary: hsl(12, 6%, 15%);
+  --secondary-foreground: hsl(60, 9%, 96%);
+  --muted: hsl(12, 6%, 17%);
+  --muted-foreground: hsl(24, 5%, 64%);
+  --border: hsl(12, 6%, 22%);
+  --input: hsl(12, 6%, 22%);
+  --ring: hsl(43, 96%, 56%);
+  --brand-orange: hsl(28, 86%, 40%);
+}
+
+/* ── Mist — Cool-slate neutrals + Sky accent ── */
+[data-palette="mist"] {
+  --background: hsl(210, 40%, 98%);
+  --foreground: hsl(222, 47%, 11%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(222, 47%, 11%);
+  --primary: hsl(200, 98%, 39%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(199, 89%, 48%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(210, 40%, 96%);
+  --secondary-foreground: hsl(222, 47%, 11%);
+  --muted: hsl(210, 40%, 96%);
+  --muted-foreground: hsl(215, 16%, 47%);
+  --border: hsl(214, 32%, 91%);
+  --input: hsl(214, 32%, 91%);
+  --ring: hsl(200, 98%, 39%);
+  --brand-orange: hsl(200, 98%, 39%);
+}
+.dark[data-palette="mist"] {
+  --background: hsl(222, 47%, 4%);
+  --foreground: hsl(210, 40%, 96%);
+  --card: hsl(222, 40%, 9%);
+  --card-foreground: hsl(210, 40%, 96%);
+  --primary: hsl(199, 89%, 60%);
+  --primary-foreground: hsl(222, 47%, 4%);
+  --accent: hsl(198, 93%, 70%);
+  --accent-foreground: hsl(222, 47%, 4%);
+  --secondary: hsl(217, 33%, 16%);
+  --secondary-foreground: hsl(210, 40%, 96%);
+  --muted: hsl(217, 33%, 18%);
+  --muted-foreground: hsl(215, 20%, 65%);
+  --border: hsl(217, 33%, 22%);
+  --input: hsl(217, 33%, 22%);
+  --ring: hsl(199, 89%, 60%);
+  --brand-orange: hsl(200, 98%, 39%);
+}
+
+/* ── Sage — Zinc neutrals + Emerald accent ── */
+[data-palette="sage"] {
+  --background: hsl(0, 0%, 98%);
+  --foreground: hsl(240, 6%, 10%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(240, 6%, 10%);
+  --primary: hsl(160, 84%, 30%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(160, 84%, 39%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(240, 5%, 96%);
+  --secondary-foreground: hsl(240, 6%, 10%);
+  --muted: hsl(240, 5%, 96%);
+  --muted-foreground: hsl(240, 4%, 46%);
+  --border: hsl(240, 6%, 90%);
+  --input: hsl(240, 6%, 90%);
+  --ring: hsl(160, 84%, 30%);
+  --brand-orange: hsl(160, 84%, 30%);
+}
+.dark[data-palette="sage"] {
+  --background: hsl(240, 10%, 4%);
+  --foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 6%, 10%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --primary: hsl(158, 64%, 52%);
+  --primary-foreground: hsl(240, 10%, 4%);
+  --accent: hsl(152, 76%, 65%);
+  --accent-foreground: hsl(240, 10%, 4%);
+  --secondary: hsl(240, 4%, 16%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 4%, 18%);
+  --muted-foreground: hsl(240, 5%, 65%);
+  --border: hsl(240, 4%, 22%);
+  --input: hsl(240, 4%, 22%);
+  --ring: hsl(158, 64%, 52%);
+  --brand-orange: hsl(160, 84%, 35%);
+}
+
+/* ── Graphite — Pure neutral gray + Rose accent ── */
+[data-palette="graphite"] {
+  --background: hsl(0, 0%, 98%);
+  --foreground: hsl(0, 0%, 4%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(0, 0%, 4%);
+  --primary: hsl(346, 77%, 50%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(351, 95%, 60%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(0, 0%, 96%);
+  --secondary-foreground: hsl(0, 0%, 4%);
+  --muted: hsl(0, 0%, 96%);
+  --muted-foreground: hsl(0, 0%, 45%);
+  --border: hsl(0, 0%, 90%);
+  --input: hsl(0, 0%, 90%);
+  --ring: hsl(346, 77%, 50%);
+  --brand-orange: hsl(346, 77%, 50%);
+}
+.dark[data-palette="graphite"] {
+  --background: hsl(0, 0%, 4%);
+  --foreground: hsl(0, 0%, 98%);
+  --card: hsl(0, 0%, 9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --primary: hsl(351, 95%, 71%);
+  --primary-foreground: hsl(0, 0%, 4%);
+  --accent: hsl(0, 96%, 76%);
+  --accent-foreground: hsl(0, 0%, 4%);
+  --secondary: hsl(0, 0%, 15%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --muted: hsl(0, 0%, 17%);
+  --muted-foreground: hsl(0, 0%, 64%);
+  --border: hsl(0, 0%, 22%);
+  --input: hsl(0, 0%, 22%);
+  --ring: hsl(351, 95%, 71%);
+  --brand-orange: hsl(346, 77%, 50%);
+}
+
+/* ── Midnight — dark-by-personality palette ──
+   Built around deep navy-blacks and an electric cyan accent. Even the
+   "light" variant uses a cool slate base so the palette reads as dark/
+   technical regardless of mode. Dark variant goes OLED-deep with a brighter
+   cyan to pop against the near-black canvas. */
+[data-palette="midnight"] {
+  --background: hsl(215, 28%, 90%);
+  --foreground: hsl(220, 30%, 8%);
+  --card: hsl(210, 30%, 97%);
+  --card-foreground: hsl(220, 30%, 8%);
+  --primary: hsl(190, 95%, 32%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(187, 92%, 42%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(214, 25%, 86%);
+  --secondary-foreground: hsl(220, 30%, 8%);
+  --muted: hsl(214, 25%, 86%);
+  --muted-foreground: hsl(215, 16%, 42%);
+  --border: hsl(214, 22%, 78%);
+  --input: hsl(214, 22%, 78%);
+  --ring: hsl(190, 95%, 32%);
+  --brand-orange: hsl(189, 94%, 38%);
+}
+.dark[data-palette="midnight"] {
+  --background: hsl(220, 30%, 4%);
+  --foreground: hsl(210, 40%, 96%);
+  --card: hsl(220, 25%, 8%);
+  --card-foreground: hsl(210, 40%, 96%);
+  --primary: hsl(189, 94%, 55%);
+  --primary-foreground: hsl(220, 30%, 4%);
+  --accent: hsl(187, 92%, 65%);
+  --accent-foreground: hsl(220, 30%, 4%);
+  --secondary: hsl(217, 20%, 12%);
+  --secondary-foreground: hsl(210, 40%, 96%);
+  --muted: hsl(217, 20%, 14%);
+  --muted-foreground: hsl(215, 20%, 60%);
+  --border: hsl(217, 20%, 18%);
+  --input: hsl(217, 20%, 18%);
+  --ring: hsl(189, 94%, 55%);
+  --brand-orange: hsl(189, 94%, 38%);
+}
+
 /* ── Register tokens in Tailwind v4 @theme ── */
 @theme {
   --font-sans: 'Noto Sans JP', sans-serif;
   --font-serif: 'Noto Serif JP', serif;
-  --font-mono: 'Fira Code', monospace;
+  /* Mono stack: prefer JetBrains Mono (loaded via index.html), then OS-native
+     monospace fonts (SF Mono on macOS, Cascadia Code on Win11, etc.).
+     `ui-monospace` is the modern keyword that picks the OS-recommended mono
+     face automatically. Avoid the bare `monospace` fallback alone — on some
+     Windows + CJK locales it resolves to Courier New / Mincho-mono, which
+     looks dated and inconsistent with the rest of the UI. */
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code',
+               'Cascadia Mono', 'Source Code Pro', Menlo, Consolas,
+               'DejaVu Sans Mono', monospace;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
