@@ -14,13 +14,14 @@ import java.time.Instant;
  * compares the caller's JWT {@code iat} claim to this timestamp; if the
  * token was issued before the kick, the request is rejected with 401.
  *
- * <p>TTL is 24 h — long enough to outlive the longest refresh token, after
- * which the entry naturally expires and we stop spending Redis memory.
+ * <p>TTL is 8 d — must outlive the longest refresh token ({@code REFRESH_TTL}
+ * is 7 d) so a kicked-out user can't mint a fresh access token via /auth/refresh
+ * after the kick entry has expired.
  */
 @Component
 public class ForceLogoutService {
 
-    public static final Duration TTL = Duration.ofHours(24);
+    public static final Duration TTL = Duration.ofDays(8);
     private static final String KEY_PREFIX = "core:auth:logout:";
 
     private final StringRedisTemplate redis;

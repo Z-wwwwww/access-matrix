@@ -58,7 +58,7 @@ public class LocalAdminSeeder {
     }
 
     private UserEntity ensureAdminUser() {
-        UserEntity existing = userMapper.findByIdentifier("admin");
+        UserEntity existing = userMapper.findByIdentifier("default", "admin");
         String adminHash = encoder.encode("admin");
         LocalDateTime now = LocalDateTime.now();
 

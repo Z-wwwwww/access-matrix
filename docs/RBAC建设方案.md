@@ -230,7 +230,7 @@ access-matrix 基盘目前已具备：
 | SELF | 仅自己创建 / 拥有的记录 | `create_user = 当前用户 ID` |
 | CUSTOM | 角色显式选定的部门集合（含各自子树） | `dept_id IN (自定义集合)` |
 
-**应用方式**：业务表只要带 `dept_id` 列（用于部门维度过滤）或 `create_user` 列（用于个人维度过滤），Mapper 方法上加 `@DataScope` 注解，框架自动注入 WHERE 条件。零侵入业务逻辑。
+**应用方式**：业务表带 `dept_id` 列（部门维度）或 `create_user` 列（个人维度），Mapper 方法挂 `@DataScope`，Service 显式调 `DataScopeHelper.apply(wrapper, decision, deptCol, creatorCol)` 注入 WHERE 条件。`DataScopeAspect` 在 Mapper 调用前会校验本请求是否调用过 `apply`：未调用则 dev 抛异常、prod 写 WARN，保证不会"忘了过滤"导致越权。
 
 **多角色合并规则**：取并集（更宽松）。一旦用户的任一角色为 ALL，立即短路放行；否则合并所有部门集合和 SELF 标记。
 
@@ -687,9 +687,9 @@ CustomerMapper.selectPage(wrapper)
 | D-03 | 自定义 AOP `@RequiresPermission`，不用 Spring `@PreAuthorize` | 通配规则易写、permit-all 模式兼容、新人 5 分钟懂 |
 | D-04 | 多角色权限取并集 | 一句话能说清，避免"挂角色反而剪权限"的反直觉 |
 | D-05 | 多角色数据范围也取并集，ALL 短路 | 同上原则；ALL 优先级最高 |
-| D-06 | 数据范围用 `@DataScope` 显式标注，不全局拦截 | 默认豁免、新人能在 Service 里看见过滤行为，避免误伤系统 SQL |
-| D-07 | JWT 继续放 scope claim，超管 `*:*` 短路，超阈值降级 `__compact__` | JWT 体积可控，权限多到极端时退化到 Redis 拉 |
-| D-08 | 权限变更后 access token 15 分钟内不主动失效 | 行业惯例，Stage 4 提供 force-logout 兜底极端场景 |
+| D-06 | 数据范围用 `@DataScope` 显式标注 + `DataScopeAspect` 强制 | Service 必须显式调 `DataScopeHelper.apply`，否则 Mapper 调用被切面拦截：dev 抛异常、prod 写 WARN，避免误漏过滤 |
+| D-07 | JWT scope 只用 `*:*`（超管）或 `__compact__`（其余） | 不内联权限码，让权限变更走缓存失效路径下次请求生效；JWT 体积始终很小 |
+| D-08 | 权限变更立即对下一个请求生效，强制下线对 access + refresh 双路径生效 | `PermissionCacheService.evictRole` + Caffeine 立即失效；`/auth/refresh` 也校验 `kickOutAt`，TTL 8 天覆盖 7 天 refresh |
 | D-09 | 超级管理员通过内置角色 SUPER_ADMIN 关联 `*:*` 权限实现 | 兼容现有 `*:*` 字面识别，admin 改造零下游影响 |
 | D-10 | 部门树用 parent_id + path 双列冗余 | path LIKE 子树查询走索引，比递归 CTE 直观 |
 | D-11 | 内置角色 / 权限 / 菜单用 is_built_in 标志保护 | 防误删，运营可见但禁止编辑关键字段 |

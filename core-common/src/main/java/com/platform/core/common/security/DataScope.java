@@ -7,15 +7,20 @@ import java.lang.annotation.Target;
 
 /**
  * Marks a {@code Mapper} (or service) method as participating in data-scope
- * filtering. The annotation itself is informational — it documents intent
- * and lets ArchUnit / static checks enforce that every annotated point has
- * a matching {@code DataScopeHelper.apply(...)} call in the corresponding
- * service.
+ * filtering.
+ *
+ * <p>Enforcement at runtime is wired through {@code DataScopeAspect}: any
+ * annotated method invocation whose query-wrapper argument has not been
+ * passed through {@code DataScopeHelper.apply(...)} in the current request
+ * is rejected (strict profiles: {@code local} / {@code dev} / {@code test})
+ * or logged as {@code WARN} (prod). Service authors thus get an immediate
+ * failure when they forget the scope filter — no silent "all rows" leak.
  *
  * <p>The actual SQL injection happens in the service layer via
  * {@code DataScopeHelper.apply(wrapper, decision, deptColumn, creatorColumn)} —
  * deliberately explicit so the filter is visible at the call site (no
- * hidden interceptor surprises).
+ * hidden interceptor surprises). The aspect only verifies that the call
+ * happened; it never silently adds a filter.
  */
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)

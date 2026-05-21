@@ -34,14 +34,19 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             AuthRateLimitFilter rateLimitFilter,
-            CoreRequestContextFilter ctxFilter) throws Exception {
+            CoreRequestContextFilter ctxFilter,
+            ForceLogoutFilter forceLogoutFilter) throws Exception {
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> {})
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(ctxFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterAfter(ctxFilter, UsernamePasswordAuthenticationFilter.class)
+                // Runs after the context filter (so MDC/RequestContext are set)
+                // and before any controller — kicks land on /menu/me etc. too,
+                // not only on @RequiresPermission-annotated endpoints.
+                .addFilterAfter(forceLogoutFilter, CoreRequestContextFilter.class);
 
         if ("permit-all".equalsIgnoreCase(props.mode())) {
             http.authorizeHttpRequests(reg -> reg.anyRequest().permitAll());

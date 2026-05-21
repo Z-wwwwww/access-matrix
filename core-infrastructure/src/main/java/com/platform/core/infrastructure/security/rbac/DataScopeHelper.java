@@ -34,6 +34,10 @@ public final class DataScopeHelper {
                                  DataScopeDecision decision,
                                  SFunction<T, ?> deptColumn,
                                  SFunction<T, ?> creatorColumn) {
+        // Mark before the early returns: even an "unrestricted" decision means
+        // the service consciously consulted scope, which is what the aspect
+        // wants to confirm. Forgetting apply() entirely is the bug we catch.
+        DataScopeContext.markApplied(wrapper);
         if (decision == null || decision.unrestricted()) return;
         if (decision.hasNoAccess()) {
             // No access at all → block every row. apply("1=0") is the standard "no-results" idiom

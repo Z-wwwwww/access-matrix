@@ -43,6 +43,7 @@ public class DeptAdminService {
         if (req.parentId() != null && !req.parentId().isBlank()) {
             parent = require(req.parentId());
         }
+        validateLeaderUserId(req.leaderUserId());
         DeptEntity d = new DeptEntity();
         d.setId(IdGenerator.ulid());
         d.setParentId(parent == null ? null : parent.getId());
@@ -53,7 +54,7 @@ public class DeptAdminService {
                 ? "/" + d.getId()
                 : parent.getPath() + "/" + d.getId());
         d.setSortOrder(req.sortOrder() == null ? 0 : req.sortOrder());
-        d.setLeaderUserId(req.leaderUserId());
+        d.setLeaderUserId(normalizeLeader(req.leaderUserId()));
         d.setStatus(req.status() == null ? 1 : req.status());
         deptMapper.insert(d);
         cacheService.evictAllDepts();
@@ -83,7 +84,13 @@ public class DeptAdminService {
         }
         if (req.name() != null) d.setName(req.name());
         if (req.sortOrder() != null) d.setSortOrder(req.sortOrder());
-        if (req.leaderUserId() != null) d.setLeaderUserId(req.leaderUserId());
+        if (req.leaderUserId() != null) {
+            // Empty string is the front-end's "clear the leader" payload; only
+            // run the existence probe for a real id.
+            String normalized = normalizeLeader(req.leaderUserId());
+            if (normalized != null) validateLeaderUserId(normalized);
+            d.setLeaderUserId(normalized);
+        }
         if (req.status() != null) d.setStatus(req.status());
         deptMapper.updateById(d);
         cacheService.evictAllDepts();
@@ -114,5 +121,32 @@ public class DeptAdminService {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Department not found: " + id);
         }
         return d;
+    }
+
+    /**
+     * The leader_user_id is non-authorising metadata — see {@code DeptEntity}
+     * javadoc. We still validate that the supplied id resolves to an active
+     * user so the front-end's dropdown can't smuggle a typo in. Null / blank
+     * means "no leader assigned" and is always accepted.
+     *
+     * <p>Tenant scoping: the MyBatis-Plus tenant interceptor rewrites
+     * {@code selectById} to include {@code tenant_id = currentTenant}, so a
+     * cross-tenant id is naturally rejected when the interceptor is enabled
+     * (dev/prod). In local mode (interceptor off) cross-tenant ids slip
+     * through, but local has only the {@code default} tenant anyway.
+     */
+    private void validateLeaderUserId(String leaderUserId) {
+        if (leaderUserId == null || leaderUserId.isBlank()) return;
+        UserEntity u = userMapper.selectById(leaderUserId);
+        if (u == null || u.getMark() == null || u.getMark() != 1
+                || u.getStatus() == null || u.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                    "Leader user id does not point to an active user: " + leaderUserId);
+        }
+    }
+
+    /** Collapse blank to null so DB stores NULL rather than empty string for "no leader". */
+    private static String normalizeLeader(String leaderUserId) {
+        return (leaderUserId == null || leaderUserId.isBlank()) ? null : leaderUserId.trim();
     }
 }

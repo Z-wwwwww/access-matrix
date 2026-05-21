@@ -7,10 +7,16 @@ import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.system.rbac.dto.RoleDto;
+import com.platform.system.rbac.entity.DeptEntity;
+import com.platform.system.rbac.entity.MenuEntity;
+import com.platform.system.rbac.entity.PermissionEntity;
 import com.platform.system.rbac.entity.RoleEntity;
 import com.platform.system.rbac.entity.RoleMenuEntity;
 import com.platform.system.rbac.entity.RolePermissionEntity;
 import com.platform.system.rbac.entity.RoleDeptEntity;
+import com.platform.system.rbac.mapper.DeptMapper;
+import com.platform.system.rbac.mapper.MenuMapper;
+import com.platform.system.rbac.mapper.PermissionMapper;
 import com.platform.system.rbac.mapper.RoleMapper;
 import com.platform.system.rbac.mapper.RoleMenuMapper;
 import com.platform.system.rbac.mapper.RolePermissionMapper;
@@ -20,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 @Service
@@ -29,17 +36,26 @@ public class RoleAdminService {
     private final RolePermissionMapper rolePermissionMapper;
     private final RoleMenuMapper roleMenuMapper;
     private final RoleDeptMapper roleDeptMapper;
+    private final PermissionMapper permissionMapper;
+    private final MenuMapper menuMapper;
+    private final DeptMapper deptMapper;
     private final PermissionCacheService cacheService;
 
     public RoleAdminService(RoleMapper roleMapper,
                             RolePermissionMapper rolePermissionMapper,
                             RoleMenuMapper roleMenuMapper,
                             RoleDeptMapper roleDeptMapper,
+                            PermissionMapper permissionMapper,
+                            MenuMapper menuMapper,
+                            DeptMapper deptMapper,
                             PermissionCacheService cacheService) {
         this.roleMapper = roleMapper;
         this.rolePermissionMapper = rolePermissionMapper;
         this.roleMenuMapper = roleMenuMapper;
         this.roleDeptMapper = roleDeptMapper;
+        this.permissionMapper = permissionMapper;
+        this.menuMapper = menuMapper;
+        this.deptMapper = deptMapper;
         this.cacheService = cacheService;
     }
 
@@ -124,16 +140,18 @@ public class RoleAdminService {
     @Transactional
     public void bindPermissions(String roleId, List<String> permissionIds) {
         assertNotBuiltIn(requireRole(roleId), "bind permissions");
+        LinkedHashSet<String> dedup = dedupOrEmpty(permissionIds);
+        assertAllExist(dedup, "permission", ids ->
+                permissionMapper.selectCount(
+                        new QueryWrapper<PermissionEntity>().eq("mark", 1).in("id", ids)));
         rolePermissionMapper.update(null,
                 new UpdateWrapper<RolePermissionEntity>().eq("role_id", roleId).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));
-        if (permissionIds != null) {
-            for (String permissionId : permissionIds) {
-                RolePermissionEntity link = new RolePermissionEntity();
-                link.setRoleId(roleId);
-                link.setPermissionId(permissionId);
-                rolePermissionMapper.insert(link);
-            }
+        for (String permissionId : dedup) {
+            RolePermissionEntity link = new RolePermissionEntity();
+            link.setRoleId(roleId);
+            link.setPermissionId(permissionId);
+            rolePermissionMapper.insert(link);
         }
         cacheService.evictRole(roleId);
     }
@@ -148,16 +166,18 @@ public class RoleAdminService {
     @Transactional
     public void bindMenus(String roleId, List<String> menuIds) {
         assertNotBuiltIn(requireRole(roleId), "bind menus");
+        LinkedHashSet<String> dedup = dedupOrEmpty(menuIds);
+        assertAllExist(dedup, "menu", ids ->
+                menuMapper.selectCount(
+                        new QueryWrapper<MenuEntity>().eq("mark", 1).in("id", ids)));
         roleMenuMapper.update(null,
                 new UpdateWrapper<RoleMenuEntity>().eq("role_id", roleId).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));
-        if (menuIds != null) {
-            for (String menuId : menuIds) {
-                RoleMenuEntity link = new RoleMenuEntity();
-                link.setRoleId(roleId);
-                link.setMenuId(menuId);
-                roleMenuMapper.insert(link);
-            }
+        for (String menuId : dedup) {
+            RoleMenuEntity link = new RoleMenuEntity();
+            link.setRoleId(roleId);
+            link.setMenuId(menuId);
+            roleMenuMapper.insert(link);
         }
         cacheService.evictRole(roleId);
     }
@@ -172,18 +192,46 @@ public class RoleAdminService {
     @Transactional
     public void bindDepts(String roleId, List<String> deptIds) {
         assertNotBuiltIn(requireRole(roleId), "bind departments");
+        LinkedHashSet<String> dedup = dedupOrEmpty(deptIds);
+        assertAllExist(dedup, "department", ids ->
+                deptMapper.selectCount(
+                        new QueryWrapper<DeptEntity>().eq("mark", 1).in("id", ids)));
         roleDeptMapper.update(null,
                 new UpdateWrapper<RoleDeptEntity>().eq("role_id", roleId).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));
-        if (deptIds != null) {
-            for (String deptId : deptIds) {
-                RoleDeptEntity link = new RoleDeptEntity();
-                link.setRoleId(roleId);
-                link.setDeptId(deptId);
-                roleDeptMapper.insert(link);
-            }
+        for (String deptId : dedup) {
+            RoleDeptEntity link = new RoleDeptEntity();
+            link.setRoleId(roleId);
+            link.setDeptId(deptId);
+            roleDeptMapper.insert(link);
         }
         cacheService.evictRole(roleId);
+    }
+
+    private static LinkedHashSet<String> dedupOrEmpty(List<String> ids) {
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        if (ids == null) return out;
+        for (String id : ids) {
+            if (id != null && !id.isBlank()) out.add(id);
+        }
+        return out;
+    }
+
+    /**
+     * Verify every supplied id is the primary key of a live (mark=1) row in
+     * the target table. Without this guard a typo or stale UI cache could
+     * insert link rows pointing at non-existent ids; pre-FK this was silent
+     * data corruption, post-FK (V9) the DB throws — but a friendly business
+     * error from the service layer is cheaper to debug.
+     */
+    private static void assertAllExist(LinkedHashSet<String> ids, String kind,
+                                       java.util.function.Function<LinkedHashSet<String>, Long> counter) {
+        if (ids.isEmpty()) return;
+        Long found = counter.apply(ids);
+        if (found == null || found.intValue() != ids.size()) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                    "One or more " + kind + " ids do not exist or are disabled");
+        }
     }
 
     private RoleEntity requireRole(String id) {

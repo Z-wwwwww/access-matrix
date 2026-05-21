@@ -30,6 +30,12 @@ public class DeptEntity extends BaseEntity {
     @TableField("sort_order")
     private Integer sortOrder;
 
+    /**
+     * Informational pointer to the user who heads this department. Pure memo:
+     * {@code DataScopeQueryService} and the permission stack never read it,
+     * so flipping this value cannot grant or revoke any access.
+     * Existence is validated by {@code DeptAdminService} at write time.
+     */
     @TableField("leader_user_id")
     private String leaderUserId;
 

@@ -1,6 +1,7 @@
 package com.platform.core.infrastructure.web;
 
 import com.platform.core.common.context.RequestContext;
+import com.platform.core.infrastructure.security.rbac.DataScopeContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,7 +24,9 @@ import java.util.UUID;
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class CoreRequestContextFilter extends OncePerRequestFilter {
 
-    private static final String TRACE_HEADER = "X-Trace-Id";
+    private static final String TRACE_HEADER  = "X-Trace-Id";
+    private static final String TENANT_HEADER = "X-Tenant-Id";
+    private static final String DEFAULT_TENANT = "default";
 
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse resp, FilterChain chain)
@@ -44,6 +47,13 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
             userId = jwt.getSubject();
             username = jwt.getClaimAsString("preferred_username");
         }
+        // Pre-auth requests (login / refresh) have no JWT — fall back to the
+        // tenant header so the tenant interceptor + audit writes still get a
+        // real value instead of writing every login as "default".
+        if (tenantId == null || tenantId.isBlank()) {
+            String header = req.getHeader(TENANT_HEADER);
+            tenantId = (header == null || header.isBlank()) ? DEFAULT_TENANT : header.trim();
+        }
 
         RequestContext.set(tenantId, userId, username, Locale.getDefault(), traceId);
         MDC.put("traceId", traceId);
@@ -55,6 +65,7 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
             chain.doFilter(req, resp);
         } finally {
             RequestContext.clear();
+            DataScopeContext.clear();
             MDC.clear();
         }
     }

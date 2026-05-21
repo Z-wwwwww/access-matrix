@@ -5,6 +5,7 @@ import com.platform.system.auth.dto.UnlockRequest;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
 import com.platform.core.common.audit.OpLog;
+import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
@@ -44,11 +45,11 @@ public class AdminAuthController {
     @RequiresPermission("auth:unlock")
     @OpLog(module = "system", action = "auth.unlock", targetType = "user")
     public JsonResult<Void> unlock(@Valid @RequestBody UnlockRequest body) {
-        UserEntity user = userMapper.findByIdentifier(body.username());
+        UserEntity user = userMapper.findByIdentifier(tenant(), body.username());
         if (user == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "User not found");
         }
-        lockoutService.reset(body.username());
+        lockoutService.reset(tenant(), body.username());
         user.setStatus(1);
         userMapper.updateById(user);
         return JsonResult.ok();
@@ -59,13 +60,18 @@ public class AdminAuthController {
     @OpLog(module = "system", action = "auth.resetPassword", targetType = "user")
     public JsonResult<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest body) {
         passwordPolicy.validate(body.newPassword());
-        UserEntity user = userMapper.findByIdentifier(body.username());
+        UserEntity user = userMapper.findByIdentifier(tenant(), body.username());
         if (user == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "User not found");
         }
         user.setPasswordHash(encoder.encode(body.newPassword()));
         userMapper.updateById(user);
         return JsonResult.ok();
+    }
+
+    private static String tenant() {
+        String tid = RequestContext.tenantId();
+        return (tid == null || tid.isBlank()) ? "default" : tid;
     }
 
     /**

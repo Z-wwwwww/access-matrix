@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Loads the menu tree visible to a given user.
@@ -53,9 +54,33 @@ public class MenuQueryService {
         } else {
             List<MenuEntity> direct = menuMapper.findMenusByUserId(userId);
             if (direct.isEmpty()) return List.of();
-            flat = withAncestors(direct);
+            // Two-pass filter: drop leaf menus whose permission_code the user
+            // does not hold, even though a role granted them the menu link.
+            // (e.g. role X has the "Orders" menu, but only includes order:read,
+            // so any "Orders > Delete" leaf with permission_code=order:delete
+            // is hidden.) Containers (no permission_code) survive because the
+            // tree-assembler still needs them to host the leaves the user can see.
+            List<MenuEntity> permitted = filterByPermissionCode(direct, perms);
+            if (permitted.isEmpty()) return List.of();
+            flat = withAncestors(permitted);
         }
         return assembleTree(flat);
+    }
+
+    /**
+     * Keep every menu without a {@code permission_code} (containers / category
+     * roots) and every leaf whose code wildcard-matches the caller's set.
+     * Parent re-hydration is left to {@link #withAncestors(List)} so a
+     * permitted leaf never becomes orphaned.
+     */
+    private List<MenuEntity> filterByPermissionCode(List<MenuEntity> menus, Set<String> perms) {
+        return menus.stream()
+                .filter(m -> {
+                    String code = m.getPermissionCode();
+                    if (code == null || code.isBlank()) return true;
+                    return PermissionMatcher.matchesAny(perms, new String[]{code});
+                })
+                .collect(Collectors.toList());
     }
 
     /** Make sure every node's parent chain is included so the tree assembler does not drop branches. */
