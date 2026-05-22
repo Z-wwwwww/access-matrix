@@ -4,6 +4,7 @@
  * Mirror of ja_JP.js — see that file for the key-tree documentation.
  */
 import general from './general/zh_CN'
+import permissions from './generated/permissions.zh_CN.json'
 
 export default {
   general,
@@ -58,7 +59,7 @@ export default {
       pleaseInput: '请输入',
       pleaseSelect: '请选择',
       search: '搜索...',
-      deptId: '部门 ID'
+      deptId: '请选择部门'
     },
     tooltip: {
       pagePrevious5: '向前 5 页',
@@ -175,10 +176,10 @@ export default {
   profile: {
     title: '个人资料',
     label: {
-      deptId: '部门 ID',
+      deptId: '部门',
       userId: '用户 ID',
-      username: '用户名',
-      displayName: '显示名',
+      username: '登录ID',
+      displayName: '用户名',
       email: '邮箱',
       userNo: '用户编号',
       tenantId: '租户',
@@ -189,15 +190,15 @@ export default {
 
   user: {
     search: {
-      placeholder: { keyword: '用户名 / 邮箱 / 显示名' },
-      label: { deptId: '部门 ID' }
+      placeholder: { keyword: '登录ID / 邮箱 / 用户名' },
+      label: { deptId: '部门' }
     },
     column: {
-      username: '用户名',
-      displayName: '显示名',
+      username: '登录ID',
+      displayName: '用户名',
       userNo: '编号',
       email: '邮箱',
-      deptId: '部门 ID',
+      deptId: '部门',
       status: '状态',
       actions: '操作'
     },
@@ -225,12 +226,12 @@ export default {
       titleCreate: '新增用户',
       lockedHint: '内置 admin 用户为只读。仅可修改密码（通过「重置密码」API）。',
       label: {
-        username: '用户名',
+        username: '登录ID',
         password: '密码',
-        displayName: '显示名',
+        displayName: '用户名',
         email: '邮箱',
         userNo: '编号',
-        deptId: '部门 ID',
+        deptId: '部门',
         status: '状态',
         roles: '角色'
       },
@@ -372,7 +373,7 @@ export default {
       titleEdit: '编辑部门',
       titleCreate: '新增部门',
       label: {
-        parentId: '父部门 ID',
+        parentId: '父部门',
         code: '编码',
         name: '名称',
         sortOrder: '排序',
@@ -435,7 +436,7 @@ export default {
         name: '名称',
         type: '类型',
         sortOrder: '排序',
-        parentId: '父菜单 ID',
+        parentId: '父菜单',
         path: '路径',
         component: '组件',
         icon: '图标',
@@ -462,48 +463,8 @@ export default {
     }
   },
 
-  permission: {
-    search: {
-      placeholder: { keyword: '编码 / 名称', module: 'system / pms / iot' },
-      label: { module: '模块' }
-    },
-    column: {
-      code: '编码',
-      name: '名称',
-      module: '模块',
-      resource: '资源',
-      action: '动作',
-      actions: '操作'
-    },
-    tooltip: {
-      editDisabled: '内置权限不可编辑',
-      edit: '编辑',
-      deleteDisabled: '内置权限不可删除'
-    },
-    message: {
-      deleteBuiltInFailed: '内置权限不可删除'
-    },
-    confirm: {
-      deleteTitle: '删除权限',
-      deleteMessage: '删除「{code}」吗？'
-    },
-    edit: {
-      titleEdit: '编辑权限',
-      titleCreate: '新增权限',
-      label: {
-        code: '编码',
-        name: '名称',
-        resource: '资源',
-        action: '动作',
-        module: '模块',
-        description: '说明'
-      },
-      placeholder: {
-        code: 'resource:action',
-        module: 'system / pms / iot'
-      }
-    }
-  },
+  // 权限码 → 显示名（backend I18nPermissionPatcher 在 dev 启动时自动补齐）
+  permission: permissions,
 
   dataTable: {
     emptyState: '暂无数据',

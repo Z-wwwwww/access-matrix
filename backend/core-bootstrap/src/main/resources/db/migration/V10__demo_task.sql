@@ -54,7 +54,7 @@ COMMENT ON COLUMN demo_task.priority IS '1=LOW 2=MID 3=HIGH';
 -- 2. KYOTO sub-department (child of TOKYO)
 -- ============================================
 INSERT INTO core_rbac_dept (id, tenant_id, parent_id, code, name, path, level, sort_order) VALUES
- ('00000000000000000000DEPT04', 'default', '00000000000000000000DEPT02', 'KYOTO',  'Kyoto Branch',
+ ('00000000000000000000DEPT04', 'default', '00000000000000000000DEPT02', 'KYOTO',  '京都支社',
   '/00000000000000000000DEPT01/00000000000000000000DEPT02/00000000000000000000DEPT04', 3, 1)
 ON CONFLICT DO NOTHING;
 
@@ -84,12 +84,15 @@ ON CONFLICT DO NOTHING;
 -- ============================================
 -- 5. Five demo roles — one per data_scope mode
 -- ============================================
+-- is_built_in=0：これら 5 ロールは demo 確認のためのお試しデータ。
+-- 業務確認後、運用画面からそのまま削除できる前提でフラグを立てない。
+-- name は「実在しそう」な職位に揃え、業務担当者が画面上で見て違和感を持たないようにする。
 INSERT INTO core_rbac_role (id, tenant_id, code, name, description, data_scope, is_built_in) VALUES
- ('00000000000000000000ROLE11', 'default', 'DEMO_ALL',      'Demo: All Scope',     'Sees every task across the tenant',          1, 1),
- ('00000000000000000000ROLE12', 'default', 'DEMO_DEPT_SUB', 'Demo: Dept + Sub',    'Sees own dept and all sub-depts',            2, 1),
- ('00000000000000000000ROLE13', 'default', 'DEMO_DEPT',     'Demo: Own Dept',      'Sees own dept only',                         3, 1),
- ('00000000000000000000ROLE14', 'default', 'DEMO_SELF',     'Demo: Self Only',     'Sees only tasks they created',               4, 1),
- ('00000000000000000000ROLE15', 'default', 'DEMO_CUSTOM',   'Demo: Custom Depts',  'Sees explicitly-bound depts (KYOTO)',        5, 1)
+ ('00000000000000000000ROLE11', 'default', 'DEMO_ALL',      '取締役',         '全社のタスクを閲覧可能',                              1, 0),
+ ('00000000000000000000ROLE12', 'default', 'DEMO_DEPT_SUB', '東京支社長',     '東京支社と配下の京都支社のタスクを閲覧',              2, 0),
+ ('00000000000000000000ROLE13', 'default', 'DEMO_DEPT',     '大阪支社課長',   '大阪支社のタスクのみ閲覧',                            3, 0),
+ ('00000000000000000000ROLE14', 'default', 'DEMO_SELF',     '一般社員',       '自分が作成したタスクのみ閲覧',                        4, 0),
+ ('00000000000000000000ROLE15', 'default', 'DEMO_CUSTOM',   '京都連絡担当',   '京都支社のタスクのみ閲覧（カスタム範囲）',            5, 0)
 ON CONFLICT DO NOTHING;
 
 -- ============================================

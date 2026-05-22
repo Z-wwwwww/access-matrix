@@ -8,6 +8,7 @@ import Switch from '@/components/ui/Switch.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Drawer from '@/components/ui/Drawer.vue'
 import IconPicker from '@/components/shared/IconPicker.vue'
+import MenuPicker from '@/components/shared/MenuPicker.vue'
 import LucideIcon from '@/components/shared/LucideIcon.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
@@ -16,6 +17,7 @@ import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, HelpCircle, Pin } from
 import {
   getMenuIndexApi, addMenuApi, editMenuApi, deleteMenuApi
 } from '../../../../services/menu'
+import { getPermissionsByModuleApi } from '../../../../services/permission'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
@@ -46,6 +48,52 @@ const menuTypeOptions = computed(() => [
 
 // 只允许 menuType=2（页面/菜单）置顶 —— 目录和按钮置顶在 UI 上没意义
 const canPin = computed(() => editForm.menuType === 2)
+
+// 権限コードのドロップダウン用：起動時に /admin/permission/by-module を一度取って
+// module ごとにグルーピングされた一覧から Select options を組み立てる。
+// label は i18n（permission.<code>）から日本語表示名を引き、code を末尾に小書きする。
+const permissionOptions = ref([])
+
+async function loadPermissionOptions() {
+  try {
+    const res = await getPermissionsByModuleApi()
+    if (res.data.code !== 0) return
+    const byModule = res.data.data || {}
+    const opts = []
+    for (const module of Object.keys(byModule).sort()) {
+      for (const p of byModule[module] || []) {
+        opts.push({
+          value: p.code,
+          // 表示名（i18n）+ code を 1 行で見せる。Select は label のみ検索対象だが
+          // code を label に含めることで code 検索もそのまま効く。
+          label: `${t(`permission.${p.code}`, p.code)} (${p.code})`
+        })
+      }
+    }
+    permissionOptions.value = opts
+  } catch { /* 非致命：ドロップダウンが空になるだけ */ }
+}
+
+// 親メニュー選択時、自分自身と子孫を候補から除外する（循環防止）。
+// ボタン (menuType=3) は親に出来ないので候補から外す。
+const parentExcludeIds = computed(() => {
+  if (!editForm.id) return []
+  const ids = [editForm.id]
+  const byParent = new Map()
+  for (const m of list.value) {
+    const k = m.parentId || ''
+    if (!byParent.has(k)) byParent.set(k, [])
+    byParent.get(k).push(m)
+  }
+  function walk(id) {
+    for (const c of byParent.get(id) || []) {
+      ids.push(c.id)
+      walk(c.id)
+    }
+  }
+  walk(editForm.id)
+  return ids
+})
 
 // menuType 切换离开 2 → 强制把 pinned 清零，避免历史脏数据保留
 watch(
@@ -163,7 +211,10 @@ async function handleDelete(row) {
   } catch (e) { toast.error(e.message) }
 }
 
-onMounted(fetchData)
+onMounted(() => {
+  fetchData()
+  loadPermissionOptions()
+})
 </script>
 
 <template>
@@ -208,7 +259,11 @@ onMounted(fetchData)
           <span class="text-xs text-muted-foreground font-mono">{{ row.component || '-' }}</span>
         </template>
         <template #cell-permissionCode="{ row }">
-          <span class="text-xs font-mono">{{ row.permissionCode || '-' }}</span>
+          <template v-if="row.permissionCode">
+            <span>{{ t(`permission.${row.permissionCode}`, row.permissionCode) }}</span>
+            <span class="text-xs text-muted-foreground font-mono ml-1">({{ row.permissionCode }})</span>
+          </template>
+          <span v-else class="text-xs text-muted-foreground">-</span>
         </template>
         <template #cell-hide="{ row }">{{ row.hide === 1 ? '✓' : '' }}</template>
         <template #cell-actions="{ row }">
@@ -251,7 +306,7 @@ onMounted(fetchData)
         </div>
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.parentId') }}</label>
-          <Input v-model="editForm.parentId" :placeholder="t('menu.edit.placeholder.parentId')" />
+          <MenuPicker v-model="editForm.parentId" :exclude="parentExcludeIds" :exclude-types="[3]" :placeholder="t('menu.edit.placeholder.parentId')" />
         </div>
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.path') }}</label>
@@ -268,7 +323,12 @@ onMounted(fetchData)
           </div>
           <div>
             <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.permissionCode') }}</label>
-            <Input v-model="editForm.permissionCode" :placeholder="t('menu.edit.placeholder.permissionCode')" />
+            <Select v-model="editForm.permissionCode"
+                    :options="permissionOptions"
+                    :placeholder="t('menu.edit.placeholder.permissionCode')"
+                    :searchable="true"
+                    clearable
+                    panel-auto-width />
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">

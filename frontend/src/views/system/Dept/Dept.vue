@@ -3,11 +3,12 @@ import { onMounted, reactive, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
-import Select from '@/components/ui/Select.vue'
+import Switch from '@/components/ui/Switch.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Drawer from '@/components/ui/Drawer.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import UserPicker from '@/components/shared/UserPicker.vue'
+import DeptPicker from '@/components/shared/DeptPicker.vue'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Info } from 'lucide-vue-next'
@@ -29,10 +30,30 @@ const editForm = reactive({
   sortOrder: 0, leaderUserId: '', status: 1
 })
 
-const statusOptions = computed(() => [
-  { label: t('common.status.active'), value: 1 },
-  { label: t('common.status.inactive'), value: 0 }
-])
+// 親部署選択時、自分自身と子孫を候補から除外する（循環防止）
+const parentExcludeIds = computed(() => {
+  if (!editForm.id) return []
+  const ids = []
+  function collect(nodes) {
+    for (const n of nodes) {
+      if (n.id === editForm.id) {
+        ids.push(n.id)
+        function walk(children) {
+          for (const c of children || []) {
+            ids.push(c.id)
+            walk(c.children)
+          }
+        }
+        walk(n.children)
+        return true
+      }
+      if (n.children?.length && collect(n.children)) return true
+    }
+    return false
+  }
+  collect(tree.value)
+  return ids
+})
 
 // User pool — kept solely for the table column's id→label resolution.
 // The drawer dropdown is now <UserPicker/>, which fetches its own options;
@@ -247,7 +268,7 @@ onMounted(() => {
       <div class="space-y-3">
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('dept.edit.label.parentId') }}</label>
-          <Input v-model="editForm.parentId" :placeholder="t('dept.edit.placeholder.parentId')" />
+          <DeptPicker v-model="editForm.parentId" :exclude="parentExcludeIds" :placeholder="t('dept.edit.placeholder.parentId')" />
           <p class="text-xs text-muted-foreground mt-1">{{ t('dept.edit.hint.rootParent') }}</p>
         </div>
         <div>
@@ -265,7 +286,10 @@ onMounted(() => {
           </div>
           <div>
             <label class="text-xs text-muted-foreground block mb-1">{{ t('dept.edit.label.status') }}</label>
-            <Select v-model="editForm.status" :options="statusOptions" />
+            <div class="h-9 flex items-center gap-2">
+              <Switch v-model="editForm.status" :checked-value="1" :unchecked-value="0" />
+              <span class="text-sm">{{ editForm.status === 1 ? t('common.status.active') : t('common.status.inactive') }}</span>
+            </div>
           </div>
         </div>
         <div>

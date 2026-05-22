@@ -1,21 +1,40 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { useAuthStore } from '@/stores/auth'
 import { getMeApi } from '../../../../services/auth'
+import { getDeptTreeApi } from '../../../../services/dept'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
 const me = ref(null)
 const loading = ref(true)
+const deptNameMap = ref(new Map())
+
+const deptDisplay = computed(() => {
+  const id = me.value?.deptId
+  if (id == null || id === '') return ''
+  return deptNameMap.value.get(id) || ''
+})
 
 async function load() {
   loading.value = true
   try {
-    const res = await getMeApi()
-    if (res.data.code === 0) me.value = res.data.data
+    const [meRes, deptRes] = await Promise.all([getMeApi(), getDeptTreeApi()])
+    if (meRes.data.code === 0) me.value = meRes.data.data
+    if (deptRes.data.code === 0) {
+      const map = new Map()
+      function walk(nodes) {
+        for (const n of nodes) {
+          map.set(n.id, n.name)
+          if (n.children?.length) walk(n.children)
+        }
+      }
+      walk(deptRes.data.data || [])
+      deptNameMap.value = map
+    }
   } finally {
     loading.value = false
   }
@@ -28,7 +47,7 @@ onMounted(load)
   <Card class="p-6">
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-lg font-semibold">{{ t('profile.title') }}</h1>
-      <Badge v-if="me?.deptId" variant="secondary">{{ t('profile.label.deptId') }}: {{ me.deptId }}</Badge>
+      <Badge v-if="deptDisplay" variant="secondary">{{ t('profile.label.deptId') }}: {{ deptDisplay }}</Badge>
     </div>
 
     <div v-if="loading" class="text-sm text-muted-foreground">{{ t('common.message.loading') }}...</div>

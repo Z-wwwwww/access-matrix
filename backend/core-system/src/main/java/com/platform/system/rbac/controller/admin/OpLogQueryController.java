@@ -9,6 +9,7 @@ import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
 import com.platform.core.common.result.PageResult;
 import com.platform.core.common.security.RequiresPermission;
+import com.platform.system.security.SystemPermissions;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,7 +23,7 @@ public class OpLogQueryController {
     }
 
     @GetMapping("/list")
-    @RequiresPermission("oplog:read")
+    @RequiresPermission(SystemPermissions.OPLOG_READ)
     public JsonResult<PageResult<OpLogEntity>> list(
             @RequestParam(defaultValue = "1")  long page,
             @RequestParam(defaultValue = "20") long size,
@@ -45,7 +46,7 @@ public class OpLogQueryController {
     }
 
     @GetMapping("/{id}")
-    @RequiresPermission("oplog:read")
+    @RequiresPermission(SystemPermissions.OPLOG_READ)
     public JsonResult<OpLogEntity> get(@PathVariable String id) {
         OpLogEntity e = mapper.selectById(id);
         if (e == null) throw new BusinessException(ErrorCode.NOT_FOUND, "OpLog not found");

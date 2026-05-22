@@ -4,6 +4,7 @@
  * Mirror of ja_JP.js — see that file for the key-tree documentation.
  */
 import general from './general/zh_TW'
+import permissions from './generated/permissions.zh_TW.json'
 
 export default {
   general,
@@ -58,7 +59,7 @@ export default {
       pleaseInput: '請輸入',
       pleaseSelect: '請選擇',
       search: '搜尋...',
-      deptId: '部門 ID'
+      deptId: '請選擇部門'
     },
     tooltip: {
       pagePrevious5: '向前 5 頁',
@@ -175,10 +176,10 @@ export default {
   profile: {
     title: '個人資料',
     label: {
-      deptId: '部門 ID',
+      deptId: '部門',
       userId: '使用者 ID',
-      username: '使用者名稱',
-      displayName: '顯示名稱',
+      username: '登入 ID',
+      displayName: '使用者名稱',
       email: '信箱',
       userNo: '使用者編號',
       tenantId: '租戶',
@@ -189,15 +190,15 @@ export default {
 
   user: {
     search: {
-      placeholder: { keyword: '使用者名稱 / 信箱 / 顯示名稱' },
-      label: { deptId: '部門 ID' }
+      placeholder: { keyword: '登入 ID / 信箱 / 使用者名稱' },
+      label: { deptId: '部門' }
     },
     column: {
-      username: '使用者名稱',
-      displayName: '顯示名稱',
+      username: '登入 ID',
+      displayName: '使用者名稱',
       userNo: '編號',
       email: '信箱',
-      deptId: '部門 ID',
+      deptId: '部門',
       status: '狀態',
       actions: '操作'
     },
@@ -225,12 +226,12 @@ export default {
       titleCreate: '新增使用者',
       lockedHint: '內建 admin 使用者為唯讀。僅可修改密碼（透過「重設密碼」API）。',
       label: {
-        username: '使用者名稱',
+        username: '登入 ID',
         password: '密碼',
-        displayName: '顯示名稱',
+        displayName: '使用者名稱',
         email: '信箱',
         userNo: '編號',
-        deptId: '部門 ID',
+        deptId: '部門',
         status: '狀態',
         roles: '角色'
       },
@@ -372,7 +373,7 @@ export default {
       titleEdit: '編輯部門',
       titleCreate: '新增部門',
       label: {
-        parentId: '父部門 ID',
+        parentId: '父部門',
         code: '代碼',
         name: '名稱',
         sortOrder: '排序',
@@ -435,7 +436,7 @@ export default {
         name: '名稱',
         type: '類型',
         sortOrder: '排序',
-        parentId: '父選單 ID',
+        parentId: '父選單',
         path: '路徑',
         component: '元件',
         icon: '圖示',
@@ -462,48 +463,8 @@ export default {
     }
   },
 
-  permission: {
-    search: {
-      placeholder: { keyword: '代碼 / 名稱', module: 'system / pms / iot' },
-      label: { module: '模組' }
-    },
-    column: {
-      code: '代碼',
-      name: '名稱',
-      module: '模組',
-      resource: '資源',
-      action: '動作',
-      actions: '操作'
-    },
-    tooltip: {
-      editDisabled: '內建權限不可編輯',
-      edit: '編輯',
-      deleteDisabled: '內建權限不可刪除'
-    },
-    message: {
-      deleteBuiltInFailed: '內建權限不可刪除'
-    },
-    confirm: {
-      deleteTitle: '刪除權限',
-      deleteMessage: '刪除「{code}」嗎？'
-    },
-    edit: {
-      titleEdit: '編輯權限',
-      titleCreate: '新增權限',
-      label: {
-        code: '代碼',
-        name: '名稱',
-        resource: '資源',
-        action: '動作',
-        module: '模組',
-        description: '說明'
-      },
-      placeholder: {
-        code: 'resource:action',
-        module: 'system / pms / iot'
-      }
-    }
-  },
+  // 權限碼 → 顯示名（backend I18nPermissionPatcher 於 dev 啟動時自動補齊）
+  permission: permissions,
 
   dataTable: {
     emptyState: '暫無資料',

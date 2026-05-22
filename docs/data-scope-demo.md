@@ -23,21 +23,21 @@ npm run dev
 ## 部门树
 
 ```
-HQ (Head Office)
- ├── TOKYO Branch
- │    └── KYOTO Branch        ← V10 新加，用于演示 DEPT_AND_SUB
- └── OSAKA Branch
+本社 (HQ)
+ ├── 東京支社 (TOKYO)
+ │    └── 京都支社 (KYOTO)    ← V10 新加，用于演示 DEPT_AND_SUB
+ └── 大阪支社 (OSAKA)
 ```
 
 ## 5 种 Scope vs 5 个 demo 用户
 
-| 用户名 | 密码 | 所属部门 | 角色 | `data_scope` | 视角说明 |
-|--------|------|---------|------|:------------:|---------|
-| `demo_all`      | `demo123` | HQ    | DEMO_ALL      | **1 ALL**          | 看到所有部门所有人的 task |
-| `demo_deptsub`  | `demo123` | TOKYO | DEMO_DEPT_SUB | **2 DEPT_AND_SUB** | 本部门 + 所有子部门（TOKYO + KYOTO） |
-| `demo_dept`     | `demo123` | OSAKA | DEMO_DEPT     | **3 DEPT**         | 仅本部门（OSAKA） |
-| `demo_self`     | `demo123` | TOKYO | DEMO_SELF     | **4 SELF**         | 只看自己创建的 task |
-| `demo_custom`   | `demo123` | HQ    | DEMO_CUSTOM   | **5 CUSTOM**       | role_dept 表显式绑了 KYOTO，所以只看 KYOTO 的 |
+| ログイン ID（登录 ID） | ユーザー名（表示名） | 密码 | 所属部门 | 角色 | `data_scope` | 视角说明 |
+|--------|--------|------|---------|------|:------------:|---------|
+| `tanaka_taro`        | 田中 太郎 | `demo123` | 本社     | 取締役       | **1 ALL**          | 看到所有部门所有人的 task |
+| `yamada_hanako`      | 山田 花子 | `demo123` | 東京支社 | 東京支社長   | **2 DEPT_AND_SUB** | 本部门 + 所有子部门（東京 + 京都） |
+| `sato_ken`           | 佐藤 健   | `demo123` | 大阪支社 | 大阪支社課長 | **3 DEPT**         | 仅本部门（大阪） |
+| `suzuki_misaki`      | 鈴木 美咲 | `demo123` | 東京支社 | 一般社員     | **4 SELF**         | 只看自己创建的 task |
+| `takahashi_shinichi` | 高橋 慎一 | `demo123` | 本社     | 京都連絡担当 | **5 CUSTOM**       | role_dept 表显式绑了 京都，所以只看 京都 的 |
 
 > 顺便：`admin` / `admin` 仍是超级管理员（SUPER_ADMIN，`*:*`），会看到全部 15 条。
 
@@ -46,21 +46,21 @@ HQ (Head Office)
 | 登录身份 | 可见 task 条数 | 说明 |
 |---------|:---:|---|
 | `admin` (SUPER_ADMIN) | 15 | `*:*` 短路，所有数据 |
-| `demo_all` | 15 | ALL scope 等同放行 |
-| `demo_deptsub` | 8  | TOKYO 5 条 + KYOTO 3 条 |
-| `demo_dept` | 4 | OSAKA 4 条 |
-| `demo_self` | 3 | 自己（TOKYO 用户）创建的 2 条 + 在 KYOTO 创建的 1 条 |
-| `demo_custom` | 3 | KYOTO 3 条（CUSTOM 绑定的部门） |
+| `tanaka_taro`        | 15 | ALL scope 等同放行 |
+| `yamada_hanako`      | 8  | 東京 5 条 + 京都 3 条 |
+| `sato_ken`           | 4  | 大阪 4 条 |
+| `suzuki_misaki`      | 3  | 自己（東京 用户）创建的 2 条 + 在 京都 创建的 1 条 |
+| `takahashi_shinichi` | 3  | 京都 3 条（CUSTOM 绑定的部门） |
 
-> SELF 是按"我创建的"过滤，跟所属部门无关 —— `demo_self` 在 TOKYO，但他在 KYOTO 创的一条也能看到。
+> SELF 是按"我创建的"过滤，跟所属部门无关 —— `suzuki_misaki` 在 東京，但他在 京都 创的一条也能看到。
 
 ## 验证步骤
 
 打开两个无痕浏览器窗口，分别登录两个 demo 用户：
 
-1. 用 `demo_all` 登录 → 看到 15 条
-2. 用 `demo_dept` 登录 → 看到 4 条（全是 OSAKA）
-3. 试着用 `demo_dept` 创建一条 HQ 的 task → **行能写进去**（写不走 scope 过滤），但回到列表 **看不到自己刚建的那条**（因为它落到 HQ，OSAKA 用户的 DEPT scope 排除了）。这是预期行为，体现"可写、不可见"
+1. 用 `tanaka_taro`（取締役）登录 → 看到 15 条
+2. 用 `sato_ken`（大阪支社課長）登录 → 看到 4 条（全是 大阪）
+3. 试着用 `sato_ken` 创建一条 本社 的 task → **行能写进去**（写不走 scope 过滤），但回到列表 **看不到自己刚建的那条**（因为它落到 本社，大阪 用户的 DEPT scope 排除了）。这是预期行为，体现"可写、不可见"
 
 ## 关键代码路径
 

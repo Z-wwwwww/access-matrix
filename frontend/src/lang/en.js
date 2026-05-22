@@ -4,6 +4,7 @@
  * Mirror of ja_JP.js — see that file for the key-tree documentation.
  */
 import general from './general/en'
+import permissions from './generated/permissions.en.json'
 
 export default {
   general,
@@ -58,7 +59,7 @@ export default {
       pleaseInput: 'Please enter',
       pleaseSelect: 'Please select',
       search: 'Search...',
-      deptId: 'Department ID'
+      deptId: 'Please select a department'
     },
     tooltip: {
       pagePrevious5: '5 pages back',
@@ -175,10 +176,10 @@ export default {
   profile: {
     title: 'Profile',
     label: {
-      deptId: 'Department ID',
+      deptId: 'Department',
       userId: 'User ID',
-      username: 'Username',
-      displayName: 'Display name',
+      username: 'Login ID',
+      displayName: 'Username',
       email: 'Email',
       userNo: 'User No.',
       tenantId: 'Tenant',
@@ -189,15 +190,15 @@ export default {
 
   user: {
     search: {
-      placeholder: { keyword: 'Username / Email / Display name' },
-      label: { deptId: 'Department ID' }
+      placeholder: { keyword: 'Login ID / Email / Username' },
+      label: { deptId: 'Department' }
     },
     column: {
-      username: 'Username',
-      displayName: 'Display name',
+      username: 'Login ID',
+      displayName: 'Username',
       userNo: 'No.',
       email: 'Email',
-      deptId: 'Department ID',
+      deptId: 'Department',
       status: 'Status',
       actions: 'Actions'
     },
@@ -225,12 +226,12 @@ export default {
       titleCreate: 'New user',
       lockedHint: 'The built-in admin user is read-only. Only password reset is allowed (via the "Reset password" API).',
       label: {
-        username: 'Username',
+        username: 'Login ID',
         password: 'Password',
-        displayName: 'Display name',
+        displayName: 'Username',
         email: 'Email',
         userNo: 'No.',
-        deptId: 'Department ID',
+        deptId: 'Department',
         status: 'Status',
         roles: 'Roles'
       },
@@ -372,7 +373,7 @@ export default {
       titleEdit: 'Edit department',
       titleCreate: 'New department',
       label: {
-        parentId: 'Parent ID',
+        parentId: 'Parent department',
         code: 'Code',
         name: 'Name',
         sortOrder: 'Sort order',
@@ -435,7 +436,7 @@ export default {
         name: 'Name',
         type: 'Type',
         sortOrder: 'Sort order',
-        parentId: 'Parent menu ID',
+        parentId: 'Parent menu',
         path: 'Path',
         component: 'Component',
         icon: 'Icon',
@@ -462,48 +463,8 @@ export default {
     }
   },
 
-  permission: {
-    search: {
-      placeholder: { keyword: 'Code / Name', module: 'system / pms / iot' },
-      label: { module: 'Module' }
-    },
-    column: {
-      code: 'Code',
-      name: 'Name',
-      module: 'Module',
-      resource: 'Resource',
-      action: 'Action',
-      actions: 'Actions'
-    },
-    tooltip: {
-      editDisabled: 'Built-in permission is not editable',
-      edit: 'Edit',
-      deleteDisabled: 'Built-in permission cannot be deleted'
-    },
-    message: {
-      deleteBuiltInFailed: 'Built-in permission cannot be deleted'
-    },
-    confirm: {
-      deleteTitle: 'Delete permission',
-      deleteMessage: 'Delete "{code}"?'
-    },
-    edit: {
-      titleEdit: 'Edit permission',
-      titleCreate: 'New permission',
-      label: {
-        code: 'Code',
-        name: 'Name',
-        resource: 'Resource',
-        action: 'Action',
-        module: 'Module',
-        description: 'Description'
-      },
-      placeholder: {
-        code: 'resource:action',
-        module: 'system / pms / iot'
-      }
-    }
-  },
+  // Permission code → display name (auto-patched by backend I18nPermissionPatcher in dev)
+  permission: permissions,
 
   dataTable: {
     emptyState: 'No data',

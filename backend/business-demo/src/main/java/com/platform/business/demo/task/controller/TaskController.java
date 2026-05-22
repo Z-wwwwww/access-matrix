@@ -6,6 +6,7 @@ import com.platform.core.common.audit.OpLog;
 import com.platform.core.common.result.JsonResult;
 import com.platform.core.common.result.PageResult;
 import com.platform.core.common.security.RequiresPermission;
+import com.platform.business.demo.security.DemoPermissions;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,7 +33,7 @@ public class TaskController {
     }
 
     @GetMapping("/list")
-    @RequiresPermission("task:read")
+    @RequiresPermission(DemoPermissions.TASK_READ)
     public JsonResult<PageResult<TaskDto.View>> list(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "20") long size,
@@ -42,20 +43,20 @@ public class TaskController {
     }
 
     @GetMapping("/{id}")
-    @RequiresPermission("task:read")
+    @RequiresPermission(DemoPermissions.TASK_READ)
     public JsonResult<TaskDto.View> get(@PathVariable String id) {
         return JsonResult.ok(service.get(id));
     }
 
     @PostMapping
-    @RequiresPermission("task:create")
+    @RequiresPermission(DemoPermissions.TASK_CREATE)
     @OpLog(module = "demo", action = "task.create", targetType = "task")
     public JsonResult<String> create(@Valid @RequestBody TaskDto.CreateRequest req) {
         return JsonResult.ok(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @RequiresPermission("task:update")
+    @RequiresPermission(DemoPermissions.TASK_UPDATE)
     @OpLog(module = "demo", action = "task.update", targetType = "task")
     public JsonResult<Void> update(@PathVariable String id, @Valid @RequestBody TaskDto.UpdateRequest req) {
         service.update(id, req);
@@ -63,7 +64,7 @@ public class TaskController {
     }
 
     @DeleteMapping("/{id}")
-    @RequiresPermission("task:delete")
+    @RequiresPermission(DemoPermissions.TASK_DELETE)
     @OpLog(module = "demo", action = "task.delete", targetType = "task")
     public JsonResult<Void> delete(@PathVariable String id) {
         service.delete(id);

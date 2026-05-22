@@ -3,8 +3,9 @@ import { ref, reactive, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Drawer from '@/components/ui/Drawer.vue'
 import Input from '@/components/ui/Input.vue'
-import Select from '@/components/ui/Select.vue'
+import Switch from '@/components/ui/Switch.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
+import DeptTreeDialog from '@/components/shared/DeptTreeDialog.vue'
 import { toast } from '@/composables/useToast'
 import { addUserApi, updateUserApi, getUserRolesApi, assignUserRolesApi } from '../../../../services/user'
 import { getRoleListApi } from '../../../../services/role'
@@ -33,11 +34,6 @@ const form = reactive({
 const allRoles = ref([])
 const selectedRoleIds = ref([])
 const saving = ref(false)
-
-const statusOptions = computed(() => [
-  { label: t('common.status.active'), value: 1 },
-  { label: t('common.status.inactive'), value: 0 }
-])
 
 watch(() => props.open, async (open) => {
   if (!open) return
@@ -129,11 +125,14 @@ async function save() {
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.deptId') }}</label>
-          <Input v-model="form.deptId" :placeholder="t('common.placeholder.deptId')" :disabled="isLocked" />
+          <DeptTreeDialog v-model="form.deptId" :placeholder="t('common.placeholder.deptId')" :disabled="isLocked" />
         </div>
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.status') }}</label>
-          <Select v-model="form.status" :options="statusOptions" :disabled="isLocked" />
+          <div class="h-9 flex items-center gap-2">
+            <Switch v-model="form.status" :checked-value="1" :unchecked-value="0" :disabled="isLocked" />
+            <span class="text-sm">{{ form.status === 1 ? t('common.status.active') : t('common.status.inactive') }}</span>
+          </div>
         </div>
       </div>
 

@@ -12,6 +12,7 @@
  *   - router.*   : route meta titles (browser tab + AppTabBar)
  */
 import general from './general/ja_JP'
+import permissions from './generated/permissions.ja_JP.json'
 
 export default {
   general,
@@ -66,7 +67,7 @@ export default {
       pleaseInput: '入力してください',
       pleaseSelect: '選択してください',
       search: '検索...',
-      deptId: '部署 ID'
+      deptId: '部署を選択してください'
     },
     tooltip: {
       pagePrevious5: '5ページ前へ',
@@ -183,10 +184,10 @@ export default {
   profile: {
     title: 'プロフィール',
     label: {
-      deptId: '部署 ID',
+      deptId: '部署',
       userId: 'ユーザー ID',
-      username: 'ユーザー名',
-      displayName: '表示名',
+      username: 'ログインID',
+      displayName: 'ユーザー名',
       email: 'メール',
       userNo: 'ユーザー No.',
       tenantId: 'テナント',
@@ -197,15 +198,15 @@ export default {
 
   user: {
     search: {
-      placeholder: { keyword: 'ユーザー名 / メール / 表示名' },
-      label: { deptId: '部署 ID' }
+      placeholder: { keyword: 'ログインID / メール / ユーザー名' },
+      label: { deptId: '部署' }
     },
     column: {
-      username: 'ユーザー名',
-      displayName: '表示名',
+      username: 'ログインID',
+      displayName: 'ユーザー名',
       userNo: '番号',
       email: 'メール',
-      deptId: '部署 ID',
+      deptId: '部署',
       status: '状態',
       actions: '操作'
     },
@@ -233,12 +234,12 @@ export default {
       titleCreate: 'ユーザー新規',
       lockedHint: '内蔵 admin ユーザーは読み取り専用です。パスワードの変更のみ可能（『パスワードリセット』API 経由）。',
       label: {
-        username: 'ユーザー名',
+        username: 'ログインID',
         password: 'パスワード',
-        displayName: '表示名',
+        displayName: 'ユーザー名',
         email: 'メール',
         userNo: '番号',
-        deptId: '部署 ID',
+        deptId: '部署',
         status: '状態',
         roles: 'ロール'
       },
@@ -380,7 +381,7 @@ export default {
       titleEdit: '部署編集',
       titleCreate: '部署新規',
       label: {
-        parentId: '親部署 ID',
+        parentId: '親部署',
         code: 'コード',
         name: '名称',
         sortOrder: '並び順',
@@ -443,7 +444,7 @@ export default {
         name: '名称',
         type: '種類',
         sortOrder: '並び順',
-        parentId: '親メニュー ID',
+        parentId: '親メニュー',
         path: 'パス',
         component: 'コンポーネント',
         icon: 'アイコン',
@@ -470,48 +471,8 @@ export default {
     }
   },
 
-  permission: {
-    search: {
-      placeholder: { keyword: 'コード / 名称', module: 'system / pms / iot' },
-      label: { module: 'モジュール' }
-    },
-    column: {
-      code: 'コード',
-      name: '名称',
-      module: 'モジュール',
-      resource: 'リソース',
-      action: 'アクション',
-      actions: '操作'
-    },
-    tooltip: {
-      editDisabled: '内蔵権限は編集不可',
-      edit: '編集',
-      deleteDisabled: '内蔵権限は削除不可'
-    },
-    message: {
-      deleteBuiltInFailed: '内蔵権限は削除できません'
-    },
-    confirm: {
-      deleteTitle: '権限削除',
-      deleteMessage: '「{code}」を削除しますか？'
-    },
-    edit: {
-      titleEdit: '権限編集',
-      titleCreate: '権限新規',
-      label: {
-        code: 'コード',
-        name: '名称',
-        resource: 'リソース',
-        action: 'アクション',
-        module: 'モジュール',
-        description: '説明'
-      },
-      placeholder: {
-        code: 'resource:action',
-        module: 'system / pms / iot'
-      }
-    }
-  },
+  // 権限コード → 表示名（コード由来、backend の I18nPermissionPatcher が dev 起動時に補完）
+  permission: permissions,
 
   dataTable: {
     emptyState: 'データなし',
