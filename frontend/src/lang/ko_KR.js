@@ -4,6 +4,7 @@
  * Mirror of ja_JP.js — see that file for the key-tree documentation.
  */
 import general from './general/ko_KR'
+import permissions from './generated/permissions.ko_KR.json'
 
 export default {
   general,
@@ -58,7 +59,7 @@ export default {
       pleaseInput: '입력하세요',
       pleaseSelect: '선택하세요',
       search: '검색...',
-      deptId: '부서 ID'
+      deptId: '부서를 선택하세요'
     },
     tooltip: {
       pagePrevious5: '5 페이지 이전',
@@ -175,10 +176,10 @@ export default {
   profile: {
     title: '프로필',
     label: {
-      deptId: '부서 ID',
+      deptId: '부서',
       userId: '사용자 ID',
-      username: '사용자명',
-      displayName: '표시 이름',
+      username: '로그인 ID',
+      displayName: '사용자명',
       email: '이메일',
       userNo: '사용자 번호',
       tenantId: '테넌트',
@@ -189,15 +190,15 @@ export default {
 
   user: {
     search: {
-      placeholder: { keyword: '사용자명 / 이메일 / 표시 이름' },
-      label: { deptId: '부서 ID' }
+      placeholder: { keyword: '로그인 ID / 이메일 / 사용자명' },
+      label: { deptId: '부서' }
     },
     column: {
-      username: '사용자명',
-      displayName: '표시 이름',
+      username: '로그인 ID',
+      displayName: '사용자명',
       userNo: '번호',
       email: '이메일',
-      deptId: '부서 ID',
+      deptId: '부서',
       status: '상태',
       actions: '작업'
     },
@@ -225,12 +226,12 @@ export default {
       titleCreate: '사용자 신규',
       lockedHint: '기본 제공 admin 사용자는 읽기 전용입니다. 비밀번호 변경만 가능합니다(「비밀번호 재설정」 API 경유).',
       label: {
-        username: '사용자명',
+        username: '로그인 ID',
         password: '비밀번호',
-        displayName: '표시 이름',
+        displayName: '사용자명',
         email: '이메일',
         userNo: '번호',
-        deptId: '부서 ID',
+        deptId: '부서',
         status: '상태',
         roles: '역할'
       },
@@ -372,7 +373,7 @@ export default {
       titleEdit: '부서 편집',
       titleCreate: '부서 신규',
       label: {
-        parentId: '상위 부서 ID',
+        parentId: '상위 부서',
         code: '코드',
         name: '명칭',
         sortOrder: '정렬 순서',
@@ -435,7 +436,7 @@ export default {
         name: '명칭',
         type: '유형',
         sortOrder: '정렬 순서',
-        parentId: '상위 메뉴 ID',
+        parentId: '상위 메뉴',
         path: '경로',
         component: '컴포넌트',
         icon: '아이콘',
@@ -462,48 +463,8 @@ export default {
     }
   },
 
-  permission: {
-    search: {
-      placeholder: { keyword: '코드 / 명칭', module: 'system / pms / iot' },
-      label: { module: '모듈' }
-    },
-    column: {
-      code: '코드',
-      name: '명칭',
-      module: '모듈',
-      resource: '리소스',
-      action: '동작',
-      actions: '작업'
-    },
-    tooltip: {
-      editDisabled: '기본 제공 권한은 편집할 수 없습니다',
-      edit: '편집',
-      deleteDisabled: '기본 제공 권한은 삭제할 수 없습니다'
-    },
-    message: {
-      deleteBuiltInFailed: '기본 제공 권한은 삭제할 수 없습니다'
-    },
-    confirm: {
-      deleteTitle: '권한 삭제',
-      deleteMessage: '「{code}」을(를) 삭제하시겠습니까?'
-    },
-    edit: {
-      titleEdit: '권한 편집',
-      titleCreate: '권한 신규',
-      label: {
-        code: '코드',
-        name: '명칭',
-        resource: '리소스',
-        action: '동작',
-        module: '모듈',
-        description: '설명'
-      },
-      placeholder: {
-        code: 'resource:action',
-        module: 'system / pms / iot'
-      }
-    }
-  },
+  // 권한 코드 → 표시명（backend I18nPermissionPatcher 가 dev 시작 시 자동 채움）
+  permission: permissions,
 
   dataTable: {
     emptyState: '데이터 없음',

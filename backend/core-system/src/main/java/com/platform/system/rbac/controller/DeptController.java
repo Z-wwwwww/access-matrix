@@ -5,6 +5,7 @@ import com.platform.system.rbac.service.DeptQueryService;
 import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.result.JsonResult;
 import com.platform.core.common.security.RequiresPermission;
+import com.platform.system.security.SystemPermissions;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,7 +24,7 @@ public class DeptController {
 
     /** Whole tenant's department tree. Requires {@code dept:read}. */
     @GetMapping("/tree")
-    @RequiresPermission("dept:read")
+    @RequiresPermission(SystemPermissions.DEPT_READ)
     public JsonResult<List<DeptNode>> tree() {
         String tenantId = RequestContext.tenantId();
         return JsonResult.ok(deptQueryService.loadTree(tenantId == null ? "default" : tenantId));

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
+import DeptPicker from '@/components/shared/DeptPicker.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
@@ -14,6 +15,7 @@ const { confirm } = useConfirm()
 import {
   getUserListApi, deleteUserApi, changeUserStatusApi, forceLogoutApi
 } from '../../../../services/user'
+import { getDeptTreeApi } from '../../../../services/dept'
 import UserEdit from './UserEdit.vue'
 import ResetPasswordDialog from './ResetPasswordDialog.vue'
 
@@ -27,6 +29,31 @@ const search = reactive({ keyword: '', deptId: '' })
 const showEdit = ref(false)
 const showResetPwd = ref(false)
 const current = ref(null)
+
+// 部署 id → 名称マップ（一覧列の表示用）。/dept/tree はログイン後キャッシュされる前提で
+// 画面ロード時に 1 回だけ取得し、行ごとの解決はこのマップで O(1) で済ませる。
+const deptNameMap = ref(new Map())
+
+async function loadDeptMap() {
+  try {
+    const res = await getDeptTreeApi()
+    if (res.data.code !== 0) return
+    const map = new Map()
+    function walk(nodes) {
+      for (const n of nodes) {
+        map.set(n.id, n.name)
+        if (n.children?.length) walk(n.children)
+      }
+    }
+    walk(res.data.data || [])
+    deptNameMap.value = map
+  } catch { /* 非致命：解決失敗時は '-' を表示 */ }
+}
+
+function deptName(id) {
+  if (id == null || id === '') return '-'
+  return deptNameMap.value.get(id) || '-'
+}
 
 // Use computed so column titles re-evaluate when the locale changes at runtime.
 const columns = computed(() => [
@@ -113,7 +140,10 @@ async function handleForceLogout(row) {
   } catch (e) { toast.error(e.message) }
 }
 
-onMounted(fetchData)
+onMounted(() => {
+  fetchData()
+  loadDeptMap()
+})
 </script>
 
 <template>
@@ -124,9 +154,9 @@ onMounted(fetchData)
           <label class="text-xs text-muted-foreground block mb-1">{{ t('common.label.keyword') }}</label>
           <Input v-model="search.keyword" :placeholder="t('user.search.placeholder.keyword')" class="w-60" />
         </div>
-        <div>
+        <div class="w-60">
           <label class="text-xs text-muted-foreground block mb-1">{{ t('user.search.label.deptId') }}</label>
-          <Input v-model="search.deptId" :placeholder="t('common.placeholder.deptId')" class="w-60" />
+          <DeptPicker v-model="search.deptId" :placeholder="t('common.placeholder.deptId')" />
         </div>
         <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                 @click="() => { page = 1; fetchData() }">
@@ -159,6 +189,9 @@ onMounted(fetchData)
         <template #cell-username="{ row }">
           <span>{{ row.username }}</span>
           <Badge v-if="row.username === 'admin'" variant="outline" class="ml-2 text-[10px]">{{ t('common.status.builtIn') }}</Badge>
+        </template>
+        <template #cell-deptId="{ row }">
+          <span>{{ deptName(row.deptId) }}</span>
         </template>
         <template #cell-status="{ row }">
           <Badge :variant="row.status === 1 ? 'default' : 'outline'">

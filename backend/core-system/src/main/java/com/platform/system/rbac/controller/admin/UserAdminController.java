@@ -6,6 +6,7 @@ import com.platform.core.common.audit.OpLog;
 import com.platform.core.common.result.JsonResult;
 import com.platform.core.common.result.PageResult;
 import com.platform.core.common.security.RequiresPermission;
+import com.platform.system.security.SystemPermissions;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,7 +23,7 @@ public class UserAdminController {
     }
 
     @GetMapping("/list")
-    @RequiresPermission("user:read")
+    @RequiresPermission(SystemPermissions.USER_READ)
     public JsonResult<PageResult<UserDto.View>> list(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "20") long size,
@@ -32,20 +33,20 @@ public class UserAdminController {
     }
 
     @GetMapping("/{id}")
-    @RequiresPermission("user:read")
+    @RequiresPermission(SystemPermissions.USER_READ)
     public JsonResult<UserDto.View> get(@PathVariable String id) {
         return JsonResult.ok(service.get(id));
     }
 
     @PostMapping
-    @RequiresPermission("user:create")
+    @RequiresPermission(SystemPermissions.USER_CREATE)
     @OpLog(module = "system", action = "user.create", targetType = "user")
     public JsonResult<String> create(@Valid @RequestBody UserDto.CreateRequest req) {
         return JsonResult.ok(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @RequiresPermission("user:update")
+    @RequiresPermission(SystemPermissions.USER_UPDATE)
     @OpLog(module = "system", action = "user.update", targetType = "user")
     public JsonResult<Void> update(@PathVariable String id, @Valid @RequestBody UserDto.UpdateRequest req) {
         service.update(id, req);
@@ -53,7 +54,7 @@ public class UserAdminController {
     }
 
     @DeleteMapping("/{id}")
-    @RequiresPermission("user:delete")
+    @RequiresPermission(SystemPermissions.USER_DELETE)
     @OpLog(module = "system", action = "user.delete", targetType = "user")
     public JsonResult<Void> delete(@PathVariable String id) {
         service.delete(id);
@@ -61,13 +62,13 @@ public class UserAdminController {
     }
 
     @GetMapping("/{id}/roles")
-    @RequiresPermission("user:read")
+    @RequiresPermission(SystemPermissions.USER_READ)
     public JsonResult<List<String>> roles(@PathVariable String id) {
         return JsonResult.ok(service.listRoleIds(id));
     }
 
     @PutMapping("/{id}/roles")
-    @RequiresPermission("user:update")
+    @RequiresPermission(SystemPermissions.USER_UPDATE)
     @OpLog(module = "system", action = "user.assignRoles", targetType = "user")
     public JsonResult<Void> assignRoles(@PathVariable String id,
                                         @Valid @RequestBody UserDto.AssignRolesRequest req) {
@@ -76,7 +77,7 @@ public class UserAdminController {
     }
 
     @PutMapping("/{id}/dept")
-    @RequiresPermission("user:update")
+    @RequiresPermission(SystemPermissions.USER_UPDATE)
     @OpLog(module = "system", action = "user.changeDept", targetType = "user")
     public JsonResult<Void> changeDept(@PathVariable String id,
                                        @Valid @RequestBody UserDto.ChangeDeptRequest req) {
@@ -85,7 +86,7 @@ public class UserAdminController {
     }
 
     @PutMapping("/{id}/status")
-    @RequiresPermission("user:update")
+    @RequiresPermission(SystemPermissions.USER_UPDATE)
     @OpLog(module = "system", action = "user.changeStatus", targetType = "user")
     public JsonResult<Void> changeStatus(@PathVariable String id,
                                          @Valid @RequestBody UserDto.ChangeStatusRequest req) {

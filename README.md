@@ -29,7 +29,7 @@ npm install && npm run dev
 
 默认监听：后端 `:9135`（context `/api`），前端 `:5273`。Vite 通过 `/proxy_url` 代理到后端。
 
-local profile 自动种 `admin/admin` 超管 + 5 个 demo 用户（`demo_all` / `demo_deptsub` / `demo_dept` / `demo_self` / `demo_custom`，密码统一 `demo123`）。各 demo 用户登录后看到的 task 数据不同，演示 5 种数据范围效果，对照表见 [docs/data-scope-demo.md](docs/data-scope-demo.md)。
+local profile 自动种 `admin/admin` 超管 + 5 个 demo 用户（`tanaka_taro`/田中太郎 ・ `yamada_hanako`/山田花子 ・ `sato_ken`/佐藤健 ・ `suzuki_misaki`/鈴木美咲 ・ `takahashi_shinichi`/高橋慎一，密码统一 `demo123`）。各 demo 用户登录后看到的 task 数据不同，演示 5 种数据范围效果，对照表见 [docs/data-scope-demo.md](docs/data-scope-demo.md)。
 
 ## 主要特性
 

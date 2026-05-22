@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import Drawer from '@/components/ui/Drawer.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
+import Switch from '@/components/ui/Switch.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import { TabsContent } from 'radix-vue'
@@ -46,10 +47,6 @@ const scopeOptions = computed(() => [
   { label: t('role.edit.option.scope.self'), value: 4 },
   { label: t('role.edit.option.scope.custom'), value: 5 }
 ])
-const statusOptions = computed(() => [
-  { label: t('common.status.active'), value: 1 },
-  { label: t('common.status.inactive'), value: 0 }
-])
 
 const permsByModule = ref({})
 const selectedPermIds = ref([])
@@ -84,28 +81,39 @@ watch(() => props.open, async (open) => {
   selectedDeptIds.value = []
 
   // Load reference data
-  try {
-    const [pRes, mRes, dRes] = await Promise.all([
-      getPermissionsByModuleApi(),
-      getMenuIndexApi(),
-      getDeptTreeApi()
-    ])
-    if (pRes.data.code === 0) permsByModule.value = pRes.data.data || {}
-    if (mRes.data.code === 0) flatMenus.value = mRes.data.data || []
-    if (dRes.data.code === 0) flatDepts.value = flatten(dRes.data.data || [])
-  } catch { /* ignore */ }
+  // Promise.allSettled: 3 つの呼び出しの一つが 403/失敗してももう 2 つは生かす。
+  // 以前は Promise.all + try/catch だったため、たとえば dept tree が落ちただけで
+  // permission/menu 一覧まで空に見えていた。
+  const [pRes, mRes, dRes] = await Promise.allSettled([
+    getPermissionsByModuleApi(),
+    getMenuIndexApi(),
+    getDeptTreeApi()
+  ])
+  if (pRes.status === 'fulfilled' && pRes.value.data.code === 0) {
+    permsByModule.value = pRes.value.data.data || {}
+  } else {
+    console.warn('[RoleEdit] 権限一覧の取得に失敗:', pRes.reason || pRes.value?.data?.msg)
+  }
+  if (mRes.status === 'fulfilled' && mRes.value.data.code === 0) {
+    flatMenus.value = mRes.value.data.data || []
+  } else {
+    console.warn('[RoleEdit] メニュー一覧の取得に失敗:', mRes.reason || mRes.value?.data?.msg)
+  }
+  if (dRes.status === 'fulfilled' && dRes.value.data.code === 0) {
+    flatDepts.value = flatten(dRes.value.data.data || [])
+  } else {
+    console.warn('[RoleEdit] 部署ツリーの取得に失敗:', dRes.reason || dRes.value?.data?.msg)
+  }
 
   if (props.role) {
-    try {
-      const [p, m, d] = await Promise.all([
-        getRolePermissionsApi(props.role.id),
-        getRoleMenusApi(props.role.id),
-        getRoleDeptsApi(props.role.id)
-      ])
-      if (p.data.code === 0) selectedPermIds.value = p.data.data || []
-      if (m.data.code === 0) selectedMenuIds.value = m.data.data || []
-      if (d.data.code === 0) selectedDeptIds.value = d.data.data || []
-    } catch { /* ignore */ }
+    const [p, m, d] = await Promise.allSettled([
+      getRolePermissionsApi(props.role.id),
+      getRoleMenusApi(props.role.id),
+      getRoleDeptsApi(props.role.id)
+    ])
+    if (p.status === 'fulfilled' && p.value.data.code === 0) selectedPermIds.value = p.value.data.data || []
+    if (m.status === 'fulfilled' && m.value.data.code === 0) selectedMenuIds.value = m.value.data.data || []
+    if (d.status === 'fulfilled' && d.value.data.code === 0) selectedDeptIds.value = d.value.data.data || []
   }
 })
 
@@ -181,7 +189,10 @@ async function save() {
             </div>
             <div>
               <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.status') }}</label>
-              <Select v-model="form.status" :options="statusOptions" :disabled="isLocked" />
+              <div class="h-9 flex items-center gap-2">
+                <Switch v-model="form.status" :checked-value="1" :unchecked-value="0" :disabled="isLocked" />
+                <span class="text-sm">{{ form.status === 1 ? t('common.status.active') : t('common.status.inactive') }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -195,7 +206,8 @@ async function save() {
               <Checkbox v-for="p in perms" :key="p.id"
                         v-model="selectedPermIds" :value="p.id" :disabled="isLocked"
                         class="px-2 py-1 hover:bg-muted rounded text-xs">
-                <span class="font-mono">{{ p.code }}</span>
+                <span>{{ t(`permission.${p.code}`, p.code) }}</span>
+                <span class="text-muted-foreground font-mono ml-1">({{ p.code }})</span>
               </Checkbox>
             </div>
           </div>

@@ -10,6 +10,7 @@ import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
 import com.platform.core.common.security.RequiresPermission;
+import com.platform.system.security.SystemPermissions;
 import com.platform.core.infrastructure.security.AccountLockoutService;
 import com.platform.core.infrastructure.security.ForceLogoutService;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
@@ -42,7 +43,7 @@ public class AdminAuthController {
     }
 
     @PostMapping("/unlock")
-    @RequiresPermission("auth:unlock")
+    @RequiresPermission(SystemPermissions.AUTH_UNLOCK)
     @OpLog(module = "system", action = "auth.unlock", targetType = "user")
     public JsonResult<Void> unlock(@Valid @RequestBody UnlockRequest body) {
         UserEntity user = userMapper.findByIdentifier(tenant(), body.username());
@@ -56,7 +57,7 @@ public class AdminAuthController {
     }
 
     @PostMapping("/reset-password")
-    @RequiresPermission("auth:reset-password")
+    @RequiresPermission(SystemPermissions.AUTH_RESET_PASSWORD)
     @OpLog(module = "system", action = "auth.resetPassword", targetType = "user")
     public JsonResult<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest body) {
         passwordPolicy.validate(body.newPassword());

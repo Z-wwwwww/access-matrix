@@ -5,6 +5,7 @@ import com.platform.system.rbac.service.DeptAdminService;
 import com.platform.core.common.audit.OpLog;
 import com.platform.core.common.result.JsonResult;
 import com.platform.core.common.security.RequiresPermission;
+import com.platform.system.security.SystemPermissions;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,14 +20,14 @@ public class DeptAdminController {
     }
 
     @PostMapping
-    @RequiresPermission("dept:create")
+    @RequiresPermission(SystemPermissions.DEPT_CREATE)
     @OpLog(module = "system", action = "dept.create", targetType = "dept")
     public JsonResult<String> create(@Valid @RequestBody DeptAdminDto.CreateRequest req) {
         return JsonResult.ok(service.create(req));
     }
 
     @PutMapping("/{id}")
-    @RequiresPermission("dept:update")
+    @RequiresPermission(SystemPermissions.DEPT_UPDATE)
     @OpLog(module = "system", action = "dept.update", targetType = "dept")
     public JsonResult<Void> update(@PathVariable String id, @Valid @RequestBody DeptAdminDto.UpdateRequest req) {
         service.update(id, req);
@@ -34,7 +35,7 @@ public class DeptAdminController {
     }
 
     @DeleteMapping("/{id}")
-    @RequiresPermission("dept:delete")
+    @RequiresPermission(SystemPermissions.DEPT_DELETE)
     @OpLog(module = "system", action = "dept.delete", targetType = "dept")
     public JsonResult<Void> delete(@PathVariable String id) {
         service.delete(id);
