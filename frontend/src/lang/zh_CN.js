@@ -274,11 +274,11 @@ export default {
 
   role: {
     search: {
-      placeholder: { keyword: '编码 / 名称' }
+      placeholder: { keyword: '名称 / 说明' }
     },
     column: {
-      code: '编码',
       name: '名称',
+      description: '说明',
       dataScope: '数据范围',
       status: '状态',
       actions: '操作'
@@ -299,7 +299,7 @@ export default {
     },
     confirm: {
       deleteTitle: '删除角色',
-      deleteMessage: '删除「{code}」吗？'
+      deleteMessage: '删除「{name}」吗？'
     },
     message: {
       deleteBuiltInFailed: '内置角色不可删除',
@@ -308,7 +308,7 @@ export default {
     edit: {
       titleEdit: '编辑角色',
       titleCreate: '新增角色',
-      lockedHint: '内置角色为只读。修改编码、数据范围或权限/菜单/部门分配可能引起认证循环或权限漂移。',
+      lockedHint: '内置角色为只读。修改名称、数据范围或权限/菜单/部门分配可能引起认证循环或权限漂移。',
       tab: {
         basic: '基本',
         permissions: '权限',
@@ -316,7 +316,6 @@ export default {
         depts: '部门'
       },
       label: {
-        code: '编码',
         name: '名称',
         description: '说明',
         dataScope: '数据范围',

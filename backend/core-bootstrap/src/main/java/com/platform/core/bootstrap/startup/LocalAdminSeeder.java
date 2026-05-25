@@ -8,6 +8,7 @@ import com.platform.system.rbac.entity.UserRoleEntity;
 import com.platform.system.rbac.mapper.RoleMapper;
 import com.platform.system.rbac.mapper.UserRoleMapper;
 import com.platform.core.common.id.IdGenerator;
+import com.platform.core.common.security.BuiltInRoles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -25,7 +26,6 @@ import java.time.LocalDateTime;
 public class LocalAdminSeeder {
 
     private static final Logger log = LoggerFactory.getLogger(LocalAdminSeeder.class);
-    private static final String SUPER_ADMIN_CODE = "SUPER_ADMIN";
 
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
@@ -71,9 +71,6 @@ public class LocalAdminSeeder {
             u.setUserNo("U00000001");
             u.setDisplayName("Local Admin");
             u.setPasswordHash(adminHash);
-            // roles/authorities JSONB columns are deprecated by RBAC tables — leave defaults ([]).
-            u.setRoles("[]");
-            u.setAuthorities("[]");
             u.setStatus(1);
             u.setMark(1);
             u.setCreateUser("system");
@@ -114,12 +111,10 @@ public class LocalAdminSeeder {
     }
 
     private void ensureSuperAdminLink(UserEntity admin) {
-        RoleEntity superAdmin = roleMapper.selectOne(
-                new QueryWrapper<RoleEntity>()
-                        .eq("code", SUPER_ADMIN_CODE)
-                        .eq("mark", 1)
-                        .last("LIMIT 1"));
-        if (superAdmin == null) {
+        // Look up by seeded ULID (see BuiltInRoles), not by code/name — the admin
+        // may have renamed the role's display name, which is now fully editable.
+        RoleEntity superAdmin = roleMapper.selectById(BuiltInRoles.SUPER_ADMIN_ID);
+        if (superAdmin == null || !Integer.valueOf(1).equals(superAdmin.getMark())) {
             log.warn("LocalAdminSeeder: SUPER_ADMIN role not found — Flyway V5 may not have run yet");
             return;
         }

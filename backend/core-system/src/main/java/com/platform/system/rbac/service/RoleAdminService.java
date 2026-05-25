@@ -32,6 +32,9 @@ import java.util.List;
 @Service
 public class RoleAdminService {
 
+    // No more SUPER_ADMIN_CODE — built-in role lookups go through BuiltInRoles ID constants
+    // so the user-facing role name can be freely renamed by admins.
+
     private final RoleMapper roleMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final RoleMenuMapper roleMenuMapper;
@@ -61,9 +64,9 @@ public class RoleAdminService {
 
     public PageResult<RoleDto.View> list(long page, long size, String keyword) {
         Page<RoleEntity> p = new Page<>(page, size);
-        QueryWrapper<RoleEntity> w = new QueryWrapper<RoleEntity>().eq("mark", 1).orderByAsc("sort_order", "code");
+        QueryWrapper<RoleEntity> w = new QueryWrapper<RoleEntity>().eq("mark", 1).orderByAsc("sort_order", "name");
         if (keyword != null && !keyword.isBlank()) {
-            w.and(q -> q.like("code", keyword).or().like("name", keyword));
+            w.and(q -> q.like("name", keyword).or().like("description", keyword));
         }
         Page<RoleEntity> result = roleMapper.selectPage(p, w);
         List<RoleDto.View> records = result.getRecords().stream().map(this::toView).toList();
@@ -80,14 +83,10 @@ public class RoleAdminService {
 
     @Transactional
     public String create(RoleDto.CreateRequest req) {
-        // Unique code per tenant.
-        Long dup = roleMapper.selectCount(new QueryWrapper<RoleEntity>().eq("mark", 1).eq("code", req.code()));
-        if (dup != null && dup > 0) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Role code already exists: " + req.code());
-        }
+        // Unique name per tenant — see uk_core_rbac_role_name index in V18.
+        assertNameUnique(req.name(), null);
         RoleEntity r = new RoleEntity();
         r.setId(IdGenerator.ulid());
-        r.setCode(req.code());
         r.setName(req.name());
         r.setDescription(req.description());
         r.setDataScope(req.dataScope() == null ? 4 : req.dataScope());
@@ -102,7 +101,10 @@ public class RoleAdminService {
     public void update(String id, RoleDto.UpdateRequest req) {
         RoleEntity r = requireRole(id);
         assertNotBuiltIn(r, "update");
-        if (req.name() != null) r.setName(req.name());
+        if (req.name() != null && !req.name().equals(r.getName())) {
+            assertNameUnique(req.name(), id);
+            r.setName(req.name());
+        }
         if (req.description() != null) r.setDescription(req.description());
         if (req.dataScope() != null) r.setDataScope(req.dataScope());
         if (req.sortOrder() != null) r.setSortOrder(req.sortOrder());
@@ -132,9 +134,10 @@ public class RoleAdminService {
 
     public List<String> listPermissionIds(String roleId) {
         requireRole(roleId);
-        return rolePermissionMapper.selectList(
-                new QueryWrapper<RolePermissionEntity>().eq("role_id", roleId).eq("mark", 1))
-                .stream().map(RolePermissionEntity::getPermissionId).toList();
+        // JOIN to permission.mark=1 — never return dangling links to soft-deleted
+        // permissions, which would otherwise surface as "ghost selections" in the
+        // admin UI and trip assertAllExist on save.
+        return rolePermissionMapper.findActivePermissionIdsByRoleId(roleId);
     }
 
     @Transactional
@@ -158,9 +161,8 @@ public class RoleAdminService {
 
     public List<String> listMenuIds(String roleId) {
         requireRole(roleId);
-        return roleMenuMapper.selectList(
-                new QueryWrapper<RoleMenuEntity>().eq("role_id", roleId).eq("mark", 1))
-                .stream().map(RoleMenuEntity::getMenuId).toList();
+        // JOIN to menu.mark=1 — see listPermissionIds rationale.
+        return roleMenuMapper.findActiveMenuIdsByRoleId(roleId);
     }
 
     @Transactional
@@ -184,9 +186,9 @@ public class RoleAdminService {
 
     public List<String> listDeptIds(String roleId) {
         requireRole(roleId);
-        return roleDeptMapper.selectList(
-                new QueryWrapper<RoleDeptEntity>().eq("role_id", roleId).eq("mark", 1))
-                .stream().map(RoleDeptEntity::getDeptId).toList();
+        // JOIN to dept.mark=1 — see listPermissionIds rationale. The runtime
+        // data-scope path keeps its own non-JOIN helper (findDeptIdsByRoleId).
+        return roleDeptMapper.findActiveDeptIdsByRoleId(roleId);
     }
 
     @Transactional
@@ -243,6 +245,21 @@ public class RoleAdminService {
     }
 
     /**
+     * Tenant-scoped name uniqueness check. Pass {@code excludeId=null} for create,
+     * or the current role id for update (so a role's own name doesn't count as a dup).
+     * Backed by index {@code uk_core_rbac_role_name} — surfacing as a business error
+     * here keeps the 500 → 400 mapping clean instead of relying on the DB constraint.
+     */
+    private void assertNameUnique(String name, String excludeId) {
+        QueryWrapper<RoleEntity> q = new QueryWrapper<RoleEntity>().eq("mark", 1).eq("name", name);
+        if (excludeId != null) q.ne("id", excludeId);
+        Long dup = roleMapper.selectCount(q);
+        if (dup != null && dup > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Role name already exists: " + name);
+        }
+    }
+
+    /**
      * Built-in roles (is_built_in=1) are platform-seeded and referenced by application code
      * (e.g. {@code SUPER_ADMIN} is wired in {@code LocalAdminSeeder} and short-circuited in
      * {@code MenuQueryService}). They must stay read-only at the admin-API layer.
@@ -250,13 +267,13 @@ public class RoleAdminService {
     private void assertNotBuiltIn(RoleEntity r, String op) {
         if (Integer.valueOf(1).equals(r.getIsBuiltIn())) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR,
-                    "Built-in role " + r.getCode() + " is read-only (rejected: " + op + ")");
+                    "Built-in role " + r.getName() + " is read-only (rejected: " + op + ")");
         }
     }
 
     private RoleDto.View toView(RoleEntity r) {
         return new RoleDto.View(
-                r.getId(), r.getCode(), r.getName(), r.getDescription(),
+                r.getId(), r.getName(), r.getDescription(),
                 r.getDataScope(), r.getIsBuiltIn(), r.getStatus(), r.getSortOrder());
     }
 }

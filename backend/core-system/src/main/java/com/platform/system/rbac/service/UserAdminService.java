@@ -7,6 +7,8 @@ import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.core.common.result.PageResult;
+import com.platform.core.common.security.BuiltInRoles;
+import com.platform.core.infrastructure.numbering.NumberingService;
 import com.platform.core.infrastructure.security.ForceLogoutService;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
 import com.platform.system.auth.entity.UserEntity;
@@ -25,7 +27,9 @@ import java.util.List;
 @Service
 public class UserAdminService {
 
-    private static final String SUPER_ADMIN_CODE = "SUPER_ADMIN";
+    /** Numbering definition seeded by V4 migration. Format {@code U[%]} with 8-digit zero-pad. */
+    private static final String USER_NO_KBN = "USER";
+    private static final String DEFAULT_TENANT = "default";
 
     private final UserMapper userMapper;
     private final UserRoleMapper userRoleMapper;
@@ -34,6 +38,7 @@ public class UserAdminService {
     private final PasswordPolicyService passwordPolicy;
     private final PermissionCacheService cacheService;
     private final ForceLogoutService forceLogoutService;
+    private final NumberingService numberingService;
 
     public UserAdminService(UserMapper userMapper,
                             UserRoleMapper userRoleMapper,
@@ -41,7 +46,8 @@ public class UserAdminService {
                             PasswordEncoder encoder,
                             PasswordPolicyService passwordPolicy,
                             PermissionCacheService cacheService,
-                            ForceLogoutService forceLogoutService) {
+                            ForceLogoutService forceLogoutService,
+                            NumberingService numberingService) {
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
         this.roleMapper = roleMapper;
@@ -49,6 +55,7 @@ public class UserAdminService {
         this.passwordPolicy = passwordPolicy;
         this.cacheService = cacheService;
         this.forceLogoutService = forceLogoutService;
+        this.numberingService = numberingService;
     }
 
     public PageResult<UserDto.View> list(long page, long size, String keyword, String deptId) {
@@ -81,13 +88,12 @@ public class UserAdminService {
         u.setUsername(req.username());
         u.setPasswordHash(encoder.encode(req.password()));
         u.setEmail(req.email());
-        u.setUserNo(req.userNo());
+        // userNo は採番（V4 で seed 済みの code_kbn="USER" 定義に従い U + 8 桁 zero-pad）。
+        // クライアント入力は受け付けない方針：採番との衝突を未然に避ける。
+        u.setUserNo(numberingService.next(USER_NO_KBN, DEFAULT_TENANT));
         u.setDisplayName(req.displayName());
         u.setDeptId(req.deptId());
         u.setStatus(req.status() == null ? 1 : req.status());
-        // Deprecated JSONB columns — keep empty defaults so MyBatis-Plus's NOT_NULL strategy still picks them up.
-        u.setRoles("[]");
-        u.setAuthorities("[]");
         userMapper.insert(u);
         return u.getId();
     }
@@ -97,7 +103,7 @@ public class UserAdminService {
         UserEntity u = require(id);
         assertNotBuiltInAdmin(u, "update");
         if (req.email() != null) u.setEmail(req.email());
-        if (req.userNo() != null) u.setUserNo(req.userNo());
+        // userNo は採番（read-only）。クライアントから来ても無視（DTO にも無い）。
         if (req.displayName() != null) u.setDisplayName(req.displayName());
         if (req.deptId() != null) u.setDeptId(req.deptId());
         if (req.status() != null) u.setStatus(req.status());
@@ -218,13 +224,15 @@ public class UserAdminService {
         }
     }
 
+    /**
+     * Returns the SUPER_ADMIN role id iff the seeded row is still live. Looking up by the
+     * seeded ULID (see {@link BuiltInRoles}) instead of by code/name string means renaming
+     * the role's display name does not break the "last super admin" protection.
+     */
     private String findSuperAdminRoleId() {
-        RoleEntity r = roleMapper.selectOne(
-                new QueryWrapper<RoleEntity>()
-                        .eq("mark", 1)
-                        .eq("code", SUPER_ADMIN_CODE)
-                        .last("LIMIT 1"));
-        return r == null ? null : r.getId();
+        RoleEntity r = roleMapper.selectById(BuiltInRoles.SUPER_ADMIN_ID);
+        if (r == null || !Integer.valueOf(1).equals(r.getMark())) return null;
+        return r.getId();
     }
 
     private UserEntity require(String id) {

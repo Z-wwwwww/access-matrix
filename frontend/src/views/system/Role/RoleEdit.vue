@@ -36,7 +36,6 @@ const isLocked = computed(() => isEdit.value && props.role?.isBuiltIn === 1)
 const tab = ref('basic')
 
 const form = reactive({
-  code: '',
   name: '',
   description: '',
   dataScope: 4,
@@ -75,7 +74,6 @@ watch(() => props.open, async (open) => {
   if (!open) return
   tab.value = 'basic'
   Object.assign(form, {
-    code: props.role?.code || '',
     name: props.role?.name || '',
     description: props.role?.description || '',
     dataScope: props.role?.dataScope ?? 4,
@@ -339,15 +337,9 @@ async function save() {
     <Tabs v-model="tab" :items="tabItems">
       <TabsContent value="basic" force-mount>
         <div class="space-y-4 pt-2">
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.code') }} <span class="text-destructive">*</span></label>
-              <Input v-model="form.code" :disabled="isEdit || isLocked" placeholder="PMS_FRONT_DESK" />
-            </div>
-            <div>
-              <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.name') }} <span class="text-destructive">*</span></label>
-              <Input v-model="form.name" :disabled="isLocked" />
-            </div>
+          <div>
+            <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.name') }} <span class="text-destructive">*</span></label>
+            <Input v-model="form.name" :disabled="isLocked" />
           </div>
           <div>
             <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.description') }}</label>

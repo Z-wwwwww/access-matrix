@@ -131,8 +131,6 @@ public class DemoSeeder {
         u.setDisplayName(displayName);
         u.setDeptId(deptId);
         u.setPasswordHash(encoder.encode(DEMO_PASSWORD));
-        u.setRoles("[]");       // deprecated JSONB columns — kept for NOT NULL strategy
-        u.setAuthorities("[]");
         u.setStatus(1);
         u.setMark(1);
         u.setCreateUser("system");

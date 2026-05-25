@@ -274,11 +274,11 @@ export default {
 
   role: {
     search: {
-      placeholder: { keyword: 'Code / Name' }
+      placeholder: { keyword: 'Name / description' }
     },
     column: {
-      code: 'Code',
       name: 'Name',
+      description: 'Description',
       dataScope: 'Data scope',
       status: 'Status',
       actions: 'Actions'
@@ -299,7 +299,7 @@ export default {
     },
     confirm: {
       deleteTitle: 'Delete role',
-      deleteMessage: 'Delete "{code}"?'
+      deleteMessage: 'Delete "{name}"?'
     },
     message: {
       deleteBuiltInFailed: 'Built-in role cannot be deleted',
@@ -308,7 +308,7 @@ export default {
     edit: {
       titleEdit: 'Edit role',
       titleCreate: 'New role',
-      lockedHint: 'The built-in role is read-only. Changing code, data scope, or permission/menu/department assignments can cause auth loops or permission drift.',
+      lockedHint: 'The built-in role is read-only. Changing name, data scope, or permission/menu/department assignments can cause auth loops or permission drift.',
       tab: {
         basic: 'Basic',
         permissions: 'Permissions',
@@ -316,7 +316,6 @@ export default {
         depts: 'Departments'
       },
       label: {
-        code: 'Code',
         name: 'Name',
         description: 'Description',
         dataScope: 'Data scope',

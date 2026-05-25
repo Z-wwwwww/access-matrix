@@ -274,11 +274,11 @@ export default {
 
   role: {
     search: {
-      placeholder: { keyword: '代碼 / 名稱' }
+      placeholder: { keyword: '名稱 / 說明' }
     },
     column: {
-      code: '代碼',
       name: '名稱',
+      description: '說明',
       dataScope: '資料範圍',
       status: '狀態',
       actions: '操作'
@@ -299,7 +299,7 @@ export default {
     },
     confirm: {
       deleteTitle: '刪除角色',
-      deleteMessage: '刪除「{code}」嗎？'
+      deleteMessage: '刪除「{name}」嗎？'
     },
     message: {
       deleteBuiltInFailed: '內建角色不可刪除',
@@ -308,7 +308,7 @@ export default {
     edit: {
       titleEdit: '編輯角色',
       titleCreate: '新增角色',
-      lockedHint: '內建角色為唯讀。修改代碼、資料範圍或權限/選單/部門分配可能引起認證循環或權限漂移。',
+      lockedHint: '內建角色為唯讀。修改名稱、資料範圍或權限/選單/部門分配可能引起認證循環或權限漂移。',
       tab: {
         basic: '基本',
         permissions: '權限',
@@ -316,7 +316,6 @@ export default {
         depts: '部門'
       },
       label: {
-        code: '代碼',
         name: '名稱',
         description: '說明',
         dataScope: '資料範圍',

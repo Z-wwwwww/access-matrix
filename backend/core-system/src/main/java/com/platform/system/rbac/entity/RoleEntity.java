@@ -11,9 +11,6 @@ import lombok.Setter;
 @TableName("core_rbac_role")
 public class RoleEntity extends BaseEntity {
 
-    @TableField("code")
-    private String code;
-
     @TableField("name")
     private String name;
 

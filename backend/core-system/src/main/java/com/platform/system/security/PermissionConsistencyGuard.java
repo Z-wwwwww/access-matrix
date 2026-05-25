@@ -196,18 +196,25 @@ public class PermissionConsistencyGuard {
     /**
      * 孤児 permission 行（および紐づく role-permission 関係）を soft delete。
      * 戻り値は失効した role-permission 行数。
+     *
+     * <p>mark=0 の permission 行に対しても級联清掃を回す：過去バージョンの Guard / 手動 SQL /
+     * V13 cleanup 系 migration が permission のみ mark=0 にして role_permission を取り残した
+     * 場合への self-heal。1 startup で残骸を全部回収する。
      */
     private int softDeleteOrphan(String code) {
+        // mark=1 / mark=0 を問わず同じ code の行を全部対象にする。
         List<PermissionEntity> rows = mapper.selectList(
-                new QueryWrapper<PermissionEntity>().eq("code", code).eq("mark", 1));
+                new QueryWrapper<PermissionEntity>().eq("code", code));
         if (rows.isEmpty()) return 0;
         int relations = 0;
         LocalDateTime now = LocalDateTime.now();
         for (PermissionEntity e : rows) {
-            e.setMark(0);
-            mapper.updateById(e);
-            // 同じ permission_id を指している role-permission を全件 soft delete。
-            // BaseMapper#update(Wrapper) で UPDATE SET ... WHERE ... 一括発行。
+            if (e.getMark() != null && e.getMark() == 1) {
+                e.setMark(0);
+                mapper.updateById(e);
+            }
+            // 既に mark=0 の permission に対しても、紐付く active な role_permission が
+            // あれば回収する（NO-OP の場合は UPDATE 0 行で安価）。
             Integer affected = rolePermissionMapper.update(null,
                     new UpdateWrapper<RolePermissionEntity>()
                             .eq("permission_id", e.getId())

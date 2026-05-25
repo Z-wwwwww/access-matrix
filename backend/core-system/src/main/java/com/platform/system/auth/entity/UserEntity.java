@@ -26,14 +26,6 @@ public class UserEntity extends BaseEntity {
     @TableField("password_hash")
     private String passwordHash;
 
-    /** JSON array stored in jsonb column, e.g. ["ADMIN","MANAGER"] */
-    @TableField("roles")
-    private String roles;
-
-    /** JSON array stored in jsonb column, e.g. ["*:*"] */
-    @TableField("authorities")
-    private String authorities;
-
     /** 1=enabled, 0=locked */
     @TableField("status")
     private Integer status;

@@ -282,11 +282,11 @@ export default {
 
   role: {
     search: {
-      placeholder: { keyword: 'コード / 名称' }
+      placeholder: { keyword: '名称 / 説明' }
     },
     column: {
-      code: 'コード',
       name: '名称',
+      description: '説明',
       dataScope: 'データスコープ',
       status: '状態',
       actions: '操作'
@@ -307,7 +307,7 @@ export default {
     },
     confirm: {
       deleteTitle: 'ロール削除',
-      deleteMessage: '「{code}」を削除しますか？'
+      deleteMessage: '「{name}」を削除しますか？'
     },
     message: {
       deleteBuiltInFailed: '内蔵ロールは削除できません',
@@ -316,7 +316,7 @@ export default {
     edit: {
       titleEdit: 'ロール編集',
       titleCreate: 'ロール新規',
-      lockedHint: '内蔵ロールは読み取り専用です。コード・データスコープ・権限/メニュー/部署の割り当てを変更すると、認証ループや権限のドリフトを引き起こす可能性があります。',
+      lockedHint: '内蔵ロールは読み取り専用です。名称・データスコープ・権限/メニュー/部署の割り当てを変更すると、認証ループや権限のドリフトを引き起こす可能性があります。',
       tab: {
         basic: '基本',
         permissions: '権限',
@@ -324,7 +324,6 @@ export default {
         depts: '部署'
       },
       label: {
-        code: 'コード',
         name: '名称',
         description: '説明',
         dataScope: 'データスコープ',
