@@ -179,7 +179,7 @@ async function save() {
                         : 'border-border bg-card hover:border-primary/40 hover:bg-muted text-foreground'
                     ]"
                     @click="toggleRole(r.id)">
-              <Check :size="14" class="shrink-0" :class="isRoleSelected(r.id) ? '' : 'opacity-0'" />
+              <Check v-if="isRoleSelected(r.id)" :size="14" class="shrink-0" />
               <span class="font-medium whitespace-nowrap">{{ r.name }}</span>
             </button>
           </div>

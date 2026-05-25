@@ -314,7 +314,6 @@ export default {
       titleCreate: 'ロール新規',
       lockedHint: '内蔵ロールは読み取り専用です。名称・データスコープ・権限/メニュー/部署の割り当てを変更すると、認証ループや権限のドリフトを引き起こす可能性があります。',
       tab: {
-        basic: '基本',
         permissions: '権限',
         menus: 'メニュー',
         depts: '部署'
@@ -341,6 +340,10 @@ export default {
         saving: '保存中...',
         updateFailed: '更新失敗',
         createFailed: '作成失敗'
+      },
+      dept: {
+        impliedTag: '（自動）',
+        impliedTooltip: '親部署の選択により自動的に含まれます。外すには上位の選択を解除してください。'
       },
       tooltip: {
         locked: '内蔵ロールは編集不可'

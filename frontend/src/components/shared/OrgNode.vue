@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { Building, Building2 } from 'lucide-vue-next'
+import { deptIconFor } from '@/utils/dept-icons'
 
 defineOptions({ name: 'OrgNode' })
 
@@ -8,18 +8,21 @@ defineOptions({ name: 'OrgNode' })
  * 縦向き org-chart の 1 ノード（自分 + 直下のサブツリー）を再帰的に描画する。
  *
  * - 連結線は CSS pseudo-element で 1px 縦・横線として描画
- * - 子の有無で Building2 / Building アイコンを切替
+ * - 階層に応じたアイコン（本社 → 拠点 → 業務単位 → チーム → 個別ユニット）
  * - クリックで親に select を emit
  */
 const props = defineProps({
   node: { type: Object, required: true },
-  modelValue: { type: [String, Number], default: '' }
+  modelValue: { type: [String, Number], default: '' },
+  /** 階層深さ（root=0）。子に再帰時 level+1 を渡す。 */
+  level: { type: Number, default: 0 }
 })
 
 const emit = defineEmits(['select'])
 
 const isLeaf = computed(() => !props.node.children?.length)
 const isSelected = computed(() => String(props.node.id) === String(props.modelValue))
+const NodeIcon = computed(() => deptIconFor(props.level))
 </script>
 
 <template>
@@ -30,7 +33,7 @@ const isSelected = computed(() => String(props.node.id) === String(props.modelVa
       :class="{ 'is-selected': isSelected, 'is-leaf': isLeaf }"
       @click="emit('select', node)"
     >
-      <component :is="isLeaf ? Building : Building2" :size="14" class="org-node-icon" />
+      <component :is="NodeIcon" :size="14" class="org-node-icon" />
       <span class="org-node-name">{{ node.name || node.label }}</span>
       <span v-if="node.code" class="org-node-code">({{ node.code }})</span>
     </button>
@@ -40,6 +43,7 @@ const isSelected = computed(() => String(props.node.id) === String(props.modelVa
         :key="child.id"
         :node="child"
         :model-value="modelValue"
+        :level="level + 1"
         @select="(n) => emit('select', n)"
       />
     </div>
