@@ -76,15 +76,25 @@ async function save() {
   try {
     let userId
     if (isEdit.value) {
+      // userNo は採番（read-only）なので update body に含めない。
       const body = {
-        email: form.email, userNo: form.userNo,
+        email: form.email,
         displayName: form.displayName, deptId: form.deptId, status: form.status
       }
       const r = await updateUserApi(props.user.id, body)
       if (r.data.code !== 0) { toast.error(r.data.msg || t('user.edit.message.updateFailed')); return }
       userId = props.user.id
     } else {
-      const r = await addUserApi(form)
+      // 新規時も userNo は送らない（送っても backend が無視するが、明示的に DTO 合わせ）。
+      const body = {
+        username: form.username,
+        password: form.password,
+        email: form.email,
+        displayName: form.displayName,
+        deptId: form.deptId,
+        status: form.status
+      }
+      const r = await addUserApi(body)
       if (r.data.code !== 0) { toast.error(r.data.msg || t('user.edit.message.createFailed')); return }
       userId = r.data.data
     }
@@ -128,9 +138,10 @@ async function save() {
           <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.email') }}</label>
           <Input v-model="form.email" type="email" :disabled="isLocked" />
         </div>
-        <div>
+        <!-- userNo は採番。新規時は付番前なのでフィールド非表示、編集時のみ read-only 表示。 -->
+        <div v-if="isEdit">
           <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.userNo') }}</label>
-          <Input v-model="form.userNo" :disabled="isLocked" />
+          <Input v-model="form.userNo" disabled />
         </div>
       </div>
       <div class="grid grid-cols-2 gap-3">
@@ -160,19 +171,16 @@ async function save() {
             <button v-for="r in allRoles" :key="r.id"
                     type="button"
                     :disabled="isLocked"
+                    :title="r.description || r.name"
                     :class="[
-                      'inline-flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-lg border text-xs transition cursor-pointer text-left',
+                      'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition cursor-pointer disabled:cursor-not-allowed',
                       isRoleSelected(r.id)
                         ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                        : 'border-border bg-card hover:border-primary/40 hover:bg-muted text-foreground',
-                      'disabled:cursor-not-allowed'
+                        : 'border-border bg-card hover:border-primary/40 hover:bg-muted text-foreground'
                     ]"
                     @click="toggleRole(r.id)">
-              <span class="inline-flex items-center gap-1 font-mono font-medium leading-tight">
-                <Check :size="12" class="shrink-0" :class="isRoleSelected(r.id) ? '' : 'opacity-0'" />
-                {{ r.code }}
-              </span>
-              <span class="opacity-70 leading-tight pl-[18px]">{{ r.name }}</span>
+              <Check :size="14" class="shrink-0" :class="isRoleSelected(r.id) ? '' : 'opacity-0'" />
+              <span class="font-medium whitespace-nowrap">{{ r.name }}</span>
             </button>
           </div>
           <div v-else class="text-xs text-muted-foreground p-2">{{ t('user.edit.message.noRoles') }}</div>

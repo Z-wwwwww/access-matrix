@@ -32,8 +32,8 @@ const showEdit = ref(false)
 const current = ref(null)
 
 const columns = computed(() => [
-  { key: 'code', title: t('role.column.code'), minWidth: '200px' },
-  { key: 'name', title: t('role.column.name'), minWidth: '160px' },
+  { key: 'name', title: t('role.column.name'), minWidth: '240px' },
+  { key: 'description', title: t('role.column.description'), minWidth: '240px' },
   { key: 'dataScope', title: t('role.column.dataScope'), minWidth: '140px', align: 'center' },
   { key: 'status', title: t('role.column.status'), minWidth: '80px', align: 'center' },
   { key: 'actions', title: t('role.column.actions'), minWidth: '120px', align: 'center', sticky: 'right' }
@@ -58,7 +58,7 @@ async function handleDelete(row) {
   if (row.isBuiltIn === 1) { toast.error(t('role.message.deleteBuiltInFailed')); return }
   const ok = await confirm({
     title: t('role.confirm.deleteTitle'),
-    message: t('role.confirm.deleteMessage', { code: row.code }),
+    message: t('role.confirm.deleteMessage', { name: row.name }),
     variant: 'destructive'
   })
   if (!ok) return
@@ -108,9 +108,12 @@ onMounted(fetchData)
         @update:page="fetchData"
         @update:page-size="fetchData"
       >
-        <template #cell-code="{ row }">
-          <span class="font-mono">{{ row.code }}</span>
+        <template #cell-name="{ row }">
+          <span class="font-medium">{{ row.name }}</span>
           <Badge v-if="row.isBuiltIn === 1" variant="outline" class="ml-2 text-[10px]">{{ t('common.status.builtIn') }}</Badge>
+        </template>
+        <template #cell-description="{ row }">
+          <span class="text-sm text-muted-foreground">{{ row.description || '-' }}</span>
         </template>
         <template #cell-dataScope="{ row }">
           <Badge variant="outline">{{ SCOPE_LABEL[row.dataScope] || '-' }}</Badge>

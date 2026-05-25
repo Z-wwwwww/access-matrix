@@ -33,6 +33,8 @@ public class AuthSchemaBootstrap {
                     )
                     """);
 
+            // V19 dropped the legacy `roles` / `authorities` JSONB columns. For schema-from-scratch
+            // (no Flyway), mirror the post-V19 layout — RBAC link tables are the single source of truth.
             jdbc.execute("""
                     CREATE TABLE IF NOT EXISTS core_auth_user (
                         id CHAR(26) PRIMARY KEY,
@@ -42,8 +44,6 @@ public class AuthSchemaBootstrap {
                         user_no VARCHAR(32),
                         display_name VARCHAR(128),
                         password_hash VARCHAR(255) NOT NULL,
-                        roles JSONB NOT NULL DEFAULT '[]'::jsonb,
-                        authorities JSONB NOT NULL DEFAULT '[]'::jsonb,
                         status SMALLINT NOT NULL DEFAULT 1,
                         mark SMALLINT NOT NULL DEFAULT 1,
                         create_user VARCHAR(64),
@@ -103,11 +103,13 @@ public class AuthSchemaBootstrap {
                     """);
 
             // ---------- V5 RBAC tables (idempotent safety net) ----------
+            // V18 dropped `code` from core_rbac_role; `name` is now the sole user-facing
+            // label and has its own unique index. For schema-from-scratch (no Flyway),
+            // mirror the post-V18 layout directly.
             jdbc.execute("""
                     CREATE TABLE IF NOT EXISTS core_rbac_role (
                         id CHAR(26) PRIMARY KEY,
                         tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
-                        code VARCHAR(64) NOT NULL,
                         name VARCHAR(128) NOT NULL,
                         description VARCHAR(512),
                         data_scope SMALLINT NOT NULL DEFAULT 4,
@@ -121,7 +123,7 @@ public class AuthSchemaBootstrap {
                         update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                     )
                     """);
-            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_role_code ON core_rbac_role (tenant_id, code) WHERE mark = 1");
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_role_name ON core_rbac_role (tenant_id, name) WHERE mark = 1");
 
             jdbc.execute("""
                     CREATE TABLE IF NOT EXISTS core_rbac_permission (
@@ -180,8 +182,8 @@ public class AuthSchemaBootstrap {
                     ON CONFLICT DO NOTHING
                     """);
             jdbc.update("""
-                    INSERT INTO core_rbac_role (id, tenant_id, code, name, description, data_scope, is_built_in)
-                    VALUES ('00000000000000000000ROLE01', 'default', 'SUPER_ADMIN', 'Super Administrator',
+                    INSERT INTO core_rbac_role (id, tenant_id, name, description, data_scope, is_built_in)
+                    VALUES ('00000000000000000000ROLE01', 'default', 'Super Administrator',
                             'Built-in super admin role with *:* permission', 1, 1)
                     ON CONFLICT DO NOTHING
                     """);

@@ -11,18 +11,18 @@ public final class UserDto {
 
     private UserDto() {}
 
+    // userNo は採番（NumberingService.next("USER", ...)）で自動付番。
+    // 旧クライアント互換のためフィールドが届いても無視する（DTO に持たない＝Jackson が黙って捨てる）。
     public record CreateRequest(
             @NotBlank @Size(max = 64) String username,
             @NotBlank @Size(min = 8, max = 128) String password,
             @Email @Size(max = 255) String email,
-            @Size(max = 32) String userNo,
             @Size(max = 128) String displayName,
             String deptId,
             Integer status) {}
 
     public record UpdateRequest(
             @Email @Size(max = 255) String email,
-            @Size(max = 32) String userNo,
             @Size(max = 128) String displayName,
             String deptId,
             Integer status) {}

@@ -274,11 +274,11 @@ export default {
 
   role: {
     search: {
-      placeholder: { keyword: '코드 / 명칭' }
+      placeholder: { keyword: '명칭 / 설명' }
     },
     column: {
-      code: '코드',
       name: '명칭',
+      description: '설명',
       dataScope: '데이터 범위',
       status: '상태',
       actions: '작업'
@@ -299,7 +299,7 @@ export default {
     },
     confirm: {
       deleteTitle: '역할 삭제',
-      deleteMessage: '「{code}」을(를) 삭제하시겠습니까?'
+      deleteMessage: '「{name}」을(를) 삭제하시겠습니까?'
     },
     message: {
       deleteBuiltInFailed: '기본 제공 역할은 삭제할 수 없습니다',
@@ -308,7 +308,7 @@ export default {
     edit: {
       titleEdit: '역할 편집',
       titleCreate: '역할 신규',
-      lockedHint: '기본 제공 역할은 읽기 전용입니다. 코드·데이터 범위·권한/메뉴/부서 할당을 변경하면 인증 루프나 권한 드리프트가 발생할 수 있습니다.',
+      lockedHint: '기본 제공 역할은 읽기 전용입니다. 명칭·데이터 범위·권한/메뉴/부서 할당을 변경하면 인증 루프나 권한 드리프트가 발생할 수 있습니다.',
       tab: {
         basic: '기본',
         permissions: '권한',
@@ -316,7 +316,6 @@ export default {
         depts: '부서'
       },
       label: {
-        code: '코드',
         name: '명칭',
         description: '설명',
         dataScope: '데이터 범위',

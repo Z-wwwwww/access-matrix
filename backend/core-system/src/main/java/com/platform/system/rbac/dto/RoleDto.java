@@ -12,7 +12,6 @@ public final class RoleDto {
     private RoleDto() {}
 
     public record CreateRequest(
-            @NotBlank @Size(max = 64) String code,
             @NotBlank @Size(max = 128) String name,
             @Size(max = 512) String description,
             Integer dataScope,
@@ -28,7 +27,6 @@ public final class RoleDto {
 
     public record View(
             String id,
-            String code,
             String name,
             String description,
             Integer dataScope,
