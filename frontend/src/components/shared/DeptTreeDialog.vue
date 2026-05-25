@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Dialog from '@/components/ui/Dialog.vue'
-import { Search, ChevronDown, X } from 'lucide-vue-next'
+import { Search, ChevronDown, X, Building2 } from 'lucide-vue-next'
 import OrgNode from './OrgNode.vue'
 import { getDeptTreeApi } from '../../../services/dept'
 
@@ -34,6 +34,8 @@ const emit = defineEmits(['update:modelValue', 'change'])
 const rawTree = ref([])
 const open = ref(false)
 const searchKeyword = ref('')
+/** 複数会社（複数ルート）時、左サイドの会社タブの選択 ID */
+const activeRootId = ref(null)
 
 const tree = computed(() => transform(rawTree.value))
 
@@ -153,8 +155,35 @@ const selectedBreadcrumb = computed(() => {
 function openDialog() {
   if (props.disabled) return
   searchKeyword.value = ''
+  // 現在値がある場合は、その値を含むルート（会社）を初期アクティブタブにする
+  let initial = null
+  if (hasValue.value) {
+    let cur = String(props.modelValue)
+    let last = cur
+    for (let s = 0; s < 100 && cur; s++) {
+      last = cur
+      const p = parentMap.value.get(cur)
+      cur = p ? String(p) : null
+    }
+    initial = nodeMap.value.get(last)?.id ?? null
+  }
+  if (initial == null && filteredTree.value.length) initial = filteredTree.value[0].id
+  activeRootId.value = initial
   open.value = true
 }
+
+/** 検索などで visibleTree が変わったとき、active タブを補正 */
+watch(visibleTree, (roots) => {
+  if (!roots.length) return
+  if (!roots.find((r) => r.id === activeRootId.value)) {
+    activeRootId.value = roots[0].id
+  }
+})
+
+/** 右ペインに表示する現在のルート（= 選択中の会社） */
+const activeRoot = computed(
+  () => visibleTree.value.find((r) => r.id === activeRootId.value) || visibleTree.value[0] || null
+)
 
 function selectNode(node) {
   emit('update:modelValue', node.id)
@@ -229,19 +258,42 @@ function clearValue(e) {
           />
         </div>
 
-        <!-- 組織図ビューポート（横スクロール可、見やすいよう中央寄せ） -->
-        <div class="border border-border rounded-lg bg-muted/20 overflow-auto">
-          <div class="min-w-full inline-flex justify-center py-6 px-4">
-            <div v-if="visibleTree.length" class="inline-flex gap-4 items-start">
-              <OrgNode
-                v-for="root in visibleTree"
-                :key="root.id"
-                :node="root"
-                :model-value="modelValue"
-                @select="selectNode"
-              />
+        <!-- 組織図ビューポート: 複数会社時は左に縦タブ、右に対象会社の org-chart -->
+        <div class="flex border border-border rounded-lg bg-muted/20 overflow-hidden">
+          <!-- 左: 会社タブ（ルートが 2 件以上のときのみ表示） -->
+          <div
+            v-if="filteredTree.length > 1"
+            class="flex-shrink-0 w-44 border-r border-border bg-card/60 overflow-y-auto max-h-[60vh]"
+          >
+            <button
+              v-for="root in visibleTree"
+              :key="root.id"
+              type="button"
+              :class="[
+                'w-full text-left px-3 py-2 text-sm border-l-2 transition flex items-center gap-2',
+                root.id === activeRootId
+                  ? 'border-primary bg-primary/10 text-primary font-medium'
+                  : 'border-transparent hover:bg-muted text-foreground'
+              ]"
+              @click="activeRootId = root.id"
+            >
+              <Building2 :size="14" class="shrink-0" />
+              <span class="truncate">{{ root.name }}</span>
+            </button>
+            <div v-if="!visibleTree.length" class="text-xs text-muted-foreground p-3">該当なし</div>
+          </div>
+          <!-- 右: 対象会社の組織図 -->
+          <div class="flex-1 overflow-auto max-h-[60vh]">
+            <div class="min-w-full inline-flex justify-center py-6 px-4">
+              <div v-if="activeRoot" class="inline-flex gap-4 items-start">
+                <OrgNode
+                  :node="activeRoot"
+                  :model-value="modelValue"
+                  @select="selectNode"
+                />
+              </div>
+              <div v-else class="text-sm text-muted-foreground py-8">該当なし</div>
             </div>
-            <div v-else class="text-sm text-muted-foreground py-8">該当なし</div>
           </div>
         </div>
       </div>

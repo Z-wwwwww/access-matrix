@@ -233,7 +233,8 @@ export default {
         userNo: '번호',
         deptId: '부서',
         status: '상태',
-        roles: '역할'
+        roles: '역할',
+        rolesSelected: '{selected} / {total} 선택됨'
       },
       placeholder: {
         password: '8자 이상 / 4종 문자 유형'

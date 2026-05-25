@@ -233,7 +233,8 @@ export default {
         userNo: 'No.',
         deptId: 'Department',
         status: 'Status',
-        roles: 'Roles'
+        roles: 'Roles',
+        rolesSelected: '{selected} of {total} selected'
       },
       placeholder: {
         password: '8+ chars / 4 character types'

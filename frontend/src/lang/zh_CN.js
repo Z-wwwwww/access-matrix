@@ -233,7 +233,8 @@ export default {
         userNo: '编号',
         deptId: '部门',
         status: '状态',
-        roles: '角色'
+        roles: '角色',
+        rolesSelected: '已选 {selected} / {total}'
       },
       placeholder: {
         password: '8 位以上 / 4 种字符类型'
