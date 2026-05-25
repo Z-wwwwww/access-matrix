@@ -67,7 +67,9 @@ public class DataScopeQueryService implements UserDataScopeLookup {
             return DataScopeDecision.unrestricted(userId);
         }
 
-        List<RoleEntity> roles = roleMapper.findRolesByUserId(userId);
+        // Tenant from RequestContext (post-auth JWT tid). Mapper queries are tenant-scoped explicitly.
+        String tenantId = com.platform.core.common.context.RequestContext.tenantIdOrDefault();
+        List<RoleEntity> roles = roleMapper.findRolesByUserId(userId, tenantId);
         if (roles.isEmpty()) return DataScopeDecision.empty(userId);
 
         UserEntity user = userMapper.selectById(userId);
@@ -91,7 +93,7 @@ public class DataScopeQueryService implements UserDataScopeLookup {
                 }
                 case SCOPE_DEPT_AND_SUB -> {
                     if (userDeptPath != null) {
-                        visibleDeptIds.addAll(deptMapper.findSubtreeIds(userDeptPath));
+                        visibleDeptIds.addAll(deptMapper.findSubtreeIds(userDeptPath, tenantId));
                     } else if (userDeptId != null) {
                         visibleDeptIds.add(userDeptId);
                     }
@@ -101,12 +103,12 @@ public class DataScopeQueryService implements UserDataScopeLookup {
                 }
                 case SCOPE_SELF -> selfOnly = true;
                 case SCOPE_CUSTOM -> {
-                    List<String> explicit = roleDeptMapper.findDeptIdsByRoleId(role.getId());
+                    List<String> explicit = roleDeptMapper.findDeptIdsByRoleId(role.getId(), tenantId);
                     for (String d : explicit) {
                         // Each explicit dept also includes its subtree.
                         DeptEntity dept = deptMapper.selectById(d);
                         if (dept != null && dept.getPath() != null) {
-                            visibleDeptIds.addAll(deptMapper.findSubtreeIds(dept.getPath()));
+                            visibleDeptIds.addAll(deptMapper.findSubtreeIds(dept.getPath(), tenantId));
                         } else {
                             visibleDeptIds.add(d);
                         }

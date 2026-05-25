@@ -12,16 +12,19 @@ import java.util.List;
 public interface RoleMenuMapper extends BaseMapper<RoleMenuEntity> {
 
     /**
-     * Menu IDs bound to a role <b>where the menu itself is still live</b>.
+     * Menu IDs bound to a role <b>where the menu itself is still live</b>, tenant-scoped.
      * Mirrors {@code RolePermissionMapper.findActivePermissionIdsByRoleId} —
      * shields the admin UI from ghost selections pointing to soft-deleted menus.
      */
     @Select("""
             SELECT rm.menu_id
               FROM core_rbac_role_menu rm
-              JOIN core_rbac_menu m ON m.id = rm.menu_id AND m.mark = 1
+              JOIN core_rbac_menu m
+                ON m.id = rm.menu_id AND m.mark = 1 AND m.tenant_id = #{tenantId}
              WHERE rm.role_id = #{roleId}
                AND rm.mark = 1
+               AND rm.tenant_id = #{tenantId}
             """)
-    List<String> findActiveMenuIdsByRoleId(@Param("roleId") String roleId);
+    List<String> findActiveMenuIdsByRoleId(@Param("roleId") String roleId,
+                                           @Param("tenantId") String tenantId);
 }

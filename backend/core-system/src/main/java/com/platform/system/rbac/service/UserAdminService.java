@@ -150,7 +150,7 @@ public class UserAdminService {
         // delete/disable paths enforce.
         String superRoleId = findSuperAdminRoleId();
         if (superRoleId != null
-                && userRoleMapper.existsActiveLink(userId, superRoleId) != null
+                && userRoleMapper.existsActiveLink(userId, superRoleId, RequestContext.tenantIdOrDefault()) != null
                 && (roleIds == null || !roleIds.contains(superRoleId))) {
             assertNotLastSuperAdmin(userId, "strip SUPER_ADMIN from");
         }
@@ -222,8 +222,9 @@ public class UserAdminService {
     private void assertNotLastSuperAdmin(String userId, String op) {
         String superRoleId = findSuperAdminRoleId();
         if (superRoleId == null) return; // role row missing entirely → nothing to guard
-        if (userRoleMapper.existsActiveLink(userId, superRoleId) == null) return; // not a super admin
-        Long total = userRoleMapper.countActiveHoldersByRoleId(superRoleId);
+        String tid = RequestContext.tenantIdOrDefault();
+        if (userRoleMapper.existsActiveLink(userId, superRoleId, tid) == null) return; // not a super admin
+        Long total = userRoleMapper.countActiveHoldersByRoleId(superRoleId, tid);
         if (total != null && total <= 1L) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR,
                     "Cannot " + op + " the last active SUPER_ADMIN user");

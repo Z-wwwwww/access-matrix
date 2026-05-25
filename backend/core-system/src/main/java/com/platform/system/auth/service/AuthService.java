@@ -137,7 +137,7 @@ public class AuthService {
 
     public TokenResponse issueTokens(UserEntity user) {
         Set<String> perms = permissionQueryService.loadUserPermissions(user.getId());
-        List<String> roleIds = roleMapper.findRoleIdsByUserId(user.getId());
+        List<String> roleIds = roleMapper.findRoleIdsByUserId(user.getId(), user.getTenantId());
         String scopeClaim = chooseScopeClaim(perms);
 
         JwtIssuer.TokenIssue access = jwtIssuer.issue(

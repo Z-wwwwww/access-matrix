@@ -30,13 +30,6 @@ public class DeptQueryService {
         return assemble(flat);
     }
 
-    /** Subtree IDs by a dept's materialised path. Caffeine-cached. */
-    @Cacheable(value = "deptSubtree", key = "#path", unless = "#result.isEmpty()")
-    public List<String> subtreeIds(String path) {
-        if (path == null || path.isBlank()) return List.of();
-        return deptMapper.findSubtreeIds(path);
-    }
-
     private List<DeptNode> assemble(List<DeptEntity> flat) {
         Map<String, DeptNode> nodes = new LinkedHashMap<>();
         for (DeptEntity d : flat) nodes.put(d.getId(), toNode(d));

@@ -2,6 +2,7 @@ package com.platform.system.rbac.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
@@ -69,7 +70,7 @@ public class DeptAdminService {
                 throw new BusinessException(ErrorCode.BUSINESS_ERROR, "A department cannot be its own parent");
             }
             // Disallow assigning the parent to one of the dept's own descendants — would create a cycle.
-            for (String descendantId : deptMapper.findSubtreeIds(d.getPath())) {
+            for (String descendantId : deptMapper.findSubtreeIds(d.getPath(), RequestContext.tenantIdOrDefault())) {
                 if (descendantId.equals(req.parentId())) {
                     throw new BusinessException(ErrorCode.BUSINESS_ERROR,
                             "New parent is a descendant — would create a cycle");
@@ -123,7 +124,7 @@ public class DeptAdminService {
         if (force && (children > 0 || users > 0 || roles > 0)) {
             // Subtree force-delete: soft-delete all descendant depts, null user.dept_id
             // for users in the subtree, and cascade role_dept references.
-            java.util.List<String> subtreeIds = deptMapper.findSubtreeIds(d.getPath());
+            java.util.List<String> subtreeIds = deptMapper.findSubtreeIds(d.getPath(), RequestContext.tenantIdOrDefault());
             if (subtreeIds == null || subtreeIds.isEmpty()) {
                 // findSubtreeIds filters by status=1; fall back to self if nothing returned.
                 subtreeIds = java.util.List.of(id);

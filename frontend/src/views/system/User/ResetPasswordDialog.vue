@@ -68,7 +68,9 @@ async function save() {
     <template #footer>
       <div class="flex justify-end gap-2">
         <button class="h-9 px-3 rounded border border-border text-sm"
-                @click="emit('update:open', false)">{{ t('common.button.cancel') }}</button>
+                @click="emit('update:open', false)">
+{{ t('common.button.cancel') }}
+</button>
         <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm disabled:opacity-50"
                 :disabled="saving" @click="save">
           {{ saving ? t('user.resetPassword.message.saving') : t('user.resetPassword.button.reset') }}

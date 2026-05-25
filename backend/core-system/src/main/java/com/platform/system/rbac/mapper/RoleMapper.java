@@ -11,27 +11,31 @@ import java.util.List;
 @Mapper
 public interface RoleMapper extends BaseMapper<RoleEntity> {
 
-    /** Role IDs (only enabled roles) bound to a given user. */
+    /** Role IDs (only enabled roles) bound to a given user, tenant-scoped. */
     @Select("""
             SELECT r.id
               FROM core_rbac_role r
               JOIN core_rbac_user_role ur
-                ON ur.role_id = r.id AND ur.mark = 1
+                ON ur.role_id = r.id AND ur.mark = 1 AND ur.tenant_id = #{tenantId}
              WHERE r.mark = 1
                AND r.status = 1
+               AND r.tenant_id = #{tenantId}
                AND ur.user_id = #{userId}
             """)
-    List<String> findRoleIdsByUserId(@Param("userId") String userId);
+    List<String> findRoleIdsByUserId(@Param("userId") String userId,
+                                     @Param("tenantId") String tenantId);
 
-    /** Full role records (only enabled) bound to a given user. */
+    /** Full role records (only enabled) bound to a given user, tenant-scoped. */
     @Select("""
             SELECT r.*
               FROM core_rbac_role r
               JOIN core_rbac_user_role ur
-                ON ur.role_id = r.id AND ur.mark = 1
+                ON ur.role_id = r.id AND ur.mark = 1 AND ur.tenant_id = #{tenantId}
              WHERE r.mark = 1
                AND r.status = 1
+               AND r.tenant_id = #{tenantId}
                AND ur.user_id = #{userId}
             """)
-    List<RoleEntity> findRolesByUserId(@Param("userId") String userId);
+    List<RoleEntity> findRolesByUserId(@Param("userId") String userId,
+                                       @Param("tenantId") String tenantId);
 }

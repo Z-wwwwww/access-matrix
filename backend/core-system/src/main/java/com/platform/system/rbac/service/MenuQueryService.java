@@ -54,12 +54,14 @@ public class MenuQueryService {
     public List<MenuNode> loadUserMenuTree(String userId) {
         if (userId == null || userId.isBlank()) return List.of();
 
+        // Tenant from RequestContext (post-auth JWT tid). Mapper queries are tenant-scoped explicitly.
+        String tenantId = com.platform.core.common.context.RequestContext.tenantIdOrDefault();
         Set<String> perms = permissionQueryService.loadUserPermissions(userId);
         List<MenuEntity> flat;
         if (perms.contains(PermissionMatcher.SUPER)) {
-            flat = menuMapper.findAllVisible();
+            flat = menuMapper.findAllVisible(tenantId);
         } else {
-            List<MenuEntity> direct = menuMapper.findMenusByUserId(userId);
+            List<MenuEntity> direct = menuMapper.findMenusByUserId(userId, tenantId);
             if (direct.isEmpty()) return List.of();
             // Two-pass filter: drop leaf menus whose permission_code the user
             // does not hold, even though a role granted them the menu link.
@@ -69,7 +71,7 @@ public class MenuQueryService {
             // tree-assembler still needs them to host the leaves the user can see.
             List<MenuEntity> permitted = filterByPermissionCode(direct, perms);
             if (permitted.isEmpty()) return List.of();
-            flat = withAncestors(permitted);
+            flat = withAncestors(permitted, tenantId);
         }
         return assembleTree(flat);
     }
@@ -91,7 +93,7 @@ public class MenuQueryService {
     }
 
     /** Make sure every node's parent chain is included so the tree assembler does not drop branches. */
-    private List<MenuEntity> withAncestors(List<MenuEntity> direct) {
+    private List<MenuEntity> withAncestors(List<MenuEntity> direct, String tenantId) {
         Map<String, MenuEntity> byId = new HashMap<>();
         Set<String> needed = new HashSet<>();
         for (MenuEntity m : direct) {
@@ -103,7 +105,7 @@ public class MenuQueryService {
         }
         // Walk up the parent chain; one fetch per generation, until we converge.
         while (!needed.isEmpty()) {
-            List<MenuEntity> fetched = menuMapper.findByIdIn(new ArrayList<>(needed));
+            List<MenuEntity> fetched = menuMapper.findByIdIn(new ArrayList<>(needed), tenantId);
             needed.clear();
             for (MenuEntity m : fetched) {
                 if (byId.put(m.getId(), m) == null) {
