@@ -11,6 +11,7 @@ import { TabsContent } from 'radix-vue'
 import { ChevronRight, ChevronDown } from 'lucide-vue-next'
 import LucideIcon from '@/components/shared/LucideIcon.vue'
 import { toast } from '@/composables/useToast'
+import { useMenuTitle } from '@/composables/useMenuTitle'
 import {
   addRoleApi, updateRoleApi,
   getRolePermissionsApi, bindRolePermissionsApi,
@@ -22,6 +23,7 @@ import { getMenuIndexApi } from '../../../../services/menu'
 import { getDeptTreeApi } from '../../../../services/dept'
 
 const { t } = useI18n()
+const { translate: translateMenu } = useMenuTitle()
 
 const props = defineProps({
   open: Boolean,
@@ -191,8 +193,19 @@ function toggleAllInActiveModule() {
   selectedPermIds.value = [...sel]
 }
 
+// module → ルートメニュー（code 一致）。サイドバーと同じ翻訳パスを使う。
+const moduleRootMenuMap = computed(() => {
+  const map = new Map()
+  for (const m of flatMenus.value) {
+    if (!m.parentId && m.code) map.set(m.code, m)
+  }
+  return map
+})
+
 function moduleLabel(key) {
   if (!key) return ''
+  const rootMenu = moduleRootMenuMap.value.get(key)
+  if (rootMenu) return translateMenu(rootMenu)
   return key.charAt(0).toUpperCase() + key.slice(1)
 }
 
