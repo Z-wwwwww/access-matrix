@@ -241,7 +241,8 @@ export default {
         userNo: '番号',
         deptId: '部署',
         status: '状態',
-        roles: 'ロール'
+        roles: 'ロール',
+        rolesSelected: '{selected} / {total} 選択中'
       },
       placeholder: {
         password: '8 文字以上 / 4 種類の文字種'

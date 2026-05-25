@@ -4,8 +4,8 @@ import { useI18n } from 'vue-i18n'
 import Drawer from '@/components/ui/Drawer.vue'
 import Input from '@/components/ui/Input.vue'
 import Switch from '@/components/ui/Switch.vue'
-import Checkbox from '@/components/ui/Checkbox.vue'
 import DeptTreeDialog from '@/components/shared/DeptTreeDialog.vue'
+import { Check } from 'lucide-vue-next'
 import { toast } from '@/composables/useToast'
 import { addUserApi, updateUserApi, getUserRolesApi, assignUserRolesApi } from '../../../../services/user'
 import { getRoleListApi } from '../../../../services/role'
@@ -59,6 +59,17 @@ watch(() => props.open, async (open) => {
     selectedRoleIds.value = []
   }
 })
+
+function toggleRole(id) {
+  if (isLocked.value) return
+  const idx = selectedRoleIds.value.indexOf(id)
+  if (idx >= 0) selectedRoleIds.value.splice(idx, 1)
+  else selectedRoleIds.value.push(id)
+}
+
+function isRoleSelected(id) {
+  return selectedRoleIds.value.includes(id)
+}
 
 async function save() {
   saving.value = true
@@ -137,16 +148,34 @@ async function save() {
       </div>
 
       <div>
-        <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.roles') }}</label>
-        <div class="border border-border rounded p-2 max-h-48 overflow-y-auto space-y-1"
+        <div class="flex items-center justify-between mb-1">
+          <label class="text-xs text-muted-foreground">{{ t('user.edit.label.roles') }}</label>
+          <span v-if="allRoles.length" class="text-xs text-muted-foreground">
+            {{ t('user.edit.label.rolesSelected', { selected: selectedRoleIds.length, total: allRoles.length }) }}
+          </span>
+        </div>
+        <div class="border border-border rounded-lg p-2 max-h-56 overflow-y-auto bg-muted/20"
              :class="isLocked && 'opacity-60 pointer-events-none'">
-          <Checkbox v-for="r in allRoles" :key="r.id"
-                    v-model="selectedRoleIds" :value="r.id" :disabled="isLocked"
-                    class="px-2 py-1 hover:bg-muted rounded text-sm">
-            <span class="font-mono">{{ r.code }}</span>
-            <span class="text-muted-foreground">— {{ r.name }}</span>
-          </Checkbox>
-          <div v-if="!allRoles.length" class="text-xs text-muted-foreground p-2">{{ t('user.edit.message.noRoles') }}</div>
+          <div v-if="allRoles.length" class="flex flex-wrap gap-1.5">
+            <button v-for="r in allRoles" :key="r.id"
+                    type="button"
+                    :disabled="isLocked"
+                    :class="[
+                      'inline-flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-lg border text-xs transition cursor-pointer text-left',
+                      isRoleSelected(r.id)
+                        ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                        : 'border-border bg-card hover:border-primary/40 hover:bg-muted text-foreground',
+                      'disabled:cursor-not-allowed'
+                    ]"
+                    @click="toggleRole(r.id)">
+              <span class="inline-flex items-center gap-1 font-mono font-medium leading-tight">
+                <Check :size="12" class="shrink-0" :class="isRoleSelected(r.id) ? '' : 'opacity-0'" />
+                {{ r.code }}
+              </span>
+              <span class="opacity-70 leading-tight pl-[18px]">{{ r.name }}</span>
+            </button>
+          </div>
+          <div v-else class="text-xs text-muted-foreground p-2">{{ t('user.edit.message.noRoles') }}</div>
         </div>
       </div>
     </div>

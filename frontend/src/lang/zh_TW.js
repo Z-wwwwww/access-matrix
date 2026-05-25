@@ -233,7 +233,8 @@ export default {
         userNo: '編號',
         deptId: '部門',
         status: '狀態',
-        roles: '角色'
+        roles: '角色',
+        rolesSelected: '已選 {selected} / {total}'
       },
       placeholder: {
         password: '8 位以上 / 4 種字元類型'
