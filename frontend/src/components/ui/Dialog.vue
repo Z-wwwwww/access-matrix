@@ -20,6 +20,16 @@ const props = defineProps({
     type: String,
     default: 'max-w-lg'
   },
+  /** Optional explicit panel height (e.g. `h-[80vh]`). When set, body flex-fills the panel. */
+  height: {
+    type: String,
+    default: ''
+  },
+  /** true: panel sizes to content (w-auto) and caps at `width`. false: panel fills `width` (w-full). */
+  fitContent: {
+    type: Boolean,
+    default: false
+  },
   class: {
     type: String,
     default: ''
@@ -79,8 +89,11 @@ provide('popupZIndex', popupZIndex)
         <!-- Panel -->
         <div
           :class="cn(
-            'relative w-full rounded-2xl border border-border/60 bg-card shadow-2xl ring-1 ring-black/5 pointer-events-auto',
+            'relative rounded-2xl border border-border/60 bg-card shadow-2xl ring-1 ring-black/5 pointer-events-auto',
+            fitContent ? 'w-auto' : 'w-full',
             width,
+            height && 'flex flex-col',
+            height,
             props.class
           )"
         >
@@ -102,7 +115,11 @@ provide('popupZIndex', popupZIndex)
           </div>
 
           <!-- Body -->
-          <div class="px-6 py-5 max-h-[70vh] overflow-y-auto scrollbar-thin">
+          <!-- height 指定時：flex-1 で panel の余白を埋める。なし時：従来の max-h-[70vh] cap。 -->
+          <div :class="cn(
+            'px-6 py-5 overflow-y-auto scrollbar-thin',
+            height ? 'flex-1 min-h-0' : 'max-h-[70vh]'
+          )">
             <slot />
           </div>
 

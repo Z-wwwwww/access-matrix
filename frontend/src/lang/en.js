@@ -307,7 +307,6 @@ export default {
       titleCreate: 'New role',
       lockedHint: 'The built-in role is read-only. Changing name, data scope, or permission/menu/department assignments can cause auth loops or permission drift.',
       tab: {
-        basic: 'Basic',
         permissions: 'Permissions',
         menus: 'Menus',
         depts: 'Departments'
@@ -334,6 +333,10 @@ export default {
         saving: 'Saving...',
         updateFailed: 'Update failed',
         createFailed: 'Create failed'
+      },
+      dept: {
+        impliedTag: '(included)',
+        impliedTooltip: 'Automatically included via a selected parent department. To remove, uncheck the parent.'
       },
       tooltip: {
         locked: 'Built-in role is not editable'

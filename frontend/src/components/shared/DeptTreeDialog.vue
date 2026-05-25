@@ -243,7 +243,7 @@ function clearValue(e) {
     <Dialog
       v-model:open="open"
       :title="t('common.placeholder.pleaseSelect')"
-      width="max-w-3xl"
+      width="max-w-[80vw]"
       z-index="z-[100]"
     >
       <div class="space-y-3">

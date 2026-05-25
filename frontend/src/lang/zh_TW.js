@@ -307,7 +307,6 @@ export default {
       titleCreate: '新增角色',
       lockedHint: '內建角色為唯讀。修改名稱、資料範圍或權限/選單/部門分配可能引起認證循環或權限漂移。',
       tab: {
-        basic: '基本',
         permissions: '權限',
         menus: '選單',
         depts: '部門'
@@ -334,6 +333,10 @@ export default {
         saving: '儲存中...',
         updateFailed: '更新失敗',
         createFailed: '建立失敗'
+      },
+      dept: {
+        impliedTag: '（包含）',
+        impliedTooltip: '勾選父部門時自動包含。若需移除，請先取消上級勾選。'
       },
       tooltip: {
         locked: '內建角色不可編輯'

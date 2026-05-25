@@ -307,7 +307,6 @@ export default {
       titleCreate: '역할 신규',
       lockedHint: '기본 제공 역할은 읽기 전용입니다. 명칭·데이터 범위·권한/메뉴/부서 할당을 변경하면 인증 루프나 권한 드리프트가 발생할 수 있습니다.',
       tab: {
-        basic: '기본',
         permissions: '권한',
         menus: '메뉴',
         depts: '부서'
@@ -334,6 +333,10 @@ export default {
         saving: '저장 중...',
         updateFailed: '업데이트 실패',
         createFailed: '생성 실패'
+      },
+      dept: {
+        impliedTag: '(자동)',
+        impliedTooltip: '상위 부서 선택에 의해 자동 포함됩니다. 제외하려면 상위 선택을 해제하세요.'
       },
       tooltip: {
         locked: '기본 제공 역할은 편집할 수 없습니다'

@@ -9,6 +9,7 @@ import Checkbox from '@/components/ui/Checkbox.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import { TabsContent } from 'radix-vue'
 import { ChevronRight, ChevronDown } from 'lucide-vue-next'
+import { deptIconFor as deptIcon } from '@/utils/dept-icons'
 import LucideIcon from '@/components/shared/LucideIcon.vue'
 import { toast } from '@/composables/useToast'
 import { useMenuTitle } from '@/composables/useMenuTitle'
@@ -59,12 +60,14 @@ const flatMenus = ref([])
 const selectedMenuIds = ref([])
 const expandedMenuIds = ref(new Set())
 
-const flatDepts = ref([])
+const deptTree = ref([])
+const expandedDeptIds = ref(new Set())
 const selectedDeptIds = ref([])
 
 const saving = ref(false)
+// 基本情報（name / description / dataScope / status）は tab の外で常に編集可。
+// tab には「割当て系」だけを残す：perms / menus / (dataScope=CUSTOM のとき) depts。
 const tabItems = computed(() => [
-  { value: 'basic',  label: t('role.edit.tab.basic') },
   { value: 'perms',  label: t('role.edit.tab.permissions') },
   { value: 'menus',  label: t('role.edit.tab.menus') },
   ...(form.dataScope === 5 ? [{ value: 'depts', label: t('role.edit.tab.depts') }] : [])
@@ -72,7 +75,7 @@ const tabItems = computed(() => [
 
 watch(() => props.open, async (open) => {
   if (!open) return
-  tab.value = 'basic'
+  tab.value = 'perms'
   Object.assign(form, {
     name: props.role?.name || '',
     description: props.role?.description || '',
@@ -109,7 +112,9 @@ watch(() => props.open, async (open) => {
     console.warn('[RoleEdit] メニュー一覧の取得に失敗:', mRes.reason || mRes.value?.data?.msg)
   }
   if (dRes.status === 'fulfilled' && dRes.value.data.code === 0) {
-    flatDepts.value = flatten(dRes.value.data.data || [])
+    deptTree.value = dRes.value.data.data || []
+    // ルート部署をデフォルトで展開（メニュー tab と同じ初期挙動）
+    expandedDeptIds.value = new Set(deptTree.value.map((d) => d.id))
   } else {
     console.warn('[RoleEdit] 部署ツリーの取得に失敗:', dRes.reason || dRes.value?.data?.msg)
   }
@@ -126,12 +131,76 @@ watch(() => props.open, async (open) => {
   }
 })
 
-function flatten(tree, level = 0, out = []) {
-  for (const n of tree) {
-    out.push({ ...n, level })
-    if (n.children?.length) flatten(n.children, level + 1, out)
+// ---- Depts tree: 展開状態を考慮した flat 列（メニュー tab と同じ展開ロジック） ----
+// 部署の選択はカスケードしない：data scope = CUSTOM の場合、backend が path-based に
+// 部分木展開する（DataScopeQueryService）ので、UI で子孫を自動勾選すると重複・冗長。
+// 代わりに「祖先が勾選されている」子孫は disabled + 半透明で「自動包含」を可視化する。
+const flatDeptTree = computed(() => {
+  const out = []
+  function walk(nodes, level) {
+    for (const n of nodes) {
+      out.push({ ...n, level })
+      if (expandedDeptIds.value.has(n.id) && n.children?.length) {
+        walk(n.children, level + 1)
+      }
+    }
   }
+  walk(deptTree.value, 0)
   return out
+})
+
+/** id → 全子孫 id（自分を含まない）。祖先勾選による「暗黙包含」判定に使う。 */
+const deptDescendantsMap = computed(() => {
+  const map = new Map()
+  function visit(nodes) {
+    for (const n of nodes) {
+      const ids = []
+      ;(function collect(children) {
+        for (const c of children) {
+          ids.push(c.id)
+          if (c.children?.length) collect(c.children)
+        }
+      })(n.children || [])
+      map.set(n.id, ids)
+      if (n.children?.length) visit(n.children)
+    }
+  }
+  visit(deptTree.value)
+  return map
+})
+
+const selectedDeptSet = computed(() => new Set(selectedDeptIds.value.map(String)))
+
+/** 祖先勾選で暗黙的に包含されている dept id 集合（backend の subtree expansion を UI で可視化）。 */
+const impliedDeptIds = computed(() => {
+  const implied = new Set()
+  for (const id of selectedDeptIds.value) {
+    const descendants = deptDescendantsMap.value.get(id) || []
+    for (const d of descendants) implied.add(String(d))
+  }
+  return implied
+})
+
+function isDeptChecked(id) {
+  return selectedDeptSet.value.has(String(id))
+}
+
+function isDeptImplied(id) {
+  return impliedDeptIds.value.has(String(id))
+}
+
+function toggleDept(id) {
+  if (isLocked.value) return
+  if (isDeptImplied(id)) return // 祖先勾選由来の自動包含 — 解除には祖先側を外す必要がある
+  const sel = new Set(selectedDeptIds.value)
+  if (sel.has(id)) sel.delete(id)
+  else sel.add(id)
+  selectedDeptIds.value = [...sel]
+}
+
+function toggleDeptExpand(id) {
+  if (expandedDeptIds.value.has(id)) expandedDeptIds.value.delete(id)
+  else expandedDeptIds.value.add(id)
 }
 
 // ---- Permissions two-pane: module ごとのカウント + 全選択トグル ----
@@ -334,61 +403,76 @@ async function save() {
          class="mb-3 text-xs px-3 py-2 rounded bg-amber-100 border border-amber-300 text-amber-900">
       {{ t('role.edit.lockedHint') }}
     </div>
-    <Tabs v-model="tab" :items="tabItems">
-      <TabsContent value="basic" force-mount>
-        <div class="space-y-4 pt-2">
-          <div>
-            <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.name') }} <span class="text-destructive">*</span></label>
-            <Input v-model="form.name" :disabled="isLocked" />
-          </div>
-          <div>
-            <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.description') }}</label>
-            <Input v-model="form.description" :disabled="isLocked" />
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.dataScope') }}</label>
-              <Select v-model="form.dataScope" :options="scopeOptions" :disabled="isLocked" />
-            </div>
-            <div>
-              <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.status') }}</label>
-              <div class="h-9 flex items-center gap-2">
-                <Switch v-model="form.status" :checked-value="1" :unchecked-value="0" :disabled="isLocked" />
-                <span class="text-sm">{{ form.status === 1 ? t('common.status.active') : t('common.status.inactive') }}</span>
-              </div>
-            </div>
+
+    <!-- 基本情報：常時編集可（tab 外）。分割線なし、下の tab 領域の背景色で視覚分離。 -->
+    <div class="space-y-4 mb-4">
+      <div>
+        <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.name') }} <span class="text-destructive">*</span></label>
+        <Input v-model="form.name" :disabled="isLocked" />
+      </div>
+      <div>
+        <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.description') }}</label>
+        <Input v-model="form.description" :disabled="isLocked" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.dataScope') }}</label>
+          <Select v-model="form.dataScope" :options="scopeOptions" :disabled="isLocked" />
+        </div>
+        <div>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.status') }}</label>
+          <div class="h-9 flex items-center gap-2">
+            <Switch v-model="form.status" :checked-value="1" :unchecked-value="0" :disabled="isLocked" />
+            <span class="text-sm">{{ form.status === 1 ? t('common.status.active') : t('common.status.inactive') }}</span>
           </div>
         </div>
-      </TabsContent>
+      </div>
+    </div>
 
+    <!-- 割当て tab 領域：outlined card + 内容区 muted bg で基本情報と視覚分離 -->
+    <div class="rounded-xl border border-border overflow-hidden">
+      <Tabs v-model="tab" :items="tabItems">
       <TabsContent value="perms" force-mount>
-        <div class="pt-2" :class="isLocked && 'opacity-60 pointer-events-none'">
-          <div v-if="Object.keys(permsByModule).length" class="flex max-h-96 min-h-[20rem] gap-3">
-            <!-- 左ペイン: module 一覧 -->
-            <div class="w-44 shrink-0 overflow-y-auto py-1">
+        <div class="p-4 bg-muted/20" :class="isLocked && 'opacity-60 pointer-events-none'">
+          <!-- 連体カード：rounded + overflow-hidden だけ、bg は parent の muted/20 を継承。
+               左 pane だけ muted/50 をかぶせて暗くし、右側＋選択中 tab は muted/20 で同色融合。 -->
+          <div v-if="Object.keys(permsByModule).length"
+               class="flex max-h-96 min-h-[20rem] rounded-lg overflow-hidden">
+            <!-- 左ペイン: 暗めの「ツールパレット」
+                 pr-0 にして active button が自然に右端へ届くようにする
+                 （calc width だと overflow-y-auto が overflow-x も auto 化されて横スクロールが出る） -->
+            <div class="w-48 shrink-0 overflow-y-auto pl-1 py-1 pr-0 bg-muted/50 space-y-0.5">
               <button
                 v-for="(perms, m) in permsByModule"
                 :key="m"
                 type="button"
                 :class="[
-                  'w-full text-left px-3 py-2 text-sm border-l-2 transition flex items-center justify-between gap-2',
+                  'w-full text-left px-3 py-2 text-sm transition flex items-center justify-between gap-2',
                   m === activePermModule
-                    ? 'border-primary bg-primary/10 text-primary font-medium'
-                    : 'border-transparent hover:bg-muted text-foreground'
+                    ? 'bg-card text-foreground font-medium rounded-l-md'
+                    : 'text-muted-foreground hover:bg-card/60 hover:text-foreground rounded-l-md'
                 ]"
                 @click="activePermModule = m"
               >
                 <span class="truncate">{{ moduleLabel(m) }}</span>
-                <span class="text-[10px] font-mono shrink-0"
-                      :class="m === activePermModule ? 'text-primary/80' : 'text-muted-foreground'">
+                <span
+                  :class="[
+                    'text-[11px] tabular-nums shrink-0 px-1.5 py-0.5 rounded-full font-medium leading-none',
+                    m === activePermModule
+                      ? 'bg-primary text-primary-foreground'
+                      : ((moduleCounts[m]?.selected ?? 0) > 0
+                          ? 'bg-primary/15 text-primary'
+                          : 'bg-card/70 text-muted-foreground')
+                  ]"
+                >
                   {{ moduleCounts[m]?.selected ?? 0 }}/{{ moduleCounts[m]?.total ?? 0 }}
                 </span>
               </button>
             </div>
-            <!-- 右ペイン: active module の権限一覧 -->
-            <div class="flex-1 overflow-y-auto pl-3 border-l border-border">
-              <div class="flex items-center justify-between pb-2 mb-2 border-b border-border">
-                <div class="text-sm font-semibold">{{ moduleLabel(activePermModule) }}</div>
+            <!-- 右ペイン: 主内容（白い content card、選中 tab と同色で融合） -->
+            <div class="flex-1 overflow-y-auto p-4 bg-card">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-base font-semibold truncate min-w-0">{{ moduleLabel(activePermModule) }}</h3>
                 <Checkbox
                   :model-value="activeModuleAllChecked"
                   :indeterminate="activeModuleIndeterminate"
@@ -400,35 +484,45 @@ async function save() {
                   </span>
                 </Checkbox>
               </div>
-              <div class="space-y-1">
+              <div class="space-y-0.5">
                 <div
                   v-for="p in activeModulePerms"
                   :key="p.id"
-                  class="flex items-center gap-2 px-2 py-1 rounded text-sm cursor-pointer hover:bg-muted"
+                  :class="[
+                    'flex items-center justify-between gap-3 px-3 py-2 rounded-md text-sm cursor-pointer transition',
+                    isPermChecked(p.id) ? 'bg-primary/10' : 'hover:bg-muted/40'
+                  ]"
                   @click="togglePerm(p.id)"
                 >
-                  <Checkbox
-                    :model-value="isPermChecked(p.id)"
-                    :disabled="isLocked"
-                    @change="togglePerm(p.id)"
-                  />
-                  <span>{{ t(`permission.${p.code}`, p.code) }}</span>
-                  <span class="text-muted-foreground font-mono text-xs">({{ p.code }})</span>
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <Checkbox
+                      :model-value="isPermChecked(p.id)"
+                      :disabled="isLocked"
+                      @change="togglePerm(p.id)"
+                    />
+                    <span class="truncate" :class="isPermChecked(p.id) && 'font-medium'">
+                      {{ t(`permission.${p.code}`, p.code) }}
+                    </span>
+                  </div>
+                  <span class="text-[11px] text-muted-foreground font-mono px-1.5 py-0.5 rounded bg-muted shrink-0">
+                    {{ p.code }}
+                  </span>
                 </div>
-                <div v-if="!activeModulePerms.length" class="text-xs text-muted-foreground p-2">
+                <div v-if="!activeModulePerms.length"
+                     class="text-xs text-muted-foreground p-4 text-center">
                   {{ t('role.edit.message.noPermissions') }}
                 </div>
               </div>
             </div>
           </div>
-          <div v-else class="text-sm text-muted-foreground p-4">
+          <div v-else class="text-sm text-muted-foreground p-6 text-center">
             {{ t('role.edit.message.noPermissions') }}
           </div>
         </div>
       </TabsContent>
 
       <TabsContent value="menus" force-mount>
-        <div class="pt-2 max-h-96 overflow-y-auto"
+        <div class="p-4 max-h-96 overflow-y-auto bg-muted/20"
              :class="isLocked && 'opacity-60 pointer-events-none'">
           <div v-if="flatMenuTree.length" class="py-1">
             <div
@@ -466,20 +560,59 @@ async function save() {
       </TabsContent>
 
       <TabsContent v-if="form.dataScope === 5" value="depts" force-mount>
-        <div class="pt-2 max-h-96 overflow-y-auto" :class="isLocked && 'opacity-60 pointer-events-none'">
-          <Checkbox v-for="d in flatDepts" :key="d.id"
-                    v-model="selectedDeptIds" :value="d.id" :disabled="isLocked"
-                    class="px-2 py-1 hover:bg-muted rounded text-sm"
-                    :style="{ paddingLeft: 8 + d.level * 20 + 'px' }">
-            <span>{{ d.name }}</span>
-            <span class="text-muted-foreground text-xs font-mono">{{ d.code }}</span>
-          </Checkbox>
-          <div v-if="!flatDepts.length" class="text-sm text-muted-foreground p-4">
+        <div class="p-4 max-h-96 overflow-y-auto bg-muted/20" :class="isLocked && 'opacity-60 pointer-events-none'">
+          <div v-if="flatDeptTree.length" class="space-y-0.5">
+            <div
+              v-for="d in flatDeptTree"
+              :key="d.id"
+              :class="[
+                'flex items-center gap-2 px-2 py-2 text-sm rounded-md transition',
+                isDeptImplied(d.id)
+                  ? 'bg-primary/5 opacity-60 cursor-not-allowed'
+                  : isDeptChecked(d.id)
+                    ? 'bg-primary/10 cursor-pointer'
+                    : 'hover:bg-muted/40 cursor-pointer'
+              ]"
+              :style="{ paddingLeft: 8 + d.level * 20 + 'px' }"
+              :title="isDeptImplied(d.id) ? t('role.edit.dept.impliedTooltip') : ''"
+              @click="toggleDept(d.id)"
+            >
+              <button
+                v-if="d.children?.length"
+                type="button"
+                class="size-4 inline-flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0"
+                @click.stop="toggleDeptExpand(d.id)"
+              >
+                <ChevronDown v-if="expandedDeptIds.has(d.id)" class="size-4" />
+                <ChevronRight v-else class="size-4" />
+              </button>
+              <span v-else class="inline-block size-4 shrink-0"></span>
+              <Checkbox
+                :model-value="isDeptChecked(d.id) || isDeptImplied(d.id)"
+                :disabled="isLocked || isDeptImplied(d.id)"
+                @change="toggleDept(d.id)"
+              />
+              <component :is="deptIcon(d.level)" :size="14" class="text-muted-foreground shrink-0" />
+              <span class="font-medium truncate min-w-0"
+                    :class="isDeptChecked(d.id) ? 'text-foreground' : 'text-foreground/90'">
+                {{ d.name }}
+              </span>
+              <span class="text-[11px] text-muted-foreground font-mono px-1.5 py-0.5 rounded bg-muted shrink-0">
+                {{ d.code }}
+              </span>
+              <span v-if="isDeptImplied(d.id) && !isDeptChecked(d.id)"
+                    class="ml-auto text-[10px] text-muted-foreground italic shrink-0">
+                {{ t('role.edit.dept.impliedTag') }}
+              </span>
+            </div>
+          </div>
+          <div v-else class="text-sm text-muted-foreground p-6 text-center">
             {{ t('role.edit.message.noDepts') }}
           </div>
         </div>
       </TabsContent>
-    </Tabs>
+      </Tabs>
+    </div>
 
     <template #footer>
       <div class="flex justify-end gap-2">
