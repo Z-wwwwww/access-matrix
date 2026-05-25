@@ -24,13 +24,13 @@ function tabLabel(tab) {
   const path = tab.path || tab.key || ''
   if (typeof path === 'string' && path.endsWith('/detail')) {
     const parentPath = path.slice(0, -'/detail'.length)
-    const base = translateMenu({ path: parentPath, title: stripSuffix(tab.title) })
+    const base = translateMenu({ path: parentPath, title: stripSuffix(tab.title), titleI18n: tab.titleI18n })
     const suffix = tab.fullPath && tab.fullPath.includes('id=')
       ? t('common.button.detail')
       : t('common.button.new')
     return `${base} - ${suffix}`
   }
-  const base = translateMenu({ path, title: tab.title })
+  const base = translateMenu({ path, title: tab.title, titleI18n: tab.titleI18n })
   // Dashboard カードからの quickFilter 付き遷移: カード名を後缀に表示
   const qfLabel = getQuickFilterLabelFromFullPath(tab.fullPath)
   return qfLabel ? `${base} - ${qfLabel}` : base

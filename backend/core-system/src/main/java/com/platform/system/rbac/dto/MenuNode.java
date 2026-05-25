@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Tree node returned by {@code GET /api/menu/me}. Field names follow the
@@ -16,6 +17,8 @@ public class MenuNode {
     private String id;
     private String code;
     private String title;
+    /** Locale → translated title. Frontend picks based on current i18n locale; falls back to {@link #title}. */
+    private Map<String, String> titleI18n;
     private Integer menuType;
     private String path;
     private String component;
@@ -40,6 +43,9 @@ public class MenuNode {
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
+
+    public Map<String, String> getTitleI18n() { return titleI18n; }
+    public void setTitleI18n(Map<String, String> titleI18n) { this.titleI18n = titleI18n; }
 
     public Integer getMenuType() { return menuType; }
     public void setMenuType(Integer menuType) { this.menuType = menuType; }

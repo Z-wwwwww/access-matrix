@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.util.Map;
+
 public final class MenuAdminDto {
 
     private MenuAdminDto() {}
@@ -12,6 +14,7 @@ public final class MenuAdminDto {
             String parentId,
             @NotBlank @Size(max = 64) String code,
             @NotBlank @Size(max = 128) String title,
+            Map<String, String> titleI18n,
             @NotNull Integer menuType,
             @Size(max = 255) String path,
             @Size(max = 255) String component,
@@ -29,6 +32,7 @@ public final class MenuAdminDto {
     public record UpdateRequest(
             String parentId,
             @Size(max = 128) String title,
+            Map<String, String> titleI18n,
             Integer menuType,
             @Size(max = 255) String path,
             @Size(max = 255) String component,
@@ -48,6 +52,7 @@ public final class MenuAdminDto {
             String parentId,
             String code,
             String title,
+            Map<String, String> titleI18n,
             Integer menuType,
             String path,
             String component,

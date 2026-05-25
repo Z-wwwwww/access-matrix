@@ -18,9 +18,17 @@ public class MenuEntity extends BaseEntity {
     @TableField("code")
     private String code;
 
-    /** Display title used by the sidebar / tab bar. */
+    /** Display title used by the sidebar / tab bar. Fallback only — prefer {@link #titleI18n}. */
     @TableField("title")
     private String title;
+
+    /**
+     * Locale → translated title, stored as raw JSON in the {@code title_i18n} jsonb column.
+     * Service layer (de)serialises via Jackson. Sent over the wire to the frontend so
+     * {@code useMenuTitle()} can pick the right locale at render time.
+     */
+    @TableField("title_i18n")
+    private String titleI18n;
 
     /** 1=directory 2=menu(page) 3=button */
     @TableField("menu_type")

@@ -10,6 +10,7 @@ import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
 import { useAuthStore } from '@/stores/auth'
 import { useMenuStore } from '@/stores/menu'
+import i18n from '@/lang'
 
 NProgress.configure({ showSpinner: false })
 
@@ -107,15 +108,16 @@ router.afterEach((to) => {
   setTimeout(() => {
     NProgress.done(true)
   }, 300)
-  // 更新页面标题
+  // 更新页面标题：titleI18n[currentLocale] が最優先、なければ meta.title（fallback）。
   if (!to.path.startsWith('/redirect/')) {
     const names = []
-    if (to.meta?.title) {
-      names.push(to.meta.title)
-    }
-    if (APP_TITLE) {
-      names.push(APP_TITLE)
-    }
+    const titleI18n = to.meta?.titleI18n
+    const localized = titleI18n && typeof titleI18n === 'object'
+      ? titleI18n[i18n.global.locale.value]
+      : null
+    const name = localized || to.meta?.title
+    if (name) names.push(name)
+    if (APP_TITLE) names.push(APP_TITLE)
     document.title = names.join(' - ')
   }
 })

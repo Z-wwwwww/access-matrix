@@ -463,7 +463,7 @@ async function save() {
                 @change="toggleMenuNode(m.id)"
               />
               <LucideIcon v-if="m.icon" :name="m.icon" :size="14" class="text-muted-foreground shrink-0" />
-              <span class="font-medium truncate">{{ m.title }}</span>
+              <span class="font-medium truncate">{{ translateMenu(m) }}</span>
               <span class="text-muted-foreground font-mono text-xs truncate">{{ m.code }}</span>
             </div>
           </div>

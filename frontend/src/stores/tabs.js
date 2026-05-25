@@ -120,6 +120,8 @@ export const useTabsStore = defineStore('tabs', () => {
     const key = buildKey(route)
     const fullPath = route.fullPath || route.path
     const title = buildTitle(route)
+    // titleI18n はタブにも保存：locale 切替時に AppTabBar が tab 自身から拾えるように。
+    const titleI18n = route.meta?.titleI18n
 
     activeTab.value = key
 
@@ -127,6 +129,7 @@ export const useTabsStore = defineStore('tabs', () => {
     if (exists) {
       exists.title = title
       exists.fullPath = fullPath
+      exists.titleI18n = titleI18n
       return
     }
 
@@ -134,7 +137,8 @@ export const useTabsStore = defineStore('tabs', () => {
       key,
       path: route.path,
       fullPath,
-      title
+      title,
+      titleI18n
     })
   }
 

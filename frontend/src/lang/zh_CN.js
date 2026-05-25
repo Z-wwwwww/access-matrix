@@ -435,6 +435,7 @@ export default {
       label: {
         code: '编码',
         name: '名称',
+        titleI18n: '多语言名称',
         type: '类型',
         sortOrder: '排序',
         parentId: '父菜单',
@@ -459,7 +460,12 @@ export default {
         parentId: '根节点留空',
         path: '/system/user',
         component: '/system/User/User',
-        permissionCode: 'user:read'
+        permissionCode: 'user:read',
+        titleI18nPrimary: '必填（默认语言）',
+        titleI18nOptional: '选填'
+      },
+      error: {
+        titleJaRequired: '日文标题为必填项'
       }
     }
   },

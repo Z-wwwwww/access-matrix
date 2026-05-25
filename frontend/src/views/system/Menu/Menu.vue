@@ -13,6 +13,7 @@ import LucideIcon from '@/components/shared/LucideIcon.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useMenuTitle } from '@/composables/useMenuTitle'
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, HelpCircle, Pin } from 'lucide-vue-next'
 import {
   getMenuIndexApi, addMenuApi, editMenuApi, deleteMenuApi
@@ -21,6 +22,16 @@ import { getPermissionsByModuleApi } from '../../../../services/permission'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
+const { translate: translateMenu } = useMenuTitle()
+
+// AppHeader の langOptions と同じ並び。primary locale は ja_JP（システム既定）。
+const SUPPORTED_LANGS = [
+  { code: 'ja_JP', label: '日本語', primary: true },
+  { code: 'en',    label: 'English' },
+  { code: 'zh_CN', label: '简体中文' },
+  { code: 'zh_TW', label: '繁體中文' },
+  { code: 'ko_KR', label: '한국어' }
+]
 
 const list = ref([])
 const loading = ref(false)
@@ -29,7 +40,7 @@ const expanded = ref(new Set())
 const showEdit = ref(false)
 const isEdit = ref(false)
 const editForm = reactive({
-  id: null, parentId: null, code: '', title: '', menuType: 2,
+  id: null, parentId: null, code: '', title: '', titleI18n: {}, menuType: 2,
   path: '', component: '', icon: '', sortOrder: 0,
   hide: 0, hideFooter: 0, hideSidebar: 0, pinned: 0,
   permissionCode: '', status: 1
@@ -164,7 +175,8 @@ function toggle(id) {
 function openCreate(parent = null) {
   isEdit.value = false
   Object.assign(editForm, {
-    id: null, parentId: parent?.id || null, code: '', title: '', menuType: parent ? 2 : 1,
+    id: null, parentId: parent?.id || null, code: '', title: '', titleI18n: {},
+    menuType: parent ? 2 : 1,
     path: '', component: '', icon: '', sortOrder: 0,
     hide: 0, hideFooter: 0, hideSidebar: 0, pinned: 0,
     permissionCode: '', status: 1
@@ -174,6 +186,8 @@ function openCreate(parent = null) {
 function openEdit(row) {
   isEdit.value = true
   Object.assign(editForm, row)
+  // backend が null を返してくる場合があるので reactive オブジェクトとして空 map を担保。
+  editForm.titleI18n = { ...(row.titleI18n || {}) }
   // 防御：历史脏数据可能存在 menuType≠2 但 pinned=1 的记录，
   // 进入编辑时直接清零，否则 switch 被 disabled 用户无法手动关掉。
   if (editForm.menuType !== 2) editForm.pinned = 0
@@ -183,6 +197,20 @@ function openEdit(row) {
 async function save() {
   // 提交前再做一次保险：menuType 不是「メニュー」时不允许 pinned。
   if (editForm.menuType !== 2) editForm.pinned = 0
+  // titleI18n の空文字キーは送らない（DB に "" を入れたくない）。
+  // `title`（fallback カラム）は ja_JP の翻訳から自動派生する（NOT NULL 制約のため）。
+  const cleanedI18n = {}
+  for (const [k, v] of Object.entries(editForm.titleI18n || {})) {
+    if (v && String(v).trim()) cleanedI18n[k] = String(v).trim()
+  }
+  editForm.titleI18n = cleanedI18n
+  if (!editForm.title || !editForm.title.trim()) {
+    editForm.title = cleanedI18n.ja_JP || Object.values(cleanedI18n)[0] || editForm.code
+  }
+  if (!cleanedI18n.ja_JP) {
+    toast.error(t('menu.edit.error.titleJaRequired'))
+    return
+  }
   try {
     if (isEdit.value) {
       const r = await editMenuApi(editForm)
@@ -243,7 +271,7 @@ onMounted(() => {
             </button>
             <span v-else class="inline-block size-4"></span>
             <LucideIcon v-if="row.icon" :name="row.icon" :size="14" />
-            <span class="font-medium">{{ row.title }}</span>
+            <span class="font-medium">{{ translateMenu(row) }}</span>
             <Pin
               v-if="row.pinned === 1"
               class="size-3.5 text-brand-orange fill-brand-orange"
@@ -284,14 +312,28 @@ onMounted(() => {
 
     <Drawer v-model:open="showEdit" :title="isEdit ? t('menu.edit.titleEdit') : t('menu.edit.titleCreate')" width="max-w-lg">
       <div class="space-y-3">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.code') }} <span class="text-destructive">*</span></label>
-            <Input v-model="editForm.code" :disabled="isEdit" :placeholder="t('menu.edit.placeholder.code')" />
-          </div>
-          <div>
-            <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.name') }} <span class="text-destructive">*</span></label>
-            <Input v-model="editForm.title" />
+        <div>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.code') }} <span class="text-destructive">*</span></label>
+          <Input v-model="editForm.code" :disabled="isEdit" :placeholder="t('menu.edit.placeholder.code')" />
+        </div>
+        <!-- 多言語タイトル：ja_JP は必須（既定 locale）、他は任意。 -->
+        <div class="space-y-2 p-3 rounded border border-border bg-muted/30">
+          <div class="text-xs text-muted-foreground">{{ t('menu.edit.label.titleI18n') }}</div>
+          <div
+            v-for="lang in SUPPORTED_LANGS"
+            :key="lang.code"
+            class="flex items-center gap-2"
+          >
+            <span class="w-20 shrink-0 text-xs font-mono text-muted-foreground">{{ lang.label }}</span>
+            <Input
+              v-model="editForm.titleI18n[lang.code]"
+              :placeholder="lang.primary
+                ? t('menu.edit.placeholder.titleI18nPrimary')
+                : t('menu.edit.placeholder.titleI18nOptional')"
+              class="flex-1"
+            />
+            <span v-if="lang.primary" class="text-destructive text-xs shrink-0">*</span>
+            <span v-else class="text-xs text-muted-foreground shrink-0">&nbsp;</span>
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">

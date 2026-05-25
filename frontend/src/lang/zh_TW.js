@@ -435,6 +435,7 @@ export default {
       label: {
         code: '代碼',
         name: '名稱',
+        titleI18n: '多語言名稱',
         type: '類型',
         sortOrder: '排序',
         parentId: '父選單',
@@ -459,7 +460,12 @@ export default {
         parentId: '根節點留空',
         path: '/system/user',
         component: '/system/User/User',
-        permissionCode: 'user:read'
+        permissionCode: 'user:read',
+        titleI18nPrimary: '必填（預設語言）',
+        titleI18nOptional: '選填'
+      },
+      error: {
+        titleJaRequired: '日文標題為必填項'
       }
     }
   },

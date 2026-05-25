@@ -443,6 +443,7 @@ export default {
       label: {
         code: 'コード',
         name: '名称',
+        titleI18n: '多言語タイトル',
         type: '種類',
         sortOrder: '並び順',
         parentId: '親メニュー',
@@ -467,7 +468,12 @@ export default {
         parentId: 'ルートの場合は空',
         path: '/system/user',
         component: '/system/User/User',
-        permissionCode: 'user:read'
+        permissionCode: 'user:read',
+        titleI18nPrimary: '必須（既定ロケール）',
+        titleI18nOptional: '任意'
+      },
+      error: {
+        titleJaRequired: '日本語タイトルは必須です'
       }
     }
   },
