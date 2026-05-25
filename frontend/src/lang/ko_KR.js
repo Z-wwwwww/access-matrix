@@ -435,6 +435,7 @@ export default {
       label: {
         code: '코드',
         name: '명칭',
+        titleI18n: '다국어 제목',
         type: '유형',
         sortOrder: '정렬 순서',
         parentId: '상위 메뉴',
@@ -459,7 +460,12 @@ export default {
         parentId: '루트인 경우 비워둠',
         path: '/system/user',
         component: '/system/User/User',
-        permissionCode: 'user:read'
+        permissionCode: 'user:read',
+        titleI18nPrimary: '필수 (기본 로케일)',
+        titleI18nOptional: '선택 사항'
+      },
+      error: {
+        titleJaRequired: '일본어 제목은 필수입니다'
       }
     }
   },

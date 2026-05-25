@@ -6,6 +6,8 @@ import com.platform.system.rbac.entity.MenuEntity;
 import com.platform.system.rbac.mapper.MenuMapper;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -35,12 +37,17 @@ import java.util.stream.Collectors;
 @Service
 public class MenuQueryService {
 
+    private static final TypeReference<Map<String, String>> I18N_MAP = new TypeReference<>() {};
+
     private final MenuMapper menuMapper;
     private final PermissionQueryService permissionQueryService;
+    private final JsonMapper jsonMapper;
 
-    public MenuQueryService(MenuMapper menuMapper, PermissionQueryService permissionQueryService) {
+    public MenuQueryService(MenuMapper menuMapper, PermissionQueryService permissionQueryService,
+                            JsonMapper jsonMapper) {
         this.menuMapper = menuMapper;
         this.permissionQueryService = permissionQueryService;
+        this.jsonMapper = jsonMapper;
     }
 
     @Cacheable(value = "userMenu", key = "#userId", unless = "#result.isEmpty()")
@@ -155,6 +162,7 @@ public class MenuQueryService {
         n.setId(m.getId());
         n.setCode(m.getCode());
         n.setTitle(m.getTitle());
+        n.setTitleI18n(parseI18n(m.getTitleI18n()));
         n.setMenuType(m.getMenuType());
         n.setPath(m.getPath());
         n.setComponent(m.getComponent());
@@ -168,5 +176,19 @@ public class MenuQueryService {
         n.setRedirect(m.getRedirect());
         n.setPermissionCode(m.getPermissionCode());
         return n;
+    }
+
+    /**
+     * Parse the raw {@code title_i18n} JSON column into a Map. Null/blank → null
+     * so {@code @JsonInclude(NON_NULL)} on {@link MenuNode} keeps the wire payload tight.
+     * Malformed JSON degrades silently; the frontend falls back to {@code title}.
+     */
+    private Map<String, String> parseI18n(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return jsonMapper.readValue(raw, I18N_MAP);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

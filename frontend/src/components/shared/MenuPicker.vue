@@ -2,6 +2,9 @@
 import { ref, computed } from 'vue'
 import TreePicker from './TreePicker.vue'
 import { getMenuIndexApi } from '../../../services/menu'
+import { useMenuTitle } from '@/composables/useMenuTitle'
+
+const { translate: translateMenu } = useMenuTitle()
 
 defineOptions({ name: 'MenuPicker' })
 
@@ -44,7 +47,7 @@ const tree = computed(() => {
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       .map((m) => ({
         id: m.id,
-        label: `${m.title}${m.code ? ` (${m.code})` : ''}`,
+        label: `${translateMenu(m)}${m.code ? ` (${m.code})` : ''}`,
         children: build(m.id)
       }))
   }

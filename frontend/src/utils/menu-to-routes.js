@@ -42,9 +42,10 @@ export function formatMenus(data) {
     return items.map((item) => {
       const menu = { ...item }
 
-      // 构建 meta
+      // 构建 meta（titleI18n を含めて TabBar / document.title 側でも locale 切替に追従できるようにする）
       menu.meta = {
         title: menu.title,
+        titleI18n: menu.titleI18n,
         icon: menu.icon,
         hide: menu.hide === 1,
         hideFooter: menu.hideFooter === 1,
@@ -153,6 +154,7 @@ export function menuToRoutes(menus, isRoot = true) {
   menus.forEach((item) => {
     const meta = item.meta || {
       title: item.title,
+      titleI18n: item.titleI18n,
       icon: item.icon,
       hide: item.hide === 1
     }

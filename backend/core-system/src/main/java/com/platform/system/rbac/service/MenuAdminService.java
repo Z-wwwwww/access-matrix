@@ -12,20 +12,28 @@ import com.platform.system.rbac.mapper.MenuMapper;
 import com.platform.system.rbac.mapper.RoleMenuMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class MenuAdminService {
 
+    private static final TypeReference<Map<String, String>> I18N_MAP = new TypeReference<>() {};
+
     private final MenuMapper menuMapper;
     private final RoleMenuMapper roleMenuMapper;
     private final PermissionCacheService cacheService;
+    private final JsonMapper jsonMapper;
 
-    public MenuAdminService(MenuMapper menuMapper, RoleMenuMapper roleMenuMapper, PermissionCacheService cacheService) {
+    public MenuAdminService(MenuMapper menuMapper, RoleMenuMapper roleMenuMapper,
+                            PermissionCacheService cacheService, JsonMapper jsonMapper) {
         this.menuMapper = menuMapper;
         this.roleMenuMapper = roleMenuMapper;
         this.cacheService = cacheService;
+        this.jsonMapper = jsonMapper;
     }
 
     public List<MenuAdminDto.View> listAll() {
@@ -50,6 +58,7 @@ public class MenuAdminService {
         m.setParentId(req.parentId());
         m.setCode(req.code());
         m.setTitle(req.title());
+        m.setTitleI18n(serializeI18n(req.titleI18n()));
         m.setMenuType(req.menuType());
         m.setPath(req.path());
         m.setComponent(req.component());
@@ -73,6 +82,7 @@ public class MenuAdminService {
         MenuEntity m = require(id);
         if (req.parentId() != null) m.setParentId(req.parentId());
         if (req.title() != null) m.setTitle(req.title());
+        if (req.titleI18n() != null) m.setTitleI18n(serializeI18n(req.titleI18n()));
         if (req.menuType() != null) m.setMenuType(req.menuType());
         if (req.path() != null) m.setPath(req.path());
         if (req.component() != null) m.setComponent(req.component());
@@ -117,8 +127,38 @@ public class MenuAdminService {
     private MenuAdminDto.View toView(MenuEntity m) {
         return new MenuAdminDto.View(
                 m.getId(), m.getParentId(), m.getCode(), m.getTitle(),
+                parseI18n(m.getTitleI18n()),
                 m.getMenuType(), m.getPath(), m.getComponent(), m.getIcon(),
                 m.getSortOrder(), m.getHide(), m.getHideFooter(), m.getHideSidebar(),
                 m.getPinned(), m.getTabUnique(), m.getRedirect(), m.getPermissionCode(), m.getStatus());
+    }
+
+    /**
+     * Parse the raw {@code title_i18n} JSON string into a Map for DTO output.
+     * Returns null (not empty map) when the column is null/blank so the wire payload
+     * keeps it absent ({@code @JsonInclude(NON_NULL)} on the consuming DTO).
+     * Malformed JSON falls back to null with a warning rather than failing the request.
+     */
+    private Map<String, String> parseI18n(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return jsonMapper.readValue(raw, I18N_MAP);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Serialise a translations map to JSON for the {@code title_i18n} column.
+     * Null/empty map → null (we want NULL in the column, not "{}"), so the
+     * fallback ladder in {@code useMenuTitle} stays clean.
+     */
+    private String serializeI18n(Map<String, String> map) {
+        if (map == null || map.isEmpty()) return null;
+        try {
+            return jsonMapper.writeValueAsString(map);
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Invalid titleI18n payload");
+        }
     }
 }

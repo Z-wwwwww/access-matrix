@@ -435,6 +435,7 @@ export default {
       label: {
         code: 'Code',
         name: 'Name',
+        titleI18n: 'Title (per language)',
         type: 'Type',
         sortOrder: 'Sort order',
         parentId: 'Parent menu',
@@ -459,7 +460,12 @@ export default {
         parentId: 'Empty for root',
         path: '/system/user',
         component: '/system/User/User',
-        permissionCode: 'user:read'
+        permissionCode: 'user:read',
+        titleI18nPrimary: 'Required (default locale)',
+        titleI18nOptional: 'Optional'
+      },
+      error: {
+        titleJaRequired: 'Japanese title is required (default locale)'
       }
     }
   },
