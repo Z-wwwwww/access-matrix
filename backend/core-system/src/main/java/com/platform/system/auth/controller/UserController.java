@@ -53,7 +53,7 @@ public class UserController {
         // Roles and authorities now come from RBAC tables, not the deprecated JSONB columns.
         // We expose role IDs (not the user-facing name) so the frontend's role-based checks
         // stay stable across admin renames — BuiltInRoles.SUPER_ADMIN_ID is the canonical key.
-        List<RoleEntity> roles = roleMapper.findRolesByUserId(userId);
+        List<RoleEntity> roles = roleMapper.findRolesByUserId(userId, u.getTenantId());
         List<String> roleIds = new ArrayList<>(roles.size());
         for (RoleEntity r : roles) roleIds.add(r.getId());
         Set<String> perms = permissionQueryService.loadUserPermissions(userId);

@@ -480,7 +480,9 @@ onBeforeUnmount(() => {
                   : 'hover:bg-muted text-foreground'
               ]"
               @click="goToPage(p)"
-            >{{ p }}</button>
+            >
+{{ p }}
+</button>
           </template>
         </div>
         <button

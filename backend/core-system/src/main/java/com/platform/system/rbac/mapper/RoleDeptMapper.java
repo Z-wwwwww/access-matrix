@@ -12,7 +12,7 @@ import java.util.List;
 public interface RoleDeptMapper extends BaseMapper<RoleDeptEntity> {
 
     /**
-     * Department IDs explicitly granted to a role (CUSTOM data scope).
+     * Department IDs explicitly granted to a role (CUSTOM data scope), tenant-scoped.
      * Does NOT filter by dept.mark — preserves legacy behaviour for the data-scope
      * runtime path (a soft-deleted dept stays in the scope until explicitly removed).
      */
@@ -20,12 +20,14 @@ public interface RoleDeptMapper extends BaseMapper<RoleDeptEntity> {
             SELECT dept_id
               FROM core_rbac_role_dept
              WHERE mark = 1
+               AND tenant_id = #{tenantId}
                AND role_id = #{roleId}
             """)
-    List<String> findDeptIdsByRoleId(@Param("roleId") String roleId);
+    List<String> findDeptIdsByRoleId(@Param("roleId") String roleId,
+                                     @Param("tenantId") String tenantId);
 
     /**
-     * Department IDs bound to a role <b>where the dept itself is still live</b>.
+     * Department IDs bound to a role <b>where the dept itself is still live</b>, tenant-scoped.
      * Used by the admin UI's role-edit drawer — same intent as the JOIN'd helpers
      * on {@code RolePermissionMapper} / {@code RoleMenuMapper}: never hand the UI
      * IDs that would later fail {@code assertAllExist}.
@@ -33,9 +35,12 @@ public interface RoleDeptMapper extends BaseMapper<RoleDeptEntity> {
     @Select("""
             SELECT rd.dept_id
               FROM core_rbac_role_dept rd
-              JOIN core_rbac_dept d ON d.id = rd.dept_id AND d.mark = 1
+              JOIN core_rbac_dept d
+                ON d.id = rd.dept_id AND d.mark = 1 AND d.tenant_id = #{tenantId}
              WHERE rd.role_id = #{roleId}
                AND rd.mark = 1
+               AND rd.tenant_id = #{tenantId}
             """)
-    List<String> findActiveDeptIdsByRoleId(@Param("roleId") String roleId);
+    List<String> findActiveDeptIdsByRoleId(@Param("roleId") String roleId,
+                                           @Param("tenantId") String tenantId);
 }

@@ -11,15 +11,17 @@ import java.util.List;
 @Mapper
 public interface DeptMapper extends BaseMapper<DeptEntity> {
 
-    /** Self + all descendants — uses the {@code path} index for O(log N) prefix scan. */
+    /** Self + all descendants, tenant-scoped — uses the {@code path} index for O(log N) prefix scan. */
     @Select("""
             SELECT id
               FROM core_rbac_dept
              WHERE mark = 1
                AND status = 1
+               AND tenant_id = #{tenantId}
                AND (path = #{path} OR path LIKE #{path} || '/%')
             """)
-    List<String> findSubtreeIds(@Param("path") String path);
+    List<String> findSubtreeIds(@Param("path") String path,
+                                @Param("tenantId") String tenantId);
 
     /** Full tree for a tenant — used by tree-render endpoints and Caffeine-cached. */
     @Select("""

@@ -3,6 +3,7 @@ package com.platform.system.rbac.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
@@ -122,7 +123,7 @@ public class RoleAdminService {
     public void delete(String id, boolean force) {
         RoleEntity r = requireRole(id);
         assertNotBuiltIn(r, "delete");
-        Long users = userRoleMapper.countActiveHoldersByRoleId(id);
+        Long users = userRoleMapper.countActiveHoldersByRoleId(id, RequestContext.tenantIdOrDefault());
         long userCount = users == null ? 0L : users;
         if (userCount > 0 && !force) {
             // IN_USE — caller may retry with force=true to clear user_role bindings.
@@ -161,7 +162,7 @@ public class RoleAdminService {
         // JOIN to permission.mark=1 — never return dangling links to soft-deleted
         // permissions, which would otherwise surface as "ghost selections" in the
         // admin UI and trip assertAllExist on save.
-        return rolePermissionMapper.findActivePermissionIdsByRoleId(roleId);
+        return rolePermissionMapper.findActivePermissionIdsByRoleId(roleId, RequestContext.tenantIdOrDefault());
     }
 
     @Transactional
@@ -186,7 +187,7 @@ public class RoleAdminService {
     public List<String> listMenuIds(String roleId) {
         requireRole(roleId);
         // JOIN to menu.mark=1 — see listPermissionIds rationale.
-        return roleMenuMapper.findActiveMenuIdsByRoleId(roleId);
+        return roleMenuMapper.findActiveMenuIdsByRoleId(roleId, RequestContext.tenantIdOrDefault());
     }
 
     @Transactional
@@ -212,7 +213,7 @@ public class RoleAdminService {
         requireRole(roleId);
         // JOIN to dept.mark=1 — see listPermissionIds rationale. The runtime
         // data-scope path keeps its own non-JOIN helper (findDeptIdsByRoleId).
-        return roleDeptMapper.findActiveDeptIdsByRoleId(roleId);
+        return roleDeptMapper.findActiveDeptIdsByRoleId(roleId, RequestContext.tenantIdOrDefault());
     }
 
     @Transactional

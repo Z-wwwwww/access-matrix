@@ -12,16 +12,19 @@ import java.util.List;
 public interface RolePermissionMapper extends BaseMapper<RolePermissionEntity> {
 
     /**
-     * Permission IDs bound to a role <b>where the permission itself is still live</b>.
-     * Filters out dangling links to soft-deleted permissions so the admin UI never
-     * picks up "ghost" selections that would later trip {@code assertAllExist}.
+     * Permission IDs bound to a role <b>where the permission itself is still live</b>,
+     * tenant-scoped. Filters out dangling links to soft-deleted permissions so the
+     * admin UI never picks up "ghost" selections that would later trip {@code assertAllExist}.
      */
     @Select("""
             SELECT rp.permission_id
               FROM core_rbac_role_permission rp
-              JOIN core_rbac_permission p ON p.id = rp.permission_id AND p.mark = 1
+              JOIN core_rbac_permission p
+                ON p.id = rp.permission_id AND p.mark = 1 AND p.tenant_id = #{tenantId}
              WHERE rp.role_id = #{roleId}
                AND rp.mark = 1
+               AND rp.tenant_id = #{tenantId}
             """)
-    List<String> findActivePermissionIdsByRoleId(@Param("roleId") String roleId);
+    List<String> findActivePermissionIdsByRoleId(@Param("roleId") String roleId,
+                                                 @Param("tenantId") String tenantId);
 }

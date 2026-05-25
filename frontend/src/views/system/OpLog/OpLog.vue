@@ -194,7 +194,8 @@ onMounted(fetchData)
           <div><span class="text-muted-foreground">{{ t('oplog.detail.label.targetType') }}：</span><span>{{ detail.targetType || '-' }}</span></div>
           <div><span class="text-muted-foreground">{{ t('oplog.detail.label.targetId') }}：</span><span class="font-mono text-xs">{{ detail.targetId || '-' }}</span></div>
           <div><span class="text-muted-foreground">{{ t('oplog.detail.label.method') }}：</span><span class="font-mono">{{ detail.method || '-' }}</span></div>
-          <div><span class="text-muted-foreground">{{ t('oplog.detail.label.result') }}：</span>
+          <div>
+<span class="text-muted-foreground">{{ t('oplog.detail.label.result') }}：</span>
             <Badge :variant="detail.success ? 'default' : 'destructive'">
               {{ detail.success ? t('oplog.status.success') : t('oplog.status.failure') }}
             </Badge>

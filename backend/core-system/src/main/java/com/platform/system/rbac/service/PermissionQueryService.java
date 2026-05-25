@@ -1,5 +1,6 @@
 package com.platform.system.rbac.service;
 
+import com.platform.core.common.context.RequestContext;
 import com.platform.core.infrastructure.security.rbac.UserPermissionsLookup;
 import com.platform.system.rbac.mapper.PermissionMapper;
 import org.springframework.cache.annotation.Cacheable;
@@ -27,7 +28,9 @@ public class PermissionQueryService implements UserPermissionsLookup {
     @Cacheable(value = "userPermissions", key = "#userId", unless = "#result.isEmpty()")
     public Set<String> loadUserPermissions(String userId) {
         if (userId == null || userId.isBlank()) return Set.of();
-        List<String> codes = permissionMapper.findPermissionCodesByUserId(userId);
+        // Tenant is taken from RequestContext (post-auth: JWT tid claim; pre-auth: X-Tenant-Id header).
+        List<String> codes = permissionMapper.findPermissionCodesByUserId(
+                userId, RequestContext.tenantIdOrDefault());
         return codes.isEmpty() ? Set.of() : new HashSet<>(codes);
     }
 }

@@ -48,7 +48,8 @@ public class PermissionCacheService {
     }
 
     public void evictRole(String roleId) {
-        List<String> userIds = userRoleMapper.findUserIdsByRoleId(roleId);
+        List<String> userIds = userRoleMapper.findUserIdsByRoleId(
+                roleId, com.platform.core.common.context.RequestContext.tenantIdOrDefault());
         Cache perms = cacheManager.getCache(CACHE_PERMS);
         Cache menu  = cacheManager.getCache(CACHE_MENU);
         Cache scope = cacheManager.getCache(CACHE_SCOPE);
