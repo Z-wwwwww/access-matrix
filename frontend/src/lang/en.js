@@ -3,12 +3,9 @@
  *
  * Mirror of ja_JP.js — see that file for the key-tree documentation.
  */
-import general from './general/en'
 import permissions from './generated/permissions.en.json'
 
 export default {
-  general,
-
   common: {
     button: {
       search: 'Search',

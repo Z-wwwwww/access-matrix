@@ -2,7 +2,6 @@
  * 日本語
  *
  * Top-level namespaces:
- *   - general.*  : legacy keys from before the Phase 1 i18n migration
  *   - common.*   : shared UI strings (buttons, statuses, toast messages, date picker)
  *   - layout.*   : application shell (header, sidebar, tabs, footer)
  *   - login.*    : login screen
@@ -11,12 +10,9 @@
  *   - notFound.* : 404 page
  *   - router.*   : route meta titles (browser tab + AppTabBar)
  */
-import general from './general/ja_JP'
 import permissions from './generated/permissions.ja_JP.json'
 
 export default {
-  general,
-
   common: {
     button: {
       search: '検索',
