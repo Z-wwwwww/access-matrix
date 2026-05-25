@@ -249,7 +249,8 @@ onMounted(() => {
   <div class="space-y-3">
     <Card class="p-4 flex items-center justify-between">
       <h1 class="text-lg font-semibold">{{ t('menu.title') }}</h1>
-      <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
+      <button v-permission="'menu:create'"
+              class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
               @click="openCreate(null)">
         <Plus class="size-4" /> {{ t('menu.button.addRoot') }}
       </button>
@@ -296,13 +297,16 @@ onMounted(() => {
         <template #cell-hide="{ row }">{{ row.hide === 1 ? '✓' : '' }}</template>
         <template #cell-actions="{ row }">
           <div class="inline-flex gap-1">
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openCreate(row)" :title="t('menu.tooltip.addChild')">
+            <button v-permission="'menu:create'"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openCreate(row)" :title="t('menu.tooltip.addChild')">
               <Plus class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEdit(row)" :title="t('menu.tooltip.edit')">
+            <button v-permission="'menu:update'"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEdit(row)" :title="t('menu.tooltip.edit')">
               <Pencil class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs" @click="handleDelete(row)" :title="t('common.button.delete')">
+            <button v-permission="'menu:delete'"
+                    class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs" @click="handleDelete(row)" :title="t('common.button.delete')">
               <Trash2 class="size-3.5" />
             </button>
           </div>

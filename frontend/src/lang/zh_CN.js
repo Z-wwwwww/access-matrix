@@ -14,6 +14,7 @@ export default {
       cancel: '取消',
       confirm: '确认',
       delete: '删除',
+      forceDelete: '强制删除',
       edit: '编辑',
       new: '新增',
       detail: '详情',
@@ -28,6 +29,10 @@ export default {
       upload: '上传',
       download: '下载',
       submit: '提交'
+    },
+    confirm: {
+      forceTitle: '强制删除',
+      forceMessage: '{detail}\n\n强制删除将清除所有关联引用并使其失效。是否继续？'
     },
     status: {
       active: '启用',
@@ -105,6 +110,10 @@ export default {
     identifierPlaceholder: '用户名 · 邮箱 · 用户编号',
     passwordLabel: '密码',
     passwordPlaceholder: '请输入密码',
+    tenantLabel: '租户',
+    tenantPlaceholder: 'default',
+    showAdvanced: '高级（切换租户）',
+    hideAdvanced: '收起',
     submit: '登录',
     submitting: '登录中...',
     forgotPassword: '忘记密码？',
@@ -296,7 +305,8 @@ export default {
     },
     confirm: {
       deleteTitle: '删除角色',
-      deleteMessage: '删除「{name}」吗？'
+      deleteMessage: '删除「{name}」吗？',
+      inUseMessage: '该角色已分配给 {users} 个用户。\n\n强制删除将清除所有用户对该角色的绑定，相关权限/菜单/部门关联同时失效。是否继续？'
     },
     message: {
       deleteBuiltInFailed: '内置角色不可删除',
@@ -367,7 +377,8 @@ export default {
     },
     confirm: {
       deleteTitle: '删除部门',
-      deleteMessage: '删除「{name}」吗？\n（存在子部门或所属用户时将被拒绝）'
+      deleteMessage: '删除「{name}」吗？',
+      inUseMessage: '该部门有：子部门 {children} 个、所属用户 {users} 个、角色引用 {roles} 个（含其 SCOPE_CUSTOM 范围）。\n\n强制删除将级联软删该部门及所有子部门，所属用户的部门设置会被清空，相关角色的自定义数据范围中也会移除该部门。是否继续？'
     },
     edit: {
       titleEdit: '编辑部门',

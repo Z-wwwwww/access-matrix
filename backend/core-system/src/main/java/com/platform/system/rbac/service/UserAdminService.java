@@ -3,6 +3,7 @@ package com.platform.system.rbac.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
@@ -90,7 +91,10 @@ public class UserAdminService {
         u.setEmail(req.email());
         // userNo は採番（V4 で seed 済みの code_kbn="USER" 定義に従い U + 8 桁 zero-pad）。
         // クライアント入力は受け付けない方針：採番との衝突を未然に避ける。
-        u.setUserNo(numberingService.next(USER_NO_KBN, DEFAULT_TENANT));
+        // テナント別に採番カウンタを分けるため、現在の RequestContext から tenantId を取得。
+        String tenantId = RequestContext.tenantId();
+        if (tenantId == null || tenantId.isBlank()) tenantId = DEFAULT_TENANT;
+        u.setUserNo(numberingService.next(USER_NO_KBN, tenantId));
         u.setDisplayName(req.displayName());
         u.setDeptId(req.deptId());
         u.setStatus(req.status() == null ? 1 : req.status());
@@ -116,8 +120,10 @@ public class UserAdminService {
         UserEntity u = require(id);
         assertNotBuiltInAdmin(u, "delete");
         assertNotLastSuperAdmin(id, "delete");
-        u.setMark(0);
-        userMapper.updateById(u);
+        // mark は @TableLogic — BaseMapper.updateById では SET 句から除外されるので UpdateWrapper で明示。
+        userMapper.update(null,
+                new UpdateWrapper<UserEntity>().eq("id", id).eq("mark", 1)
+                        .set("mark", 0).set("update_user", "system"));
         userRoleMapper.update(null,
                 new UpdateWrapper<UserRoleEntity>().eq("user_id", id).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));

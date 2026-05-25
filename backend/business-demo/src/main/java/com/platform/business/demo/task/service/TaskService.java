@@ -103,8 +103,11 @@ public class TaskService {
         if (t == null || t.getMark() == null || t.getMark() != 1) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Task not found: " + id);
         }
-        t.setMark(0);
-        taskMapper.updateById(t);
+        // mark は @TableLogic — BaseMapper.updateById では SET 句から除外されるので UpdateWrapper で明示。
+        taskMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<TaskEntity>()
+                        .eq("id", id).eq("mark", 1)
+                        .set("mark", 0).set("update_user", "system"));
     }
 
     private TaskDto.View toView(TaskEntity t) {

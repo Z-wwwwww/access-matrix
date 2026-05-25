@@ -7,7 +7,12 @@ import permissions from './generated/permissions.en.json'
 
 export default {
   common: {
+    confirm: {
+      forceTitle: 'Force delete',
+      forceMessage: '{detail}\n\nForce delete will cascade-clean all dependent references. Continue?'
+    },
     button: {
+      forceDelete: 'Force delete',
       search: 'Search',
       reset: 'Reset',
       save: 'Save',
@@ -101,6 +106,10 @@ export default {
   },
 
   login: {
+    tenantLabel: 'Tenant',
+    tenantPlaceholder: 'default',
+    showAdvanced: 'Advanced (switch tenant)',
+    hideAdvanced: 'Hide',
     identifierLabel: 'Username / Email / Number',
     identifierPlaceholder: 'Username · Email · User number',
     passwordLabel: 'Password',
@@ -296,7 +305,8 @@ export default {
     },
     confirm: {
       deleteTitle: 'Delete role',
-      deleteMessage: 'Delete "{name}"?'
+      deleteMessage: 'Delete "{name}"?',
+      inUseMessage: 'This role is assigned to {users} user(s).\n\nForce delete will clear all user bindings and cascade-clean the role\'s permission / menu / department references. Continue?'
     },
     message: {
       deleteBuiltInFailed: 'Built-in role cannot be deleted',
@@ -367,7 +377,8 @@ export default {
     },
     confirm: {
       deleteTitle: 'Delete department',
-      deleteMessage: 'Delete "{name}"?\n(Rejected if it has sub-departments or members.)'
+      deleteMessage: 'Delete "{name}"?',
+      inUseMessage: 'This department has {children} sub-department(s), {users} member(s), and {roles} role(s) referencing it (in their SCOPE_CUSTOM data range).\n\nForce delete will soft-delete this department and the entire subtree, clear affected users\'\' department assignment, and remove the department from the referencing roles\'\' custom data scope. Continue?'
     },
     edit: {
       titleEdit: 'Edit department',

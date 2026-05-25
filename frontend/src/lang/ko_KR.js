@@ -7,7 +7,12 @@ import permissions from './generated/permissions.ko_KR.json'
 
 export default {
   common: {
+    confirm: {
+      forceTitle: '강제 삭제',
+      forceMessage: '{detail}\n\n강제 삭제하면 관련된 모든 링크가 해제됩니다. 계속하시겠습니까?'
+    },
     button: {
+      forceDelete: '강제 삭제',
       search: '검색',
       reset: '재설정',
       save: '저장',
@@ -101,6 +106,10 @@ export default {
   },
 
   login: {
+    tenantLabel: '테넌트',
+    tenantPlaceholder: 'default',
+    showAdvanced: '고급 (테넌트 전환)',
+    hideAdvanced: '접기',
     identifierLabel: '사용자명 / 이메일 / 번호',
     identifierPlaceholder: '사용자명 · 이메일 · 사용자 번호',
     passwordLabel: '비밀번호',
@@ -296,7 +305,8 @@ export default {
     },
     confirm: {
       deleteTitle: '역할 삭제',
-      deleteMessage: '「{name}」을(를) 삭제하시겠습니까?'
+      deleteMessage: '「{name}」을(를) 삭제하시겠습니까?',
+      inUseMessage: '이 역할은 {users}명의 사용자에게 할당되어 있습니다.\n\n강제 삭제하면 사용자 할당이 모두 해제되고, 권한 / 메뉴 / 부서 연결도 함께 정리됩니다. 계속하시겠습니까?'
     },
     message: {
       deleteBuiltInFailed: '기본 제공 역할은 삭제할 수 없습니다',
@@ -367,7 +377,8 @@ export default {
     },
     confirm: {
       deleteTitle: '부서 삭제',
-      deleteMessage: '「{name}」을(를) 삭제하시겠습니까?\n(하위 부서나 소속 사용자가 있는 경우 거부됩니다)'
+      deleteMessage: '「{name}」을(를) 삭제하시겠습니까?',
+      inUseMessage: '이 부서에는: 하위 부서 {children}개, 소속 사용자 {users}명, 참조 역할 {roles}개(SCOPE_CUSTOM 데이터 범위)가 있습니다.\n\n강제 삭제하면 이 부서와 모든 하위 부서를 함께 소프트 삭제하며, 소속 사용자의 부서 설정 및 참조 역할의 커스텀 데이터 범위에서도 해제됩니다. 계속하시겠습니까?'
     },
     edit: {
       titleEdit: '부서 편집',

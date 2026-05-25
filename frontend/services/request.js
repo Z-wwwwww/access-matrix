@@ -35,12 +35,22 @@ function isAuthEndpoint(url) {
   return url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/logout')
 }
 
+// Tenant id is stored in localStorage so the same browser can keep one tenant
+// across reloads. Login page lets the user change it; default = "default".
+const TENANT_KEY = 'tenant_id'
+function currentTenantId() {
+  return localStorage.getItem(TENANT_KEY) || 'default'
+}
+
 // ─── Request Interceptor ───
 request.interceptors.request.use((config) => {
   const token = useAuthStore().accessToken
   if (token) config.headers['Authorization'] = 'Bearer ' + token
   const lang = localStorage.getItem('i18n-lang')
   config.headers['Accept-language'] = LANG_MAP[lang] || 'ja-JP'
+  // X-Tenant-Id：post-auth は JWT の `tid` クレームが正、pre-auth (/auth/login など)
+  // はこのヘッダがバックエンドの RequestContextFilter に拾われる。
+  config.headers['X-Tenant-Id'] = currentTenantId()
   return config
 })
 

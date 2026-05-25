@@ -198,8 +198,29 @@ async function handleDelete(row) {
   if (!ok) return
   try {
     const r = await deleteDeptApi(row.id)
-    if (r.data.code === 0) { toast.success(t('common.message.deleteSuccessful')); fetchData() }
-    else toast.error(r.data.msg || t('dept.message.deleteFailed'))
+    if (r.data.code === 0) {
+      toast.success(t('common.message.deleteSuccessful'))
+      fetchData()
+      return
+    }
+    // IN_USE (703) — backend が利用中を検出。data.children / data.users / data.roles で件数を i18n 整形。
+    if (r.data.code === 703) {
+      const children = r.data.data?.children ?? 0
+      const users = r.data.data?.users ?? 0
+      const roles = r.data.data?.roles ?? 0
+      const forceOk = await confirm({
+        title: t('common.confirm.forceTitle'),
+        message: t('dept.confirm.inUseMessage', { children, users, roles }),
+        variant: 'destructive',
+        confirmText: t('common.button.forceDelete')
+      })
+      if (!forceOk) return
+      const r2 = await deleteDeptApi(row.id, { force: true })
+      if (r2.data.code === 0) { toast.success(t('common.message.deleteSuccessful')); fetchData() }
+      else toast.error(r2.data.msg || t('dept.message.deleteFailed'))
+      return
+    }
+    toast.error(r.data.msg || t('dept.message.deleteFailed'))
   } catch (e) { toast.error(e.message) }
 }
 
@@ -213,7 +234,8 @@ onMounted(() => {
   <div class="space-y-3">
     <Card class="p-4 flex items-center justify-between">
       <h1 class="text-lg font-semibold">{{ t('dept.title') }}</h1>
-      <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
+      <button v-permission="'dept:create'"
+              class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
               @click="openCreate(null)">
         <Plus class="size-4" /> {{ t('dept.button.addRoot') }}
       </button>
@@ -250,13 +272,16 @@ onMounted(() => {
         </template>
         <template #cell-actions="{ row }">
           <div class="inline-flex gap-1">
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openCreate(row)" :title="t('dept.tooltip.addChild')">
+            <button v-permission="'dept:create'"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openCreate(row)" :title="t('dept.tooltip.addChild')">
               <Plus class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEdit(row)" :title="t('dept.tooltip.edit')">
+            <button v-permission="'dept:update'"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEdit(row)" :title="t('dept.tooltip.edit')">
               <Pencil class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs" @click="handleDelete(row)" :title="t('common.button.delete')">
+            <button v-permission="'dept:delete'"
+                    class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs" @click="handleDelete(row)" :title="t('common.button.delete')">
               <Trash2 class="size-3.5" />
             </button>
           </div>

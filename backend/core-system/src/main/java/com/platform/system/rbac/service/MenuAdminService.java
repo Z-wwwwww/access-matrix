@@ -108,8 +108,10 @@ public class MenuAdminService {
         if (children != null && children > 0) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Menu has children; remove them first");
         }
-        m.setMark(0);
-        menuMapper.updateById(m);
+        // mark は @TableLogic — BaseMapper.updateById では SET 句から除外されるので UpdateWrapper で明示。
+        menuMapper.update(null,
+                new UpdateWrapper<MenuEntity>().eq("id", id).eq("mark", 1)
+                        .set("mark", 0).set("update_user", "system"));
         roleMenuMapper.update(null,
                 new UpdateWrapper<RoleMenuEntity>().eq("menu_id", id).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));

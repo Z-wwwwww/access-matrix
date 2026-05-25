@@ -167,7 +167,8 @@ onMounted(() => {
           <RotateCcw class="size-4" /> {{ t('common.button.reset') }}
         </button>
         <div class="ml-auto">
-          <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
+          <button v-permission="'user:create'"
+                  class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                   @click="openCreate">
             <Plus class="size-4" /> {{ t('common.button.new') }}
           </button>
@@ -200,29 +201,34 @@ onMounted(() => {
         </template>
         <template #cell-actions="{ row }">
           <div class="inline-flex items-center gap-1">
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            <button v-permission="'user:update'"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                     :disabled="row.username === 'admin'"
                     :title="row.username === 'admin' ? t('user.tooltip.editDisabled') : t('user.tooltip.edit')"
                     @click="openEdit(row)">
               <Pencil class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
+            <button v-permission="'auth:reset-password'"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
                     :title="t('user.tooltip.resetPassword')"
                     @click="openResetPwd(row)">
               <Key class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            <button v-permission="'user:update'"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                     :disabled="row.username === 'admin'"
                     :title="row.username === 'admin' ? t('user.tooltip.statusChangeDisabled') : t('user.tooltip.toggleStatus')"
                     @click="toggleStatus(row)">
               <Power class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
+            <button v-permission="'*:*'"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
                     :title="t('user.tooltip.forceLogout')"
                     @click="handleForceLogout(row)">
               <LogOut class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            <button v-permission="'user:delete'"
+                    class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                     :disabled="row.username === 'admin'"
                     :title="row.username === 'admin' ? t('user.tooltip.deleteDisabled') : t('common.button.delete')"
                     @click="handleDelete(row)">

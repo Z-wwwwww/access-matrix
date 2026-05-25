@@ -63,8 +63,9 @@ public class RoleAdminController {
     @DeleteMapping("/{id}")
     @RequiresPermission(SystemPermissions.ROLE_DELETE)
     @OpLog(module = "system", action = "role.delete", targetType = "role")
-    public JsonResult<Void> delete(@PathVariable String id) {
-        service.delete(id);
+    public JsonResult<Void> delete(@PathVariable String id,
+                                   @RequestParam(defaultValue = "false") boolean force) {
+        service.delete(id, force);
         return JsonResult.ok();
     }
 

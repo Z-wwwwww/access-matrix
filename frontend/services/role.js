@@ -20,9 +20,13 @@ export function updateRoleApi(id, data) {
   return request.put('/admin/role/' + id, data)
 }
 
-/** ロール削除（内蔵ロールは拒否される） */
-export function deleteRoleApi(id) {
-  return request.delete('/admin/role/' + id)
+/**
+ * ロール削除。{force:true} で user_role 含む全関連リンクを強制クリアする。
+ * 通常呼び出し（force 省略）で利用中の場合は backend が IN_USE (code=703) を返すので、
+ * 呼び出し側で再確認 → force=true で再送信する想定。
+ */
+export function deleteRoleApi(id, opts = {}) {
+  return request.delete('/admin/role/' + id, opts.force ? { params: { force: true } } : {})
 }
 
 /** ロール保持の権限 ID 一覧 */

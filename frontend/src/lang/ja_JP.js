@@ -14,7 +14,12 @@ import permissions from './generated/permissions.ja_JP.json'
 
 export default {
   common: {
+    confirm: {
+      forceTitle: '強制削除',
+      forceMessage: '{detail}\n\n強制削除すると、関連する全リンクをカスケード解除します。続行しますか？'
+    },
     button: {
+      forceDelete: '強制削除',
       search: '検索',
       reset: 'リセット',
       save: '保存',
@@ -108,6 +113,10 @@ export default {
   },
 
   login: {
+    tenantLabel: 'テナント',
+    tenantPlaceholder: 'default',
+    showAdvanced: '詳細（テナント切替）',
+    hideAdvanced: '閉じる',
     identifierLabel: 'ユーザー名 / メール / 番号',
     identifierPlaceholder: 'ユーザー名・メール・ユーザー番号',
     passwordLabel: 'パスワード',
@@ -303,7 +312,8 @@ export default {
     },
     confirm: {
       deleteTitle: 'ロール削除',
-      deleteMessage: '「{name}」を削除しますか？'
+      deleteMessage: '「{name}」を削除しますか？',
+      inUseMessage: 'このロールは {users} 人のユーザーに割り当てられています。\n\n強制削除すると、ユーザーへの割り当てを全て解除し、権限／メニュー／部署の関連付けもまとめてクリアします。続行しますか？'
     },
     message: {
       deleteBuiltInFailed: '内蔵ロールは削除できません',
@@ -374,7 +384,8 @@ export default {
     },
     confirm: {
       deleteTitle: '部署削除',
-      deleteMessage: '「{name}」を削除しますか？\n（子部署や所属ユーザーがある場合は拒否されます）'
+      deleteMessage: '「{name}」を削除しますか？',
+      inUseMessage: 'この部署には：子部署 {children} 件、所属ユーザー {users} 名、参照ロール {roles} 件（SCOPE_CUSTOM データ範囲）があります。\n\n強制削除すると、この部署と全子部署をまとめてソフト削除し、所属ユーザーの部署設定をクリア、参照ロールのカスタムデータ範囲からも除外します。続行しますか？'
     },
     edit: {
       titleEdit: '部署編集',

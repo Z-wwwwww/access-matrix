@@ -7,7 +7,12 @@ import permissions from './generated/permissions.zh_TW.json'
 
 export default {
   common: {
+    confirm: {
+      forceTitle: '強制刪除',
+      forceMessage: '{detail}\n\n強制刪除將清除所有關聯引用並使其失效。是否繼續？'
+    },
     button: {
+      forceDelete: '強制刪除',
       search: '搜尋',
       reset: '重設',
       save: '儲存',
@@ -101,6 +106,10 @@ export default {
   },
 
   login: {
+    tenantLabel: '租戶',
+    tenantPlaceholder: 'default',
+    showAdvanced: '進階（切換租戶）',
+    hideAdvanced: '收合',
     identifierLabel: '使用者名稱 / 信箱 / 編號',
     identifierPlaceholder: '使用者名稱 · 信箱 · 使用者編號',
     passwordLabel: '密碼',
@@ -296,7 +305,8 @@ export default {
     },
     confirm: {
       deleteTitle: '刪除角色',
-      deleteMessage: '刪除「{name}」嗎？'
+      deleteMessage: '刪除「{name}」嗎？',
+      inUseMessage: '該角色已分配給 {users} 個使用者。\n\n強制刪除將清除所有使用者對該角色的綁定，相關權限／選單／部門關聯同時失效。是否繼續？'
     },
     message: {
       deleteBuiltInFailed: '內建角色不可刪除',
@@ -367,7 +377,8 @@ export default {
     },
     confirm: {
       deleteTitle: '刪除部門',
-      deleteMessage: '刪除「{name}」嗎？\n（存在子部門或所屬使用者時將被拒絕）'
+      deleteMessage: '刪除「{name}」嗎？',
+      inUseMessage: '該部門有：子部門 {children} 個、所屬使用者 {users} 個、角色參照 {roles} 個（含其 SCOPE_CUSTOM 範圍）。\n\n強制刪除將級聯軟刪該部門及所有子部門，所屬使用者的部門設定會被清空，相關角色的自訂資料範圍中也會移除該部門。是否繼續？'
     },
     edit: {
       titleEdit: '編輯部門',

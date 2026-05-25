@@ -14,6 +14,7 @@ import com.platform.system.rbac.entity.RoleEntity;
 import com.platform.system.rbac.entity.RoleMenuEntity;
 import com.platform.system.rbac.entity.RolePermissionEntity;
 import com.platform.system.rbac.entity.RoleDeptEntity;
+import com.platform.system.rbac.entity.UserRoleEntity;
 import com.platform.system.rbac.mapper.DeptMapper;
 import com.platform.system.rbac.mapper.MenuMapper;
 import com.platform.system.rbac.mapper.PermissionMapper;
@@ -21,6 +22,7 @@ import com.platform.system.rbac.mapper.RoleMapper;
 import com.platform.system.rbac.mapper.RoleMenuMapper;
 import com.platform.system.rbac.mapper.RolePermissionMapper;
 import com.platform.system.rbac.mapper.RoleDeptMapper;
+import com.platform.system.rbac.mapper.UserRoleMapper;
 import com.platform.core.common.result.PageResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +41,7 @@ public class RoleAdminService {
     private final RolePermissionMapper rolePermissionMapper;
     private final RoleMenuMapper roleMenuMapper;
     private final RoleDeptMapper roleDeptMapper;
+    private final UserRoleMapper userRoleMapper;
     private final PermissionMapper permissionMapper;
     private final MenuMapper menuMapper;
     private final DeptMapper deptMapper;
@@ -48,6 +51,7 @@ public class RoleAdminService {
                             RolePermissionMapper rolePermissionMapper,
                             RoleMenuMapper roleMenuMapper,
                             RoleDeptMapper roleDeptMapper,
+                            UserRoleMapper userRoleMapper,
                             PermissionMapper permissionMapper,
                             MenuMapper menuMapper,
                             DeptMapper deptMapper,
@@ -56,6 +60,7 @@ public class RoleAdminService {
         this.rolePermissionMapper = rolePermissionMapper;
         this.roleMenuMapper = roleMenuMapper;
         this.roleDeptMapper = roleDeptMapper;
+        this.userRoleMapper = userRoleMapper;
         this.permissionMapper = permissionMapper;
         this.menuMapper = menuMapper;
         this.deptMapper = deptMapper;
@@ -114,11 +119,25 @@ public class RoleAdminService {
     }
 
     @Transactional
-    public void delete(String id) {
+    public void delete(String id, boolean force) {
         RoleEntity r = requireRole(id);
         assertNotBuiltIn(r, "delete");
-        r.setMark(0);
-        roleMapper.updateById(r);
+        Long users = userRoleMapper.countActiveHoldersByRoleId(id);
+        long userCount = users == null ? 0L : users;
+        if (userCount > 0 && !force) {
+            // IN_USE — caller may retry with force=true to clear user_role bindings.
+            // detail map ships structured counts so the frontend can format an i18n message.
+            throw new BusinessException(ErrorCode.IN_USE,
+                    "Role is assigned to " + userCount + " user(s)",
+                    java.util.Map.of("users", userCount));
+        }
+        // 注意：mark は @TableLogic フィールドのため、setMark(0)+updateById では SET 句に
+        //   含まれず実際には削除されない（update_time / update_user だけ更新される）。
+        //   明示的に UpdateWrapper で set("mark", 0) する必要がある。
+        roleMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<RoleEntity>()
+                        .eq("id", id).eq("mark", 1)
+                        .set("mark", 0).set("update_user", "system"));
         // Cascade soft-delete the link rows so future joins ignore them.
         rolePermissionMapper.update(null,
                 new UpdateWrapper<RolePermissionEntity>().eq("role_id", id).eq("mark", 1)
@@ -129,7 +148,12 @@ public class RoleAdminService {
         roleDeptMapper.update(null,
                 new UpdateWrapper<RoleDeptEntity>().eq("role_id", id).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));
+        // Evict caches BEFORE soft-deleting user_role — evictRole finds users via
+        // the mark=1 user_role rows, so we need them still present at this point.
         cacheService.evictRole(id);
+        userRoleMapper.update(null,
+                new UpdateWrapper<UserRoleEntity>().eq("role_id", id).eq("mark", 1)
+                        .set("mark", 0).set("update_user", "system"));
     }
 
     public List<String> listPermissionIds(String roleId) {

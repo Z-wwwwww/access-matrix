@@ -97,22 +97,63 @@ public class DeptAdminService {
     }
 
     @Transactional
-    public void delete(String id) {
+    public void delete(String id, boolean force) {
         DeptEntity d = require(id);
-        Long children = deptMapper.selectCount(new QueryWrapper<DeptEntity>().eq("mark", 1).eq("parent_id", id));
-        if (children != null && children > 0) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Department has children; remove them first");
+        long children = countNonNull(deptMapper.selectCount(
+                new QueryWrapper<DeptEntity>().eq("mark", 1).eq("parent_id", id)));
+        long users = countNonNull(userMapper.selectCount(
+                new QueryWrapper<UserEntity>().eq("mark", 1).eq("dept_id", id)));
+        // role_dept 経由の参照（SCOPE_CUSTOM の role が ここを範囲に含めている件数）。
+        // ここを数えないと、子も user もないが role に引用されている dept が無声で削除され、
+        // 該当 role のデータ範囲が静かに狭まる事故になる。
+        long roles = countNonNull(roleDeptMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<RoleDeptEntity>()
+                        .eq("mark", 1).eq("dept_id", id)));
+        if ((children > 0 || users > 0 || roles > 0) && !force) {
+            // IN_USE — caller may retry with force=true to cascade-clean the subtree.
+            // detail map ships structured counts so the frontend can format an i18n message.
+            StringBuilder sb = new StringBuilder("Department in use: ");
+            boolean first = true;
+            if (children > 0) { sb.append(children).append(" sub-department(s)"); first = false; }
+            if (users > 0) { if (!first) sb.append(", "); sb.append(users).append(" user(s) assigned"); first = false; }
+            if (roles > 0) { if (!first) sb.append(", "); sb.append(roles).append(" role(s) referencing"); }
+            throw new BusinessException(ErrorCode.IN_USE, sb.toString(),
+                    java.util.Map.of("children", children, "users", users, "roles", roles));
         }
-        Long users = userMapper.selectCount(new QueryWrapper<UserEntity>().eq("mark", 1).eq("dept_id", id));
-        if (users != null && users > 0) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Department has users assigned; reassign first");
+        if (force && (children > 0 || users > 0 || roles > 0)) {
+            // Subtree force-delete: soft-delete all descendant depts, null user.dept_id
+            // for users in the subtree, and cascade role_dept references.
+            java.util.List<String> subtreeIds = deptMapper.findSubtreeIds(d.getPath());
+            if (subtreeIds == null || subtreeIds.isEmpty()) {
+                // findSubtreeIds filters by status=1; fall back to self if nothing returned.
+                subtreeIds = java.util.List.of(id);
+            }
+            userMapper.update(null,
+                    new UpdateWrapper<UserEntity>().in("dept_id", subtreeIds)
+                            .set("dept_id", null).set("update_user", "system"));
+            roleDeptMapper.update(null,
+                    new UpdateWrapper<RoleDeptEntity>().in("dept_id", subtreeIds).eq("mark", 1)
+                            .set("mark", 0).set("update_user", "system"));
+            deptMapper.update(null,
+                    new UpdateWrapper<DeptEntity>().in("id", subtreeIds).eq("mark", 1)
+                            .set("mark", 0).set("update_user", "system"));
+        } else {
+            // No dependencies — simple single-row soft delete + role_dept cascade.
+            // 注意：mark は @TableLogic フィールド。BaseMapper.updateById は @TableLogic を
+            //   SET 句から自動除外するので、setMark(0)+updateById では mark が変わらない。
+            //   明示的に UpdateWrapper で set("mark", 0) する必要がある。
+            deptMapper.update(null,
+                    new UpdateWrapper<DeptEntity>().eq("id", id).eq("mark", 1)
+                            .set("mark", 0).set("update_user", "system"));
+            roleDeptMapper.update(null,
+                    new UpdateWrapper<RoleDeptEntity>().eq("dept_id", id).eq("mark", 1)
+                            .set("mark", 0).set("update_user", "system"));
         }
-        d.setMark(0);
-        deptMapper.updateById(d);
-        roleDeptMapper.update(null,
-                new UpdateWrapper<RoleDeptEntity>().eq("dept_id", id).eq("mark", 1)
-                        .set("mark", 0).set("update_user", "system"));
         cacheService.evictAllDepts();
+    }
+
+    private static long countNonNull(Long v) {
+        return v == null ? 0L : v;
     }
 
     private DeptEntity require(String id) {
