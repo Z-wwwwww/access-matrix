@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useMenuStore } from '@/stores/menu'
 import { useTabsStore } from '@/stores/tabs'
-import { User, Lock } from 'lucide-vue-next'
+import { User, Lock, Building } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
@@ -14,10 +14,13 @@ const authStore = useAuthStore()
 const menuStore = useMenuStore()
 const tabsStore = useTabsStore()
 
+const TENANT_KEY = 'tenant_id'
 const form = ref({
+  tenant: localStorage.getItem(TENANT_KEY) || 'default',
   username: '',
   password: ''
 })
+const showTenant = ref(form.value.tenant !== 'default')
 
 const loading = ref(false)
 const errorMsg = ref('')
@@ -34,6 +37,10 @@ async function handleLogin() {
 
   loading.value = true
   errorMsg.value = ''
+  // Tenant は X-Tenant-Id ヘッダ経由（request.js の interceptor が localStorage から読む）。
+  // ログイン直前に localStorage を更新し、その後のすべてのリクエストに反映させる。
+  const tenant = (form.value.tenant || 'default').trim() || 'default'
+  localStorage.setItem(TENANT_KEY, tenant)
   try {
     const res = await authStore.login({
       username: form.value.username,
@@ -122,6 +129,22 @@ onMounted(() => {
           </div>
         </div>
 
+        <!-- tenant (optional, defaults to "default") -->
+        <div v-if="showTenant">
+          <label class="block text-sm font-medium text-foreground mb-1.5">{{ t('login.tenantLabel') }}</label>
+          <div class="relative">
+            <div class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              <Building :size="16" />
+            </div>
+            <input
+              v-model="form.tenant"
+              type="text"
+              :placeholder="t('login.tenantPlaceholder')"
+              class="w-full h-10 pl-10 pr-4 border border-input rounded-lg bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+            />
+          </div>
+        </div>
+
         <!-- submit -->
         <button
           type="submit"
@@ -130,6 +153,17 @@ onMounted(() => {
         >
           {{ loading ? t('login.submitting') : t('login.submit') }}
         </button>
+
+        <!-- advanced toggle (tenant input) -->
+        <div class="text-center">
+          <button
+            type="button"
+            class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            @click="showTenant = !showTenant"
+          >
+            {{ showTenant ? t('login.hideAdvanced') : t('login.showAdvanced') }}
+          </button>
+        </div>
       </form>
     </div>
     <!-- Footer -->

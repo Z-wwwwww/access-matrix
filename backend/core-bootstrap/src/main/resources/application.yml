@@ -10,7 +10,9 @@ spring:
   application:
     name: core-service
   profiles:
-    active: local
+    # fail-closed default: missing SPRING_PROFILES_ACTIVE → prod (jwt + tenant on).
+    # Local development must set SPRING_PROFILES_ACTIVE=local explicitly.
+    active: ${SPRING_PROFILES_ACTIVE:prod}
   jackson:
     time-zone: Asia/Tokyo
     datatype:

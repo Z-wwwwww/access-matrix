@@ -210,8 +210,12 @@ public class PermissionConsistencyGuard {
         LocalDateTime now = LocalDateTime.now();
         for (PermissionEntity e : rows) {
             if (e.getMark() != null && e.getMark() == 1) {
-                e.setMark(0);
-                mapper.updateById(e);
+                // mark は @TableLogic フィールドのため、BaseMapper.updateById では
+                // SET 句から外され実際には変更されない。UpdateWrapper で明示的に SET する。
+                mapper.update(null,
+                        new UpdateWrapper<PermissionEntity>()
+                                .eq("id", e.getId()).eq("mark", 1)
+                                .set("mark", 0).set("update_time", now));
             }
             // 既に mark=0 の permission に対しても、紐付く active な role_permission が
             // あれば回収する（NO-OP の場合は UPDATE 0 行で安価）。

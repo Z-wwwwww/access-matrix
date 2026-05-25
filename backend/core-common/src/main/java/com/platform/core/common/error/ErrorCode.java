@@ -13,6 +13,8 @@ public enum ErrorCode {
     BUSINESS_ERROR(700, "Business error"),
     VALIDATION_FAILED(701, "Validation failed"),
     OPTIMISTIC_LOCK_CONFLICT(702, "Optimistic lock conflict"),
+    /** Resource is referenced by other rows. Caller may retry with force=true to cascade-clean. */
+    IN_USE(703, "Resource in use"),
     MISSING_TENANT(710, "Missing tenant context"),
     EXTERNAL_SERVICE_ERROR(720, "External service error"),
     ACCOUNT_LOCKED(730, "Account locked"),

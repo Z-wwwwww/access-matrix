@@ -67,6 +67,10 @@ public class AdminAuthController {
         }
         user.setPasswordHash(encoder.encode(body.newPassword()));
         userMapper.updateById(user);
+        // パスワード変更後は当該ユーザーの既存トークンを必ず無効化する。
+        // これをしないと、漏洩した旧 access token が自然失効までずっと使えてしまい、
+        // 「リセット = 攻撃者を追い出す」という前提が成り立たない。
+        forceLogoutService.kickOut(user.getId());
         return JsonResult.ok();
     }
 

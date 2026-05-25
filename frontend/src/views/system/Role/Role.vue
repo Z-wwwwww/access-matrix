@@ -64,8 +64,27 @@ async function handleDelete(row) {
   if (!ok) return
   try {
     const res = await deleteRoleApi(row.id)
-    if (res.data.code === 0) { toast.success(t('common.message.deleteSuccessful')); fetchData() }
-    else toast.error(res.data.msg || t('role.message.deleteFailed'))
+    if (res.data.code === 0) {
+      toast.success(t('common.message.deleteSuccessful'))
+      fetchData()
+      return
+    }
+    // IN_USE (703) — backend が利用中を検出。data.users で件数を i18n 整形。
+    if (res.data.code === 703) {
+      const users = res.data.data?.users ?? 0
+      const forceOk = await confirm({
+        title: t('common.confirm.forceTitle'),
+        message: t('role.confirm.inUseMessage', { users }),
+        variant: 'destructive',
+        confirmText: t('common.button.forceDelete')
+      })
+      if (!forceOk) return
+      const r2 = await deleteRoleApi(row.id, { force: true })
+      if (r2.data.code === 0) { toast.success(t('common.message.deleteSuccessful')); fetchData() }
+      else toast.error(r2.data.msg || t('role.message.deleteFailed'))
+      return
+    }
+    toast.error(res.data.msg || t('role.message.deleteFailed'))
   } catch (e) { toast.error(e.message) }
 }
 
@@ -89,7 +108,8 @@ onMounted(fetchData)
           <RotateCcw class="size-4" /> {{ t('common.button.reset') }}
         </button>
         <div class="ml-auto">
-          <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
+          <button v-permission="'role:create'"
+                  class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                   @click="openCreate">
             <Plus class="size-4" /> {{ t('common.button.new') }}
           </button>
@@ -123,12 +143,14 @@ onMounted(fetchData)
         </template>
         <template #cell-actions="{ row }">
           <div class="inline-flex items-center gap-1">
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
+            <button v-permission="'role:update'"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
                     :title="row.isBuiltIn === 1 ? t('role.tooltip.viewOnly') : t('role.tooltip.edit')"
                     @click="openEdit(row)">
               <Pencil class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            <button v-permission="'role:delete'"
+                    class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                     :disabled="row.isBuiltIn === 1"
                     :title="row.isBuiltIn === 1 ? t('role.tooltip.deleteDisabled') : t('common.button.delete')"
                     @click="handleDelete(row)">

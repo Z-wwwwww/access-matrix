@@ -1,6 +1,14 @@
 import { useAuthStore } from '@/stores/auth'
-import { arrayHas, arrayHasAny } from '@/utils/permission'
+import { arrayHasAny, matchPermission, hasAnyPermission as _hasAnyPermission } from '@/utils/permission'
 
+/**
+ * Role / permission probes that mirror the backend semantics.
+ *
+ *   - role checks are exact-match (string equality).
+ *   - permission checks honour `*:*` and `resource:*` wildcards so a super-admin
+ *     (`["*:*"]`) is not wrongly hidden from `v-permission='user:read'` style
+ *     guards. See {@link matchPermission} for the matching rules.
+ */
 export function usePermission() {
   const authStore = useAuthStore()
 
@@ -13,11 +21,11 @@ export function usePermission() {
   }
 
   function hasPermission(auth) {
-    return authStore.authorities.includes(auth)
+    return matchPermission(authStore.authorities, auth)
   }
 
   function hasAnyPermission(auths) {
-    return arrayHasAny(authStore.authorities, Array.isArray(auths) ? auths : [auths])
+    return _hasAnyPermission(authStore.authorities, Array.isArray(auths) ? auths : [auths])
   }
 
   return { hasRole, hasAnyRole, hasPermission, hasAnyPermission }

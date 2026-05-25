@@ -1,5 +1,5 @@
 import { useAuthStore } from '@/stores/auth'
-import { arrayHas, arrayHasAny } from '@/utils/permission'
+import { arrayHas, arrayHasAny, hasAllPermissions, hasAnyPermission } from '@/utils/permission'
 
 function createDirective(field, checkFn) {
   return {
@@ -13,10 +13,13 @@ function createDirective(field, checkFn) {
   }
 }
 
+// Roles are exact-match (no wildcard semantics on the role side).
 export const vRole = createDirective('roles', arrayHas)
 export const vAnyRole = createDirective('roles', arrayHasAny)
-export const vPermission = createDirective('authorities', arrayHas)
-export const vAnyPermission = createDirective('authorities', arrayHasAny)
+// Permissions go through the wildcard-aware matcher so a user holding `*:*` or
+// `resource:*` is not falsely rejected for a specific `resource:action` button.
+export const vPermission = createDirective('authorities', hasAllPermissions)
+export const vAnyPermission = createDirective('authorities', hasAnyPermission)
 
 export function registerPermissionDirectives(app) {
   app.directive('role', vRole)
