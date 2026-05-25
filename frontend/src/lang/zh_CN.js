@@ -3,12 +3,9 @@
  *
  * Mirror of ja_JP.js — see that file for the key-tree documentation.
  */
-import general from './general/zh_CN'
 import permissions from './generated/permissions.zh_CN.json'
 
 export default {
-  general,
-
   common: {
     button: {
       search: '搜索',

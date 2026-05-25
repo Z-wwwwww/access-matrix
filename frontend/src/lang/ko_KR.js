@@ -3,12 +3,9 @@
  *
  * Mirror of ja_JP.js — see that file for the key-tree documentation.
  */
-import general from './general/ko_KR'
 import permissions from './generated/permissions.ko_KR.json'
 
 export default {
-  general,
-
   common: {
     button: {
       search: '검색',

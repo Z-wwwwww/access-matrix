@@ -1,15 +1,10 @@
 /**
- * Auth store — JWT-based (new backend at port 9135).
+ * Auth store — JWT-based.
  *
  * Internal model:
  *   - accessToken : short-lived JWT in localStorage, attached as Bearer.
  *   - refresh     : opaque token in HttpOnly cookie; never visible to JS.
  *   - userInfo    : profile + roles + authorities from GET /user/me.
- *
- * The legacy `useAuthStore` surface (token / currentUser / companyId / companyName /
- * roles / authorities / permission / cacheToken / setUserFromMenu / setToken) is kept
- * as thin aliases so existing business views compile unchanged. Once those views are
- * migrated to the new backend, the aliases can be deleted.
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -29,17 +24,12 @@ export const useAuthStore = defineStore('auth', () => {
   const tenantId = computed(() => claims.value.tid || '')
   const username = computed(() => claims.value.preferred_username || '')
 
-  // --- Legacy-compatible alias surface (kept until business views migrate) ---
-  const token       = computed(() => accessToken.value)
-  const currentUser = computed(() => userInfo.value || {})
-  const companyId   = computed(() => tenantId.value || currentUser.value.companyId || '')
-  const companyName = computed(() => currentUser.value.companyName || '')
+  // --- /me-derived ---
   const roles       = computed(() => {
     const r = userInfo.value?.roles || []
     return r.map((x) => (typeof x === 'string' ? x : x.roleCode))
   })
   const authorities = computed(() => userInfo.value?.authorities || [])
-  const permission  = computed(() => authorities.value)
 
   function setAccessToken(t) {
     accessToken.value = t || ''
@@ -47,30 +37,12 @@ export const useAuthStore = defineStore('auth', () => {
     else                   localStorage.removeItem(ACCESS_KEY)
   }
 
-  /** Legacy compat: accepts a raw token string or { token, remember } object. */
-  function setToken(arg) {
-    setAccessToken(typeof arg === 'string' ? arg : arg?.token)
-  }
-
-  /** Legacy compat: silent token swap. With cookie-based refresh this is now a plain set. */
-  function cacheToken(t) {
-    setAccessToken(t)
-  }
-
   function clearAuth() {
     accessToken.value = ''
     userInfo.value    = null
     localStorage.removeItem(ACCESS_KEY)
-    // Cleanup of stale keys from older builds so users carrying them across upgrades reset cleanly.
-    localStorage.removeItem('access_token_v2')
-    localStorage.removeItem('refresh_token_v2')
-    localStorage.removeItem('user')
-    localStorage.removeItem('remember')
     sessionStorage.removeItem('access_matrix_tabs')
   }
-
-  /** Legacy compat — menus no longer carry user data in the new backend. */
-  function setUserFromMenu() {}
 
   async function login(payload) {
     const res = await loginApi(payload)
@@ -95,7 +67,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    // primary
     accessToken,
     userInfo,
     isAuthenticated,
@@ -103,20 +74,10 @@ export const useAuthStore = defineStore('auth', () => {
     userId,
     tenantId,
     username,
-    // legacy aliases
-    token,
-    currentUser,
-    companyId,
-    companyName,
     roles,
     authorities,
-    permission,
-    // actions
     setAccessToken,
-    setToken,
-    cacheToken,
     clearAuth,
-    setUserFromMenu,
     login,
     refresh,
     logout,
