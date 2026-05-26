@@ -127,6 +127,7 @@ export default {
     ssoDivider: 'または',
     ssoButton: 'SSO でサインイン',
     ssoOnlyHint: 'シングルサインオン（SSO）でサインインしてください。',
+    ssoRedirecting: 'SSO にリダイレクト中...',
     passwordBreakGlass: 'パスワードログインモード（緊急用）',
     backToSso: 'SSO に戻す',
     passwordModeHotzone: 'パスワードログインを解除するには 2 秒以内に 5 回クリック',

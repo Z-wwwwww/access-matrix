@@ -120,6 +120,7 @@ export default {
     ssoDivider: '或',
     ssoButton: 'SSO 登录',
     ssoOnlyHint: '请使用单点登录 (SSO) 进入系统。',
+    ssoRedirecting: '正在跳转到 SSO...',
     passwordBreakGlass: '密码登录模式（应急）',
     backToSso: '返回 SSO',
     passwordModeHotzone: '2 秒内连击 5 次可解锁密码登录',
