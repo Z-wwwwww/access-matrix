@@ -13,6 +13,13 @@ spring:
 
 app:
   security:
+    # mode=permit-all keeps local dev frictionless — backend boots with no IdP
+    # dependency. Switch to `oidc` once Keycloak is running locally:
+    #   1. start-keycloak.bat (see infra/keycloak/README.md)
+    #   2. set app.security.mode: oidc here, or run with
+    #      APP_SECURITY_MODE=oidc override
+    # The issuer-uri default in application.yml already points at
+    # http://localhost:8180/realms/default, so no extra config is needed.
     mode: permit-all
     refresh-cookie:
       secure: false
