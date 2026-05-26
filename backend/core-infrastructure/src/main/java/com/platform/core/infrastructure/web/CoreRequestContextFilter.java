@@ -14,6 +14,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -31,6 +32,8 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
 
     private static final String TRACE_HEADER  = "X-Trace-Id";
     private static final String TENANT_HEADER = "X-Tenant-Id";
+    private static final String AUTH_HEADER   = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
     private static final String DEFAULT_TENANT = "default";
     private static final Locale DEFAULT_LOCALE = Locale.JAPAN;
 
@@ -46,9 +49,20 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
      * lookups hit the right row. See {@code OidcJitUserService}.
      */
     private final ObjectProvider<OidcUserResolver> oidcResolver;
+    /**
+     * Manual fallback decoder for the {@code permit-all} mode (where
+     * Spring Security's oauth2-resource-server filter chain is NOT installed,
+     * so {@link SecurityContextHolder} stays anonymous on every request).
+     * Without this fallback, {@code RequestContext.userId} would be null
+     * on every authenticated call in permit-all mode and every {@code /me}
+     * endpoint would 401.
+     */
+    private final JwtDecoder jwtDecoder;
 
-    public CoreRequestContextFilter(ObjectProvider<OidcUserResolver> oidcResolver) {
+    public CoreRequestContextFilter(ObjectProvider<OidcUserResolver> oidcResolver,
+                                    JwtDecoder jwtDecoder) {
         this.oidcResolver = oidcResolver;
+        this.jwtDecoder = jwtDecoder;
     }
 
     @Override
@@ -64,9 +78,8 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
         String username = null;
         Locale locale = null;
 
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof JwtAuthenticationToken jwtAuth) {
-            Jwt jwt = jwtAuth.getToken();
+        Jwt jwt = currentJwt(req);
+        if (jwt != null) {
             tenantId = jwt.getClaimAsString("tid");
             username = jwt.getClaimAsString("preferred_username");
             // OIDC 'locale' claim is the standard place (Keycloak emits it
@@ -75,15 +88,11 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
             if (localeClaim != null && !localeClaim.isBlank()) {
                 locale = Locale.forLanguageTag(localeClaim.replace('_', '-'));
             }
-            // Default: trust the JWT subject as-is (legacy HS256 flow — sub
-            // IS already the business ULID because we sign our own tokens).
+            // Default: trust the JWT subject as-is. For HS256 (in-house
+            // AdminAuthController.login) the sub IS already the business
+            // ULID; for OIDC tokens it's the Keycloak UUID and the resolver
+            // below translates it (or no-ops for non-OIDC tokens).
             userId = jwt.getSubject();
-            // When the OIDC resolver is on the classpath, sub is a Keycloak
-            // UUID; convert it to the business id and provision the row
-            // lazily on first login. Returning null = mapping failed; we
-            // keep the raw sub so request still gets through (filters /
-            // controllers can still 401/403 on missing permissions, but
-            // we don't black-hole the request here).
             OidcUserResolver resolver = oidcResolver.getIfAvailable();
             if (resolver != null) {
                 String businessId = resolver.resolveBusinessUserId(jwt);
@@ -120,6 +129,33 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
             RequestContext.clear();
             DataScopeContext.clear();
             MDC.clear();
+        }
+    }
+
+    /**
+     * Get the JWT for this request, preferring the SecurityContext (set by
+     * Spring Security's oauth2-resource-server filter in jwt / oidc modes)
+     * and falling back to a manual decode of the Bearer header in permit-all
+     * mode (where no resource-server filter is installed).
+     *
+     * <p>Returns null when no JWT is present (pre-auth paths like /auth/login,
+     * /health) or when manual decode fails (invalid token — caller will see
+     * RequestContext.userId == null and the controller's auth check kicks in).
+     */
+    private Jwt currentJwt(HttpServletRequest req) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken jat) {
+            return jat.getToken();
+        }
+        String header = req.getHeader(AUTH_HEADER);
+        if (header == null || !header.startsWith(BEARER_PREFIX)) return null;
+        try {
+            return jwtDecoder.decode(header.substring(BEARER_PREFIX.length()));
+        } catch (Exception e) {
+            // Bad token — leave RequestContext.userId null. The endpoint's
+            // own auth requirements will reject it; we don't want to spam
+            // logs on every drive-by malformed Bearer.
+            return null;
         }
     }
 }

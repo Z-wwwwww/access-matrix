@@ -8,8 +8,6 @@ import com.platform.core.infrastructure.config.properties.AppSecurityProperties;
 import com.platform.core.infrastructure.web.CoreRequestContextFilter;
 import jakarta.servlet.Filter;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -100,32 +98,37 @@ public class SecurityBeansConfig {
     }
 
     /**
-     * OIDC decoder — active when {@code app.security.mode=oidc}. Pulls the
-     * well-known discovery document from {@code issuer-uri} and configures
-     * JWKS validation + issuer assertion automatically.
+     * The JwtDecoder bean wired into the resource-server filter and the
+     * fallback decode path in {@code CoreRequestContextFilter}.
+     *
+     * <p>In {@code oidc} mode this is a {@link DualModeJwtDecoder} that
+     * routes:
+     * <ul>
+     *   <li>{@code alg=HS256} → in-house HMAC decoder (validates tokens
+     *       minted by {@code AdminAuthController.login} — the break-glass
+     *       password path that survives Keycloak being unavailable)</li>
+     *   <li>everything else (typically {@code RS256}) → Keycloak JWKS
+     *       decoder for normal SSO traffic</li>
+     * </ul>
+     *
+     * <p>In {@code jwt} or {@code permit-all} mode there is no IdP and the
+     * decoder is HS256 only.
      */
     @Bean
-    @ConditionalOnProperty(name = "app.security.mode", havingValue = "oidc")
-    public JwtDecoder oidcJwtDecoder(
+    public JwtDecoder jwtDecoder(
+            @Value("${app.security.mode:permit-all}") String mode,
             @Value("${app.security.oidc.issuer-uri:}") String issuerUri) {
+        JwtDecoder hs256 = buildHs256Decoder();
+        if (!"oidc".equalsIgnoreCase(mode)) {
+            return hs256;
+        }
         if (issuerUri == null || issuerUri.isBlank()) {
             throw new IllegalStateException(
                     "app.security.mode=oidc requires app.security.oidc.issuer-uri to be set "
                             + "(e.g. http://localhost:8180/realms/default).");
         }
-        return JwtDecoders.fromIssuerLocation(issuerUri);
-    }
-
-    /**
-     * Fallback HS256 decoder for tokens locally signed by {@link #jwtEncoder()} —
-     * the {@code AdminAuthController.login} (legacy / break-glass) path. Only
-     * registered when no other {@link JwtDecoder} is on the context, so the
-     * OIDC bean above wins when mode=oidc.
-     */
-    @Bean
-    @ConditionalOnMissingBean(JwtDecoder.class)
-    public JwtDecoder hs256JwtDecoder() {
-        return buildHs256Decoder();
+        JwtDecoder oidc = JwtDecoders.fromIssuerLocation(issuerUri);
+        return new DualModeJwtDecoder(hs256, oidc);
     }
 
     private JwtDecoder buildHs256Decoder() {

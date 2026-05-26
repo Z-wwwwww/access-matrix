@@ -144,6 +144,15 @@ onMounted(() => {
         ? `${t('login.message.ssoFailed')} — ${detail}`
         : t('login.message.ssoFailed')
   }
+  // err=menu means router.beforeEach couldn't load /menu/me after a
+  // successful login (token granted, but downstream session unusable).
+  // Surface the detail rather than silently 404-ing the user.
+  if (route.query.err === 'menu') {
+    const detail = route.query.detail ? decodeURIComponent(route.query.detail) : ''
+    ssoErrorFromQuery.value = detail
+        ? `Menu load failed — ${detail}`
+        : 'Menu load failed'
+  }
 })
 
 onBeforeUnmount(() => {
