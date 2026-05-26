@@ -17,7 +17,7 @@ NProgress.configure({ showSpinner: false })
 const APP_TITLE = 'Access Matrix'
 
 /** 免登录白名单 */
-const WHITE_LIST = ['/login', '/forget']
+const WHITE_LIST = ['/login', '/forget', '/sso/callback']
 
 /** 登录后可访问但不走后端菜单的静态页面（ヘッダー・ユーザーメニュー等から遷移） */
 const STATIC_LAYOUT_CHILDREN = [
@@ -39,6 +39,13 @@ const routes = [
     path: '/forget',
     component: () => import('@/views/login/Forget.vue'),
     meta: { title: 'パスワード忘れ' }
+  },
+  {
+    // OIDC redirect target — Keycloak sends ?code=...&state=... here
+    // after a successful login. See utils/oidc.js + SsoCallback.vue.
+    path: '/sso/callback',
+    component: () => import('@/views/login/SsoCallback.vue'),
+    meta: { title: 'Signing in…' }
   },
   {
     path: '/:pathMatch(.*)*',

@@ -117,10 +117,13 @@ export default {
     submit: '로그인',
     submitting: '로그인 중...',
     forgotPassword: '비밀번호를 잊으셨나요?',
+    ssoDivider: '또는',
+    ssoButton: 'SSO로 로그인',
     message: {
       enterUsername: '사용자명을 입력하세요',
       enterPassword: '비밀번호를 입력하세요',
-      loginFailed: '로그인에 실패했습니다'
+      loginFailed: '로그인에 실패했습니다',
+      ssoFailed: 'SSO 로그인 실패'
     }
   },
 

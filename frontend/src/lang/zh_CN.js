@@ -117,10 +117,13 @@ export default {
     submit: '登录',
     submitting: '登录中...',
     forgotPassword: '忘记密码？',
+    ssoDivider: '或',
+    ssoButton: 'SSO 登录',
     message: {
       enterUsername: '请输入用户名',
       enterPassword: '请输入密码',
-      loginFailed: '登录失败'
+      loginFailed: '登录失败',
+      ssoFailed: 'SSO 登录失败'
     }
   },
 
