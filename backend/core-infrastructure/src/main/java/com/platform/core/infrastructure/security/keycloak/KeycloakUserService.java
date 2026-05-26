@@ -132,6 +132,18 @@ public class KeycloakUserService {
         }
     }
 
+    /**
+     * Returns {@code true} iff a user with this exact username exists in the
+     * realm (case-sensitive). Used by bootstrap seeders to ensure a default
+     * admin exists without double-creating on every restart.
+     */
+    public boolean userExists(String realm, String username) {
+        try (Keycloak kc = newAdminClient()) {
+            List<UserRepresentation> hits = kc.realm(realm).users().searchByUsername(username, true);
+            return hits != null && !hits.isEmpty();
+        }
+    }
+
     public void deleteUser(String realm, String keycloakUserId) {
         try (Keycloak kc = newAdminClient();
              Response r = kc.realm(realm).users().delete(keycloakUserId)) {
