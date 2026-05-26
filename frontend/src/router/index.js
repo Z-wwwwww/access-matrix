@@ -17,7 +17,7 @@ NProgress.configure({ showSpinner: false })
 const APP_TITLE = 'Access Matrix'
 
 /** 免登录白名单 */
-const WHITE_LIST = ['/login', '/forget', '/sso/callback']
+const WHITE_LIST = ['/login', '/sso/callback']
 /**
  * /invite/<token> 也是公开页面，但 token 是动态段，不能写进上面的精确匹配
  * 数组里。下面的守卫额外允许任意以 /invite/ 开头的路径，与 WHITE_LIST 形成
@@ -40,11 +40,6 @@ const routes = [
     path: '/login',
     component: () => import('@/views/login/index.vue'),
     meta: { title: 'ログイン' }
-  },
-  {
-    path: '/forget',
-    component: () => import('@/views/login/Forget.vue'),
-    meta: { title: 'パスワード忘れ' }
   },
   {
     // OIDC redirect target — Keycloak sends ?code=...&state=... here

@@ -192,6 +192,9 @@ export default {
     oldPassword: '旧パスワード',
     password: '新しいパスワード',
     confirmPassword: 'パスワード（確認）',
+    openConsoleHint: 'パスワードの変更は ID プロバイダ (Keycloak) の自己管理画面で行います。',
+    openConsoleButton: 'Account Console を開く',
+    consoleUnavailable: 'SSO ログインが有効でない環境ではパスワード変更画面はご利用いただけません。',
     message: {
       inconsistent: '2 回入力したパスワードが一致しません'
     }

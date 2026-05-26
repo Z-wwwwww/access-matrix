@@ -27,6 +27,40 @@ export function oidcConfig() {
   }
 }
 
+/**
+ * URL of the Keycloak built-in self-service account console — the user can
+ * change their password, email, MFA settings, view sessions, etc. Each realm
+ * has its own at /realms/&lt;realm&gt;/account/. We derive the realm from the
+ * issuer URL so we don't need a separate VITE_ var.
+ */
+export function keycloakAccountUrl() {
+  const cfg = oidcConfig()
+  if (!cfg.enabled || !cfg.issuer) return null
+  return `${cfg.issuer}/account/`
+}
+
+/**
+ * URL of the Keycloak built-in "forgot password" flow. Lands the user at
+ * the email-collection page; Keycloak handles the rest (sending the
+ * reset email, validating the link, prompting for a new password).
+ * Returns to redirect_uri after success.
+ */
+export function keycloakForgotPasswordUrl() {
+  const cfg = oidcConfig()
+  if (!cfg.enabled || !cfg.issuer || !cfg.clientId) return null
+  const params = new URLSearchParams({
+    client_id:     cfg.clientId,
+    redirect_uri:  cfg.redirectUri,
+    response_type: 'code',
+    scope:         cfg.scopes,
+    // tab_id-less reset-credentials shortcut: append &kc_action=reset
+    // to a normal authorize URL → Keycloak triggers the reset-password
+    // required action immediately instead of asking for credentials.
+    kc_action:     'reset-credentials'
+  })
+  return `${cfg.issuer}/protocol/openid-connect/auth?${params}`
+}
+
 /** Where the user wanted to land — preserved through the IdP round-trip. */
 export function stashReturnTo(path) {
   if (path) sessionStorage.setItem(SS_FROM, path)

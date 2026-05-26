@@ -55,6 +55,15 @@
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Keycloak Testcontainers module — boots a real Keycloak under
+             test for the end-to-end JIT-provisioning IT. Same major as the
+             local server (26.x). -->
+        <dependency>
+            <groupId>com.github.dasniko</groupId>
+            <artifactId>testcontainers-keycloak</artifactId>
+            <version>3.5.1</version>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Lombok -->
         <dependency>
@@ -66,6 +75,21 @@
 
     <build>
         <finalName>core-service</finalName>
+        <!-- Make infra/keycloak/realms/default-realm.json available on the
+             test classpath so OidcJitProvisioningIT (testcontainers-keycloak)
+             can mount it into the Keycloak container's data/import dir. -->
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+            </testResource>
+            <testResource>
+                <directory>${project.basedir}/../../infra/keycloak/realms</directory>
+                <includes>
+                    <include>default-realm.json</include>
+                </includes>
+                <targetPath>.</targetPath>
+            </testResource>
+        </testResources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

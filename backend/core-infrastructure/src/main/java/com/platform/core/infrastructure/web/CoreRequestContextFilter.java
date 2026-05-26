@@ -22,6 +22,9 @@ import java.io.IOException;
 import java.util.Locale;
 import java.util.UUID;
 
+import org.springframework.web.servlet.LocaleResolver;
+import org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver;
+
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class CoreRequestContextFilter extends OncePerRequestFilter {
@@ -29,6 +32,12 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
     private static final String TRACE_HEADER  = "X-Trace-Id";
     private static final String TENANT_HEADER = "X-Tenant-Id";
     private static final String DEFAULT_TENANT = "default";
+    private static final Locale DEFAULT_LOCALE = Locale.JAPAN;
+
+    private final LocaleResolver localeResolver = new AcceptHeaderLocaleResolver();
+    {
+        ((AcceptHeaderLocaleResolver) localeResolver).setDefaultLocale(DEFAULT_LOCALE);
+    }
 
     /**
      * Optional — only present when {@code app.security.mode=oidc}. When
@@ -53,12 +62,19 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
         String tenantId = null;
         String userId = null;
         String username = null;
+        Locale locale = null;
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof JwtAuthenticationToken jwtAuth) {
             Jwt jwt = jwtAuth.getToken();
             tenantId = jwt.getClaimAsString("tid");
             username = jwt.getClaimAsString("preferred_username");
+            // OIDC 'locale' claim is the standard place (Keycloak emits it
+            // from the user's UI language). Format may be "ja-JP" or "ja".
+            String localeClaim = jwt.getClaimAsString("locale");
+            if (localeClaim != null && !localeClaim.isBlank()) {
+                locale = Locale.forLanguageTag(localeClaim.replace('_', '-'));
+            }
             // Default: trust the JWT subject as-is (legacy HS256 flow — sub
             // IS already the business ULID because we sign our own tokens).
             userId = jwt.getSubject();
@@ -74,6 +90,16 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
                 if (businessId != null) userId = businessId;
             }
         }
+        // No locale on the JWT (pre-auth / legacy / claim missing) → take it
+        // from Accept-Language. The resolver falls back to ja_JP if nothing
+        // sensible can be inferred.
+        if (locale == null) {
+            try {
+                locale = localeResolver.resolveLocale(req);
+            } catch (Exception e) {
+                locale = DEFAULT_LOCALE;
+            }
+        }
         // Pre-auth requests (login / refresh) have no JWT — fall back to the
         // tenant header so the tenant interceptor + audit writes still get a
         // real value instead of writing every login as "default".
@@ -82,7 +108,7 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
             tenantId = (header == null || header.isBlank()) ? DEFAULT_TENANT : header.trim();
         }
 
-        RequestContext.set(tenantId, userId, username, Locale.getDefault(), traceId);
+        RequestContext.set(tenantId, userId, username, locale, traceId);
         MDC.put("traceId", traceId);
         if (tenantId != null) MDC.put("tenantId", tenantId);
         if (userId != null) MDC.put("userId", userId);

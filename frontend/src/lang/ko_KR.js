@@ -185,6 +185,9 @@ export default {
     oldPassword: '현재 비밀번호',
     password: '새 비밀번호',
     confirmPassword: '비밀번호 확인',
+    openConsoleHint: '비밀번호 변경은 ID 제공자(Keycloak)에서 관리합니다. 셀프 계정 콘솔을 여세요.',
+    openConsoleButton: 'Account Console 열기',
+    consoleUnavailable: 'SSO가 활성화되지 않은 환경에서는 비밀번호 변경을 사용할 수 없습니다.',
     message: {
       inconsistent: '두 비밀번호가 일치하지 않습니다'
     }

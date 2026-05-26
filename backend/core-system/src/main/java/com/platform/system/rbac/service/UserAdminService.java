@@ -172,6 +172,16 @@ public class UserAdminService {
             // address to send to. Nothing to do — the user was still created.
             return;
         }
+        // Recipient locale: take the admin's current locale as a reasonable
+        // proxy. The new user has no profile row to query yet, and admins
+        // typically invite people who share their language environment.
+        // When OIDC users start switching their own locale in the Keycloak
+        // account console, the next email (e.g. password reset) will reflect
+        // that automatically — MailService reads it from the JWT 'locale'
+        // claim through RequestContext.
+        java.util.Locale locale = RequestContext.locale();
+        if (locale == null) locale = java.util.Locale.JAPAN;
+
         try {
             Map<String, Object> model = new HashMap<>();
             model.put("appName",     mailProps.fromName());
@@ -179,6 +189,8 @@ public class UserAdminService {
             model.put("displayName", u.getDisplayName());
             model.put("tenantId",    tenantId);
             model.put("supportEmail", mailProps.from());
+
+            Object[] subjectArgs = new Object[] { "[" + mailProps.fromName() + "]" };
 
             if (mode == UserDto.ProvisionMode.INVITE) {
                 InviteTokenService invites = inviteProvider.getIfAvailable();
@@ -191,16 +203,16 @@ public class UserAdminService {
                 String token = invites.mint(tenantId, u.getId(), u.getKeycloakId());
                 String url = mailProps.baseUrl() + "/invite/" + token;
                 model.put("inviteUrl", url);
-                model.put("expiresIn", "7 days");
-                mail.sendHtmlAsync(u.getEmail(),
-                        "[" + mailProps.fromName() + "] アカウント招待",
-                        "user-invite.ftl", model);
+                model.put("expiresIn", "7");
+                mail.sendHtmlAsync(u.getEmail(), locale,
+                        "user-invite.subject", subjectArgs,
+                        "user-invite", model);
             } else {
                 model.put("loginUrl",     mailProps.baseUrl() + "/login");
                 model.put("tempPassword", tempPassword);
-                mail.sendHtmlAsync(u.getEmail(),
-                        "[" + mailProps.fromName() + "] アカウント開設のお知らせ",
-                        "user-direct-welcome.ftl", model);
+                mail.sendHtmlAsync(u.getEmail(), locale,
+                        "user-direct-welcome.subject", subjectArgs,
+                        "user-direct-welcome", model);
             }
         } catch (Exception e) {
             // Anything that goes wrong building / sending the mail is
