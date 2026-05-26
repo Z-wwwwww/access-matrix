@@ -15,6 +15,12 @@ pnpm-debug.log*
 .eslintcache
 coverage/
 
+# Test runner artefacts — Playwright reports, traces, downloaded browsers metadata.
+# Vitest writes to coverage/ above; Playwright defaults below.
+playwright-report/
+test-results/
+debug.log
+
 # Per-mode local override (e.g. .env.development.local) — committed dev defaults
 # stay; only the .local override is ignored.
 .env.*.local
