@@ -33,12 +33,24 @@ const viewMode = computed(() => (ssoEnabled && !passwordUnlocked.value) ? 'sso' 
 // hot-zone counter
 const HOT_CLICKS_REQUIRED = 5
 const HOT_RESET_MS = 2000
+const AUTO_REDIRECT_DELAY_MS = 1500   // window for hot-zone before SSO fires
 const hotClicks = ref(0)
 let hotResetTimer = null
+let autoRedirectTimer = null
+const autoRedirecting = ref(false)
+
 function onHotZoneClick() {
   if (!ssoEnabled || passwordUnlocked.value) return  // nothing to unlock
   hotClicks.value += 1
   clearTimeout(hotResetTimer)
+  // First hot-zone click also cancels the pending auto-redirect — once
+  // the user starts trying to break glass, don't yank the rug out from
+  // under them by navigating to Keycloak mid-click.
+  if (autoRedirectTimer) {
+    clearTimeout(autoRedirectTimer)
+    autoRedirectTimer = null
+    autoRedirecting.value = false
+  }
   if (hotClicks.value >= HOT_CLICKS_REQUIRED) {
     passwordUnlocked.value = true
     sessionStorage.setItem(PASSWORD_UNLOCK_KEY, '1')
@@ -133,8 +145,29 @@ function handleForgotPassword() {
   }
 }
 
+// Auto-redirect to SSO when we're in SSO mode and there's no reason to
+// stay on /login. Reasons to stay:
+//   - already authenticated (caller redirects to '/')
+//   - the user just bounced back from SSO with an error (showing it
+//     immediately would cause a redirect loop)
+//   - the user manually unlocked password mode (5-click hot-zone) and
+//     the SPA needs to render the password form for them
+//   - they came here via ?password=1 (e.g. an admin's bookmarked
+//     break-glass URL)
+function shouldAutoRedirectToSso() {
+  if (!ssoEnabled) return false
+  if (authStore.isAuthenticated) return false
+  if (passwordUnlocked.value) return false
+  if (route.query.sso_error || route.query.err) return false
+  if (route.query.password === '1') return false
+  return true
+}
+
 onMounted(() => {
-  if (authStore.isAuthenticated) router.replace('/')
+  if (authStore.isAuthenticated) {
+    router.replace('/')
+    return
+  }
   // Surface a callback failure (set by SsoCallback.vue) so the user
   // sees why they were bounced back from the IdP. detail param carries
   // the actual error message for fast debugging.
@@ -153,10 +186,25 @@ onMounted(() => {
         ? `Menu load failed — ${detail}`
         : 'Menu load failed'
   }
+  // Fire-and-forget SSO redirect after a short window. The delay gives
+  // the user time to engage the 5-click hot-zone (break-glass) if they
+  // need it — without it, SSO would fire on the first paint and the
+  // hot-zone would never be reachable. beginSsoLogin itself navigates
+  // via window.location.assign and never resolves.
+  if (shouldAutoRedirectToSso()) {
+    autoRedirecting.value = true
+    autoRedirectTimer = setTimeout(() => {
+      beginSsoLogin().catch((e) => {
+        autoRedirecting.value = false
+        errorMsg.value = e.message || 'SSO not available'
+      })
+    }, AUTO_REDIRECT_DELAY_MS)
+  }
 })
 
 onBeforeUnmount(() => {
   clearTimeout(hotResetTimer)
+  clearTimeout(autoRedirectTimer)
 })
 </script>
 
@@ -190,28 +238,43 @@ onBeforeUnmount(() => {
 
       <!-- ─── SSO MODE ────────────────────────────────────────────────────── -->
       <div v-if="viewMode === 'sso'" class="space-y-4">
-        <p class="text-sm text-muted-foreground text-center">
-          {{ t('login.ssoOnlyHint') }}
-        </p>
+        <!-- Auto-redirect in progress: show a low-key spinner. The 5-click
+             hot-zone in the card's top-right corner is still alive during
+             this window — clicking it 5 times cancels the redirect and
+             unlocks the password form. -->
+        <template v-if="autoRedirecting">
+          <div class="flex flex-col items-center justify-center py-4 space-y-3">
+            <div class="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <p class="text-sm text-muted-foreground">{{ t('login.ssoRedirecting') }}</p>
+          </div>
+        </template>
 
-        <button
-          type="button"
-          class="w-full h-11 inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground font-medium rounded-lg text-sm hover:bg-primary/90 active:bg-primary/80 transition-colors"
-          @click="handleSsoLogin"
-        >
-          <KeyRound :size="16" />
-          {{ t('login.ssoButton') }}
-        </button>
+        <!-- Fallback / error state: show the manual button + forgot link
+             (auto-redirect failed, or user landed here with ?sso_error). -->
+        <template v-else>
+          <p class="text-sm text-muted-foreground text-center">
+            {{ t('login.ssoOnlyHint') }}
+          </p>
 
-        <div class="text-center">
           <button
             type="button"
-            class="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            @click="handleForgotPassword"
+            class="w-full h-11 inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground font-medium rounded-lg text-sm hover:bg-primary/90 active:bg-primary/80 transition-colors"
+            @click="handleSsoLogin"
           >
-            {{ t('login.forgotPassword') }}
+            <KeyRound :size="16" />
+            {{ t('login.ssoButton') }}
           </button>
-        </div>
+
+          <div class="text-center">
+            <button
+              type="button"
+              class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              @click="handleForgotPassword"
+            >
+              {{ t('login.forgotPassword') }}
+            </button>
+          </div>
+        </template>
       </div>
 
       <!-- ─── PASSWORD MODE (default when SSO disabled, or hot-zone unlocked) ── -->

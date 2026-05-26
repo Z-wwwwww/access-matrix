@@ -26,6 +26,21 @@ export KC_HOSTNAME_STRICT=false
 export KEYCLOAK_ADMIN=admin
 export KEYCLOAK_ADMIN_PASSWORD=admin
 
+# Sync custom themes (access-matrix) into $KEYCLOAK_HOME/themes — Keycloak
+# only looks at its own themes folder, but we keep the source of truth in
+# infra/keycloak/themes/ so it's reviewable + version-controlled. rsync
+# with -u only copies changed files, so this is effectively free on warm
+# launches.
+THEMES_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/themes"
+if [[ -d "$THEMES_SRC" ]]; then
+    echo "Syncing themes from $THEMES_SRC to $KEYCLOAK_HOME/themes ..."
+    if command -v rsync > /dev/null; then
+        rsync -a --update "$THEMES_SRC/" "$KEYCLOAK_HOME/themes/"
+    else
+        cp -RuT "$THEMES_SRC" "$KEYCLOAK_HOME/themes"
+    fi
+fi
+
 cat <<EOF
 
 === Starting Keycloak ===

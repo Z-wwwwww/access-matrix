@@ -21,5 +21,10 @@ desktop.ini
 *~
 .*.kate-swp
 
+# Local dev screenshots taken via Chrome DevTools MCP while iterating on
+# Keycloak theme / frontend layout. Useful while debugging but not worth
+# committing — they bloat the repo and go stale immediately.
+.dev-screenshots/
+
 # Claude Code per-user override (skill prompts under .claude/commands/ stay committed)
 .claude/settings.local.json

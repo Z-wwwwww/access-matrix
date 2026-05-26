@@ -2,6 +2,7 @@
     "id":  "31e704be-8857-4e97-8fde-b203dbf3a6f8",
     "realm":  "default",
     "displayName":  "Default Tenant",
+    "loginTheme":  "access-matrix",
     "notBefore":  0,
     "defaultSignatureAlgorithm":  "RS256",
     "revokeRefreshToken":  false,

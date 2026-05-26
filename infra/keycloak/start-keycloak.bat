@@ -42,6 +42,17 @@ REM still work for backward compatibility with start-dev.
 set KEYCLOAK_ADMIN=admin
 set KEYCLOAK_ADMIN_PASSWORD=admin
 
+REM --- Sync custom themes (access-matrix) into $KEYCLOAK_HOME/themes ---
+REM Keycloak only looks at its own themes folder; we keep the source of
+REM truth under infra/keycloak/themes/ (commits + reviewable) and copy
+REM on each launch. xcopy with /D only updates changed files so this is
+REM essentially free after the first run.
+set THEMES_SRC=%~dp0themes
+if exist "%THEMES_SRC%" (
+    echo Syncing themes from %THEMES_SRC% to %KEYCLOAK_HOME%\themes ...
+    xcopy "%THEMES_SRC%\*" "%KEYCLOAK_HOME%\themes\" /E /I /Y /D > nul
+)
+
 echo.
 echo === Starting Keycloak ===
 echo   Home:        %KEYCLOAK_HOME%
@@ -51,8 +62,7 @@ echo   Realm UI:    http://localhost:%KC_HTTP_PORT%
 echo.
 
 REM --import-realm imports any *.json under $KEYCLOAK_HOME/data/import on startup.
-REM We don't yet have a realm-export.json committed; once the dev realm is
-REM configured via the admin UI, export it from the Realm Settings > Action
-REM menu and drop it into infra/keycloak/realms/, then symlink that directory
-REM into Keycloak's data/import for auto-load.
+REM Note: --import-realm only inserts when the realm doesn't already exist; to
+REM apply changes (theme switch / new client / mapper edits) to an existing
+REM realm, delete it from the admin console first or use partial-import.
 "%KEYCLOAK_HOME%\bin\kc.bat" start-dev --import-realm

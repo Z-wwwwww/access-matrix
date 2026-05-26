@@ -112,6 +112,47 @@ Once a realm is configured the way you want it to ship to other developers:
 > The current `realms/` directory only has a `.gitkeep`; once we agree on
 > the dev realm shape we'll commit the first export there.
 
+## Custom theme (access-matrix branding)
+
+The committed login theme under `infra/keycloak/themes/access-matrix/`
+restyles Keycloak's login pages to match the access-matrix Vue UI:
+
+- Slate-50 page background (matches the SPA's `bg-background`)
+- Tailwind blue-600 primary button + focus ring
+- Rounded inputs (8 px) / card (12 px) / subtle shadow
+- System UI font stack (matches the SPA)
+
+The theme extends `keycloak.v2` (PatternFly-based) so we get every
+flow's template for free (login / forgot-password / update-password /
+verify-email / required-action / …) and only override colors / fonts /
+spacing via CSS custom properties. Future Keycloak upgrades that touch
+template HTML are absorbed automatically; only PatternFly version
+bumps need attention here.
+
+**Sync**: `start-keycloak.bat` / `.sh` `xcopy` / `rsync` the theme into
+`$KEYCLOAK_HOME/themes/` on every launch so edits to
+`infra/keycloak/themes/access-matrix/` take effect after a Keycloak
+restart (or `Ctrl+Shift+R` in the login page if `--spi-theme-cache-themes=false`).
+
+**Activation per realm**: the committed `default-realm.json` sets
+`"loginTheme": "access-matrix"`, so a fresh `--import-realm` picks it
+up automatically. For a realm that already exists (created before this
+theme was committed), apply the change one of two ways:
+
+```bash
+# Option A: admin console
+#   Realm settings → Themes → Login theme → access-matrix → Save
+
+# Option B: one-liner via kcadm
+$KEYCLOAK_HOME/bin/kcadm.sh config credentials \
+    --server http://localhost:8180 --realm master --user admin --password admin
+$KEYCLOAK_HOME/bin/kcadm.sh update realms/default -s 'loginTheme=access-matrix'
+```
+
+Adding more themes: drop a sibling directory under
+`infra/keycloak/themes/<name>/` and set the realm's `loginTheme` /
+`accountTheme` / `adminTheme` / `emailTheme` to that name.
+
 ## Backend wiring (next PR)
 
 Not yet wired — the backend still uses the local `AdminAuthController.login`

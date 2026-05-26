@@ -120,6 +120,7 @@ export default {
     ssoDivider: '또는',
     ssoButton: 'SSO로 로그인',
     ssoOnlyHint: '싱글 사인온(SSO)으로 로그인하세요.',
+    ssoRedirecting: 'SSO로 이동 중...',
     passwordBreakGlass: '비밀번호 로그인 모드(긴급용)',
     backToSso: 'SSO로 돌아가기',
     passwordModeHotzone: '2초 안에 5번 클릭하면 비밀번호 로그인 해제',
