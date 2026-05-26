@@ -126,6 +126,10 @@ export default {
     forgotPassword: 'パスワードを忘れた',
     ssoDivider: 'または',
     ssoButton: 'SSO でサインイン',
+    ssoOnlyHint: 'シングルサインオン（SSO）でサインインしてください。',
+    passwordBreakGlass: 'パスワードログインモード（緊急用）',
+    backToSso: 'SSO に戻す',
+    passwordModeHotzone: 'パスワードログインを解除するには 2 秒以内に 5 回クリック',
     message: {
       enterUsername: 'ユーザー名を入力してください',
       enterPassword: 'パスワードを入力してください',

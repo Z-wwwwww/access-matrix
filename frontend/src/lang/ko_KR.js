@@ -119,6 +119,10 @@ export default {
     forgotPassword: '비밀번호를 잊으셨나요?',
     ssoDivider: '또는',
     ssoButton: 'SSO로 로그인',
+    ssoOnlyHint: '싱글 사인온(SSO)으로 로그인하세요.',
+    passwordBreakGlass: '비밀번호 로그인 모드(긴급용)',
+    backToSso: 'SSO로 돌아가기',
+    passwordModeHotzone: '2초 안에 5번 클릭하면 비밀번호 로그인 해제',
     message: {
       enterUsername: '사용자명을 입력하세요',
       enterPassword: '비밀번호를 입력하세요',

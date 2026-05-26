@@ -1,5 +1,6 @@
 package com.platform.core.infrastructure.security.rbac;
 
+import com.platform.core.common.context.RequestContext;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,18 +19,26 @@ import java.util.Set;
 /**
  * Converts the current HTTP request into the caller's permission-code set.
  *
- * <p>Resolution order:
- * <ol>
- *   <li>{@link SecurityContextHolder} holds a {@link JwtAuthenticationToken} (jwt mode)
- *       → read the {@code scope} claim.</li>
- *   <li>Otherwise (permit-all mode) decode the {@code Authorization: Bearer ...}
- *       header manually via {@link JwtDecoder}.</li>
- *   <li>Neither → return empty set (caller will be denied unless the endpoint is unguarded).</li>
- * </ol>
+ * <p>Scope is NEVER inlined into the JWT — we always load the current
+ * permission set from the database (Caffeine-cached via
+ * {@link UserPermissionsLookup}). Two reasons:
  *
- * <p>When the {@code scope} claim is the literal {@code "__compact__"} the user has
- * too many permissions to fit in the JWT and we delegate to
- * {@link UserPermissionsLookup} (typically Caffeine-cached, see Stage 1 plan).
+ * <ul>
+ *   <li><b>Live revocation</b>: an admin removing a role from a user must
+ *       take effect on the user's NEXT request, not when their JWT expires
+ *       15 minutes later. Inline scopes can't be revoked.</li>
+ *   <li><b>OIDC mode compatibility</b>: an external IdP (Keycloak) emits
+ *       the OIDC-standard {@code scope} claim ("openid profile email"),
+ *       NOT our business permission codes ("user:read", "role:delete").
+ *       Reading the token's scope would parse those as permission codes
+ *       and the user would have exactly three useless authorities. Same
+ *       reasoning applies if anyone ever switches to SAML / Azure AD —
+ *       the token shape is the IdP's contract, not ours.</li>
+ * </ul>
+ *
+ * <p>The legacy in-house {@code AdminAuthController} signs HS256 tokens
+ * with {@code scope = "__compact__"} as a hint, but the value is now
+ * informational — we look up regardless.
  */
 @Component
 public class PermissionResolver {
@@ -48,28 +57,28 @@ public class PermissionResolver {
 
     public Set<String> resolve() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Jwt jwt;
         if (auth instanceof JwtAuthenticationToken jat) {
-            return fromJwt(jat.getToken());
+            jwt = jat.getToken();
+        } else {
+            // permit-all mode: SecurityContext stays empty, decode the bearer header ourselves
+            jwt = manuallyDecodeFromHeader();
+            if (jwt == null) return Set.of();
         }
-        Jwt manual = manuallyDecodeFromHeader();
-        if (manual != null) {
-            return fromJwt(manual);
+        UserPermissionsLookup lookup = lookupProvider.getIfAvailable();
+        if (lookup == null) {
+            log.warn("No UserPermissionsLookup bean registered — denying every permission check");
+            return Set.of();
         }
-        return Set.of();
-    }
-
-    private Set<String> fromJwt(Jwt jwt) {
-        String scope = jwt.getClaimAsString("scope");
-        if (scope == null || scope.isBlank()) return Set.of();
-        if (COMPACT_MARKER.equals(scope)) {
-            UserPermissionsLookup lookup = lookupProvider.getIfAvailable();
-            if (lookup == null) {
-                log.warn("scope=__compact__ but no UserPermissionsLookup bean registered; denying");
-                return Set.of();
-            }
-            return lookup.loadUserPermissions(jwt.getSubject());
-        }
-        return Set.of(scope.trim().split("\\s+"));
+        // Always load from DB. See class javadoc for why we ignore the JWT
+        // scope claim entirely. Business user id comes from RequestContext
+        // (translated from JWT.sub via OidcUserResolver in OIDC mode); fall
+        // back to JWT subject only for the (legacy) HS256 jwt mode where
+        // sub IS already the business ULID.
+        String userId = RequestContext.userId();
+        if (userId == null || userId.isBlank()) userId = jwt.getSubject();
+        if (userId == null || userId.isBlank()) return Set.of();
+        return lookup.loadUserPermissions(userId);
     }
 
     private Jwt manuallyDecodeFromHeader() {

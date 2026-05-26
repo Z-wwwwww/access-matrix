@@ -5,9 +5,12 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.platform.core.infrastructure.config.properties.AppSecurityProperties;
+import com.platform.core.infrastructure.web.CoreRequestContextFilter;
+import jakarta.servlet.Filter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -35,6 +38,52 @@ public class SecurityBeansConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12);
+    }
+
+    /**
+     * Disable Spring Boot's automatic servlet-global registration of our
+     * @Component filters that {@link com.platform.core.infrastructure.security.SecurityConfig}
+     * adds into the Spring Security chain via {@code addFilterAfter(...)}.
+     *
+     * <p>Without these registrations, every {@code OncePerRequestFilter}
+     * annotated {@code @Component} would be registered TWICE:
+     * <ul>
+     *   <li>once at the servlet container level (runs BEFORE Spring Security,
+     *       so {@code SecurityContextHolder.getAuthentication()} returns null)</li>
+     *   <li>once inside the Spring Security chain (would see the auth, but
+     *       {@code OncePerRequestFilter} skips because of the per-request
+     *       attribute set by the first invocation)</li>
+     * </ul>
+     *
+     * <p>Net effect of the double registration: filters that read the JWT
+     * (e.g. {@code CoreRequestContextFilter} setting {@code RequestContext.userId})
+     * always see an empty auth context, so {@code RequestContext.userId()}
+     * is null even after a valid Bearer token was accepted. Disabling the
+     * global registration keeps only the Spring Security chain instance,
+     * which runs AFTER {@code BearerTokenAuthenticationFilter} as intended.
+     */
+    @Bean
+    public FilterRegistrationBean<CoreRequestContextFilter> coreRequestContextFilterRegistration(
+            CoreRequestContextFilter f) {
+        return disable(f);
+    }
+
+    @Bean
+    public FilterRegistrationBean<ForceLogoutFilter> forceLogoutFilterRegistration(
+            ForceLogoutFilter f) {
+        return disable(f);
+    }
+
+    @Bean
+    public FilterRegistrationBean<AuthRateLimitFilter> authRateLimitFilterRegistration(
+            AuthRateLimitFilter f) {
+        return disable(f);
+    }
+
+    private static <T extends Filter> FilterRegistrationBean<T> disable(T filter) {
+        FilterRegistrationBean<T> reg = new FilterRegistrationBean<>(filter);
+        reg.setEnabled(false);
+        return reg;
     }
 
     /**

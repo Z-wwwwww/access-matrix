@@ -98,8 +98,12 @@ function openChangePassword() {
 
 async function handleLogout() {
   userOpen.value = false
-  await authStore.logout()
-  router.push('/login')
+  // OIDC mode: logout() navigates to Keycloak's end_session_endpoint and
+  // returns true — we MUST NOT router.push afterwards, the page is
+  // already on its way out. Password mode: returns false, we handle the
+  // /login navigation here.
+  const navigatedAway = await authStore.logout()
+  if (!navigatedAway) router.push('/login')
 }
 
 onBeforeUnmount(() => {

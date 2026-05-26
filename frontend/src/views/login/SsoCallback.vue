@@ -26,8 +26,12 @@ const errorMsg = ref('')
 
 onMounted(async () => {
   try {
-    const { accessToken } = await handleCallback(route.query)
+    const { accessToken, idToken } = await handleCallback(route.query)
     authStore.setAccessToken(accessToken)
+    // id_token is required for RP-Initiated Logout — Keycloak uses it to
+    // confirm which session to end. Stash it now even though nothing
+    // reads it until the user signs out.
+    authStore.setIdToken(idToken)
 
     // Same post-login cleanup as the password path — old menus / tabs /
     // dynamic routes can carry stale permissions across re-logins.
@@ -35,17 +39,28 @@ onMounted(async () => {
     tabsStore.clearTabs()
     if (router.hasRoute('AppLayout')) router.removeRoute('AppLayout')
 
+    // fetchUserInfo failure is FATAL — if /user/me can't resolve the
+    // business row (e.g. backend not restarted after the JIT changes, or
+    // the row was soft-deleted but the Keycloak account still exists),
+    // continuing would land the user in an empty shell with no menu and
+    // no perms. Better to clear the token and bounce back with a clear
+    // error than to silently hide the cause.
     try {
       await authStore.fetchUserInfo()
     } catch (e) {
       console.error('[sso-callback] fetchUserInfo failed:', e)
+      authStore.clearAuth()
+      throw new Error(`Profile lookup failed: ${(e && e.message) || 'unknown'}`)
     }
 
     router.replace(popReturnTo())
   } catch (err) {
     console.error('[sso-callback] error:', err)
     errorMsg.value = err.message || 'SSO sign-in failed'
-    setTimeout(() => router.replace({ path: '/login', query: { sso_error: '1' } }), 1500)
+    // 3 s instead of 1.5 s so the user actually has time to read the
+    // message; carry detail through query so login page can show it too.
+    const detail = encodeURIComponent(err.message || 'unknown')
+    setTimeout(() => router.replace({ path: '/login', query: { sso_error: '1', detail } }), 3000)
   }
 })
 </script>

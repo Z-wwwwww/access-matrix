@@ -6,15 +6,10 @@ import com.platform.system.auth.mapper.UserMapper;
 import com.platform.system.rbac.entity.RoleEntity;
 import com.platform.system.rbac.mapper.RoleMapper;
 import com.platform.system.rbac.service.PermissionQueryService;
+import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,22 +23,27 @@ import java.util.Set;
 public class UserController {
 
     private final UserMapper userMapper;
-    private final JwtDecoder jwtDecoder;
     private final RoleMapper roleMapper;
     private final PermissionQueryService permissionQueryService;
 
-    public UserController(UserMapper userMapper, JwtDecoder jwtDecoder,
+    public UserController(UserMapper userMapper,
                           RoleMapper roleMapper, PermissionQueryService permissionQueryService) {
         this.userMapper = userMapper;
-        this.jwtDecoder = jwtDecoder;
         this.roleMapper = roleMapper;
         this.permissionQueryService = permissionQueryService;
     }
 
     @GetMapping("/me")
-    public JsonResult<UserInfoResponse> me(HttpServletRequest req) {
-        String userId = extractUserId(req);
-        if (userId == null) {
+    public JsonResult<UserInfoResponse> me() {
+        // RequestContext.userId is the BUSINESS ULID (CoreRequestContextFilter
+        // injects it via OidcUserResolver for OIDC mode; in jwt mode the JWT
+        // subject IS already the business ULID since we sign our own tokens).
+        // We must NOT read JWT.subject directly here — in OIDC mode that's the
+        // Keycloak UUID, which doesn't match any core_auth_user.id, so the
+        // selectById below would silently return null and the user would see
+        // a 404 with no roles / no menu / no perms.
+        String userId = RequestContext.userId();
+        if (userId == null || userId.isBlank()) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required");
         }
         UserEntity u = userMapper.selectById(userId);
@@ -70,22 +70,5 @@ public class UserController {
                 new ArrayList<>(perms)
         );
         return JsonResult.ok(resp);
-    }
-
-    private String extractUserId(HttpServletRequest req) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof JwtAuthenticationToken jat) {
-            return jat.getToken().getSubject();
-        }
-        String header = req.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ")) {
-            try {
-                Jwt jwt = jwtDecoder.decode(header.substring(7));
-                return jwt.getSubject();
-            } catch (Exception e) {
-                throw new BusinessException(ErrorCode.INVALID_TOKEN, "Invalid token");
-            }
-        }
-        return null;
     }
 }
