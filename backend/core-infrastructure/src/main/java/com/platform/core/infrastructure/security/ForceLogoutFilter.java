@@ -2,6 +2,7 @@ package com.platform.core.infrastructure.security;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.platform.core.common.context.RequestContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -67,7 +68,18 @@ public class ForceLogoutFilter extends OncePerRequestFilter {
             chain.doFilter(req, resp);
             return;
         }
-        String userId = jwt.getSubject();
+        // CoreRequestContextFilter runs BEFORE this filter (Ordered chain) and
+        // has already converted JWT subject → business ULID via OidcUserResolver.
+        // Force-logout keys are stored by business ULID (UserAdminService.delete
+        // / changeStatus / AdminAuthController.resetPassword all call
+        // forceLogoutService.kickOut(<business-ulid>)). Reading JWT.subject here
+        // would key by Keycloak UUID in OIDC mode → permanent kick-out miss.
+        String userId = RequestContext.userId();
+        if (userId == null || userId.isBlank()) {
+            // Fallback for callers that haven't been through the context filter
+            // (e.g. permit-all paths). subject equals business ULID in jwt mode.
+            userId = jwt.getSubject();
+        }
         if (userId == null || userId.isBlank()) {
             chain.doFilter(req, resp);
             return;

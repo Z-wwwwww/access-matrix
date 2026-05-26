@@ -40,6 +40,37 @@ export function keycloakAccountUrl() {
 }
 
 /**
+ * RP-Initiated Logout URL (OIDC spec). Hits Keycloak's end_session_endpoint
+ * so the IdP wipes its own session cookie; without this, the next
+ * "Sign in with SSO" silent-logins via Keycloak's still-valid cookie
+ * and the user can't actually log out.
+ *
+ * Requires the id_token from the original /token exchange — Keycloak
+ * uses it to confirm WHICH session to end. Falls back to a plain
+ * post_logout_redirect_uri navigation if id_token isn't available
+ * (e.g. legacy session predating this fix); Keycloak 26 may then
+ * present a confirmation page asking the user to confirm logout.
+ *
+ * @param idToken      the id_token from the last successful login (nullable)
+ * @param postLogoutTo absolute URL to land on after logout (e.g. /login)
+ */
+export function keycloakLogoutUrl(idToken, postLogoutTo) {
+  const cfg = oidcConfig()
+  if (!cfg.enabled || !cfg.issuer) return null
+  const params = new URLSearchParams({
+    post_logout_redirect_uri: postLogoutTo
+  })
+  if (idToken) {
+    params.append('id_token_hint', idToken)
+  } else {
+    // Without id_token_hint, Keycloak needs client_id to know which client's
+    // post-logout redirect list to validate against.
+    params.append('client_id', cfg.clientId)
+  }
+  return `${cfg.issuer}/protocol/openid-connect/logout?${params}`
+}
+
+/**
  * URL of the Keycloak built-in "forgot password" flow. Lands the user at
  * the email-collection page; Keycloak handles the rest (sending the
  * reset email, validating the link, prompting for a new password).

@@ -10,6 +10,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
@@ -41,11 +42,22 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> {})
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Rate-limit is per-IP and runs before auth (so the IP itself
+                // is what's limited even when no JWT is present).
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(ctxFilter, UsernamePasswordAuthenticationFilter.class)
-                // Runs after the context filter (so MDC/RequestContext are set)
-                // and before any controller — kicks land on /menu/me etc. too,
-                // not only on @RequiresPermission-annotated endpoints.
+                // Context filter MUST run AFTER all authentication filters so
+                // SecurityContextHolder is already populated when it reads the
+                // JWT. Anchoring on AuthorizationFilter (the very last filter
+                // in the Spring Security chain — always present regardless of
+                // mode) is the simplest way to guarantee that ordering;
+                // anchoring on UsernamePasswordAuthenticationFilter used to be
+                // a subtle bug because BearerTokenAuthenticationFilter sits
+                // AFTER UsernamePasswordAuthenticationFilter in Spring Security
+                // 6/7, so ctxFilter ran with an empty SecurityContext under OIDC.
+                .addFilterBefore(ctxFilter, AuthorizationFilter.class)
+                // Runs right after ctxFilter (so MDC/RequestContext are set)
+                // and still before AuthorizationFilter / controllers — kicks
+                // land on /menu/me etc. too, not only on @RequiresPermission.
                 .addFilterAfter(forceLogoutFilter, CoreRequestContextFilter.class);
 
         // app.security.mode controls how auth is enforced:

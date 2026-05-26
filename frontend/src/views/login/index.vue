@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -19,6 +19,41 @@ const authStore = useAuthStore()
 const menuStore = useMenuStore()
 const tabsStore = useTabsStore()
 
+// ─── view mode ─────────────────────────────────────────────────────────────
+// When SSO is enabled (VITE_OIDC_ENABLED=true), we hide the username/password
+// form by default and show only the "Sign in with SSO" button — that's the
+// primary path. The legacy password form stays reachable as a break-glass for
+// devs / admins when Keycloak is unreachable; to unlock it, click the
+// invisible hot-zone in the card's top-right corner 5 times within 2 seconds.
+// Choice persists per tab (sessionStorage) so a refresh doesn't snap back.
+const PASSWORD_UNLOCK_KEY = 'login_password_unlocked'
+const passwordUnlocked = ref(sessionStorage.getItem(PASSWORD_UNLOCK_KEY) === '1')
+const viewMode = computed(() => (ssoEnabled && !passwordUnlocked.value) ? 'sso' : 'password')
+
+// hot-zone counter
+const HOT_CLICKS_REQUIRED = 5
+const HOT_RESET_MS = 2000
+const hotClicks = ref(0)
+let hotResetTimer = null
+function onHotZoneClick() {
+  if (!ssoEnabled || passwordUnlocked.value) return  // nothing to unlock
+  hotClicks.value += 1
+  clearTimeout(hotResetTimer)
+  if (hotClicks.value >= HOT_CLICKS_REQUIRED) {
+    passwordUnlocked.value = true
+    sessionStorage.setItem(PASSWORD_UNLOCK_KEY, '1')
+    hotClicks.value = 0
+  } else {
+    hotResetTimer = setTimeout(() => { hotClicks.value = 0 }, HOT_RESET_MS)
+  }
+}
+function relockPassword() {
+  passwordUnlocked.value = false
+  sessionStorage.removeItem(PASSWORD_UNLOCK_KEY)
+  hotClicks.value = 0
+}
+
+// ─── form state (only used in password mode) ──────────────────────────────
 const TENANT_KEY = 'tenant_id'
 const form = ref({
   tenant: localStorage.getItem(TENANT_KEY) || 'default',
@@ -76,7 +111,7 @@ async function handleLogin() {
 }
 
 function handleKeydown(e) {
-  if (e.key === 'Enter') handleLogin()
+  if (e.key === 'Enter' && viewMode.value === 'password') handleLogin()
 }
 
 async function handleSsoLogin() {
@@ -101,10 +136,18 @@ function handleForgotPassword() {
 onMounted(() => {
   if (authStore.isAuthenticated) router.replace('/')
   // Surface a callback failure (set by SsoCallback.vue) so the user
-  // sees why they were bounced back from the IdP.
+  // sees why they were bounced back from the IdP. detail param carries
+  // the actual error message for fast debugging.
   if (route.query.sso_error) {
-    ssoErrorFromQuery.value = t('login.message.ssoFailed')
+    const detail = route.query.detail ? decodeURIComponent(route.query.detail) : ''
+    ssoErrorFromQuery.value = detail
+        ? `${t('login.message.ssoFailed')} — ${detail}`
+        : t('login.message.ssoFailed')
   }
+})
+
+onBeforeUnmount(() => {
+  clearTimeout(hotResetTimer)
 })
 </script>
 
@@ -114,7 +157,18 @@ onMounted(() => {
     @keydown="handleKeydown"
   >
     <!-- Login card -->
-    <div class="w-full max-w-[420px] rounded-xl border border-border bg-card shadow-lg shadow-black/[0.06] p-8">
+    <div class="relative w-full max-w-[420px] rounded-xl border border-border bg-card shadow-lg shadow-black/[0.06] p-8">
+      <!-- Hidden hot-zone: 5 clicks within 2 s in SSO mode unlocks the password
+           form (break-glass for devs when Keycloak is down). Invisible by design
+           — visible cue would defeat the "hidden door" intent. -->
+      <button
+        type="button"
+        class="absolute top-0 right-0 w-12 h-12 opacity-0 cursor-default"
+        :aria-label="t('login.passwordModeHotzone')"
+        :title="hotClicks > 0 ? `${hotClicks}/${HOT_CLICKS_REQUIRED}` : ''"
+        @click="onHotZoneClick"
+      ></button>
+
       <!-- Brand -->
       <div class="text-center mb-8">
         <h1 class="text-2xl font-bold text-foreground font-serif tracking-wide">Access Matrix</h1>
@@ -125,7 +179,43 @@ onMounted(() => {
         {{ errorMsg || ssoErrorFromQuery }}
       </div>
 
-      <form @submit.prevent="handleLogin" class="space-y-4">
+      <!-- ─── SSO MODE ────────────────────────────────────────────────────── -->
+      <div v-if="viewMode === 'sso'" class="space-y-4">
+        <p class="text-sm text-muted-foreground text-center">
+          {{ t('login.ssoOnlyHint') }}
+        </p>
+
+        <button
+          type="button"
+          class="w-full h-11 inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground font-medium rounded-lg text-sm hover:bg-primary/90 active:bg-primary/80 transition-colors"
+          @click="handleSsoLogin"
+        >
+          <KeyRound :size="16" />
+          {{ t('login.ssoButton') }}
+        </button>
+
+        <div class="text-center">
+          <button
+            type="button"
+            class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            @click="handleForgotPassword"
+          >
+            {{ t('login.forgotPassword') }}
+          </button>
+        </div>
+      </div>
+
+      <!-- ─── PASSWORD MODE (default when SSO disabled, or hot-zone unlocked) ── -->
+      <form v-else @submit.prevent="handleLogin" class="space-y-4">
+        <!-- Break-glass indicator when SSO is enabled but user unlocked password mode -->
+        <div v-if="ssoEnabled && passwordUnlocked"
+             class="flex items-center justify-between p-2 rounded-lg bg-amber-100/60 border border-amber-300/60 text-xs text-amber-900">
+          <span>⚠ {{ t('login.passwordBreakGlass') }}</span>
+          <button type="button" class="underline hover:text-amber-700" @click="relockPassword">
+            {{ t('login.backToSso') }}
+          </button>
+        </div>
+
         <!-- identifier (username / email / user_no) -->
         <div>
           <label class="block text-sm font-medium text-foreground mb-1.5">{{ t('login.identifierLabel') }}</label>
@@ -183,24 +273,7 @@ onMounted(() => {
           {{ loading ? t('login.submitting') : t('login.submit') }}
         </button>
 
-        <!-- SSO (only shown when VITE_OIDC_ENABLED=true at build time) -->
-        <template v-if="ssoEnabled">
-          <div class="relative my-2 flex items-center">
-            <div class="flex-1 border-t border-border"></div>
-            <span class="px-2 text-xs text-muted-foreground">{{ t('login.ssoDivider') }}</span>
-            <div class="flex-1 border-t border-border"></div>
-          </div>
-          <button
-            type="button"
-            class="w-full h-10 inline-flex items-center justify-center gap-2 border border-input bg-background text-foreground font-medium rounded-lg text-sm hover:bg-muted transition-colors"
-            @click="handleSsoLogin"
-          >
-            <KeyRound :size="16" />
-            {{ t('login.ssoButton') }}
-          </button>
-        </template>
-
-        <!-- footer links: tenant toggle + forgot password (SSO only) -->
+        <!-- footer links: tenant toggle only (forgot password only in SSO mode) -->
         <div class="flex items-center justify-between text-xs text-muted-foreground">
           <button
             type="button"
@@ -208,14 +281,6 @@ onMounted(() => {
             @click="showTenant = !showTenant"
           >
             {{ showTenant ? t('login.hideAdvanced') : t('login.showAdvanced') }}
-          </button>
-          <button
-            v-if="ssoEnabled"
-            type="button"
-            class="hover:text-foreground transition-colors"
-            @click="handleForgotPassword"
-          >
-            {{ t('login.forgotPassword') }}
           </button>
         </div>
       </form>

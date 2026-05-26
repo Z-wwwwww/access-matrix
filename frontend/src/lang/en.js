@@ -119,6 +119,10 @@ export default {
     forgotPassword: 'Forgot password?',
     ssoDivider: 'or',
     ssoButton: 'Sign in with SSO',
+    ssoOnlyHint: 'Sign in with single sign-on (SSO).',
+    passwordBreakGlass: 'Password login mode (break-glass)',
+    backToSso: 'Back to SSO',
+    passwordModeHotzone: 'Click 5 times within 2 seconds to unlock password login',
     message: {
       enterUsername: 'Please enter your username',
       enterPassword: 'Please enter your password',

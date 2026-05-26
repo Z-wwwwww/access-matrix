@@ -119,6 +119,10 @@ export default {
     forgotPassword: '忘记密码？',
     ssoDivider: '或',
     ssoButton: 'SSO 登录',
+    ssoOnlyHint: '请使用单点登录 (SSO) 进入系统。',
+    passwordBreakGlass: '密码登录模式（应急）',
+    backToSso: '返回 SSO',
+    passwordModeHotzone: '2 秒内连击 5 次可解锁密码登录',
     message: {
       enterUsername: '请输入用户名',
       enterPassword: '请输入密码',

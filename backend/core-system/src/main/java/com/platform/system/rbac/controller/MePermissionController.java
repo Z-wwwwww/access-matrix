@@ -1,15 +1,10 @@
 package com.platform.system.rbac.controller;
 
+import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
 import com.platform.system.rbac.service.PermissionQueryService;
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,36 +27,20 @@ import java.util.Set;
 public class MePermissionController {
 
     private final PermissionQueryService permissionQueryService;
-    private final JwtDecoder jwtDecoder;
 
-    public MePermissionController(PermissionQueryService permissionQueryService, JwtDecoder jwtDecoder) {
+    public MePermissionController(PermissionQueryService permissionQueryService) {
         this.permissionQueryService = permissionQueryService;
-        this.jwtDecoder = jwtDecoder;
     }
 
     @GetMapping("/me")
-    public JsonResult<Set<String>> me(HttpServletRequest req) {
-        String userId = extractUserId(req);
-        if (userId == null) {
+    public JsonResult<Set<String>> me() {
+        // See MeMenuController for the same fix rationale: business ULID via
+        // RequestContext, NOT the raw JWT subject (which is the Keycloak UUID
+        // in OIDC mode and doesn't appear in core_auth_user.id).
+        String userId = RequestContext.userId();
+        if (userId == null || userId.isBlank()) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required");
         }
         return JsonResult.ok(permissionQueryService.loadUserPermissions(userId));
-    }
-
-    private String extractUserId(HttpServletRequest req) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof JwtAuthenticationToken jat) {
-            return jat.getToken().getSubject();
-        }
-        String header = req.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ")) {
-            try {
-                Jwt jwt = jwtDecoder.decode(header.substring(7));
-                return jwt.getSubject();
-            } catch (Exception e) {
-                throw new BusinessException(ErrorCode.INVALID_TOKEN, "Invalid token");
-            }
-        }
-        return null;
     }
 }

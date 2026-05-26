@@ -81,7 +81,12 @@ public class PermissionAspect {
     private void enforceForceLogout() {
         Jwt jwt = currentJwt();
         if (jwt == null) return;  // no JWT → fall through, perm check handles deny
-        String userId = jwt.getSubject();
+        // RequestContext.userId is the BUSINESS ULID (translated by
+        // CoreRequestContextFilter via OidcUserResolver). Force-logout keys
+        // are stored by business ULID, so the JWT subject (Keycloak UUID in
+        // OIDC mode) would never match and the check would silently no-op.
+        String userId = com.platform.core.common.context.RequestContext.userId();
+        if (userId == null || userId.isBlank()) userId = jwt.getSubject();
         if (userId == null) return;
         long kickAt = forceLogoutService.kickOutAt(userId);
         if (kickAt <= 0) return;
