@@ -28,7 +28,10 @@ const form = reactive({
   userNo: '',
   displayName: '',
   deptId: '',
-  status: 1
+  status: 1,
+  // 'INVITE' = メール経由でユーザー本人がパスワード設定（推奨）
+  // 'DIRECT' = 管理者が初期パスワードを設定（パスワード必須）
+  mode: 'INVITE'
 })
 
 const allRoles = ref([])
@@ -44,7 +47,8 @@ watch(() => props.open, async (open) => {
     userNo: props.user?.userNo || '',
     displayName: props.user?.displayName || '',
     deptId: props.user?.deptId || '',
-    status: props.user?.status ?? 1
+    status: props.user?.status ?? 1,
+    mode: 'INVITE'
   })
   try {
     const r = await getRoleListApi({ page: 1, size: 100 })
@@ -86,13 +90,15 @@ async function save() {
       userId = props.user.id
     } else {
       // 新規時も userNo は送らない（送っても backend が無視するが、明示的に DTO 合わせ）。
+      // INVITE モードでは password は無視されるが念のため空文字を送る（DTO 上 optional）。
       const body = {
         username: form.username,
-        password: form.password,
+        password: form.mode === 'DIRECT' ? form.password : '',
         email: form.email,
         displayName: form.displayName,
         deptId: form.deptId,
-        status: form.status
+        status: form.status,
+        mode: form.mode
       }
       const r = await addUserApi(body)
       if (r.data.code !== 0) { toast.error(r.data.msg || t('user.edit.message.createFailed')); return }
@@ -125,9 +131,41 @@ async function save() {
         <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.username') }} <span class="text-destructive">*</span></label>
         <Input v-model="form.username" :disabled="isEdit" />
       </div>
+      <!-- Provision mode (only on create) — INVITE sends a magic link, DIRECT lets the admin pick the password. -->
       <div v-if="!isEdit">
+        <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.mode') }}</label>
+        <div class="flex gap-2">
+          <button type="button"
+                  :class="[
+                    'flex-1 px-3 py-2 rounded-lg border text-sm transition text-left',
+                    form.mode === 'INVITE'
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-card text-foreground hover:bg-muted'
+                  ]"
+                  @click="form.mode = 'INVITE'">
+            <div class="font-medium">{{ t('user.edit.mode.invite.title') }}</div>
+            <div class="text-xs text-muted-foreground mt-0.5">{{ t('user.edit.mode.invite.hint') }}</div>
+          </button>
+          <button type="button"
+                  :class="[
+                    'flex-1 px-3 py-2 rounded-lg border text-sm transition text-left',
+                    form.mode === 'DIRECT'
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border bg-card text-foreground hover:bg-muted'
+                  ]"
+                  @click="form.mode = 'DIRECT'">
+            <div class="font-medium">{{ t('user.edit.mode.direct.title') }}</div>
+            <div class="text-xs text-muted-foreground mt-0.5">{{ t('user.edit.mode.direct.hint') }}</div>
+          </button>
+        </div>
+      </div>
+      <div v-if="!isEdit && form.mode === 'DIRECT'">
         <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.password') }} <span class="text-destructive">*</span></label>
         <Input v-model="form.password" type="password" :placeholder="t('user.edit.placeholder.password')" />
+      </div>
+      <div v-else-if="!isEdit && form.mode === 'INVITE'"
+           class="text-xs text-muted-foreground p-2 rounded bg-muted/40 border border-border">
+        {{ t('user.edit.mode.invite.willEmail', { email: form.email || '—' }) }}
       </div>
       <div>
         <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.displayName') }}</label>

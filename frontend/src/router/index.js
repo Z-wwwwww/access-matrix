@@ -18,6 +18,12 @@ const APP_TITLE = 'Access Matrix'
 
 /** 免登录白名单 */
 const WHITE_LIST = ['/login', '/forget', '/sso/callback']
+/**
+ * /invite/<token> 也是公开页面，但 token 是动态段，不能写进上面的精确匹配
+ * 数组里。下面的守卫额外允许任意以 /invite/ 开头的路径，与 WHITE_LIST 形成
+ * "exact match | prefix match" 两路覆盖。
+ */
+const PUBLIC_PREFIXES = ['/invite/']
 
 /** 登录后可访问但不走后端菜单的静态页面（ヘッダー・ユーザーメニュー等から遷移） */
 const STATIC_LAYOUT_CHILDREN = [
@@ -46,6 +52,13 @@ const routes = [
     path: '/sso/callback',
     component: () => import('@/views/login/SsoCallback.vue'),
     meta: { title: 'Signing in…' }
+  },
+  {
+    // Invite-acceptance landing page — the email link lands here with a
+    // single-use token in the path. No session required.
+    path: '/invite/:token',
+    component: () => import('@/views/login/InviteAccept.vue'),
+    meta: { title: 'アカウント設定' }
   },
   {
     path: '/:pathMatch(.*)*',
@@ -103,7 +116,7 @@ router.beforeEach(async (to, from, next) => {
       }
       next()
     }
-  } else if (WHITE_LIST.includes(to.path)) {
+  } else if (WHITE_LIST.includes(to.path) || PUBLIC_PREFIXES.some((p) => to.path.startsWith(p))) {
     next()
   } else {
     next({ path: '/login', query: to.path === '/' ? {} : { from: to.path } })

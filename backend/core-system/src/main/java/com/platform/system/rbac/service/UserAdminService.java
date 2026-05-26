@@ -9,21 +9,28 @@ import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.core.common.result.PageResult;
 import com.platform.core.common.security.BuiltInRoles;
+import com.platform.core.infrastructure.config.properties.AppMailProperties;
+import com.platform.core.infrastructure.mail.MailService;
 import com.platform.core.infrastructure.numbering.NumberingService;
 import com.platform.core.infrastructure.security.ForceLogoutService;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
+import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
+import com.platform.system.auth.service.InviteTokenService;
 import com.platform.system.rbac.dto.UserDto;
 import com.platform.system.rbac.entity.RoleEntity;
 import com.platform.system.rbac.entity.UserRoleEntity;
 import com.platform.system.rbac.mapper.RoleMapper;
 import com.platform.system.rbac.mapper.UserRoleMapper;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class UserAdminService {
@@ -40,6 +47,13 @@ public class UserAdminService {
     private final PermissionCacheService cacheService;
     private final ForceLogoutService forceLogoutService;
     private final NumberingService numberingService;
+    // The following four are only wired when app.security.mode=oidc (the
+    // beans are @ConditionalOnProperty). ObjectProvider keeps this service
+    // bootable in non-OIDC modes — create(...) checks for null before using.
+    private final ObjectProvider<KeycloakUserService> keycloakProvider;
+    private final ObjectProvider<InviteTokenService> inviteProvider;
+    private final ObjectProvider<MailService> mailProvider;
+    private final AppMailProperties mailProps;
 
     public UserAdminService(UserMapper userMapper,
                             UserRoleMapper userRoleMapper,
@@ -48,7 +62,11 @@ public class UserAdminService {
                             PasswordPolicyService passwordPolicy,
                             PermissionCacheService cacheService,
                             ForceLogoutService forceLogoutService,
-                            NumberingService numberingService) {
+                            NumberingService numberingService,
+                            ObjectProvider<KeycloakUserService> keycloakProvider,
+                            ObjectProvider<InviteTokenService> inviteProvider,
+                            ObjectProvider<MailService> mailProvider,
+                            AppMailProperties mailProps) {
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
         this.roleMapper = roleMapper;
@@ -57,6 +75,10 @@ public class UserAdminService {
         this.cacheService = cacheService;
         this.forceLogoutService = forceLogoutService;
         this.numberingService = numberingService;
+        this.keycloakProvider = keycloakProvider;
+        this.inviteProvider = inviteProvider;
+        this.mailProvider = mailProvider;
+        this.mailProps = mailProps;
     }
 
     public PageResult<UserDto.View> list(long page, long size, String keyword, String deptId) {
@@ -79,27 +101,115 @@ public class UserAdminService {
 
     @Transactional
     public String create(UserDto.CreateRequest req) {
-        passwordPolicy.validate(req.password());
+        // DIRECT requires a typed-in password (validate complexity + HIBP).
+        // INVITE never asks the admin for one — the user picks at acceptance time.
+        UserDto.ProvisionMode mode = req.mode();
+        if (mode == UserDto.ProvisionMode.DIRECT) {
+            if (req.password() == null || req.password().isBlank()) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                        "Password is required when provision mode is DIRECT");
+            }
+            passwordPolicy.validate(req.password());
+        } else {
+            if (req.email() == null || req.email().isBlank()) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                        "Email is required when provision mode is INVITE");
+            }
+        }
+
         Long dup = userMapper.selectCount(new QueryWrapper<UserEntity>().eq("mark", 1).eq("username", req.username()));
         if (dup != null && dup > 0) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Username already exists: " + req.username());
         }
+
+        // Tenant for numbering: each tenant has its own user-no counter.
+        String tenantId = RequestContext.tenantId();
+        if (tenantId == null || tenantId.isBlank()) tenantId = DEFAULT_TENANT;
+
         UserEntity u = new UserEntity();
         u.setId(IdGenerator.ulid());
         u.setUsername(req.username());
-        u.setPasswordHash(encoder.encode(req.password()));
         u.setEmail(req.email());
-        // userNo は採番（V4 で seed 済みの code_kbn="USER" 定義に従い U + 8 桁 zero-pad）。
-        // クライアント入力は受け付けない方針：採番との衝突を未然に避ける。
-        // テナント別に採番カウンタを分けるため、現在の RequestContext から tenantId を取得。
-        String tenantId = RequestContext.tenantId();
-        if (tenantId == null || tenantId.isBlank()) tenantId = DEFAULT_TENANT;
+        // Legacy password column — only filled in DIRECT mode for the
+        // (mode=password) fallback path. OIDC users authenticate via Keycloak.
+        if (mode == UserDto.ProvisionMode.DIRECT) {
+            u.setPasswordHash(encoder.encode(req.password()));
+        }
         u.setUserNo(numberingService.next(USER_NO_KBN, tenantId));
         u.setDisplayName(req.displayName());
         u.setDeptId(req.deptId());
         u.setStatus(req.status() == null ? 1 : req.status());
+
+        // Side-effect: provision in Keycloak first when oidc is on, so we can
+        // store keycloak_id on the row we insert. On Keycloak failure we never
+        // touch the business DB → no half-created users.
+        KeycloakUserService keycloak = keycloakProvider.getIfAvailable();
+        String kcId = null;
+        if (keycloak != null) {
+            // For INVITE the Keycloak user has no credentials yet; setPassword
+            // is called from the invite-acceptance endpoint after the user
+            // chooses their password.
+            String tempPw = (mode == UserDto.ProvisionMode.DIRECT) ? req.password() : null;
+            kcId = keycloak.createUser(tenantId, req.username(), req.email(), req.displayName(), tempPw);
+            u.setKeycloakId(kcId);
+        }
+
         userMapper.insert(u);
+
+        // Side-effect: notification email. INVITE includes the magic link;
+        // DIRECT just confirms account opening + reminds of the initial creds.
+        // Failures here are LOGGED, not propagated — the user row is already
+        // committed, and a missing email is recoverable (admin can resend).
+        notifyOnboarding(u, mode, req.password(), tenantId);
+
         return u.getId();
+    }
+
+    private void notifyOnboarding(UserEntity u, UserDto.ProvisionMode mode, String tempPassword, String tenantId) {
+        MailService mail = mailProvider.getIfAvailable();
+        if (mail == null || u.getEmail() == null || u.getEmail().isBlank()) {
+            // No mail service wired (legacy / password-only deployments) or no
+            // address to send to. Nothing to do — the user was still created.
+            return;
+        }
+        try {
+            Map<String, Object> model = new HashMap<>();
+            model.put("appName",     mailProps.fromName());
+            model.put("username",    u.getUsername());
+            model.put("displayName", u.getDisplayName());
+            model.put("tenantId",    tenantId);
+            model.put("supportEmail", mailProps.from());
+
+            if (mode == UserDto.ProvisionMode.INVITE) {
+                InviteTokenService invites = inviteProvider.getIfAvailable();
+                if (invites == null) {
+                    // OIDC off but INVITE requested — shouldn't happen given the
+                    // validation in create(), but guard anyway so we never email
+                    // a "click here" link that has no backing token.
+                    return;
+                }
+                String token = invites.mint(tenantId, u.getId(), u.getKeycloakId());
+                String url = mailProps.baseUrl() + "/invite/" + token;
+                model.put("inviteUrl", url);
+                model.put("expiresIn", "7 days");
+                mail.sendHtmlAsync(u.getEmail(),
+                        "[" + mailProps.fromName() + "] アカウント招待",
+                        "user-invite.ftl", model);
+            } else {
+                model.put("loginUrl",     mailProps.baseUrl() + "/login");
+                model.put("tempPassword", tempPassword);
+                mail.sendHtmlAsync(u.getEmail(),
+                        "[" + mailProps.fromName() + "] アカウント開設のお知らせ",
+                        "user-direct-welcome.ftl", model);
+            }
+        } catch (Exception e) {
+            // Anything that goes wrong building / sending the mail is
+            // logged at WARN — the user row is already committed.
+            // No throw: don't surface an SMTP misconfiguration as a 500 to
+            // the admin's user-creation form.
+            org.slf4j.LoggerFactory.getLogger(UserAdminService.class)
+                    .warn("[user] onboarding mail to {} failed: {}", u.getEmail(), e.toString());
+        }
     }
 
     @Transactional

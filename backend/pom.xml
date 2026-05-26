@@ -46,6 +46,9 @@
         <caffeine.version>3.2.0</caffeine.version>
         <lombok.version>1.18.44</lombok.version>
         <testcontainers.version>1.21.3</testcontainers.version>
+        <!-- Keycloak admin-client version is decoupled from the server (26.6.2 used here)
+             but the broad-compat 26.x line is fine — REST API is stable within the major. -->
+        <keycloak-admin-client.version>26.0.4</keycloak-admin-client.version>
     </properties>
 
     <dependencyManagement>
@@ -137,6 +140,15 @@
                 <version>${testcontainers.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <!-- Keycloak Admin REST client — pinned here so the version
+                 doesn't fall back to a placeholder when child modules
+                 resolve our installed pom transitively. -->
+            <dependency>
+                <groupId>org.keycloak</groupId>
+                <artifactId>keycloak-admin-client</artifactId>
+                <version>${keycloak-admin-client.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

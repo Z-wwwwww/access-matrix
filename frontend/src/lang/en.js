@@ -127,6 +127,29 @@ export default {
     }
   },
 
+  invite: {
+    title: 'Set up your account',
+    tenantPrefix: 'Tenant:',
+    passwordLabel: 'Password',
+    passwordPlaceholder: 'At least 8 characters',
+    passwordConfirmLabel: 'Confirm password',
+    passwordConfirmPlaceholder: 'Re-enter your password',
+    button: {
+      submit: 'Set password',
+      submitting: 'Submitting...',
+      goLogin: 'Go to login'
+    },
+    message: {
+      checking: 'Validating invite...',
+      invalidLink: 'Invite link is malformed',
+      notValid: 'This invite is invalid, expired, or already used',
+      passwordTooShort: 'Password must be at least 8 characters',
+      passwordMismatch: 'Passwords do not match',
+      acceptFailed: 'Failed to set password',
+      done: 'Password set. You can now sign in.'
+    }
+  },
+
   forget: {
     title: 'Reset password',
     mobileLabel: 'Mobile number',
@@ -243,7 +266,19 @@ export default {
         deptId: 'Department',
         status: 'Status',
         roles: 'Roles',
-        rolesSelected: '{selected} of {total} selected'
+        rolesSelected: '{selected} of {total} selected',
+        mode: 'Provision mode'
+      },
+      mode: {
+        invite: {
+          title: 'Invite',
+          hint: 'User sets their own password via email link',
+          willEmail: 'An invite email will be sent to {email}'
+        },
+        direct: {
+          title: 'Direct',
+          hint: 'Admin sets the initial password'
+        }
       },
       placeholder: {
         password: '8+ chars / 4 character types'

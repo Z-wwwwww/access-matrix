@@ -134,6 +134,29 @@ export default {
     }
   },
 
+  invite: {
+    title: 'アカウントの設定',
+    tenantPrefix: 'テナント:',
+    passwordLabel: 'パスワード',
+    passwordPlaceholder: '8 文字以上',
+    passwordConfirmLabel: 'パスワード（確認）',
+    passwordConfirmPlaceholder: 'もう一度入力してください',
+    button: {
+      submit: 'パスワードを設定',
+      submitting: '送信中...',
+      goLogin: 'ログイン画面へ'
+    },
+    message: {
+      checking: '招待を確認しています...',
+      invalidLink: '招待リンクが不正です',
+      notValid: 'この招待は無効、期限切れ、または既に使用済みです',
+      passwordTooShort: 'パスワードは 8 文字以上にしてください',
+      passwordMismatch: '2 回入力したパスワードが一致しません',
+      acceptFailed: 'パスワード設定に失敗しました',
+      done: 'パスワードを設定しました。ログインしてください。'
+    }
+  },
+
   forget: {
     title: 'パスワード再設定',
     mobileLabel: '携帯番号',
@@ -250,7 +273,19 @@ export default {
         deptId: '部署',
         status: '状態',
         roles: 'ロール',
-        rolesSelected: '{selected} / {total} 選択中'
+        rolesSelected: '{selected} / {total} 選択中',
+        mode: 'パスワード設定方法'
+      },
+      mode: {
+        invite: {
+          title: '招待メール',
+          hint: 'ユーザーがメールから自分で設定',
+          willEmail: '{email} に招待メールを送信します'
+        },
+        direct: {
+          title: '管理者設定',
+          hint: '初期パスワードを管理者が指定'
+        }
       },
       placeholder: {
         password: '8 文字以上 / 4 種類の文字種'

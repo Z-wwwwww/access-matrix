@@ -5,11 +5,15 @@ import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.security.BuiltInRoles;
+import com.platform.core.infrastructure.config.properties.AppMailProperties;
+import com.platform.core.infrastructure.mail.MailService;
 import com.platform.core.infrastructure.numbering.NumberingService;
 import com.platform.core.infrastructure.security.ForceLogoutService;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
+import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
+import com.platform.system.auth.service.InviteTokenService;
 import com.platform.system.rbac.dto.UserDto;
 import com.platform.system.rbac.entity.RoleEntity;
 import com.platform.system.rbac.entity.UserRoleEntity;
@@ -23,6 +27,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
@@ -61,6 +66,14 @@ class UserAdminServiceTest {
     @Mock PermissionCacheService cacheService;
     @Mock ForceLogoutService forceLogoutService;
     @Mock NumberingService numberingService;
+    // ObjectProvider mocks for the three OIDC-conditional beans + the mail
+    // properties record. Default behaviour: getIfAvailable() returns null,
+    // meaning the legacy / non-OIDC code path runs (no Keycloak side-effects,
+    // no email send) — keeps these unit tests focused on the DB plumbing.
+    @Mock ObjectProvider<KeycloakUserService> keycloakProvider;
+    @Mock ObjectProvider<InviteTokenService> inviteProvider;
+    @Mock ObjectProvider<MailService> mailProvider;
+    AppMailProperties mailProps = new AppMailProperties(false, null, null, null);
 
     @InjectMocks UserAdminService service;
 
@@ -101,7 +114,8 @@ class UserAdminServiceTest {
         when(numberingService.next("USER", "acme")).thenReturn("U00000001");
 
         UserDto.CreateRequest req = new UserDto.CreateRequest(
-                "alice", "Password!23", "alice@example.com", "Alice", null, 1);
+                "alice", "Password!23", "alice@example.com", "Alice", null, 1,
+                UserDto.ProvisionMode.DIRECT);
         String id = service.create(req);
 
         assertThat(id).isNotBlank();
@@ -119,7 +133,8 @@ class UserAdminServiceTest {
         when(numberingService.next("USER", "default")).thenReturn("U00000099");
 
         UserDto.CreateRequest req = new UserDto.CreateRequest(
-                "bob", "Password!23", "bob@example.com", "Bob", null, 1);
+                "bob", "Password!23", "bob@example.com", "Bob", null, 1,
+                UserDto.ProvisionMode.DIRECT);
         service.create(req);
 
         verify(numberingService).next("USER", "default");
