@@ -10,12 +10,20 @@ spring:
       port: 6379
       password: ${REDIS_PASSWORD:abcd@1234}
       database: 1
-  # ─── Outgoing mail (Tencent ExMail) ───
-  # Fill in your own credentials before flipping app.mail.enabled to true. The
-  # smtp host / port / SSL flags inherit from application.yml's Tencent defaults.
+  # ─── Outgoing mail (Tencent ExMail / 腾讯企业邮) ───
+  # Host / port / SSL flags inherit from application.yml — only credentials
+  # need filling in here. Same approach inntouch uses for *@nts-cn.com /
+  # *@sozonext.com mailboxes via SendMailUtil's hostMap entry "smtp.nts-cn".
+  #
+  # SMTP password is the "client-specific password" — NOT your ExMail login.
+  # Generate via:  ExMail console → settings → 安全 → 客户端专用密码 → 新增
+  # (1 per device; can be revoked individually).
+  #
+  # Once filled, set CORE_MAIL_ENABLED=true (or app.mail.enabled below) to
+  # actually fire emails — otherwise MailService logs the intended send.
   mail:
-    username: ${CORE_MAIL_USERNAME:wen.zhang@sozonext.com}
-    password: ${CORE_MAIL_PASSWORD:}    # paste your ExMail SMTP password / app-password
+    username: ${CORE_MAIL_USERNAME:wen.zhang@nts-cn.com}
+    password: ${CORE_MAIL_PASSWORD:}
 
 app:
   security:
@@ -26,16 +34,21 @@ app:
     #      APP_SECURITY_MODE=oidc override
     # The issuer-uri default in application.yml already points at
     # http://localhost:8180/realms/default, so no extra config is needed.
-    mode: permit-all
+#    mode: permit-all
+    mode: oidc
     refresh-cookie:
       secure: false
       same-site: Lax
   mail:
-    # Set to true to actually send mail (otherwise MailService no-ops and logs).
-    # Defaults false so a fresh dev checkout doesn't try to talk to ExMail
-    # with empty creds.
+    # Set CORE_MAIL_ENABLED=true to actually send mail. When false, MailService
+    # short-circuits and logs the intended recipient + template so dev can
+    # confirm the wiring without burning real sends. Default false so a fresh
+    # checkout (no SMTP password yet) doesn't error on user-create.
     enabled: ${CORE_MAIL_ENABLED:false}
-    from:      ${CORE_MAIL_FROM:wen.zhang@sozonext.com}
+    # ExMail requires the envelope FROM to match the authenticated user —
+    # keep `from` aligned with spring.mail.username above. The display name
+    # (`from-name`) is free-form; it shows in mail clients next to the address.
+    from:      ${CORE_MAIL_FROM:wen.zhang@nts-cn.com}
     from-name: ${CORE_MAIL_FROM_NAME:Access Matrix (dev)}
     base-url:  ${CORE_APP_BASE_URL:http://localhost:5273}
   cors:

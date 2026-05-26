@@ -18,9 +18,23 @@ spring:
     datatype:
       datetime:
         write-dates-as-timestamps: false
-  # Spring Mail — JavaMailSender wired from these properties. Concrete creds
-  # live in profile-specific yml (application-local.yml has placeholders).
-  # Defaults below match Tencent ExMail (smtp.exmail.qq.com:465 SSL).
+  # Spring Mail — JavaMailSender wired from these properties. Concrete
+  # creds live in profile-specific yml (application-local.yml fills
+  # in CORE_MAIL_*). Defaults match Tencent ExMail (腾讯企业邮),
+  # the SMTP relay the inntouch project uses for *@nts-cn.com /
+  # *@sozonext.com style mailboxes (see SendMailUtil.hostMap).
+  #
+  # ExMail-specific quirks:
+  #   * port 465 with IMPLICIT TLS  → mail.smtp.ssl.enable=true,
+  #     starttls.enable=false (NOT 587 / STARTTLS — that's a different
+  #     endpoint that may or may not be enabled per account).
+  #   * TLSv1.2+ required; TLS 1.0/1.1 are rejected.
+  #   * AUTH must be enabled; username is the FULL email address
+  #     (e.g. wen.zhang@nts-cn.com), password is the "client-specific
+  #     password" from ExMail console → 安全设置 → 客户端专用密码,
+  #     NOT your login password.
+  #   * Server-identity check is on so a hijacked DNS can't redirect
+  #     us at a fake SMTP endpoint that accepts our creds.
   mail:
     host: ${CORE_MAIL_HOST:smtp.exmail.qq.com}
     port: ${CORE_MAIL_PORT:465}
@@ -31,10 +45,15 @@ spring:
       mail.smtp.auth: true
       mail.smtp.ssl.enable: true
       mail.smtp.ssl.protocols: TLSv1.2
+      mail.smtp.ssl.checkserveridentity: true
       mail.smtp.starttls.enable: false
       mail.smtp.connectiontimeout: 5000
       mail.smtp.timeout: 5000
       mail.smtp.writetimeout: 5000
+      # Envelope-FROM (return-path / bounce target). Tencent ExMail
+      # rejects messages whose envelope FROM doesn't match the
+      # authenticated user, so we explicitly bind it to the SMTP user.
+      mail.smtp.from: ${CORE_MAIL_USERNAME:}
   # Freemarker — used by MailService to render mailtemplate/*.ftl. JSON API
   # so we disable the MVC view resolver; the FreeMarkerConfigurer bean stays
   # auto-wired and MailService injects it directly.
@@ -125,29 +144,6 @@ app:
       # this base and wires JWKS validation + issuer assertion automatically.
       # Default points at the locally-launched Keycloak in infra/keycloak/.
       issuer-uri: ${CORE_OIDC_ISSUER_URI:http://localhost:8180/realms/default}
-  keycloak:
-    # Server-side Keycloak Admin REST connection used by KeycloakUserService
-    # to provision / disable / delete users from the backend. Realm = tenant id.
-    admin:
-      server-url:    ${CORE_KEYCLOAK_SERVER_URL:http://localhost:8180}
-      realm:         ${CORE_KEYCLOAK_ADMIN_REALM:master}
-      # Default to admin-cli + admin/admin so a fresh local Keycloak just
-      # works. In prod we use a dedicated service-account client per realm
-      # with only `realm-management/manage-users` granted.
-      client-id:     ${CORE_KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
-      client-secret: ${CORE_KEYCLOAK_ADMIN_CLIENT_SECRET:}
-      username:      ${CORE_KEYCLOAK_ADMIN_USERNAME:admin}
-      password:      ${CORE_KEYCLOAK_ADMIN_PASSWORD:admin}
-  # Outgoing mail — used by MailService for invite + onboarding notices.
-  mail:
-    enabled:    ${CORE_MAIL_ENABLED:false}
-    from:       ${CORE_MAIL_FROM:noreply@localhost}
-    from-name:  ${CORE_MAIL_FROM_NAME:Access Matrix}
-    base-url:   ${CORE_APP_BASE_URL:http://localhost:5273}
-  invite:
-    # Invite token lifetime — default 7 days, matching Keycloak's default for
-    # `executeActionsEmail`. Override per environment.
-    token-ttl:  ${CORE_INVITE_TOKEN_TTL:7d}
     rate-limit:
       enabled: true
       requests-per-minute: 30
@@ -173,6 +169,29 @@ app:
       path: /api/auth
       secure: true
       same-site: Strict
+  keycloak:
+    # Server-side Keycloak Admin REST connection used by KeycloakUserService
+    # to provision / disable / delete users from the backend. Realm = tenant id.
+    admin:
+      server-url:    ${CORE_KEYCLOAK_SERVER_URL:http://localhost:8180}
+      realm:         ${CORE_KEYCLOAK_ADMIN_REALM:master}
+      # Default to admin-cli + admin/admin so a fresh local Keycloak just
+      # works. In prod we use a dedicated service-account client per realm
+      # with only `realm-management/manage-users` granted.
+      client-id:     ${CORE_KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
+      client-secret: ${CORE_KEYCLOAK_ADMIN_CLIENT_SECRET:}
+      username:      ${CORE_KEYCLOAK_ADMIN_USERNAME:admin}
+      password:      ${CORE_KEYCLOAK_ADMIN_PASSWORD:admin}
+  # Outgoing mail — used by MailService for invite + onboarding notices.
+  mail:
+    enabled:    ${CORE_MAIL_ENABLED:false}
+    from:       ${CORE_MAIL_FROM:noreply@localhost}
+    from-name:  ${CORE_MAIL_FROM_NAME:Access Matrix}
+    base-url:   ${CORE_APP_BASE_URL:http://localhost:5273}
+  invite:
+    # Invite token lifetime — default 7 days, matching Keycloak's default for
+    # `executeActionsEmail`. Override per environment.
+    token-ttl:  ${CORE_INVITE_TOKEN_TTL:7d}
   mybatis:
     tenant:
       enabled: false
