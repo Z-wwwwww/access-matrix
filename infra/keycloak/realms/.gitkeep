@@ -1,0 +1,4 @@
+Drop exported realm JSON files (Realm Settings -> Action -> Partial export, or
+the full bin/kc.sh export) here. The start scripts symlink this directory
+into $KEYCLOAK_HOME/data/import so `start-dev --import-realm` picks them up
+on every boot, keeping all developers' Keycloak state in sync via git.
