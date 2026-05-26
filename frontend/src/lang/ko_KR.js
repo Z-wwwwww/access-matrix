@@ -127,6 +127,29 @@ export default {
     }
   },
 
+  invite: {
+    title: '계정 설정',
+    tenantPrefix: '테넌트:',
+    passwordLabel: '비밀번호',
+    passwordPlaceholder: '8자 이상',
+    passwordConfirmLabel: '비밀번호 확인',
+    passwordConfirmPlaceholder: '비밀번호를 다시 입력하세요',
+    button: {
+      submit: '비밀번호 설정',
+      submitting: '전송 중...',
+      goLogin: '로그인 화면으로'
+    },
+    message: {
+      checking: '초대 확인 중...',
+      invalidLink: '초대 링크가 잘못되었습니다',
+      notValid: '이 초대는 유효하지 않거나 만료되었거나 이미 사용되었습니다',
+      passwordTooShort: '비밀번호는 8자 이상이어야 합니다',
+      passwordMismatch: '두 비밀번호가 일치하지 않습니다',
+      acceptFailed: '비밀번호 설정 실패',
+      done: '비밀번호가 설정되었습니다. 로그인하세요.'
+    }
+  },
+
   forget: {
     title: '비밀번호 재설정',
     mobileLabel: '휴대폰 번호',
@@ -243,7 +266,19 @@ export default {
         deptId: '부서',
         status: '상태',
         roles: '역할',
-        rolesSelected: '{selected} / {total} 선택됨'
+        rolesSelected: '{selected} / {total} 선택됨',
+        mode: '비밀번호 설정 방법'
+      },
+      mode: {
+        invite: {
+          title: '초대 메일',
+          hint: '사용자가 메일에서 직접 설정',
+          willEmail: '초대 메일이 {email} 로 발송됩니다'
+        },
+        direct: {
+          title: '관리자 설정',
+          hint: '관리자가 초기 비밀번호 지정'
+        }
       },
       placeholder: {
         password: '8자 이상 / 4종 문자 유형'

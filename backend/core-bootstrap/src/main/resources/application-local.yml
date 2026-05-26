@@ -10,6 +10,12 @@ spring:
       port: 6379
       password: ${REDIS_PASSWORD:abcd@1234}
       database: 1
+  # ─── Outgoing mail (Tencent ExMail) ───
+  # Fill in your own credentials before flipping app.mail.enabled to true. The
+  # smtp host / port / SSL flags inherit from application.yml's Tencent defaults.
+  mail:
+    username: ${CORE_MAIL_USERNAME:wen.zhang@sozonext.com}
+    password: ${CORE_MAIL_PASSWORD:}    # paste your ExMail SMTP password / app-password
 
 app:
   security:
@@ -24,6 +30,14 @@ app:
     refresh-cookie:
       secure: false
       same-site: Lax
+  mail:
+    # Set to true to actually send mail (otherwise MailService no-ops and logs).
+    # Defaults false so a fresh dev checkout doesn't try to talk to ExMail
+    # with empty creds.
+    enabled: ${CORE_MAIL_ENABLED:false}
+    from:      ${CORE_MAIL_FROM:wen.zhang@sozonext.com}
+    from-name: ${CORE_MAIL_FROM_NAME:Access Matrix (dev)}
+    base-url:  ${CORE_APP_BASE_URL:http://localhost:5273}
   cors:
     allowed-origins:
       - "*"

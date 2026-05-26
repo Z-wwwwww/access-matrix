@@ -112,6 +112,29 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
 
+        <!-- Mail (jakarta.mail under Spring Boot 4) + Freemarker for HTML templates.
+             Used by MailService for user-onboarding emails (account-opened
+             notice + invite link). Inntouch's SendMailUtil set the precedent
+             for this stack; we keep freemarker but switch from commons-email
+             + static fields to Spring's @Service + JavaMailSender. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-freemarker</artifactId>
+        </dependency>
+
+        <!-- Keycloak Admin REST client — wraps token refresh + error mapping
+             so KeycloakUserService.createUser / setPassword / deleteUser stays
+             one-liners. Only loaded; the @Service that uses it is conditional
+             on app.security.mode=oidc. -->
+        <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-admin-client</artifactId>
+        </dependency>
+
         <!-- MapStruct -->
         <dependency>
             <groupId>org.mapstruct</groupId>

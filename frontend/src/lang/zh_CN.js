@@ -127,6 +127,29 @@ export default {
     }
   },
 
+  invite: {
+    title: '设置账号',
+    tenantPrefix: '租户:',
+    passwordLabel: '密码',
+    passwordPlaceholder: '至少 8 个字符',
+    passwordConfirmLabel: '确认密码',
+    passwordConfirmPlaceholder: '再次输入密码',
+    button: {
+      submit: '设置密码',
+      submitting: '提交中...',
+      goLogin: '前往登录'
+    },
+    message: {
+      checking: '正在验证邀请...',
+      invalidLink: '邀请链接格式错误',
+      notValid: '邀请已失效、过期或已被使用',
+      passwordTooShort: '密码至少需要 8 个字符',
+      passwordMismatch: '两次输入的密码不一致',
+      acceptFailed: '设置密码失败',
+      done: '密码已设置，现在可以登录'
+    }
+  },
+
   forget: {
     title: '重置密码',
     mobileLabel: '手机号',
@@ -243,7 +266,19 @@ export default {
         deptId: '部门',
         status: '状态',
         roles: '角色',
-        rolesSelected: '已选 {selected} / {total}'
+        rolesSelected: '已选 {selected} / {total}',
+        mode: '密码设置方式'
+      },
+      mode: {
+        invite: {
+          title: '邀请邮件',
+          hint: '用户通过邮件自行设置密码',
+          willEmail: '邀请邮件将发送至 {email}'
+        },
+        direct: {
+          title: '管理员设置',
+          hint: '管理员指定初始密码'
+        }
       },
       placeholder: {
         password: '8 位以上 / 4 种字符类型'

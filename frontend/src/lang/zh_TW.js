@@ -127,6 +127,29 @@ export default {
     }
   },
 
+  invite: {
+    title: '設定帳號',
+    tenantPrefix: '租戶:',
+    passwordLabel: '密碼',
+    passwordPlaceholder: '至少 8 個字元',
+    passwordConfirmLabel: '確認密碼',
+    passwordConfirmPlaceholder: '再次輸入密碼',
+    button: {
+      submit: '設定密碼',
+      submitting: '提交中...',
+      goLogin: '前往登入'
+    },
+    message: {
+      checking: '正在驗證邀請...',
+      invalidLink: '邀請連結格式錯誤',
+      notValid: '邀請已失效、過期或已被使用',
+      passwordTooShort: '密碼至少需要 8 個字元',
+      passwordMismatch: '兩次輸入的密碼不一致',
+      acceptFailed: '設定密碼失敗',
+      done: '密碼已設定，現在可以登入'
+    }
+  },
+
   forget: {
     title: '重設密碼',
     mobileLabel: '手機號碼',
@@ -243,7 +266,19 @@ export default {
         deptId: '部門',
         status: '狀態',
         roles: '角色',
-        rolesSelected: '已選 {selected} / {total}'
+        rolesSelected: '已選 {selected} / {total}',
+        mode: '密碼設定方式'
+      },
+      mode: {
+        invite: {
+          title: '邀請郵件',
+          hint: '使用者透過郵件自行設定密碼',
+          willEmail: '邀請郵件將發送至 {email}'
+        },
+        direct: {
+          title: '管理員設定',
+          hint: '管理員指定初始密碼'
+        }
       },
       placeholder: {
         password: '8 位以上 / 4 種字元類型'
