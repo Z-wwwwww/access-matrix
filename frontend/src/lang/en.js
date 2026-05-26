@@ -117,10 +117,13 @@ export default {
     submit: 'Log in',
     submitting: 'Logging in...',
     forgotPassword: 'Forgot password?',
+    ssoDivider: 'or',
+    ssoButton: 'Sign in with SSO',
     message: {
       enterUsername: 'Please enter your username',
       enterPassword: 'Please enter your password',
-      loginFailed: 'Login failed'
+      loginFailed: 'Login failed',
+      ssoFailed: 'SSO sign-in failed'
     }
   },
 

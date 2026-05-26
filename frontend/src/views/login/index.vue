@@ -5,7 +5,12 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useMenuStore } from '@/stores/menu'
 import { useTabsStore } from '@/stores/tabs'
-import { User, Lock, Building } from 'lucide-vue-next'
+import { User, Lock, Building, KeyRound } from 'lucide-vue-next'
+import { beginLogin as beginSsoLogin, oidcConfig, stashReturnTo } from '@/utils/oidc'
+
+const ssoConfig = oidcConfig()
+const ssoEnabled = ssoConfig.enabled
+const ssoErrorFromQuery = ref('')
 
 const router = useRouter()
 const route = useRoute()
@@ -74,8 +79,24 @@ function handleKeydown(e) {
   if (e.key === 'Enter') handleLogin()
 }
 
+async function handleSsoLogin() {
+  errorMsg.value = ''
+  ssoErrorFromQuery.value = ''
+  stashReturnTo(route.query.from || '/')
+  try {
+    await beginSsoLogin()   // navigates away; never resolves
+  } catch (e) {
+    errorMsg.value = e.message || 'SSO not available'
+  }
+}
+
 onMounted(() => {
   if (authStore.isAuthenticated) router.replace('/')
+  // Surface a callback failure (set by SsoCallback.vue) so the user
+  // sees why they were bounced back from the IdP.
+  if (route.query.sso_error) {
+    ssoErrorFromQuery.value = t('login.message.ssoFailed')
+  }
 })
 </script>
 
@@ -92,8 +113,8 @@ onMounted(() => {
       </div>
 
       <!-- Error message -->
-      <div v-if="errorMsg" class="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm border border-destructive/20">
-        {{ errorMsg }}
+      <div v-if="errorMsg || ssoErrorFromQuery" class="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm border border-destructive/20">
+        {{ errorMsg || ssoErrorFromQuery }}
       </div>
 
       <form @submit.prevent="handleLogin" class="space-y-4">
@@ -153,6 +174,23 @@ onMounted(() => {
         >
           {{ loading ? t('login.submitting') : t('login.submit') }}
         </button>
+
+        <!-- SSO (only shown when VITE_OIDC_ENABLED=true at build time) -->
+        <template v-if="ssoEnabled">
+          <div class="relative my-2 flex items-center">
+            <div class="flex-1 border-t border-border"></div>
+            <span class="px-2 text-xs text-muted-foreground">{{ t('login.ssoDivider') }}</span>
+            <div class="flex-1 border-t border-border"></div>
+          </div>
+          <button
+            type="button"
+            class="w-full h-10 inline-flex items-center justify-center gap-2 border border-input bg-background text-foreground font-medium rounded-lg text-sm hover:bg-muted transition-colors"
+            @click="handleSsoLogin"
+          >
+            <KeyRound :size="16" />
+            {{ t('login.ssoButton') }}
+          </button>
+        </template>
 
         <!-- advanced toggle (tenant input) -->
         <div class="text-center">

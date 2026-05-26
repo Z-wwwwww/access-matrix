@@ -124,10 +124,13 @@ export default {
     submit: 'ログイン',
     submitting: 'ログイン中...',
     forgotPassword: 'パスワードを忘れた',
+    ssoDivider: 'または',
+    ssoButton: 'SSO でサインイン',
     message: {
       enterUsername: 'ユーザー名を入力してください',
       enterPassword: 'パスワードを入力してください',
-      loginFailed: 'ログインに失敗しました'
+      loginFailed: 'ログインに失敗しました',
+      ssoFailed: 'SSO ログインに失敗しました'
     }
   },
 

@@ -117,10 +117,13 @@ export default {
     submit: '登入',
     submitting: '登入中...',
     forgotPassword: '忘記密碼？',
+    ssoDivider: '或',
+    ssoButton: 'SSO 登入',
     message: {
       enterUsername: '請輸入使用者名稱',
       enterPassword: '請輸入密碼',
-      loginFailed: '登入失敗'
+      loginFailed: '登入失敗',
+      ssoFailed: 'SSO 登入失敗'
     }
   },
 
