@@ -26,6 +26,15 @@ public class UserEntity extends BaseEntity {
     @TableField("password_hash")
     private String passwordHash;
 
+    /**
+     * Keycloak user UUID — the external identity anchor for users who log in
+     * via OIDC. NULL for users still on the legacy password path. Filled by
+     * {@code OidcJitUserService} on the first JWT seen for this identity.
+     * See V21 migration for the index / nullability rationale.
+     */
+    @TableField("keycloak_id")
+    private String keycloakId;
+
     /** 1=enabled, 0=locked */
     @TableField("status")
     private Integer status;

@@ -78,6 +78,11 @@ springdoc:
 
 app:
   security:
+    # permit-all | jwt | oidc
+    #   permit-all : no auth check (tests / smoke only)
+    #   jwt        : legacy HS256, tokens signed by AdminAuthController
+    #   oidc       : Keycloak / external IdP; JIT-provisions core_auth_user
+    #                rows via OidcJitUserService on first login
     mode: permit-all
     jwt:
       secret: ${CORE_JWT_SECRET:dev-placeholder-secret-please-override-32bytes!}
@@ -85,6 +90,12 @@ app:
       user-id-claim: sub
       username-claim: preferred_username
       authorities-claim: scope
+    oidc:
+      # Only consulted when mode=oidc. Points at the IdP realm's well-known
+      # discovery doc — Spring fetches /.well-known/openid-configuration from
+      # this base and wires JWKS validation + issuer assertion automatically.
+      # Default points at the locally-launched Keycloak in infra/keycloak/.
+      issuer-uri: ${CORE_OIDC_ISSUER_URI:http://localhost:8180/realms/default}
     rate-limit:
       enabled: true
       requests-per-minute: 30

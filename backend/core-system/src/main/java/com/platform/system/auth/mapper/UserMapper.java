@@ -44,4 +44,24 @@ public interface UserMapper extends BaseMapper<UserEntity> {
             """)
     UserEntity findByIdAndTenant(@Param("userId") String userId,
                                  @Param("tenantId") String tenantId);
+
+    /**
+     * Looks up the business user for a given Keycloak UUID inside a tenant.
+     * The (tenant_id, keycloak_id) pair has a partial unique index (see V21),
+     * so this should return at most one row.
+     *
+     * <p>Hand-written {@code @Select} — tenant_id is filtered explicitly so
+     * the MyBatis-Plus tenant interceptor doesn't rewrite the predicate from
+     * the request context (the caller is the auth filter, which runs BEFORE
+     * the request context is finalised).
+     */
+    @Select("""
+            SELECT * FROM core_auth_user
+             WHERE mark = 1
+               AND tenant_id = #{tenantId}
+               AND keycloak_id = #{keycloakId}
+             LIMIT 1
+            """)
+    UserEntity findByKeycloakIdAndTenant(@Param("keycloakId") String keycloakId,
+                                         @Param("tenantId") String tenantId);
 }

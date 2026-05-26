@@ -48,6 +48,12 @@ public class SecurityConfig {
                 // not only on @RequiresPermission-annotated endpoints.
                 .addFilterAfter(forceLogoutFilter, CoreRequestContextFilter.class);
 
+        // app.security.mode controls how auth is enforced:
+        //   permit-all : no auth check at all (test runs / smoke).
+        //   jwt        : legacy — accept HS256 tokens signed by AdminAuthController.
+        //   oidc       : accept RS256 tokens issued by an external IdP (Keycloak),
+        //                verified against the IdP's JWKS endpoint. SecurityBeansConfig
+        //                wires the right JwtDecoder bean based on the same property.
         if ("permit-all".equalsIgnoreCase(props.mode())) {
             http.authorizeHttpRequests(reg -> reg.anyRequest().permitAll());
         } else {
