@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useMenuStore } from '@/stores/menu'
 import { useTabsStore } from '@/stores/tabs'
 import { User, Lock, Building, KeyRound } from 'lucide-vue-next'
-import { beginLogin as beginSsoLogin, oidcConfig, stashReturnTo } from '@/utils/oidc'
+import { beginLogin as beginSsoLogin, oidcConfig, stashReturnTo, keycloakForgotPasswordUrl } from '@/utils/oidc'
 
 const ssoConfig = oidcConfig()
 const ssoEnabled = ssoConfig.enabled
@@ -87,6 +87,14 @@ async function handleSsoLogin() {
     await beginSsoLogin()   // navigates away; never resolves
   } catch (e) {
     errorMsg.value = e.message || 'SSO not available'
+  }
+}
+
+function handleForgotPassword() {
+  const url = keycloakForgotPasswordUrl()
+  if (url) {
+    stashReturnTo(route.query.from || '/')
+    window.location.assign(url)
   }
 }
 
@@ -192,14 +200,22 @@ onMounted(() => {
           </button>
         </template>
 
-        <!-- advanced toggle (tenant input) -->
-        <div class="text-center">
+        <!-- footer links: tenant toggle + forgot password (SSO only) -->
+        <div class="flex items-center justify-between text-xs text-muted-foreground">
           <button
             type="button"
-            class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            class="hover:text-foreground transition-colors"
             @click="showTenant = !showTenant"
           >
             {{ showTenant ? t('login.hideAdvanced') : t('login.showAdvanced') }}
+          </button>
+          <button
+            v-if="ssoEnabled"
+            type="button"
+            class="hover:text-foreground transition-colors"
+            @click="handleForgotPassword"
+          >
+            {{ t('login.forgotPassword') }}
           </button>
         </div>
       </form>

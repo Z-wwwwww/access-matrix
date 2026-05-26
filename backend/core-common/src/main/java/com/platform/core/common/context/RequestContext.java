@@ -55,6 +55,12 @@ public final class RequestContext {
         return ctx == null ? null : ctx.userId;
     }
 
+    /** Current request locale. May be null when invoked outside of a web thread (jobs / startup). */
+    public static Locale locale() {
+        RequestContext ctx = HOLDER.get();
+        return ctx == null ? null : ctx.locale;
+    }
+
     public static void clear() {
         HOLDER.remove();
     }

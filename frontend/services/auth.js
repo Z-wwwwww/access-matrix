@@ -11,26 +11,6 @@ export const getMeApi   = ()     => request.get('/user/me')
 // Legacy alias (existing callers expect this name); points at the same /user/me.
 export const getUserInfoApi = getMeApi
 
-// ─────────────────────────────────────────────────────────────────────────
-// Self-service password change — the new backend's admin-only flow lives
-// under /admin/auth/reset-password. We don't have a dedicated self-service
-// endpoint yet, so we expose a stub the ChangePasswordDialog can call. It
-// throws with a friendly error so the user sees a clear "not available"
-// message instead of an exception trace.
-// TODO(stage5): wire to /auth/change-password once the backend lands.
-// ─────────────────────────────────────────────────────────────────────────
-export function updatePwdApi(/* { oldPwd, newPwd } */) {
-  return Promise.resolve({
-    data: { code: 700, msg: 'パスワード変更は管理者経由でリセットしてください', data: null }
-  })
-}
-
-// Forget-password captcha — same story, no captcha endpoint in the new
-// backend yet. Returns an empty body so the Forget page renders without
-// crashing; the form-submit path will surface a "not implemented" toast.
-// TODO(stage5): wire to /auth/captcha + /auth/forget-password.
-export function getCaptchaApi() {
-  return Promise.resolve({
-    data: { code: 0, msg: 'success', data: { captchaId: '', captchaImg: '' } }
-  })
-}
+// Self-service password change + reset live in Keycloak's account console
+// and forgot-password flow — see utils/oidc.js for keycloakAccountUrl() and
+// keycloakForgotPasswordUrl(). We don't proxy them through the backend.
