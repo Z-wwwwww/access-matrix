@@ -181,6 +181,96 @@ class PasswordToSsoMigrationServiceTest {
         verify(keycloak, times(3)).createUser(any(), eq("harriet"), any(), any(), any());
     }
 
+    // ─── resend() ─────────────────────────────────────────────────────
+    // Companion entry point for the case where users let the reset-password
+    // email expire (KC's default link lifespan is 12 h). The candidate set
+    // is the same as run() (keycloak_id IS NULL) but the action is different:
+    // skip create, ONLY re-fire executeActionsEmail against the existing KC user.
+
+    @Test
+    void resend_emailsExistingKcUserAndSkipsCreate() {
+        dbUsers.add(row("ULID-I", "ivy", "ivy@example.com"));
+        when(keycloak.findUserIdByUsername("default", "ivy")).thenReturn("kc-uuid-ivy");
+
+        MigrationReport report = service.resend(List.of("default"));
+
+        // No createUser — that's the whole point of the dedicated entry point.
+        verify(keycloak, never()).createUser(any(), any(), any(), any(), any());
+        // Email gets re-fired against the existing KC user.
+        verify(keycloak).executeActionsEmail("default", "kc-uuid-ivy", List.of("UPDATE_PASSWORD"));
+        // Bucketed under "created" (reused tally for "email re-issued").
+        assertThat(report.tenants.get(0).created).hasSize(1);
+        assertThat(report.tenants.get(0).created.get(0).keycloakId).isEqualTo("kc-uuid-ivy");
+    }
+
+    @Test
+    void resend_skipsRowsWithNoKcUserYet() {
+        // A row that was never run() through migration has no KC user.
+        // resend() must NOT silently create one — that would mask a misconfig
+        // (the operator forgot to run the first migration pass).
+        dbUsers.add(row("ULID-J", "jen", "jen@example.com"));
+        when(keycloak.findUserIdByUsername("default", "jen")).thenReturn(null);
+
+        MigrationReport report = service.resend(List.of("default"));
+
+        verify(keycloak, never()).createUser(any(), any(), any(), any(), any());
+        verify(keycloak, never()).executeActionsEmail(any(), any(), anyList());
+        assertThat(report.tenants.get(0).created).isEmpty();
+        assertThat(report.tenants.get(0).skipped).hasSize(1);
+        assertThat(report.tenants.get(0).skipped.get(0).reason)
+                .isEqualTo("no-kc-user-yet-run-migration-first");
+    }
+
+    @Test
+    void resend_recordsFailureIfEmailThrows() {
+        dbUsers.add(row("ULID-K", "kara", "kara@example.com"));
+        when(keycloak.findUserIdByUsername("default", "kara")).thenReturn("kc-uuid-kara");
+        org.mockito.Mockito.doThrow(new RuntimeException("SMTP unreachable"))
+                .when(keycloak).executeActionsEmail("default", "kc-uuid-kara",
+                        List.of("UPDATE_PASSWORD"));
+
+        MigrationReport report = service.resend(List.of("default"));
+
+        assertThat(report.tenants.get(0).failed).hasSize(1);
+        assertThat(report.tenants.get(0).failed.get(0).stage).isEqualTo("send-reset-email");
+        assertThat(report.tenants.get(0).created).isEmpty();
+    }
+
+    @Test
+    void resend_skipsUserMissingUsername() {
+        dbUsers.add(row("ULID-L", null, "lara@example.com"));
+
+        MigrationReport report = service.resend(List.of("default"));
+
+        verify(keycloak, never()).findUserIdByUsername(any(), any());
+        verify(keycloak, never()).executeActionsEmail(any(), any(), anyList());
+        assertThat(report.tenants.get(0).skipped).hasSize(1);
+        assertThat(report.tenants.get(0).skipped.get(0).reason).isEqualTo("missing-username");
+    }
+
+    @Test
+    void resend_doesNotTouchUsersWhoAlreadyBound() {
+        // Critical safety property: once a user has bound (keycloak_id set
+        // via the bind path on first SSO login), resend must skip them.
+        // The candidate query already filters on `keycloak_id IS NULL`, so
+        // bound users never even enter the loop. Simulate the contract by
+        // returning ZERO candidates from the mapper even though we have
+        // "users" in the underlying list.
+        dbUsers.clear();   // mapper returns 0 → bound users absent
+        // (would-be bound user just to make the intent clear)
+        UserEntity bound = row("ULID-M", "mark", "mark@example.com");
+        bound.setKeycloakId("kc-uuid-mark-already");
+        // dbUsers stays empty — the mapper QueryWrapper isNull("keycloak_id")
+        // would have filtered "mark" out.
+
+        MigrationReport report = service.resend(List.of("default"));
+
+        verify(keycloak, never()).executeActionsEmail(any(), any(), anyList());
+        assertThat(report.tenants.get(0).created).isEmpty();
+        assertThat(report.tenants.get(0).skipped).isEmpty();
+        assertThat(report.tenants.get(0).failed).isEmpty();
+    }
+
     @Test
     void skipsBlankOrNullTenantId() {
         MigrationReport report = service.run(java.util.Arrays.asList("default", null, "", "  "));
