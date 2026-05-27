@@ -305,6 +305,7 @@ export default {
     },
     tooltip: {
       editDisabled: '内置用户不可编辑',
+      editAdminContactOnly: '内置 admin：仅可编辑联系信息（邮箱、显示名）',
       edit: '编辑',
       resetPassword: '重置密码',
       resetPasswordDisabledSso: 'SSO 模式下不可用 — 用户在 Keycloak 账号控制台自助修改密码',
@@ -326,7 +327,7 @@ export default {
     edit: {
       titleEdit: '编辑用户',
       titleCreate: '新增用户',
-      lockedHint: '内置 admin 用户为只读。仅可修改密码（通过「重置密码」API）。',
+      lockedHint: '内置 admin 用户「仅可编辑联系信息」：邮箱和显示名可以修改（应急密码告警需要可达邮箱）。部门、状态、角色保持锁定。',
       label: {
         username: '登录ID',
         password: '密码',

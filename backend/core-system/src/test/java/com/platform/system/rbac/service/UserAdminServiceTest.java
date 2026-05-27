@@ -174,6 +174,80 @@ class UserAdminServiceTest {
         verify(forceLogoutService, never()).kickOut(any());
     }
 
+    // ─── built-in admin partial editability ───────────────────────────
+    // Admin can edit contact fields (email, displayName) so break-glass
+    // alerts have a reachable inbox. Structural fields (deptId, status)
+    // stay locked even via this update path.
+
+    @Test
+    void update_builtInAdmin_allowsEmailAndDisplayNameChange() {
+        UserEntity adminUser = user("u1", "admin");
+        adminUser.setEmail("old@example.com");
+        adminUser.setDisplayName("Admin");
+        when(userMapper.selectById("u1")).thenReturn(adminUser);
+
+        UserDto.UpdateRequest req = new UserDto.UpdateRequest(
+                "admin@platform.local", "Local Admin", null, null);
+        service.update("u1", req);
+
+        assertThat(adminUser.getEmail()).isEqualTo("admin@platform.local");
+        assertThat(adminUser.getDisplayName()).isEqualTo("Local Admin");
+        verify(userMapper).updateById(adminUser);
+        verify(cacheService).evictUser("u1");
+    }
+
+    @Test
+    void update_builtInAdmin_refusesDeptChange() {
+        UserEntity adminUser = user("u1", "admin");
+        adminUser.setDeptId("DEPT-HQ");
+        when(userMapper.selectById("u1")).thenReturn(adminUser);
+
+        UserDto.UpdateRequest req = new UserDto.UpdateRequest(
+                null, null, "DEPT-OTHER", null);
+        assertThatThrownBy(() -> service.update("u1", req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("cannot change department");
+
+        verify(userMapper, never()).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    void update_builtInAdmin_refusesStatusChange() {
+        UserEntity adminUser = user("u1", "admin");
+        adminUser.setStatus(1);
+        when(userMapper.selectById("u1")).thenReturn(adminUser);
+
+        UserDto.UpdateRequest req = new UserDto.UpdateRequest(
+                null, null, null, 0);
+        assertThatThrownBy(() -> service.update("u1", req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("cannot change status");
+
+        verify(userMapper, never()).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    void update_builtInAdmin_echoingSameStructuralValues_isAllowedNoOp() {
+        // The frontend form sends the FULL row back on edit, including the
+        // existing deptId and status. Re-asserting the same values must NOT
+        // trip the structural-change guards — otherwise editing email would
+        // 400 unless the UI specifically stripped deptId/status from the
+        // payload (which is the kind of fiddly thing future regressions
+        // would silently break).
+        UserEntity adminUser = user("u1", "admin");
+        adminUser.setDeptId("DEPT-HQ");
+        adminUser.setStatus(1);
+        adminUser.setEmail("admin@platform.local");
+        when(userMapper.selectById("u1")).thenReturn(adminUser);
+
+        UserDto.UpdateRequest req = new UserDto.UpdateRequest(
+                "admin-new@platform.local", null, "DEPT-HQ", 1);
+        service.update("u1", req);
+
+        assertThat(adminUser.getEmail()).isEqualTo("admin-new@platform.local");
+        verify(userMapper).updateById(adminUser);
+    }
+
     @Test
     void delete_refusesLastSuperAdmin() {
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));

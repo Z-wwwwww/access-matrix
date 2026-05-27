@@ -305,6 +305,7 @@ export default {
     },
     tooltip: {
       editDisabled: 'Built-in user is not editable',
+      editAdminContactOnly: 'Built-in admin: only contact details (email, display name) editable',
       edit: 'Edit',
       resetPassword: 'Reset password',
       resetPasswordDisabledSso: 'Disabled in SSO mode — users change their password in the Keycloak account console',
@@ -326,7 +327,7 @@ export default {
     edit: {
       titleEdit: 'Edit user',
       titleCreate: 'New user',
-      lockedHint: 'The built-in admin user is read-only. Only password reset is allowed (via the "Reset password" API).',
+      lockedHint: 'Built-in admin user: only contact info is editable. Email and display name can be changed (needed for break-glass alerts). Department, status, and roles stay locked.',
       label: {
         username: 'Login ID',
         password: 'Password',

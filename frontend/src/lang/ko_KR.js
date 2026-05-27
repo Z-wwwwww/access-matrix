@@ -305,6 +305,7 @@ export default {
     },
     tooltip: {
       editDisabled: '기본 제공 사용자는 편집할 수 없습니다',
+      editAdminContactOnly: '기본 제공 admin: 연락처 정보(이메일·표시명)만 편집 가능',
       edit: '편집',
       resetPassword: '비밀번호 재설정',
       resetPasswordDisabledSso: 'SSO 모드에서는 비활성화됩니다 — 사용자는 Keycloak 계정 콘솔에서 직접 비밀번호를 변경합니다',
@@ -326,7 +327,7 @@ export default {
     edit: {
       titleEdit: '사용자 편집',
       titleCreate: '사용자 신규',
-      lockedHint: '기본 제공 admin 사용자는 읽기 전용입니다. 비밀번호 변경만 가능합니다(「비밀번호 재설정」 API 경유).',
+      lockedHint: '기본 제공 admin 사용자는 「연락처 정보만 편집 가능」합니다. 이메일과 표시명은 수정할 수 있습니다(비상용 비밀번호 알림 수신에 필요). 부서·상태·역할은 잠겨 있습니다.',
       label: {
         username: '로그인 ID',
         password: '비밀번호',

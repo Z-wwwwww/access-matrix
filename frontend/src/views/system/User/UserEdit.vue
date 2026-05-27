@@ -19,7 +19,12 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => !!props.user)
-const isLocked = computed(() => isEdit.value && props.user?.username === 'admin')
+// Built-in admin: partially editable. Contact fields (email, displayName)
+// are open so break-glass alerts can be delivered to a real inbox.
+// Structural fields (deptId, status, role assignments) stay locked —
+// backend re-enforces this even if the UI is bypassed.
+const isBuiltInAdmin = computed(() => isEdit.value && props.user?.username === 'admin')
+const isStructuralLocked = computed(() => isBuiltInAdmin.value)
 
 const form = reactive({
   username: '',
@@ -65,7 +70,7 @@ watch(() => props.open, async (open) => {
 })
 
 function toggleRole(id) {
-  if (isLocked.value) return
+  if (isStructuralLocked.value) return
   const idx = selectedRoleIds.value.indexOf(id)
   if (idx >= 0) selectedRoleIds.value.splice(idx, 1)
   else selectedRoleIds.value.push(id)
@@ -81,10 +86,13 @@ async function save() {
     let userId
     if (isEdit.value) {
       // userNo は採番（read-only）なので update body に含めない。
-      const body = {
-        email: form.email,
-        displayName: form.displayName, deptId: form.deptId, status: form.status
-      }
+      // For built-in admin, omit deptId/status from the body so the
+      // backend's "cannot change department/status" guards don't trip
+      // even on a no-op echo of the current values (defends against
+      // the form picking up null → "" coercion).
+      const body = isBuiltInAdmin.value
+        ? { email: form.email, displayName: form.displayName }
+        : { email: form.email, displayName: form.displayName, deptId: form.deptId, status: form.status }
       const r = await updateUserApi(props.user.id, body)
       if (r.data.code !== 0) { toast.error(r.data.msg || t('user.edit.message.updateFailed')); return }
       userId = props.user.id
@@ -123,7 +131,7 @@ async function save() {
     @update:open="(v) => emit('update:open', v)"
   >
     <div class="space-y-4">
-      <div v-if="isLocked"
+      <div v-if="isStructuralLocked"
            class="text-xs px-3 py-2 rounded bg-amber-100 border border-amber-300 text-amber-900">
         {{ t('user.edit.lockedHint') }}
       </div>
@@ -169,12 +177,12 @@ async function save() {
       </div>
       <div>
         <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.displayName') }}</label>
-        <Input v-model="form.displayName" :disabled="isLocked" />
+        <Input v-model="form.displayName" />
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.email') }}</label>
-          <Input v-model="form.email" type="email" :disabled="isLocked" />
+          <Input v-model="form.email" type="email" />
         </div>
         <!-- userNo は採番。新規時は付番前なのでフィールド非表示、編集時のみ read-only 表示。 -->
         <div v-if="isEdit">
@@ -185,12 +193,12 @@ async function save() {
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.deptId') }}</label>
-          <DeptTreeDialog v-model="form.deptId" :placeholder="t('common.placeholder.deptId')" :disabled="isLocked" />
+          <DeptTreeDialog v-model="form.deptId" :placeholder="t('common.placeholder.deptId')" :disabled="isStructuralLocked" />
         </div>
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.status') }}</label>
           <div class="h-9 flex items-center gap-2">
-            <Switch v-model="form.status" :checked-value="1" :unchecked-value="0" :disabled="isLocked" />
+            <Switch v-model="form.status" :checked-value="1" :unchecked-value="0" :disabled="isStructuralLocked" />
             <span class="text-sm">{{ form.status === 1 ? t('common.status.active') : t('common.status.inactive') }}</span>
           </div>
         </div>
@@ -204,11 +212,11 @@ async function save() {
           </span>
         </div>
         <div class="border border-border rounded-lg p-2 max-h-56 overflow-y-auto bg-muted/20"
-             :class="isLocked && 'opacity-60 pointer-events-none'">
+             :class="isStructuralLocked && 'opacity-60 pointer-events-none'">
           <div v-if="allRoles.length" class="flex flex-wrap gap-1.5">
             <button v-for="r in allRoles" :key="r.id"
                     type="button"
-                    :disabled="isLocked"
+                    :disabled="isStructuralLocked"
                     :title="r.description || r.name"
                     :class="[
                       'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition cursor-pointer disabled:cursor-not-allowed',
@@ -233,8 +241,8 @@ async function save() {
 {{ t('common.button.cancel') }}
 </button>
         <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                :disabled="saving || isLocked"
-                :title="isLocked ? t('user.tooltip.editDisabled') : ''"
+                :disabled="saving || isStructuralLocked"
+                :title="isStructuralLocked ? t('user.tooltip.editDisabled') : ''"
                 @click="save">
           {{ saving ? t('user.edit.message.saving') : t('common.button.save') }}
         </button>

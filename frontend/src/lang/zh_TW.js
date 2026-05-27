@@ -305,6 +305,7 @@ export default {
     },
     tooltip: {
       editDisabled: '內建使用者不可編輯',
+      editAdminContactOnly: '內建 admin：僅可編輯連絡資訊（信箱、顯示名稱）',
       edit: '編輯',
       resetPassword: '重設密碼',
       resetPasswordDisabledSso: 'SSO 模式下不可用 — 使用者於 Keycloak 帳號控制台自助修改密碼',
@@ -326,7 +327,7 @@ export default {
     edit: {
       titleEdit: '編輯使用者',
       titleCreate: '新增使用者',
-      lockedHint: '內建 admin 使用者為唯讀。僅可修改密碼（透過「重設密碼」API）。',
+      lockedHint: '內建 admin 使用者「僅可編輯連絡資訊」：信箱和顯示名稱可以修改（應急密碼通知需要可達信箱）。部門、狀態、角色保持鎖定。',
       label: {
         username: '登入 ID',
         password: '密碼',
