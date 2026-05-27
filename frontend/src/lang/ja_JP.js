@@ -115,7 +115,7 @@ export default {
 
   login: {
     tenantLabel: 'テナント',
-    tenantPlaceholder: 'default',
+    tenantPlaceholder: 'demo',
     showAdvanced: '詳細（テナント切替）',
     hideAdvanced: '閉じる',
     identifierLabel: 'ユーザー名 / メール / 番号',

@@ -64,14 +64,14 @@ class PasswordToSsoMigrationServiceTest {
     @Test
     void happyPath_createsKcUserAndTriggersResetEmail() {
         dbUsers.add(row("ULID-A", "alice", "alice@example.com"));
-        when(keycloak.findUserIdByUsername("default", "alice")).thenReturn(null);
-        when(keycloak.createUser("default", "alice", "alice@example.com", "alice", null))
+        when(keycloak.findUserIdByUsername("demo", "alice")).thenReturn(null);
+        when(keycloak.createUser("demo", "alice", "alice@example.com", "alice", null))
                 .thenReturn("kc-uuid-alice");
 
-        MigrationReport report = service.run(List.of("default"));
+        MigrationReport report = service.run(List.of("demo"));
 
-        verify(keycloak).createUser("default", "alice", "alice@example.com", "alice", null);
-        verify(keycloak).executeActionsEmail("default", "kc-uuid-alice", List.of("UPDATE_PASSWORD"));
+        verify(keycloak).createUser("demo", "alice", "alice@example.com", "alice", null);
+        verify(keycloak).executeActionsEmail("demo", "kc-uuid-alice", List.of("UPDATE_PASSWORD"));
 
         assertThat(report.tenants).hasSize(1);
         assertThat(report.tenants.get(0).created).hasSize(1);
@@ -87,7 +87,7 @@ class PasswordToSsoMigrationServiceTest {
     void skipsUserMissingUsername() {
         dbUsers.add(row("ULID-B", null, "bob@example.com"));
 
-        MigrationReport report = service.run(List.of("default"));
+        MigrationReport report = service.run(List.of("demo"));
 
         verify(keycloak, never()).createUser(any(), any(), any(), any(), any());
         assertThat(report.tenants.get(0).skipped).hasSize(1);
@@ -98,7 +98,7 @@ class PasswordToSsoMigrationServiceTest {
     void skipsUserMissingEmail() {
         dbUsers.add(row("ULID-C", "carol", null));
 
-        MigrationReport report = service.run(List.of("default"));
+        MigrationReport report = service.run(List.of("demo"));
 
         verify(keycloak, never()).createUser(any(), any(), any(), any(), any());
         assertThat(report.tenants.get(0).skipped).hasSize(1);
@@ -110,9 +110,9 @@ class PasswordToSsoMigrationServiceTest {
         // A partial earlier run left "dave" in KC — re-run must NOT recreate
         // and must NOT re-email (would spam users on every restart).
         dbUsers.add(row("ULID-D", "dave", "dave@example.com"));
-        when(keycloak.findUserIdByUsername("default", "dave")).thenReturn("kc-uuid-existing-dave");
+        when(keycloak.findUserIdByUsername("demo", "dave")).thenReturn("kc-uuid-existing-dave");
 
-        MigrationReport report = service.run(List.of("default"));
+        MigrationReport report = service.run(List.of("demo"));
 
         verify(keycloak, never()).createUser(any(), any(), any(), any(), any());
         verify(keycloak, never()).executeActionsEmail(any(), any(), anyList());
@@ -126,12 +126,12 @@ class PasswordToSsoMigrationServiceTest {
         dbUsers.add(row("ULID-E", "erin", "erin@example.com"));
         dbUsers.add(row("ULID-F", "frank", "frank@example.com"));
         when(keycloak.findUserIdByUsername(anyString(), anyString())).thenReturn(null);
-        when(keycloak.createUser(eq("default"), eq("erin"), any(), any(), any()))
+        when(keycloak.createUser(eq("demo"), eq("erin"), any(), any(), any()))
                 .thenThrow(new RuntimeException("KC unreachable"));
-        when(keycloak.createUser(eq("default"), eq("frank"), any(), any(), any()))
+        when(keycloak.createUser(eq("demo"), eq("frank"), any(), any(), any()))
                 .thenReturn("kc-uuid-frank");
 
-        MigrationReport report = service.run(List.of("default"));
+        MigrationReport report = service.run(List.of("demo"));
 
         // erin failed at create, frank succeeded — the batch did not abort.
         assertThat(report.tenants.get(0).failed).hasSize(1);
@@ -144,19 +144,19 @@ class PasswordToSsoMigrationServiceTest {
     @Test
     void recordsFailureWhenEmailThrows_butKcUserStaysCreated() {
         dbUsers.add(row("ULID-G", "gina", "gina@example.com"));
-        when(keycloak.findUserIdByUsername("default", "gina")).thenReturn(null);
-        when(keycloak.createUser("default", "gina", "gina@example.com", "gina", null))
+        when(keycloak.findUserIdByUsername("demo", "gina")).thenReturn(null);
+        when(keycloak.createUser("demo", "gina", "gina@example.com", "gina", null))
                 .thenReturn("kc-uuid-gina");
         // Realm SMTP misconfigured — KC returns 500 on the email call.
         org.mockito.Mockito.doThrow(new RuntimeException("SMTP unreachable"))
-                .when(keycloak).executeActionsEmail("default", "kc-uuid-gina",
+                .when(keycloak).executeActionsEmail("demo", "kc-uuid-gina",
                         List.of("UPDATE_PASSWORD"));
 
-        MigrationReport report = service.run(List.of("default"));
+        MigrationReport report = service.run(List.of("demo"));
 
         // create succeeded (KC user exists, idempotent re-run will skip it),
         // but the email leg failed — operator must resend after fixing SMTP.
-        verify(keycloak).createUser("default", "gina", "gina@example.com", "gina", null);
+        verify(keycloak).createUser("demo", "gina", "gina@example.com", "gina", null);
         assertThat(report.tenants.get(0).failed).hasSize(1);
         assertThat(report.tenants.get(0).failed.get(0).stage).isEqualTo("send-reset-email");
         assertThat(report.tenants.get(0).created).isEmpty();
@@ -172,10 +172,10 @@ class PasswordToSsoMigrationServiceTest {
         when(keycloak.createUser(anyString(), eq("harriet"), any(), any(), any()))
                 .thenReturn("kc-uuid-harriet");
 
-        MigrationReport report = service.run(List.of("default", "acme", "beta"));
+        MigrationReport report = service.run(List.of("demo", "acme", "beta"));
 
         assertThat(report.tenants).hasSize(3);
-        assertThat(report.tenants.get(0).tenantId).isEqualTo("default");
+        assertThat(report.tenants.get(0).tenantId).isEqualTo("demo");
         assertThat(report.tenants.get(1).tenantId).isEqualTo("acme");
         assertThat(report.tenants.get(2).tenantId).isEqualTo("beta");
         verify(keycloak, times(3)).createUser(any(), eq("harriet"), any(), any(), any());
@@ -190,14 +190,14 @@ class PasswordToSsoMigrationServiceTest {
     @Test
     void resend_emailsExistingKcUserAndSkipsCreate() {
         dbUsers.add(row("ULID-I", "ivy", "ivy@example.com"));
-        when(keycloak.findUserIdByUsername("default", "ivy")).thenReturn("kc-uuid-ivy");
+        when(keycloak.findUserIdByUsername("demo", "ivy")).thenReturn("kc-uuid-ivy");
 
-        MigrationReport report = service.resend(List.of("default"));
+        MigrationReport report = service.resend(List.of("demo"));
 
         // No createUser — that's the whole point of the dedicated entry point.
         verify(keycloak, never()).createUser(any(), any(), any(), any(), any());
         // Email gets re-fired against the existing KC user.
-        verify(keycloak).executeActionsEmail("default", "kc-uuid-ivy", List.of("UPDATE_PASSWORD"));
+        verify(keycloak).executeActionsEmail("demo", "kc-uuid-ivy", List.of("UPDATE_PASSWORD"));
         // Bucketed under "created" (reused tally for "email re-issued").
         assertThat(report.tenants.get(0).created).hasSize(1);
         assertThat(report.tenants.get(0).created.get(0).keycloakId).isEqualTo("kc-uuid-ivy");
@@ -209,9 +209,9 @@ class PasswordToSsoMigrationServiceTest {
         // resend() must NOT silently create one — that would mask a misconfig
         // (the operator forgot to run the first migration pass).
         dbUsers.add(row("ULID-J", "jen", "jen@example.com"));
-        when(keycloak.findUserIdByUsername("default", "jen")).thenReturn(null);
+        when(keycloak.findUserIdByUsername("demo", "jen")).thenReturn(null);
 
-        MigrationReport report = service.resend(List.of("default"));
+        MigrationReport report = service.resend(List.of("demo"));
 
         verify(keycloak, never()).createUser(any(), any(), any(), any(), any());
         verify(keycloak, never()).executeActionsEmail(any(), any(), anyList());
@@ -224,12 +224,12 @@ class PasswordToSsoMigrationServiceTest {
     @Test
     void resend_recordsFailureIfEmailThrows() {
         dbUsers.add(row("ULID-K", "kara", "kara@example.com"));
-        when(keycloak.findUserIdByUsername("default", "kara")).thenReturn("kc-uuid-kara");
+        when(keycloak.findUserIdByUsername("demo", "kara")).thenReturn("kc-uuid-kara");
         org.mockito.Mockito.doThrow(new RuntimeException("SMTP unreachable"))
-                .when(keycloak).executeActionsEmail("default", "kc-uuid-kara",
+                .when(keycloak).executeActionsEmail("demo", "kc-uuid-kara",
                         List.of("UPDATE_PASSWORD"));
 
-        MigrationReport report = service.resend(List.of("default"));
+        MigrationReport report = service.resend(List.of("demo"));
 
         assertThat(report.tenants.get(0).failed).hasSize(1);
         assertThat(report.tenants.get(0).failed.get(0).stage).isEqualTo("send-reset-email");
@@ -240,7 +240,7 @@ class PasswordToSsoMigrationServiceTest {
     void resend_skipsUserMissingUsername() {
         dbUsers.add(row("ULID-L", null, "lara@example.com"));
 
-        MigrationReport report = service.resend(List.of("default"));
+        MigrationReport report = service.resend(List.of("demo"));
 
         verify(keycloak, never()).findUserIdByUsername(any(), any());
         verify(keycloak, never()).executeActionsEmail(any(), any(), anyList());
@@ -263,7 +263,7 @@ class PasswordToSsoMigrationServiceTest {
         // dbUsers stays empty — the mapper QueryWrapper isNull("keycloak_id")
         // would have filtered "mark" out.
 
-        MigrationReport report = service.resend(List.of("default"));
+        MigrationReport report = service.resend(List.of("demo"));
 
         verify(keycloak, never()).executeActionsEmail(any(), any(), anyList());
         assertThat(report.tenants.get(0).created).isEmpty();
@@ -273,10 +273,10 @@ class PasswordToSsoMigrationServiceTest {
 
     @Test
     void skipsBlankOrNullTenantId() {
-        MigrationReport report = service.run(java.util.Arrays.asList("default", null, "", "  "));
+        MigrationReport report = service.run(java.util.Arrays.asList("demo", null, "", "  "));
 
-        // Only "default" should have produced a tenant bucket.
+        // Only "demo" should have produced a tenant bucket.
         assertThat(report.tenants).hasSize(1);
-        assertThat(report.tenants.get(0).tenantId).isEqualTo("default");
+        assertThat(report.tenants.get(0).tenantId).isEqualTo("demo");
     }
 }

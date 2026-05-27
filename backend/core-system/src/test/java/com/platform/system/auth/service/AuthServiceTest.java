@@ -88,7 +88,7 @@ class AuthServiceTest {
         when(mailProps.from()).thenReturn("noreply@example.com");
         when(mailProps.baseUrl()).thenReturn("https://app.example.com");
         // RequestContext.tenantId() is read by AuthService; set a synthetic one.
-        RequestContext.set("default", null, null, Locale.JAPAN, "test-trace");
+        RequestContext.set("demo", null, null, Locale.JAPAN, "test-trace");
         // Stub the rest of the login dependencies so the success path completes.
         when(jwtIssuer.issue(any(), any(), any(), any(), any()))
                 .thenReturn(new JwtIssuer.TokenIssue(
@@ -109,7 +109,7 @@ class AuthServiceTest {
     private UserEntity successfulUserRow() {
         UserEntity u = new UserEntity();
         u.setId("ULID-USER-26");
-        u.setTenantId("default");
+        u.setTenantId("demo");
         u.setUsername("admin");
         u.setEmail("admin@example.com");
         u.setDisplayName("Admin User");
@@ -119,8 +119,8 @@ class AuthServiceTest {
     }
 
     private void stubLoginSuccess(UserEntity user) {
-        when(userMapper.findByIdentifier("default", "admin")).thenReturn(user);
-        when(lockoutService.remainingLockSeconds("default", "admin")).thenReturn(0L);
+        when(userMapper.findByIdentifier("demo", "admin")).thenReturn(user);
+        when(lockoutService.remainingLockSeconds("demo", "admin")).thenReturn(0L);
         when(encoder.matches("RightPassword", user.getPasswordHash())).thenReturn(true);
     }
 
@@ -129,7 +129,7 @@ class AuthServiceTest {
         ReflectionTestUtils.setField(service, "securityMode", "oidc");
         UserEntity user = successfulUserRow();
         stubLoginSuccess(user);
-        when(roleMapper.findRoleIdsByUserId("ULID-USER-26", "default"))
+        when(roleMapper.findRoleIdsByUserId("ULID-USER-26", "demo"))
                 .thenReturn(List.of(BuiltInRoles.SUPER_ADMIN_ID));
 
         AuthService.LoginResult result = service.login("admin", "RightPassword", req);

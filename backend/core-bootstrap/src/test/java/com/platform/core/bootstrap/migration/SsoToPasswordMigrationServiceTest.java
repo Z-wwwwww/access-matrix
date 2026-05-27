@@ -72,11 +72,11 @@ class SsoToPasswordMigrationServiceTest {
     @Test
     void happyPath_mintsTokenAndSendsResetEmail() {
         dbUsers.add(row("ULID-A", "alice", "alice@example.com", "kc-uuid-A"));
-        when(tokens.mint("default", "ULID-A", "kc-uuid-A")).thenReturn("CLEARTEXT_TOKEN");
+        when(tokens.mint("demo", "ULID-A", "kc-uuid-A")).thenReturn("CLEARTEXT_TOKEN");
 
-        MigrationReport report = service.run(List.of("default"));
+        MigrationReport report = service.run(List.of("demo"));
 
-        verify(tokens).mint("default", "ULID-A", "kc-uuid-A");
+        verify(tokens).mint("demo", "ULID-A", "kc-uuid-A");
         verify(mailService).sendHtmlAsync(
                 eq("alice@example.com"),
                 eq(Locale.JAPAN),
@@ -96,7 +96,7 @@ class SsoToPasswordMigrationServiceTest {
     void skipsUserMissingEmail() {
         dbUsers.add(row("ULID-B", "bob", null, "kc-uuid-B"));
 
-        MigrationReport report = service.run(List.of("default"));
+        MigrationReport report = service.run(List.of("demo"));
 
         verify(tokens, never()).mint(anyString(), anyString(), anyString());
         verify(mailService, never()).sendHtmlAsync(
@@ -109,7 +109,7 @@ class SsoToPasswordMigrationServiceTest {
     void skipsUserMissingUsername() {
         dbUsers.add(row("ULID-C", null, "carol@example.com", "kc-uuid-C"));
 
-        MigrationReport report = service.run(List.of("default"));
+        MigrationReport report = service.run(List.of("demo"));
 
         verify(tokens, never()).mint(anyString(), anyString(), anyString());
         assertThat(report.tenants.get(0).skipped).hasSize(1);
@@ -124,7 +124,7 @@ class SsoToPasswordMigrationServiceTest {
                 .thenThrow(new RuntimeException("DB write failed"));
         when(tokens.mint(anyString(), eq("ULID-E"), anyString())).thenReturn("OK_TOKEN");
 
-        MigrationReport report = service.run(List.of("default"));
+        MigrationReport report = service.run(List.of("demo"));
 
         assertThat(report.tenants.get(0).failed).hasSize(1);
         assertThat(report.tenants.get(0).failed.get(0).stage).isEqualTo("mint-token");
@@ -137,16 +137,16 @@ class SsoToPasswordMigrationServiceTest {
     @Test
     void recordsFailureWhenMailThrows_andDoesNotRollbackToken() {
         dbUsers.add(row("ULID-F", "frank", "frank@example.com", "kc-uuid-F"));
-        when(tokens.mint("default", "ULID-F", "kc-uuid-F")).thenReturn("TOK");
+        when(tokens.mint("demo", "ULID-F", "kc-uuid-F")).thenReturn("TOK");
         org.mockito.Mockito.doThrow(new RuntimeException("SMTP down"))
                 .when(mailService).sendHtmlAsync(
                         anyString(), any(), anyString(), any(Object[].class), anyString(), any());
 
-        MigrationReport report = service.run(List.of("default"));
+        MigrationReport report = service.run(List.of("demo"));
 
         // Token was minted (still in DB, will expire on its own). Operator
         // can re-run after fixing SMTP and a fresh token will be issued.
-        verify(tokens).mint("default", "ULID-F", "kc-uuid-F");
+        verify(tokens).mint("demo", "ULID-F", "kc-uuid-F");
         assertThat(report.tenants.get(0).failed).hasSize(1);
         assertThat(report.tenants.get(0).failed.get(0).stage).isEqualTo("send-reset-email");
         assertThat(report.tenants.get(0).created).isEmpty();
@@ -157,10 +157,10 @@ class SsoToPasswordMigrationServiceTest {
         dbUsers.add(row("ULID-G", "gina", "gina@example.com", "kc-uuid-G"));
         when(tokens.mint(anyString(), anyString(), anyString())).thenReturn("T");
 
-        MigrationReport report = service.run(List.of("default", "acme"));
+        MigrationReport report = service.run(List.of("demo", "acme"));
 
         assertThat(report.tenants).hasSize(2);
-        assertThat(report.tenants.get(0).tenantId).isEqualTo("default");
+        assertThat(report.tenants.get(0).tenantId).isEqualTo("demo");
         assertThat(report.tenants.get(1).tenantId).isEqualTo("acme");
         verify(tokens, org.mockito.Mockito.times(2))
                 .mint(anyString(), eq("ULID-G"), anyString());
@@ -168,9 +168,9 @@ class SsoToPasswordMigrationServiceTest {
 
     @Test
     void skipsBlankOrNullTenantId() {
-        MigrationReport report = service.run(java.util.Arrays.asList("default", null, "", "  "));
+        MigrationReport report = service.run(java.util.Arrays.asList("demo", null, "", "  "));
 
         assertThat(report.tenants).hasSize(1);
-        assertThat(report.tenants.get(0).tenantId).isEqualTo("default");
+        assertThat(report.tenants.get(0).tenantId).isEqualTo("demo");
     }
 }

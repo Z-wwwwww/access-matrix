@@ -79,7 +79,7 @@ UPDATE core_auth_user
    SET password_hash = '$2a$12$...',
        update_user   = 'manual-sql-recovery',
        update_time   = NOW()
- WHERE tenant_id = 'default'
+ WHERE tenant_id = 'demo'
    AND username  = 'admin';
 ```
 

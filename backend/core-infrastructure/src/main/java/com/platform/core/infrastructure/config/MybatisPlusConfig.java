@@ -47,7 +47,8 @@ public class MybatisPlusConfig {
                 @Override
                 public Expression getTenantId() {
                     String tid = RequestContext.tenantId();
-                    return new StringValue(tid == null ? "default" : tid);
+                    // "demo" fallback — see RequestContext.tenantIdOrDefault.
+                    return new StringValue(tid == null ? "demo" : tid);
                 }
 
                 @Override

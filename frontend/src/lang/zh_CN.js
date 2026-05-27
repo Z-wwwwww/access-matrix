@@ -112,7 +112,7 @@ export default {
     passwordLabel: '密码',
     passwordPlaceholder: '请输入密码',
     tenantLabel: '租户',
-    tenantPlaceholder: 'default',
+    tenantPlaceholder: 'demo',
     showAdvanced: '高级（切换租户）',
     hideAdvanced: '收起',
     submit: '登录',

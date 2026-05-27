@@ -91,7 +91,7 @@ public class AuthService {
         String clientIp = clientIp(req);
         String userAgent = req.getHeader("User-Agent");
         // CoreRequestContextFilter has already resolved the tenant for this
-        // pre-auth request from X-Tenant-Id (or filled in "default"). We must
+        // pre-auth request from X-Tenant-Id (or filled in "demo"). We must
         // pass it through the hand-written @Select since the MyBatis-Plus
         // tenant interceptor does not rewrite raw SQL.
         String tenantId = currentTenantOrDefault();
@@ -294,7 +294,7 @@ public class AuthService {
 
     private static String currentTenantOrDefault() {
         String tid = RequestContext.tenantId();
-        return (tid == null || tid.isBlank()) ? "default" : tid;
+        return (tid == null || tid.isBlank()) ? "demo" : tid;
     }
 
     public static String clientIp(HttpServletRequest req) {

@@ -34,7 +34,13 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
     private static final String TENANT_HEADER = "X-Tenant-Id";
     private static final String AUTH_HEADER   = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
-    private static final String DEFAULT_TENANT = "default";
+    // Fallback tenant when X-Tenant-Id is missing on a pre-auth request
+    // (login / refresh / health). "demo" is the conventional dev / QA
+    // tenant; in prod, callers should always set X-Tenant-Id explicitly
+    // (subdomain routing in the SPA enforces this). Hard fail on missing
+    // header is a follow-up — would currently break test fixtures that
+    // don't bother setting it.
+    private static final String DEFAULT_TENANT = "demo";
     private static final Locale DEFAULT_LOCALE = Locale.JAPAN;
 
     private final LocaleResolver localeResolver = new AcceptHeaderLocaleResolver();

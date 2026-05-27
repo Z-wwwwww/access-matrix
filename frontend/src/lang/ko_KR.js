@@ -108,7 +108,7 @@ export default {
 
   login: {
     tenantLabel: '테넌트',
-    tenantPlaceholder: 'default',
+    tenantPlaceholder: 'demo',
     showAdvanced: '고급 (테넌트 전환)',
     hideAdvanced: '접기',
     identifierLabel: '사용자명 / 이메일 / 번호',

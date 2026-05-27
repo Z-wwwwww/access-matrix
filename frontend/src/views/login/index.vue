@@ -75,11 +75,11 @@ function relockPassword() {
 // ─── form state (only used in password mode) ──────────────────────────────
 const TENANT_KEY = 'tenant_id'
 const form = ref({
-  tenant: localStorage.getItem(TENANT_KEY) || 'default',
+  tenant: localStorage.getItem(TENANT_KEY) || 'demo',
   username: '',
   password: ''
 })
-const showTenant = ref(form.value.tenant !== 'default')
+const showTenant = ref(form.value.tenant !== 'demo')
 
 const loading = ref(false)
 const errorMsg = ref('')
@@ -98,7 +98,7 @@ async function handleLogin() {
   errorMsg.value = ''
   // Tenant は X-Tenant-Id ヘッダ経由（request.js の interceptor が localStorage から読む）。
   // ログイン直前に localStorage を更新し、その後のすべてのリクエストに反映させる。
-  const tenant = (form.value.tenant || 'default').trim() || 'default'
+  const tenant = (form.value.tenant || 'demo').trim() || 'demo'
   localStorage.setItem(TENANT_KEY, tenant)
   try {
     const res = await authStore.login({
@@ -429,7 +429,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- tenant (optional, defaults to "default") -->
+        <!-- tenant (optional, defaults to "demo") -->
         <div v-if="showTenant">
           <label class="block text-sm font-medium text-foreground mb-1.5">{{ t('login.tenantLabel') }}</label>
           <div class="relative">

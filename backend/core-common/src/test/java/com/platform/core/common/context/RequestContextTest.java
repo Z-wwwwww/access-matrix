@@ -23,13 +23,13 @@ class RequestContextTest {
     void tenantIdOrDefaultFallsBackToDefault() {
         // No context set → fallback string. This is the contract every mapper
         // caller relies on when post-auth requests run outside an HTTP filter.
-        assertThat(RequestContext.tenantIdOrDefault()).isEqualTo("default");
+        assertThat(RequestContext.tenantIdOrDefault()).isEqualTo("demo");
 
         RequestContext.set("", null, null, Locale.JAPAN, "t1");
-        assertThat(RequestContext.tenantIdOrDefault()).isEqualTo("default");
+        assertThat(RequestContext.tenantIdOrDefault()).isEqualTo("demo");
 
         RequestContext.set("   ", null, null, Locale.JAPAN, "t1");
-        assertThat(RequestContext.tenantIdOrDefault()).isEqualTo("default");
+        assertThat(RequestContext.tenantIdOrDefault()).isEqualTo("demo");
     }
 
     @Test

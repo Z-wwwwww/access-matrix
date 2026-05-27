@@ -124,7 +124,7 @@ public class DemoSeeder {
         }
         UserEntity u = new UserEntity();
         u.setId(userId);
-        u.setTenantId("default");
+        u.setTenantId("demo");
         u.setUsername(username);
         u.setEmail(email);
         u.setUserNo(userNo);
@@ -212,7 +212,7 @@ public class DemoSeeder {
         // filled by AuditMetaObjectHandler; for seeded rows where no request
         // context is active we set them explicitly so the rows do not look like
         // they were created by "anonymous".
-        t.setTenantId("default");
+        t.setTenantId("demo");
         t.setMark(1);
         if (creatorOrNull != null) {
             t.setCreateUser(creatorOrNull);
