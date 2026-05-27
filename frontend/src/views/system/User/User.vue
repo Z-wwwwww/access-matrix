@@ -18,6 +18,17 @@ import {
 import { getDeptTreeApi } from '../../../../services/dept'
 import UserEdit from './UserEdit.vue'
 import ResetPasswordDialog from './ResetPasswordDialog.vue'
+import { oidcConfig } from '@/utils/oidc'
+
+// In OIDC mode, password resets through this controller path are
+// disabled — the local password_hash write would never propagate to
+// Keycloak (the actual login authority) and would also undo the
+// "as-if-always-OIDC" data invariant that OidcJitUserService maintains.
+// We grey out the trigger here and the backend re-rejects defensively.
+// Super-admins manage their own break-glass credential via the AppHeader
+// "Break-glass" entry; everyone else resets SSO passwords in the KC
+// account console (linked from the "Change password" entry).
+const ssoMode = oidcConfig().enabled
 
 const loading = ref(false)
 const list = ref([])
@@ -209,8 +220,9 @@ onMounted(() => {
               <Pencil class="size-3.5" />
             </button>
             <button v-permission="'auth:reset-password'"
-                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
-                    :title="t('user.tooltip.resetPassword')"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    :disabled="ssoMode"
+                    :title="ssoMode ? t('user.tooltip.resetPasswordDisabledSso') : t('user.tooltip.resetPassword')"
                     @click="openResetPwd(row)">
               <Key class="size-3.5" />
             </button>

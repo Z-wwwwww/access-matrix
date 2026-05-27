@@ -85,6 +85,7 @@ export default {
     header: {
       profile: '프로필',
       password: '비밀번호 변경',
+      breakGlass: '비상용 비밀번호',
       logout: '로그아웃',
       userFallback: '사용자'
     },
@@ -152,6 +153,42 @@ export default {
       passwordMismatch: '두 비밀번호가 일치하지 않습니다',
       acceptFailed: '비밀번호 설정 실패',
       done: '비밀번호가 설정되었습니다. 로그인하세요.'
+    }
+  },
+
+  breakGlass: {
+    title: '비상용 비밀번호',
+    intro: {
+      what: 'Keycloak(SSO)을 사용할 수 없을 때 시스템에 로그인하기 위한 비상용 전용 비밀번호입니다.',
+      howDifferent: '평소 SSO 로그인에 사용하는 비밀번호(Keycloak 관리)와는 **별개**이며 **동기화되지 않습니다**. 같은 비밀번호를 사용하지 마십시오.',
+      whenUsed: 'KC 장애 등 SSO 를 사용할 수 없을 때 /login 의 비밀번호 필드로만 사용됩니다. 슈퍼 관리자만 보유합니다.'
+    },
+    status: {
+      configured: '비상용 비밀번호가 설정되어 있습니다',
+      notConfigured: '아직 설정되지 않았습니다 — 필요할 때를 대비해 미리 설정하실 것을 강력히 권장합니다'
+    },
+    label: {
+      newPassword: '새 비상용 비밀번호',
+      confirmPassword: '확인을 위해 다시 입력'
+    },
+    placeholder: {
+      newPassword: '8자 이상, 문자 종류 혼합',
+      confirmPassword: '동일한 비밀번호를 다시 입력'
+    },
+    hint: {
+      storeSafely: '비밀번호 관리자나 조직 금고에 저장해 주세요 — 분실 시 복구 경로가 없습니다.'
+    },
+    button: {
+      save: '저장',
+      saving: '저장 중...'
+    },
+    message: {
+      saved: '비상용 비밀번호가 업데이트되었습니다'
+    },
+    error: {
+      tooShort: '비밀번호는 8자 이상이어야 합니다',
+      mismatch: '두 비밀번호가 일치하지 않습니다',
+      saveFailed: '저장 실패'
     }
   },
 
@@ -270,6 +307,7 @@ export default {
       editDisabled: '기본 제공 사용자는 편집할 수 없습니다',
       edit: '편집',
       resetPassword: '비밀번호 재설정',
+      resetPasswordDisabledSso: 'SSO 모드에서는 비활성화됩니다 — 사용자는 Keycloak 계정 콘솔에서 직접 비밀번호를 변경합니다',
       statusChangeDisabled: '기본 제공 사용자 상태는 변경할 수 없습니다',
       toggleStatus: '활성/비활성',
       forceLogout: '강제 로그아웃',

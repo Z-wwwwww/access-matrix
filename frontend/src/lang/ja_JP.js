@@ -92,6 +92,7 @@ export default {
     header: {
       profile: 'プロフィール',
       password: 'パスワード変更',
+      breakGlass: 'ブレークグラス・パスワード',
       logout: 'ログアウト',
       userFallback: 'ユーザー'
     },
@@ -159,6 +160,42 @@ export default {
       passwordMismatch: '2 回入力したパスワードが一致しません',
       acceptFailed: 'パスワード設定に失敗しました',
       done: 'パスワードを設定しました。ログインしてください。'
+    }
+  },
+
+  breakGlass: {
+    title: 'ブレークグラス・パスワード',
+    intro: {
+      what: 'これは「緊急用パスワード」です。Keycloak（SSO）が利用できなくなったときに、システムへログインするための独立した認証情報です。',
+      howDifferent: 'SSO のログインに使う日常のパスワード（Keycloak 管理）とは別物で、互いに同期しません。同じパスワードを使うのは避けてください。',
+      whenUsed: 'KC 障害時など、SSO が使えない緊急時のみ /login の従来パスワード欄から使用します。スーパー管理者のみが保持できます。'
+    },
+    status: {
+      configured: '現在、緊急用パスワードが設定されています',
+      notConfigured: 'まだ設定されていません — 万一に備えて今すぐ設定することを推奨します'
+    },
+    label: {
+      newPassword: '新しい緊急用パスワード',
+      confirmPassword: '確認のためもう一度入力'
+    },
+    placeholder: {
+      newPassword: '8 文字以上、英数字記号混在',
+      confirmPassword: '同じパスワードをもう一度'
+    },
+    hint: {
+      storeSafely: 'パスワードマネージャーや組織の保管庫に必ず保存してください。失念した場合の復旧経路はありません。'
+    },
+    button: {
+      save: '保存',
+      saving: '保存中...'
+    },
+    message: {
+      saved: '緊急用パスワードを更新しました'
+    },
+    error: {
+      tooShort: 'パスワードは 8 文字以上必要です',
+      mismatch: '2 回入力したパスワードが一致しません',
+      saveFailed: '保存に失敗しました'
     }
   },
 
@@ -277,6 +314,7 @@ export default {
       editDisabled: '内蔵ユーザーは編集不可',
       edit: '編集',
       resetPassword: 'パスワードリセット',
+      resetPasswordDisabledSso: 'SSO モードでは無効：ユーザーは Keycloak アカウントコンソールで自分のパスワードを変更します',
       statusChangeDisabled: '内蔵ユーザーは状態変更不可',
       toggleStatus: '有効/無効',
       forceLogout: '強制ログアウト',

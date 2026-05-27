@@ -85,6 +85,7 @@ export default {
     header: {
       profile: '个人资料',
       password: '修改密码',
+      breakGlass: '应急密码',
       logout: '退出登录',
       userFallback: '用户'
     },
@@ -152,6 +153,42 @@ export default {
       passwordMismatch: '两次输入的密码不一致',
       acceptFailed: '设置密码失败',
       done: '密码已设置，现在可以登录'
+    }
+  },
+
+  breakGlass: {
+    title: '应急密码',
+    intro: {
+      what: '这是一个仅用于"应急"的密码，专门用于 Keycloak（SSO）不可用时登录系统。',
+      howDifferent: '它与您日常使用的 SSO 密码（保存在 Keycloak 中）**完全独立**，二者**不会同步**。请不要使用相同的密码。',
+      whenUsed: '仅在 KC 故障等 SSO 无法访问时，通过 /login 的密码字段使用。仅超级管理员拥有此密码。'
+    },
+    status: {
+      configured: '当前已配置应急密码',
+      notConfigured: '尚未配置 — 强烈建议在需要前先设置一个'
+    },
+    label: {
+      newPassword: '新的应急密码',
+      confirmPassword: '请再次输入以确认'
+    },
+    placeholder: {
+      newPassword: '至少 8 个字符，混合字符类型',
+      confirmPassword: '再次输入相同的密码'
+    },
+    hint: {
+      storeSafely: '请保存到密码管理器或团队保密库中 — 一旦遗忘没有找回途径。'
+    },
+    button: {
+      save: '保存',
+      saving: '保存中...'
+    },
+    message: {
+      saved: '应急密码已更新'
+    },
+    error: {
+      tooShort: '密码至少需要 8 个字符',
+      mismatch: '两次输入的密码不一致',
+      saveFailed: '保存失败'
     }
   },
 
@@ -270,6 +307,7 @@ export default {
       editDisabled: '内置用户不可编辑',
       edit: '编辑',
       resetPassword: '重置密码',
+      resetPasswordDisabledSso: 'SSO 模式下不可用 — 用户在 Keycloak 账号控制台自助修改密码',
       statusChangeDisabled: '内置用户状态不可变更',
       toggleStatus: '启用/禁用',
       forceLogout: '强制登出',

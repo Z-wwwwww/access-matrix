@@ -30,6 +30,7 @@ access-matrix/
 | **多租户** | MyBatis-Plus 拦截器自动注入 `tenant_id`；JWT `tid` claim + `X-Tenant-Id` header 双路径 |
 | **用户开通** | 邀请邮件（用户自设密码）/ 直接创建（管理员设临时密码）双模式 |
 | **password ↔ SSO 双向迁移** | 改一行 yml + 重启 = 全员自动迁移；**正向**（password→SSO）走 KC 自助改密邮件，**反向**（SSO→password）走自家 reset 落地页；含链接过期重发模式；可选 `auto-on-mode-flip` 只切 mode 自动派发；幂等可回滚；业务 ULID / 角色 / 审计全保留 |
+| **Break-Glass 应急凭据** | super-admin 专属"应急密码"；OIDC 模式下日常密码归 KC，应急密码独立存 DB；自家 UI 自助轮换 + 状态显示；KC 挂掉时通过 5 击 hot-zone + `/auth/login` 进入；OIDC 模式下旧 `/admin/auth/reset-password` 自动禁用、用户管理界面对应按钮置灰 |
 | **强制下线** | `ForceLogoutService` + Redis 黑名单，权限变更立即生效 |
 | **审计** | `@OpLog` 注解 → `core_oplog` 表异步落库 |
 | **国际化** | 邮件模板 5 语言（ja_JP / en / zh_CN / zh_TW / ko_KR），UI 同步 |
@@ -78,6 +79,7 @@ npm install && npm run dev
 | [Keycloak setup](infra/keycloak/README.md) | 本地 Keycloak 启动 + realm 配置 |
 | [**password → SSO 迁移**](docs/migration-password-to-sso.md) | password 项目零数据损失切到 SSO 的 runbook：自动 mirror + 邮件过期重发 + 5 大坑 + 健康检查 SQL + 回滚步骤 |
 | [**SSO → password 迁移**](docs/migration-sso-to-password.md) | 反向 runbook：自家 reset 落地页 + token 表 + 5 语言邮件；含 `auto-on-mode-flip` 自动派发说明 |
+| [**Break-Glass 应急凭据**](docs/break-glass.md) | super-admin 独立应急密码：什么是 / 为什么不同步 / 怎么轮换 / 什么时候用 / 威胁模型 |
 
 模块级（给开发者看）：
 - [backend/AGENTS.md](backend/AGENTS.md) — 模块边界 / Flyway / 安全 / API 约定

@@ -1,11 +1,14 @@
 <script setup>
-import { ref, onBeforeUnmount } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
-import { Menu, LogOut, User, Sun, Moon, Palette, Languages, ChevronDown, Check, KeyRound } from 'lucide-vue-next'
+import { Menu, LogOut, User, Sun, Moon, Palette, Languages, ChevronDown, Check, KeyRound, ShieldAlert } from 'lucide-vue-next'
 import ChangePasswordDialog from './ChangePasswordDialog.vue'
+import BreakGlassPasswordDialog from './BreakGlassPasswordDialog.vue'
+import { usePermission } from '@/composables/usePermission'
+import { oidcConfig } from '@/utils/oidc'
 
 defineProps({
   collapsed: {
@@ -90,10 +93,21 @@ function goProfile() {
 }
 
 const passwordDialogOpen = ref(false)
+const breakGlassDialogOpen = ref(false)
+const { hasPermission } = usePermission()
+// Break-glass entry only relevant when the deployment uses SSO (otherwise
+// the user IS using password mode and "break-glass" makes no sense) AND
+// the caller is a super-admin (only super-admins have a break-glass hash).
+const showBreakGlassEntry = computed(() => oidcConfig().enabled && hasPermission('*:*'))
 
 function openChangePassword() {
   userOpen.value = false
   passwordDialogOpen.value = true
+}
+
+function openBreakGlass() {
+  userOpen.value = false
+  breakGlassDialogOpen.value = true
 }
 
 async function handleLogout() {
@@ -249,6 +263,14 @@ onBeforeUnmount(() => {
             {{ t('layout.header.password') }}
           </button>
           <button
+            v-if="showBreakGlassEntry"
+            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+            @click="openBreakGlass"
+          >
+            <ShieldAlert :size="16" class="text-amber-600 dark:text-amber-400" />
+            {{ t('layout.header.breakGlass') }}
+          </button>
+          <button
             class="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
             @click="handleLogout"
           >
@@ -263,5 +285,6 @@ onBeforeUnmount(() => {
 
     <!-- パスワード変更ダイアログ -->
     <ChangePasswordDialog v-model:open="passwordDialogOpen" />
+    <BreakGlassPasswordDialog v-if="showBreakGlassEntry" v-model:open="breakGlassDialogOpen" />
   </header>
 </template>
