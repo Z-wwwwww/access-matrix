@@ -129,6 +129,13 @@ export default {
     ssoButton: 'SSO でサインイン',
     ssoOnlyHint: 'シングルサインオン（SSO）でサインインしてください。',
     ssoRedirecting: 'SSO にリダイレクト中...',
+    ssoUnreachable: {
+      title: 'SSO サーバーに接続できません',
+      body: 'Keycloak（SSO）が現在応答していません。メンテナンス中・再起動中、またはネットワーク障害の可能性があります。応急パスワードでログインするか、しばらくしてから再試行してください。',
+      useBreakGlass: '応急パスワードで続行',
+      retry: 'SSO を再試行',
+      retrying: '確認中...'
+    },
     passwordBreakGlass: 'パスワードログインモード（緊急用）',
     backToSso: 'SSO に戻す',
     passwordModeHotzone: 'パスワードログインを解除するには 2 秒以内に 5 回クリック',

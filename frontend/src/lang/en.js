@@ -122,6 +122,13 @@ export default {
     ssoButton: 'Sign in with SSO',
     ssoOnlyHint: 'Sign in with single sign-on (SSO).',
     ssoRedirecting: 'Redirecting to SSO...',
+    ssoUnreachable: {
+      title: 'Cannot reach the SSO server',
+      body: 'Keycloak (SSO) is not responding. It may be under maintenance, restarting, or a network issue is blocking access. You can use a break-glass password to continue, or retry shortly.',
+      useBreakGlass: 'Continue with break-glass password',
+      retry: 'Retry SSO',
+      retrying: 'Checking...'
+    },
     passwordBreakGlass: 'Password login mode (break-glass)',
     backToSso: 'Back to SSO',
     passwordModeHotzone: 'Click 5 times within 2 seconds to unlock password login',

@@ -122,6 +122,13 @@ export default {
     ssoButton: 'SSO로 로그인',
     ssoOnlyHint: '싱글 사인온(SSO)으로 로그인하세요.',
     ssoRedirecting: 'SSO로 이동 중...',
+    ssoUnreachable: {
+      title: 'SSO 서버에 연결할 수 없습니다',
+      body: 'Keycloak(SSO)이 현재 응답하지 않습니다. 점검 중이거나 재시작 중일 수 있으며, 네트워크 문제일 수도 있습니다. 비상용 비밀번호로 계속 로그인하거나 잠시 후 다시 시도해 주세요.',
+      useBreakGlass: '비상용 비밀번호로 계속',
+      retry: 'SSO 재시도',
+      retrying: '확인 중...'
+    },
     passwordBreakGlass: '비밀번호 로그인 모드(긴급용)',
     backToSso: 'SSO로 돌아가기',
     passwordModeHotzone: '2초 안에 5번 클릭하면 비밀번호 로그인 해제',

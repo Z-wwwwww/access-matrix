@@ -5,8 +5,8 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useMenuStore } from '@/stores/menu'
 import { useTabsStore } from '@/stores/tabs'
-import { User, Lock, Building, KeyRound } from 'lucide-vue-next'
-import { beginLogin as beginSsoLogin, oidcConfig, stashReturnTo, keycloakForgotPasswordUrl } from '@/utils/oidc'
+import { User, Lock, Building, KeyRound, ShieldAlert, RefreshCw } from 'lucide-vue-next'
+import { beginLogin as beginSsoLogin, oidcConfig, stashReturnTo, keycloakForgotPasswordUrl, isSsoReachable } from '@/utils/oidc'
 
 const ssoConfig = oidcConfig()
 const ssoEnabled = ssoConfig.enabled
@@ -38,6 +38,13 @@ const hotClicks = ref(0)
 let hotResetTimer = null
 let autoRedirectTimer = null
 const autoRedirecting = ref(false)
+// SSO server pre-flight probe state. When the probe fails (KC down,
+// network blocked, etc.) we abort the auto-redirect and surface a friendly
+// in-app banner with a "use break-glass" CTA — much better UX than letting
+// the browser navigate to a dead URL and render its native error page,
+// where the user has no path back to the SPA.
+const ssoUnreachable = ref(false)
+const ssoRetrying = ref(false)
 
 function onHotZoneClick() {
   if (!ssoEnabled || passwordUnlocked.value) return  // nothing to unlock
@@ -129,12 +136,38 @@ function handleKeydown(e) {
 async function handleSsoLogin() {
   errorMsg.value = ''
   ssoErrorFromQuery.value = ''
+  // Probe BEFORE handing control off to window.location.assign. If the
+  // probe fails we keep the user in-app and surface the friendly banner;
+  // the redirect would otherwise dead-end on the browser's native error
+  // page with no way back.
+  ssoRetrying.value = true
+  const reachable = await isSsoReachable()
+  ssoRetrying.value = false
+  if (!reachable) {
+    ssoUnreachable.value = true
+    return
+  }
+  ssoUnreachable.value = false
   stashReturnTo(route.query.from || '/')
   try {
     await beginSsoLogin()   // navigates away; never resolves
   } catch (e) {
     errorMsg.value = e.message || 'SSO not available'
   }
+}
+
+// Banner CTA: "use break-glass login". Equivalent to the 5-click hot-zone
+// reaching its threshold — unlock the password form, persist the choice
+// to sessionStorage so a reload doesn't snap back to the SSO view.
+function useBreakGlass() {
+  passwordUnlocked.value = true
+  sessionStorage.setItem(PASSWORD_UNLOCK_KEY, '1')
+  ssoUnreachable.value = false
+  if (autoRedirectTimer) {
+    clearTimeout(autoRedirectTimer)
+    autoRedirectTimer = null
+  }
+  autoRedirecting.value = false
 }
 
 function handleForgotPassword() {
@@ -193,12 +226,25 @@ onMounted(() => {
   // via window.location.assign and never resolves.
   if (shouldAutoRedirectToSso()) {
     autoRedirecting.value = true
-    autoRedirectTimer = setTimeout(() => {
-      beginSsoLogin().catch((e) => {
+    // Pre-flight the SSO endpoint BEFORE the 1.5s hot-zone window kicks
+    // in. If KC is down, the user gets a friendly in-app banner with a
+    // break-glass CTA instead of the browser's "refused to connect"
+    // page — that page has no way back, so a confused operator would
+    // have to hit Back, lose tab state, and rediscover the hot-zone.
+    isSsoReachable().then((reachable) => {
+      if (!reachable) {
         autoRedirecting.value = false
-        errorMsg.value = e.message || 'SSO not available'
-      })
-    }, AUTO_REDIRECT_DELAY_MS)
+        ssoUnreachable.value = true
+        return
+      }
+      // Healthy — proceed with the normal hot-zone-friendly delay.
+      autoRedirectTimer = setTimeout(() => {
+        beginSsoLogin().catch((e) => {
+          autoRedirecting.value = false
+          errorMsg.value = e.message || 'SSO not available'
+        })
+      }, AUTO_REDIRECT_DELAY_MS)
+    })
   }
 })
 
@@ -238,11 +284,46 @@ onBeforeUnmount(() => {
 
       <!-- ─── SSO MODE ────────────────────────────────────────────────────── -->
       <div v-if="viewMode === 'sso'" class="space-y-4">
+        <!-- SSO server is unreachable (probe failed) — show the friendly
+             banner with break-glass + retry CTAs. Takes precedence over
+             the auto-redirect spinner because we KNOW the redirect would
+             fail anyway. -->
+        <template v-if="ssoUnreachable">
+          <div class="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-3">
+            <div class="flex items-start gap-3">
+              <ShieldAlert :size="18" class="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div class="space-y-1">
+                <p class="text-sm font-medium text-foreground">{{ t('login.ssoUnreachable.title') }}</p>
+                <p class="text-xs text-muted-foreground leading-relaxed">{{ t('login.ssoUnreachable.body') }}</p>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="flex-1 h-10 inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground font-medium rounded-lg text-sm hover:bg-primary/90 transition-colors"
+                @click="useBreakGlass"
+              >
+                <KeyRound :size="14" />
+                {{ t('login.ssoUnreachable.useBreakGlass') }}
+              </button>
+              <button
+                type="button"
+                :disabled="ssoRetrying"
+                class="h-10 px-3 inline-flex items-center justify-center gap-1.5 border border-border rounded-lg text-xs text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+                @click="handleSsoLogin"
+              >
+                <RefreshCw :size="14" :class="ssoRetrying && 'animate-spin'" />
+                {{ ssoRetrying ? t('login.ssoUnreachable.retrying') : t('login.ssoUnreachable.retry') }}
+              </button>
+            </div>
+          </div>
+        </template>
+
         <!-- Auto-redirect in progress: show a low-key spinner. The 5-click
              hot-zone in the card's top-right corner is still alive during
              this window — clicking it 5 times cancels the redirect and
              unlocks the password form. -->
-        <template v-if="autoRedirecting">
+        <template v-else-if="autoRedirecting">
           <div class="flex flex-col items-center justify-center py-4 space-y-3">
             <div class="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
             <p class="text-sm text-muted-foreground">{{ t('login.ssoRedirecting') }}</p>

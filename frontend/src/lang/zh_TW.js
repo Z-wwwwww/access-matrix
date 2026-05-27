@@ -122,6 +122,13 @@ export default {
     ssoButton: 'SSO 登入',
     ssoOnlyHint: '請使用單一登入 (SSO) 進入系統。',
     ssoRedirecting: '正在跳轉至 SSO...',
+    ssoUnreachable: {
+      title: 'SSO 伺服器無法存取',
+      body: 'Keycloak（SSO）目前未回應。可能正在維護、重新啟動，或網路存在問題。可以使用應急密碼繼續登入，或稍後再試。',
+      useBreakGlass: '使用應急密碼登入',
+      retry: '重試 SSO',
+      retrying: '檢查中...'
+    },
     passwordBreakGlass: '密碼登入模式（應急）',
     backToSso: '返回 SSO',
     passwordModeHotzone: '2 秒內連點 5 次可解鎖密碼登入',

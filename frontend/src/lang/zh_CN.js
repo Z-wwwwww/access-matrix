@@ -122,6 +122,13 @@ export default {
     ssoButton: 'SSO 登录',
     ssoOnlyHint: '请使用单点登录 (SSO) 进入系统。',
     ssoRedirecting: '正在跳转到 SSO...',
+    ssoUnreachable: {
+      title: 'SSO 服务器无法访问',
+      body: 'Keycloak（SSO）当前没有响应。可能正在维护、重启，或网络出现问题。可以使用应急密码继续登录，或稍后再试。',
+      useBreakGlass: '使用应急密码登录',
+      retry: '重试 SSO',
+      retrying: '检测中...'
+    },
     passwordBreakGlass: '密码登录模式（应急）',
     backToSso: '返回 SSO',
     passwordModeHotzone: '2 秒内连击 5 次可解锁密码登录',

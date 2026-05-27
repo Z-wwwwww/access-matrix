@@ -120,6 +120,50 @@ export function keycloakForgotPasswordUrl() {
   return `${cfg.issuer}/protocol/openid-connect/auth?${params}`
 }
 
+/**
+ * Probe whether the configured OIDC server is reachable BEFORE we commit
+ * to a {@link window.location.assign} — without this the browser navigates
+ * away and renders its own native "refused to connect" page, which gives
+ * the user no in-app path back to break-glass.
+ *
+ * <p>Implementation: GET {issuer}/.well-known/openid-configuration with
+ * a 3s timeout. Keycloak exposes that endpoint without auth and with
+ * permissive CORS (since 12.x); a successful 2xx means the realm is up.
+ * Anything else — network error, CORS rejection, timeout, 404 (wrong
+ * realm), 5xx — we treat as "unreachable" because the redirect would
+ * also fail.
+ *
+ * <p>Why 3s: on a healthy KC this responds in <100ms; we don't want to
+ * wait too long if KC is down (the user's already waiting for the auto-
+ * redirect grace window). Three seconds is short enough to avoid being
+ * annoying and long enough to absorb a slow link.
+ */
+const SSO_PROBE_TIMEOUT_MS = 3000
+
+export async function isSsoReachable() {
+  const cfg = oidcConfig()
+  if (!cfg.enabled || !cfg.issuer) return false
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), SSO_PROBE_TIMEOUT_MS)
+    const res = await fetch(`${cfg.issuer}/.well-known/openid-configuration`, {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-store',
+      credentials: 'omit',
+      signal: ctrl.signal
+    })
+    clearTimeout(t)
+    return res.ok
+  } catch {
+    // network error / CORS rejection / timeout / abort — all treated as
+    // unreachable. We can't distinguish between "KC down" and "CORS
+    // misconfigured", but either way the redirect would fail with the
+    // same browser-level error page.
+    return false
+  }
+}
+
 /** Where the user wanted to land — preserved through the IdP round-trip. */
 export function stashReturnTo(path) {
   if (path) sessionStorage.setItem(SS_FROM, path)
