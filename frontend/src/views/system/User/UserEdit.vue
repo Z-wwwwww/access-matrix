@@ -112,9 +112,14 @@ async function save() {
       if (r.data.code !== 0) { toast.error(r.data.msg || t('user.edit.message.createFailed')); return }
       userId = r.data.data
     }
-    // assign roles
-    const r2 = await assignUserRolesApi(userId, selectedRoleIds.value)
-    if (r2.data.code !== 0) { toast.error(r2.data.msg || t('user.edit.message.assignRolesFailed')); return }
+    // assign roles — skipped for built-in admin: roles are immutable on
+    // that row (the backend's assignRoles still calls assertNotBuiltInAdmin
+    // and would reject), AND the UI gates the role toggles via
+    // isStructuralLocked so there's nothing to persist anyway.
+    if (!isBuiltInAdmin.value) {
+      const r2 = await assignUserRolesApi(userId, selectedRoleIds.value)
+      if (r2.data.code !== 0) { toast.error(r2.data.msg || t('user.edit.message.assignRolesFailed')); return }
+    }
     toast.success(t('common.message.saveSuccessful'))
     emit('saved')
     emit('update:open', false)
