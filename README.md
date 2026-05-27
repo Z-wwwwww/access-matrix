@@ -80,6 +80,7 @@ npm install && npm run dev
 | [**password → SSO 迁移**](docs/migration-password-to-sso.md) | password 项目零数据损失切到 SSO 的 runbook：自动 mirror + 邮件过期重发 + 5 大坑 + 健康检查 SQL + 回滚步骤 |
 | [**SSO → password 迁移**](docs/migration-sso-to-password.md) | 反向 runbook：自家 reset 落地页 + token 表 + 5 语言邮件；含 `auto-on-mode-flip` 自动派发说明 |
 | [**Break-Glass 应急凭据**](docs/break-glass.md) | super-admin 独立应急密码：什么是 / 为什么不同步 / 怎么轮换 / 什么时候用 / 威胁模型 |
+| [**`system` realm（平台运维）**](docs/system-realm.md) | 平台运营专用的隐形 realm + `PLATFORM_ADMIN` 角色 + MP 拦截器 bypass：跨租户管理的"控制平面" |
 
 模块级（给开发者看）：
 - [backend/AGENTS.md](backend/AGENTS.md) — 模块边界 / Flyway / 安全 / API 约定

@@ -32,6 +32,19 @@ public class MybatisPlusConfig {
             "core_numbering_key"
     );
 
+    /**
+     * Tenant id that signals "platform-ops caller — bypass scoping".
+     * Users in the 'system' realm carry {@code tid='system'} on their JWT;
+     * the filter recognises that and refuses to inject the
+     * {@code WHERE tenant_id = 'system'} predicate, which would otherwise
+     * scope queries to a tenant that has no business data. Bypassing
+     * scoping lets PLATFORM_ADMIN holders read / write across all
+     * business tenants — the magic that makes a cross-tenant management
+     * UI possible without per-tenant @InterceptorIgnore annotations
+     * sprinkled across the codebase.
+     */
+    private static final String PLATFORM_TENANT_ID = "system";
+
     private final AppMybatisProperties props;
 
     public MybatisPlusConfig(AppMybatisProperties props) {
@@ -48,12 +61,23 @@ public class MybatisPlusConfig {
                 public Expression getTenantId() {
                     String tid = RequestContext.tenantId();
                     // "demo" fallback — see RequestContext.tenantIdOrDefault.
+                    // The system-tenant bypass is handled by ignoreTable below
+                    // (returns true for ALL tables when caller is platform-ops),
+                    // so this branch only fires for business tenants.
                     return new StringValue(tid == null ? "demo" : tid);
                 }
 
                 @Override
                 public boolean ignoreTable(String tableName) {
                     if (tableName == null) return true;
+                    // Platform-ops caller — bypass scoping for EVERY table so
+                    // queries read across all business tenants. The role check
+                    // (`platform:*` permission) happens at the controller layer;
+                    // by the time SQL is being emitted, the security decision
+                    // is already made.
+                    if (PLATFORM_TENANT_ID.equals(RequestContext.tenantId())) {
+                        return true;
+                    }
                     String lower = tableName.toLowerCase();
                     if (lower.startsWith("flyway_")) return true;
                     return TENANT_EXCLUDED_TABLES.contains(lower);
