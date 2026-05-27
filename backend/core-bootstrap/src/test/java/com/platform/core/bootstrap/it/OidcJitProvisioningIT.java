@@ -145,8 +145,11 @@ class OidcJitProvisioningIT {
         // OIDC: point Spring Security + our KeycloakUserService at the
         // ephemeral container, not the local-dev :8180.
         r.add("app.security.mode", () -> "oidc");
-        r.add("app.security.oidc.issuer-uri",
-                () -> KEYCLOAK.getAuthServerUrl() + "/realms/default");
+        // Multi-realm trust prefix — the SaaS path. Single-realm `issuer-uri`
+        // is intentionally NOT set so this IT exercises the same code path
+        // production runs (MultiRealmJwtDecoder, OidcJitUserService's
+        // issuer-base prefix check).
+        r.add("app.security.oidc.issuer-base-uri", KEYCLOAK::getAuthServerUrl);
         r.add("app.keycloak.admin.server-url", KEYCLOAK::getAuthServerUrl);
         r.add("app.keycloak.admin.realm",      () -> "master");
         r.add("app.keycloak.admin.client-id",  () -> "admin-cli");

@@ -108,7 +108,16 @@ public class SecurityBeansConfig {
      *       minted by {@code AdminAuthController.login} — the break-glass
      *       password path that survives Keycloak being unavailable)</li>
      *   <li>everything else (typically {@code RS256}) → Keycloak JWKS
-     *       decoder for normal SSO traffic</li>
+     *       decoder for normal SSO traffic. Pick by config:
+     *       <ul>
+     *         <li>{@code app.security.oidc.issuer-base-uri} set →
+     *             {@link MultiRealmJwtDecoder} accepting any realm under
+     *             that Keycloak host (recommended — SaaS multi-tenant).</li>
+     *         <li>else {@code app.security.oidc.issuer-uri} set → a single
+     *             {@link JwtDecoders#fromIssuerLocation} pinned to exactly
+     *             that realm (locked-down single-tenant deploy).</li>
+     *       </ul>
+     *   </li>
      * </ul>
      *
      * <p>In {@code jwt} or {@code permit-all} mode there is no IdP and the
@@ -117,17 +126,26 @@ public class SecurityBeansConfig {
     @Bean
     public JwtDecoder jwtDecoder(
             @Value("${app.security.mode:permit-all}") String mode,
-            @Value("${app.security.oidc.issuer-uri:}") String issuerUri) {
+            @Value("${app.security.oidc.issuer-uri:}") String issuerUri,
+            @Value("${app.security.oidc.issuer-base-uri:}") String issuerBaseUri) {
         JwtDecoder hs256 = buildHs256Decoder();
         if (!"oidc".equalsIgnoreCase(mode)) {
             return hs256;
         }
-        if (issuerUri == null || issuerUri.isBlank()) {
+        JwtDecoder oidc;
+        if (issuerBaseUri != null && !issuerBaseUri.isBlank()) {
+            // Multi-tenant: any realm under this Keycloak host is trusted,
+            // each realm's JWKS is fetched lazily on first sighting.
+            oidc = new MultiRealmJwtDecoder(issuerBaseUri);
+        } else if (issuerUri != null && !issuerUri.isBlank()) {
+            // Single-tenant pinning — keep old behavior for staging / locked-down deploys.
+            oidc = JwtDecoders.fromIssuerLocation(issuerUri);
+        } else {
             throw new IllegalStateException(
-                    "app.security.mode=oidc requires app.security.oidc.issuer-uri to be set "
-                            + "(e.g. http://localhost:8180/realms/default).");
+                    "app.security.mode=oidc requires either app.security.oidc.issuer-base-uri "
+                            + "(multi-realm, recommended) or app.security.oidc.issuer-uri "
+                            + "(single realm) to be set.");
         }
-        JwtDecoder oidc = JwtDecoders.fromIssuerLocation(issuerUri);
         return new DualModeJwtDecoder(hs256, oidc);
     }
 

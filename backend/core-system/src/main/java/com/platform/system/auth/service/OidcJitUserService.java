@@ -55,16 +55,27 @@ public class OidcJitUserService implements OidcUserResolver {
     private String usernameClaim;
 
     /**
-     * Expected OIDC issuer URL. JIT only fires for tokens whose {@code iss}
-     * matches this prefix; otherwise the token is treated as in-house HS256
-     * (signed by {@code AdminAuthController.login}) and we return its
-     * subject as-is. This is what makes the OIDC + in-house dual-mode
-     * "break-glass" flow safe — without it, an HS256 token's ULID subject
-     * would get written into a Keycloak user's {@code keycloak_id} column
-     * and the next real OIDC login for that user would create a duplicate.
+     * Expected OIDC issuer URL (legacy single-realm pinning). JIT only fires
+     * for tokens whose {@code iss} matches this prefix; otherwise the token
+     * is treated as in-house HS256 (signed by {@code AdminAuthController.login})
+     * and we return its subject as-is. This is what makes the OIDC + in-house
+     * dual-mode "break-glass" flow safe — without it, an HS256 token's ULID
+     * subject would get written into a Keycloak user's {@code keycloak_id}
+     * column and the next real OIDC login for that user would create a duplicate.
      */
     @Value("${app.security.oidc.issuer-uri:}")
     private String expectedIssuer;
+
+    /**
+     * Multi-realm trust prefix (recommended for SaaS multi-tenant). When set,
+     * any token whose {@code iss} starts with {@code <base>/realms/} is
+     * treated as OIDC; the actual realm name is read from the token's
+     * {@code tid} claim. Takes precedence over {@link #expectedIssuer} so
+     * a base-uri-configured deploy doesn't accidentally fall back to
+     * single-realm semantics if both happen to be set.
+     */
+    @Value("${app.security.oidc.issuer-base-uri:}")
+    private String expectedIssuerBase;
 
     public OidcJitUserService(UserMapper userMapper) {
         this.userMapper = userMapper;
@@ -76,17 +87,22 @@ public class OidcJitUserService implements OidcUserResolver {
         // Skip JIT for non-OIDC tokens (HS256 break-glass tokens from
         // AdminAuthController). Their subject is already the business ULID,
         // so we return it directly — CoreRequestContextFilter's caller will
-        // use it as-is. Only enforced when expectedIssuer is configured
-        // (the production path with @Value injection); when unset (unit
-        // tests without Spring context) fall through and treat every
+        // use it as-is. Only enforced when an expected issuer is configured
+        // (the production path with @Value injection); when both are unset
+        // (unit tests without Spring context) fall through and treat every
         // token as an OIDC candidate.
         //
         // Use getClaimAsString rather than getIssuer() — the latter calls
         // getClaimAsURL which throws IllegalArgumentException on non-URL
         // values. AdminAuthController.login signs HS256 tokens whose iss
         // is a plain string like "access-matrix-local", not a URL.
-        if (expectedIssuer != null && !expectedIssuer.isBlank()) {
-            String issuer = jwt.getClaimAsString("iss");
+        String issuer = jwt.getClaimAsString("iss");
+        if (expectedIssuerBase != null && !expectedIssuerBase.isBlank()) {
+            String base = stripTrailingSlash(expectedIssuerBase) + "/realms/";
+            if (issuer == null || !issuer.startsWith(base)) {
+                return jwt.getSubject();
+            }
+        } else if (expectedIssuer != null && !expectedIssuer.isBlank()) {
             if (issuer == null || !issuer.startsWith(expectedIssuer)) {
                 return jwt.getSubject();
             }
@@ -149,6 +165,10 @@ public class OidcJitUserService implements OidcUserResolver {
         log.info("OIDC JIT: provisioned new user {} (tenant {}, username {}) for keycloak id {}",
                 fresh.getId(), tid, fresh.getUsername(), kcId);
         return fresh.getId();
+    }
+
+    private static String stripTrailingSlash(String s) {
+        return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
     }
 
 }
