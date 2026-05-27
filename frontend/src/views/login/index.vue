@@ -45,13 +45,6 @@ const autoRedirecting = ref(false)
 // where the user has no path back to the SPA.
 const ssoUnreachable = ref(false)
 const ssoRetrying = ref(false)
-// When AppHeader's logout couldn't reach KC and bounced the user here
-// with ?logout=local-only, surface a small "local-only logout" notice
-// above the standard unreachable banner so the user understands:
-//   (a) the logout SUCCEEDED locally, they're not still signed in
-//   (b) KC's session cookie may still be alive — clear it manually
-//       (or wait for KC to come back) if they suspect compromise
-const localOnlyLogoutNotice = ref(false)
 
 function onHotZoneClick() {
   if (!ssoEnabled || passwordUnlocked.value) return  // nothing to unlock
@@ -222,11 +215,12 @@ onMounted(() => {
         : t('login.message.ssoFailed')
   }
   // Local-only logout (KC was unreachable at sign-out): pre-arm the
-  // unreachable banner so the user lands on the same break-glass UI
-  // they'd see if they tried to SSO afresh.
+  // unreachable banner so the user lands on the EXACT same UI they
+  // would see if they'd tried to SSO fresh and hit a down KC. No
+  // separate "you were logged out locally" prefix — visual consistency
+  // with the login-time probe failure is the explicit design goal.
   if (route.query.logout === 'local-only') {
     ssoUnreachable.value = true
-    localOnlyLogoutNotice.value = true
   }
   // err=menu means router.beforeEach couldn't load /menu/me after a
   // successful login (token granted, but downstream session unusable).
@@ -308,13 +302,6 @@ onBeforeUnmount(() => {
              fail anyway. -->
         <template v-if="ssoUnreachable">
           <div class="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-3">
-            <!-- Local-only logout context: leads the banner so the user
-                 knows the logout itself succeeded (don't fix the panic). -->
-            <div v-if="localOnlyLogoutNotice"
-                 class="text-xs leading-relaxed pb-2 border-b border-amber-500/20">
-              <p class="font-medium text-foreground">{{ t('login.localLogoutOnly.title') }}</p>
-              <p class="text-muted-foreground mt-1">{{ t('login.localLogoutOnly.body') }}</p>
-            </div>
             <div class="flex items-start gap-3">
               <ShieldAlert :size="18" class="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div class="space-y-1">
