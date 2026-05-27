@@ -85,6 +85,7 @@ export default {
     header: {
       profile: 'Profile',
       password: 'Change password',
+      breakGlass: 'Break-glass password',
       logout: 'Log out',
       userFallback: 'User'
     },
@@ -152,6 +153,42 @@ export default {
       passwordMismatch: 'Passwords do not match',
       acceptFailed: 'Failed to set password',
       done: 'Password set. You can now sign in.'
+    }
+  },
+
+  breakGlass: {
+    title: 'Break-glass password',
+    intro: {
+      what: 'This is an emergency-only password used to log in to the system when Keycloak (SSO) is unavailable.',
+      howDifferent: 'It is SEPARATE from your daily SSO password (which lives in Keycloak) and the two are NOT synced. Do not reuse the same value.',
+      whenUsed: 'Use it via the legacy /login password field only when SSO is unreachable. Only super-admin users have one.'
+    },
+    status: {
+      configured: 'A break-glass password is currently configured.',
+      notConfigured: 'Not yet configured — strongly recommended to set one before you need it.'
+    },
+    label: {
+      newPassword: 'New break-glass password',
+      confirmPassword: 'Confirm new password'
+    },
+    placeholder: {
+      newPassword: 'At least 8 chars, mixed character types',
+      confirmPassword: 'Re-enter the same password'
+    },
+    hint: {
+      storeSafely: 'Save it in your password manager or organisational vault — there is no recovery path if you forget it.'
+    },
+    button: {
+      save: 'Save',
+      saving: 'Saving...'
+    },
+    message: {
+      saved: 'Break-glass password updated'
+    },
+    error: {
+      tooShort: 'Password must be at least 8 characters',
+      mismatch: 'Passwords do not match',
+      saveFailed: 'Save failed'
     }
   },
 
@@ -270,6 +307,7 @@ export default {
       editDisabled: 'Built-in user is not editable',
       edit: 'Edit',
       resetPassword: 'Reset password',
+      resetPasswordDisabledSso: 'Disabled in SSO mode — users change their password in the Keycloak account console',
       statusChangeDisabled: 'Built-in user status cannot be changed',
       toggleStatus: 'Enable / Disable',
       forceLogout: 'Force logout',

@@ -15,6 +15,7 @@ import com.platform.core.infrastructure.security.AccountLockoutService;
 import com.platform.core.infrastructure.security.ForceLogoutService;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,6 +32,17 @@ public class AdminAuthController {
     private final PasswordPolicyService passwordPolicy;
     private final PasswordEncoder encoder;
     private final ForceLogoutService forceLogoutService;
+
+    /**
+     * Active security mode. In OIDC mode this controller's reset-password
+     * endpoint refuses — Keycloak owns user credentials, and writing the
+     * local password_hash here would diverge from KC without any login
+     * pathway picking the value up. Admins should use Keycloak's self-service
+     * reset for SSO password recovery, and the break-glass endpoint
+     * (/me/break-glass-password) for emergency credential management.
+     */
+    @Value("${app.security.mode:permit-all}")
+    private String securityMode;
 
     public AdminAuthController(UserMapper userMapper, AccountLockoutService lockoutService,
                                PasswordPolicyService passwordPolicy, PasswordEncoder encoder,
@@ -60,6 +72,20 @@ public class AdminAuthController {
     @RequiresPermission(SystemPermissions.AUTH_RESET_PASSWORD)
     @OpLog(module = "system", action = "auth.resetPassword", targetType = "user")
     public JsonResult<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest body) {
+        // OIDC mode: this endpoint is a footgun. Writing local password_hash
+        // never propagates to Keycloak and never gets picked up by the SSO
+        // login path; worse, it can re-populate the column on a non-super-admin
+        // row after the JIT bind path cleared it, undoing the "as if always
+        // OIDC" data invariant. Refuse here as defense in depth — the SPA
+        // already greys out the trigger, but a direct API call would otherwise
+        // succeed silently.
+        if ("oidc".equalsIgnoreCase(securityMode)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                    "Password reset is disabled in OIDC mode. "
+                            + "Users reset their SSO password via Keycloak's account console "
+                            + "(or the 'Forgot password' link on the login page). "
+                            + "For break-glass credentials, see /me/break-glass-password.");
+        }
         passwordPolicy.validate(body.newPassword());
         UserEntity user = userMapper.findByIdentifier(tenant(), body.username());
         if (user == null) {

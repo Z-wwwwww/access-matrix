@@ -85,6 +85,7 @@ export default {
     header: {
       profile: '個人資料',
       password: '修改密碼',
+      breakGlass: '應急密碼',
       logout: '登出',
       userFallback: '使用者'
     },
@@ -152,6 +153,42 @@ export default {
       passwordMismatch: '兩次輸入的密碼不一致',
       acceptFailed: '設定密碼失敗',
       done: '密碼已設定，現在可以登入'
+    }
+  },
+
+  breakGlass: {
+    title: '應急密碼',
+    intro: {
+      what: '這是一組僅用於「應急」的密碼，專門在 Keycloak（SSO）無法使用時用來登入系統。',
+      howDifferent: '它與您日常使用的 SSO 密碼（保存在 Keycloak）**完全獨立**，兩者**不會同步**。請勿使用相同的密碼。',
+      whenUsed: '僅在 KC 故障等 SSO 無法存取時，透過 /login 的密碼欄位使用。只有超級管理員擁有此密碼。'
+    },
+    status: {
+      configured: '目前已設定應急密碼',
+      notConfigured: '尚未設定 — 強烈建議於需要前先行設定'
+    },
+    label: {
+      newPassword: '新的應急密碼',
+      confirmPassword: '請再次輸入以確認'
+    },
+    placeholder: {
+      newPassword: '至少 8 個字元，包含多種字元類型',
+      confirmPassword: '再次輸入相同的密碼'
+    },
+    hint: {
+      storeSafely: '請保存於密碼管理器或團隊保密庫中 — 一旦遺忘無法找回。'
+    },
+    button: {
+      save: '儲存',
+      saving: '儲存中...'
+    },
+    message: {
+      saved: '應急密碼已更新'
+    },
+    error: {
+      tooShort: '密碼至少需要 8 個字元',
+      mismatch: '兩次輸入的密碼不一致',
+      saveFailed: '儲存失敗'
     }
   },
 
@@ -270,6 +307,7 @@ export default {
       editDisabled: '內建使用者不可編輯',
       edit: '編輯',
       resetPassword: '重設密碼',
+      resetPasswordDisabledSso: 'SSO 模式下不可用 — 使用者於 Keycloak 帳號控制台自助修改密碼',
       statusChangeDisabled: '內建使用者狀態不可變更',
       toggleStatus: '啟用/停用',
       forceLogout: '強制登出',
