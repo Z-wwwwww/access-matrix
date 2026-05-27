@@ -129,10 +129,6 @@ export default {
       retry: '重试 SSO',
       retrying: '检测中...'
     },
-    localLogoutOnly: {
-      title: '已在本地登出',
-      body: '本地会话已清除，但 Keycloak 不可达，IdP 端的会话未能终止。如怀疑账号已被盗用，请手动清除浏览器 Cookie。'
-    },
     passwordBreakGlass: '密码登录模式（应急）',
     backToSso: '返回 SSO',
     passwordModeHotzone: '2 秒内连击 5 次可解锁密码登录',

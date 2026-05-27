@@ -129,10 +129,6 @@ export default {
       retry: 'SSO 재시도',
       retrying: '확인 중...'
     },
-    localLogoutOnly: {
-      title: '로컬에서 로그아웃되었습니다',
-      body: '로컬 세션은 정리되었지만 Keycloak 에 연결할 수 없어 IdP 측 세션은 종료되지 않았습니다. 보안 우려가 있다면 브라우저 쿠키를 직접 삭제해 주세요.'
-    },
     passwordBreakGlass: '비밀번호 로그인 모드(긴급용)',
     backToSso: 'SSO로 돌아가기',
     passwordModeHotzone: '2초 안에 5번 클릭하면 비밀번호 로그인 해제',

@@ -129,10 +129,6 @@ export default {
       retry: '重試 SSO',
       retrying: '檢查中...'
     },
-    localLogoutOnly: {
-      title: '已在本機登出',
-      body: '本機作業階段已清除，但 Keycloak 無法存取，IdP 端的作業階段未能結束。若懷疑帳號已被盜用，請手動清除瀏覽器 Cookie。'
-    },
     passwordBreakGlass: '密碼登入模式（應急）',
     backToSso: '返回 SSO',
     passwordModeHotzone: '2 秒內連點 5 次可解鎖密碼登入',
