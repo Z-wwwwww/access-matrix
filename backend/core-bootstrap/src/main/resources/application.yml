@@ -197,6 +197,25 @@ app:
     # Invite token lifetime — default 7 days, matching Keycloak's default for
     # `executeActionsEmail`. Override per environment.
     token-ttl:  ${CORE_INVITE_TOKEN_TTL:7d}
+  migration:
+    # One-shot password→SSO migration. Only honoured when
+    #   app.security.mode = oidc
+    # When set to "password-to-sso" on a backend restart, mirrors every
+    # legacy core_auth_user row (where keycloak_id IS NULL) into the matching
+    # Keycloak realm and triggers a UPDATE_PASSWORD reset-email so the user
+    # finishes enrollment unattended. Idempotent — re-runs skip users that
+    # already live in Keycloak. See docs/migration-password-to-sso.md for the
+    # full playbook, gotchas, and rollback procedure.
+    #
+    # Leave UNSET in normal operation. Set, restart, verify report, UNSET, restart.
+    run-on-startup: ${CORE_MIGRATION_RUN_ON_STARTUP:}
+    # Comma-separated list of tenant ids (== realm names) to migrate. The
+    # service iterates them sequentially with a synthetic RequestContext per
+    # tenant so MyBatis-Plus's tenant interceptor scopes the candidate query
+    # correctly. Default = "default" alone.
+    tenants:        ${CORE_MIGRATION_TENANTS:default}
+    # Where the per-user JSON report lands. One file per run, timestamped.
+    report-dir:     ${CORE_MIGRATION_REPORT_DIR:logs}
   mybatis:
     tenant:
       enabled: false

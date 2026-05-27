@@ -120,6 +120,47 @@ public class KeycloakUserService {
         }
     }
 
+    /**
+     * Trigger one of Keycloak's "required actions" by email — e.g.
+     * {@code UPDATE_PASSWORD}, {@code VERIFY_EMAIL}, {@code CONFIGURE_TOTP}.
+     *
+     * <p>Used by the password→SSO migration runner: after mirroring a
+     * legacy DB user into Keycloak with NO credentials, this fires off the
+     * "set your password" email so the user can complete enrollment without
+     * any admin intervention. The recipient hits an OIDC reset-credentials
+     * page; Keycloak verifies the link, prompts for a new password against
+     * the realm's password policy, and stores the argon2id hash on its side.
+     *
+     * <p>Requires the realm's SMTP settings to be configured and the user
+     * row to have a {@code email}. KC will throw HTTP 500 if either is missing.
+     */
+    public void executeActionsEmail(String realm,
+                                    String keycloakUserId,
+                                    List<String> actions) {
+        try (Keycloak kc = newAdminClient()) {
+            kc.realm(realm).users().get(keycloakUserId).executeActionsEmail(actions);
+            log.info("[kc] executeActionsEmail({}) for user {} in realm {}",
+                    actions, keycloakUserId, realm);
+        } catch (WebApplicationException e) {
+            throw new KeycloakOperationException(
+                    "Keycloak executeActionsEmail failed: HTTP " + e.getResponse().getStatus(), e);
+        }
+    }
+
+    /**
+     * Find the Keycloak UUID for a given username inside a realm. Returns null
+     * if no exact-match user exists. Useful for the migration runner so we can
+     * skip users that already live in Keycloak (e.g. partial earlier mirror run).
+     */
+    public String findUserIdByUsername(String realm, String username) {
+        try (Keycloak kc = newAdminClient()) {
+            List<UserRepresentation> hits = kc.realm(realm).users()
+                    .searchByUsername(username, /* exact = */ true);
+            if (hits == null || hits.isEmpty()) return null;
+            return hits.get(0).getId();
+        }
+    }
+
     public void disableUser(String realm, String keycloakUserId) {
         try (Keycloak kc = newAdminClient()) {
             UserResource ur = kc.realm(realm).users().get(keycloakUserId);
