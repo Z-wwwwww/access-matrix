@@ -1,6 +1,6 @@
 {
     "id":  "31e704be-8857-4e97-8fde-b203dbf3a6f8",
-    "realm":  "default",
+    "realm":  "acme",
     "displayName":  "Default Tenant",
     "loginTheme":  "access-matrix",
     "notBefore":  0,
@@ -609,7 +609,7 @@
                                                     "consentRequired":  false,
                                                     "config":  {
                                                                    "introspection.token.claim":  "true",
-                                                                   "claim.value":  "default",
+                                                                   "claim.value":  "acme",
                                                                    "userinfo.token.claim":  "true",
                                                                    "id.token.claim":  "true",
                                                                    "access.token.claim":  "true",
