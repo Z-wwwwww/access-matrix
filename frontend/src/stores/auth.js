@@ -61,6 +61,13 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(ACCESS_KEY)
     localStorage.removeItem(ID_TOKEN_KEY)
     sessionStorage.removeItem('access_matrix_tabs')
+    // login_password_unlocked is the per-tab "user is in break-glass
+    // mode" flag (set by the hot-zone or the unreachable-banner CTA on
+    // /login). Once we log out, the tab's relationship with the SPA
+    // resets — the next visit to /login should re-evaluate whether
+    // SSO is reachable rather than silently dropping the user into
+    // the password form because they once broke glass an hour ago.
+    sessionStorage.removeItem('login_password_unlocked')
   }
 
   async function login(payload) {
