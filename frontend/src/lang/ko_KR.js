@@ -140,6 +140,65 @@ export default {
     }
   },
 
+  platform: {
+    tenant: {
+      column: {
+        tenantCode: '테넌트 코드',
+        displayName: '표시명',
+        contactEmail: '연락처 이메일',
+        status: '상태',
+        createTime: '생성 시각',
+        actions: '작업'
+      },
+      status: { active: '활성', suspended: '중단' },
+      search: { placeholder: '코드 또는 이름으로 검색' },
+      softDeleteHint: {
+        title: '소프트 삭제 전용:',
+        body: '테넌트를 삭제하면 Keycloak realm 이 비활성화되어 사용자가 로그인할 수 없게 되지만, 비즈니스 데이터는 보존됩니다. 완전 삭제는 별도의 운영 절차로 수행합니다.'
+      },
+      tooltip: {
+        softDelete: '테넌트 소프트 삭제',
+        builtInLocked: '기본 제공 테넌트(system / demo)는 삭제할 수 없습니다'
+      },
+      confirm: {
+        deleteTitle: '테넌트 삭제',
+        deleteMessage: '"{displayName}"({tenantCode})을(를) 소프트 삭제하시겠습니까?\n\n• Keycloak realm 이 비활성화되어 사용자는 로그인할 수 없습니다\n• 비즈니스 데이터는 보존됩니다\n• 재활성화는 KC 관리 콘솔에서 수동으로 수행해야 합니다',
+        deleteConfirm: '소프트 삭제 실행'
+      },
+      button: { new: '신규 테넌트' },
+      message: {
+        loadFailed: '테넌트 목록 로드 실패',
+        createSuccess: '테넌트가 생성되었습니다',
+        createFailed: '테넌트 생성 실패',
+        deleteSuccess: '테넌트가 소프트 삭제되었습니다',
+        deleteFailed: '테넌트 삭제 실패'
+      },
+      edit: {
+        titleCreate: '신규 테넌트',
+        intro: '한 번의 작업으로 Keycloak realm 과 중앙 레지스트리 항목을 생성합니다. 테넌트 코드는 생성 후 변경할 수 없습니다.',
+        label: {
+          tenantCode: '테넌트 코드',
+          displayName: '표시명',
+          contactEmail: '연락처 이메일'
+        },
+        placeholder: {
+          tenantCode: 'acme',
+          displayName: 'Acme 주식회사',
+          contactEmail: 'admin@acme.example'
+        },
+        hint: {
+          tenantCode: '소문자 영숫자·하이픈(RFC1035 레이블). Keycloak realm 이름과 서브도메인으로 사용됩니다.',
+          contactEmail: '선택 - 첫 관리자 초대에 사용'
+        },
+        error: {
+          invalidCode: '테넌트 코드는 소문자 RFC1035 레이블이어야 합니다(소문자 영숫자·하이픈)',
+          missingDisplayName: '표시명을 입력해 주세요'
+        },
+        saving: '저장 중...'
+      }
+    }
+  },
+
   signOut: {
     title: '로그아웃 중...',
     body: '로컬 세션을 정리하고 ID 공급자(Keycloak)에게 알리는 중입니다.',
