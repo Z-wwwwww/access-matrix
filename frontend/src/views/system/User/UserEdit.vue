@@ -241,8 +241,7 @@ async function save() {
 {{ t('common.button.cancel') }}
 </button>
         <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                :disabled="saving || isStructuralLocked"
-                :title="isStructuralLocked ? t('user.tooltip.editDisabled') : ''"
+                :disabled="saving"
                 @click="save">
           {{ saving ? t('user.edit.message.saving') : t('common.button.save') }}
         </button>
