@@ -169,7 +169,7 @@ app:
     mode: oidc
   migration:
     run-on-startup: password-to-sso     # 首次群发
-    tenants: default
+    tenants: demo
 ```
 
 重启 → 后端为每个 `core_auth_user` 在 Keycloak realm 建一个无密码用户，触发 KC `executeActionsEmail(UPDATE_PASSWORD)`，用户收到"设置密码"链接。点击 → 在 KC 自助页选新密码 → 首次 SSO 登录 → **bind path** 把 `keycloak_id` 写回原行 + 清掉 `password_hash`（super-admin 例外，保留 break-glass）。业务 ULID / 角色 / 部门 / 审计 / 编号全部保留，最终行状态跟"一直 OIDC 模式"完全一致。
@@ -184,7 +184,7 @@ app:
     mode: password
   migration:
     run-on-startup: sso-to-password     # 反向迁移
-    tenants: default
+    tenants: demo
 ```
 
 重启 → 后端为每个 KC 绑定的用户 mint 一个 reset token，MailService 发 5 语言邮件，链接落到自家 `/reset-password/{token}` 页面。点击 → 在我们自己的页面选新密码 → 后端 bcrypt 写 `password_hash` + NULL 掉 `keycloak_id` + `KC.disableUser`。最终行状态跟"一直 password 模式"完全一致。

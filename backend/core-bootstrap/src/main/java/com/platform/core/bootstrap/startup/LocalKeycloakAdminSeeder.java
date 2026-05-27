@@ -54,7 +54,7 @@ public class LocalKeycloakAdminSeeder {
 
     private static final Logger log = LoggerFactory.getLogger(LocalKeycloakAdminSeeder.class);
 
-    private static final String TENANT_REALM   = "default";
+    private static final String TENANT_REALM   = "demo";
     private static final String ADMIN_USERNAME = "admin";
     private static final String ADMIN_EMAIL    = "admin@platform.local";
     private static final String ADMIN_DISPLAY  = "Local Admin";

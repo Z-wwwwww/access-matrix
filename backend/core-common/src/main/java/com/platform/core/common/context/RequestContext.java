@@ -44,10 +44,15 @@ public final class RequestContext {
         return ctx == null ? null : ctx.tenantId;
     }
 
-    /** Tenant id with a {@code "default"} fallback. Use for mapper calls that always need a non-null tenant. */
+    /**
+     * Tenant id with a {@code "demo"} fallback. Use for mapper calls that
+     * always need a non-null tenant. The fallback is for dev / QA contexts
+     * where no X-Tenant-Id header was supplied; production callers always
+     * have one (set by the SPA based on subdomain routing).
+     */
     public static String tenantIdOrDefault() {
         String tid = tenantId();
-        return (tid == null || tid.isBlank()) ? "default" : tid;
+        return (tid == null || tid.isBlank()) ? "demo" : tid;
     }
 
     public static String userId() {

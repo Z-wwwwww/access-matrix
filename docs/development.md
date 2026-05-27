@@ -69,7 +69,7 @@ INSERT INTO core_rbac_menu (
     -- ULID can be generated via IdGenerator.ulid() at build time; for
     -- migrations we hand-pick stable 26-char strings.
     '01HXXXXXXXXXXXXXXXMENU01',  -- new menu id
-    'default',
+    'demo',
     '00000000000000000000MENU05', -- parent = 系统
     'dict',
     '/system/dict',
@@ -90,7 +90,7 @@ UPDATE core_rbac_menu
 INSERT INTO core_rbac_role_menu (id, tenant_id, role_id, menu_id, mark)
 VALUES (
     IdGenerator.ulid_placeholder(),  -- 实际用 UUID 或固定 ULID
-    'default',
+    'demo',
     '00000000000000000000ROLE01', -- SUPER_ADMIN
     '01HXXXXXXXXXXXXXXXMENU01',
     1
@@ -224,7 +224,7 @@ V25__demo_dict_data.sql
 ```sql
 CREATE TABLE IF NOT EXISTS core_dict (
     id          CHAR(26)    PRIMARY KEY,
-    tenant_id   VARCHAR(64) NOT NULL DEFAULT 'default',
+    tenant_id   VARCHAR(64) NOT NULL DEFAULT 'demo',
     -- ... business cols ...
     mark        SMALLINT    NOT NULL DEFAULT 1,
     create_user VARCHAR(64),

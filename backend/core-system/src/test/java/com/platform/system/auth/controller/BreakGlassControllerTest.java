@@ -51,7 +51,7 @@ class BreakGlassControllerTest {
 
     @BeforeEach
     void setRequestContext() {
-        RequestContext.set("default", "ULID-CALLER", "alice", Locale.JAPAN, "test-trace");
+        RequestContext.set("demo", "ULID-CALLER", "alice", Locale.JAPAN, "test-trace");
     }
 
     @AfterEach
@@ -61,7 +61,7 @@ class BreakGlassControllerTest {
 
     @Test
     void status_superAdmin_withConfiguredHash_returnsConfiguredTrue() {
-        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "default"))
+        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "demo"))
                 .thenReturn(List.of(BuiltInRoles.SUPER_ADMIN_ID));
         UserEntity row = new UserEntity();
         row.setId("ULID-CALLER");
@@ -75,7 +75,7 @@ class BreakGlassControllerTest {
 
     @Test
     void status_superAdmin_withNullHash_returnsConfiguredFalse() {
-        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "default"))
+        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "demo"))
                 .thenReturn(List.of(BuiltInRoles.SUPER_ADMIN_ID));
         UserEntity row = new UserEntity();
         row.setId("ULID-CALLER");
@@ -89,7 +89,7 @@ class BreakGlassControllerTest {
 
     @Test
     void status_nonSuperAdmin_refused() {
-        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "default")).thenReturn(List.of());
+        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "demo")).thenReturn(List.of());
 
         assertThatThrownBy(() -> controller.status())
                 .isInstanceOf(BusinessException.class)
@@ -107,7 +107,7 @@ class BreakGlassControllerTest {
 
     @Test
     void setPassword_superAdmin_writesBcryptViaUpdateWrapper() {
-        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "default"))
+        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "demo"))
                 .thenReturn(List.of(BuiltInRoles.SUPER_ADMIN_ID));
         when(encoder.encode("NewBreakGlass!23")).thenReturn("$2a$12$newhash...");
 
@@ -130,7 +130,7 @@ class BreakGlassControllerTest {
 
     @Test
     void setPassword_nonSuperAdmin_refused_andDoesNotWriteToDb() {
-        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "default")).thenReturn(List.of());
+        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "demo")).thenReturn(List.of());
 
         assertThatThrownBy(() ->
                 controller.setBreakGlassPassword(
@@ -152,7 +152,7 @@ class BreakGlassControllerTest {
         // WRITE on a security-sensitive column. A failed role check must
         // refuse, not allow (better to spuriously deny one admin than to
         // accidentally let a non-admin set a break-glass credential).
-        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "default"))
+        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "demo"))
                 .thenThrow(new RuntimeException("DB blip"));
 
         assertThatThrownBy(() ->
@@ -165,7 +165,7 @@ class BreakGlassControllerTest {
 
     @Test
     void setPassword_passwordPolicyRejects_propagatesAndDoesNotWrite() {
-        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "default"))
+        when(roleMapper.findRoleIdsByUserId("ULID-CALLER", "demo"))
                 .thenReturn(List.of(BuiltInRoles.SUPER_ADMIN_ID));
         org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.BUSINESS_ERROR, "Pwned: seen in HIBP"))
                 .when(passwordPolicy).validate("password123");

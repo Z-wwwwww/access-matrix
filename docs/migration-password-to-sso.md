@@ -49,7 +49,7 @@ Nothing else needs to be re-entered. The user keeps their:
 ## Prerequisites
 
 - [ ] Keycloak ≥ 26 reachable from the backend (see `infra/keycloak/README.md`).
-- [ ] The realm whose name matches your tenant id exists (`default` for
+- [ ] The realm whose name matches your tenant id exists (`demo` for
       single-tenant deploys). Generate with
       `infra/keycloak/new-tenant.ps1 -Name <tenant>` if needed.
 - [ ] The realm has a working **SMTP** configuration. Without it the
@@ -88,7 +88,7 @@ app:
     mode: oidc                       # required — migration is OIDC-conditional
   migration:
     run-on-startup: password-to-sso  # opt-in trigger
-    tenants: default                 # comma-separated; one realm per item
+    tenants: demo                 # comma-separated; one realm per item
     report-dir: logs                 # where the JSON report lands
 ```
 
@@ -96,7 +96,7 @@ Equivalent env-var form:
 
 ```sh
 CORE_MIGRATION_RUN_ON_STARTUP=password-to-sso
-CORE_MIGRATION_TENANTS=default,acme,beta
+CORE_MIGRATION_TENANTS=demo,acme,beta
 ```
 
 The flag is **fail-safe by default** (`""` ⇒ nothing happens). Forgetting
@@ -116,9 +116,9 @@ systemctl restart access-matrix-backend
 On the next startup the runner fires. Look for:
 
 ```
-[migration] starting password-to-sso for tenants=[default]
-[migration] tenant=default found 47 candidates
-[migration] tenant=default created=47 skipped=0 failed=0
+[migration] starting password-to-sso for tenants=[demo]
+[migration] tenant=demo found 47 candidates
+[migration] tenant=demo created=47 skipped=0 failed=0
 [migration] complete: created=47 skipped=0 failed=0 report=logs/migration-password-to-sso-20260527-141503.json
 ```
 
@@ -160,7 +160,7 @@ restarts don't pointlessly hammer the Keycloak admin API:
 app:
   migration:
     # run-on-startup: password-to-sso     ← remove or comment out
-    tenants: default
+    tenants: demo
 ```
 
 Restart. Normal startup resumes.
@@ -189,7 +189,7 @@ SELECT
     COUNT(*)                                          AS total
 FROM core_auth_user
 WHERE mark = 1
-  AND tenant_id = 'default';
+  AND tenant_id = 'demo';
 ```
 
 Run daily during the cutover window. When `not_yet_bound` reaches an
@@ -246,7 +246,7 @@ app:
     mode: oidc
   migration:
     run-on-startup: password-to-sso-resend   # NOT "password-to-sso"
-    tenants: default
+    tenants: demo
 ```
 
 Restart. The runner walks `core_auth_user` rows where `keycloak_id IS NULL`

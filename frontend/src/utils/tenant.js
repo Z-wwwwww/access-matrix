@@ -18,7 +18,10 @@
  *   3. localStorage `tenant_id` — sticky value from a previous explicit pick.
  *      Lets a dev keep "acme" across reloads of `localhost:5273?tenant=acme`.
  *
- *   4. `"default"` — final fallback so single-tenant local builds Just Work.
+ *   4. `"demo"` — final fallback. This is the conventional dev / QA tenant
+ *      (the realm seeded by demo-realm.json). Production deploys should
+ *      reach this branch only via misconfiguration; the subdomain path
+ *      is the authoritative routing.
  *
  * Value is RFC 1035 label-shaped (lowercase, digits, hyphen; 1-63 chars,
  * must start with alphanumeric). Anything else is rejected and we fall
@@ -33,7 +36,7 @@
 
 const TENANT_LS_KEY = 'tenant_id'
 const TENANT_QS_KEY = 'tenant'
-const DEFAULT_TENANT = 'default'
+const DEFAULT_TENANT = 'demo'
 
 /**
  * Subdomain labels that are infrastructure / reserved hosts, NOT tenants.

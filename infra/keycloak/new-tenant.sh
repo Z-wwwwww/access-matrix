@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Clone default-realm.json into <name>-realm.json with the realm name and
+# Clone demo-realm.json into <name>-realm.json with the realm name and
 # tid hardcoded-claim-mapper retargeted. See new-tenant.ps1 header for the
 # full rationale; this is just the unix companion.
 
@@ -10,13 +10,17 @@ if [[ -z "$name" || ! "$name" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
   echo "usage: $0 <tenant-name>  (lowercase RFC1035 label)" >&2
   exit 1
 fi
-if [[ "$name" == "default" ]]; then
-  echo "'default' already exists - edit default-realm.json directly instead" >&2
+if [[ "$name" == "demo" ]]; then
+  echo "'demo' already exists - edit demo-realm.json directly instead" >&2
+  exit 1
+fi
+if [[ "$name" == "system" ]]; then
+  echo "'system' is reserved for platform-ops realm - choose a different name" >&2
   exit 1
 fi
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-src="$here/realms/default-realm.json"
+src="$here/realms/demo-realm.json"
 dst="$here/realms/${name}-realm.json"
 
 [[ -f "$src" ]] || { echo "source realm not found at $src" >&2; exit 1; }
@@ -24,8 +28,8 @@ dst="$here/realms/${name}-realm.json"
 
 # Use perl rather than sed for cross-platform regex semantics (macOS sed
 # differs from GNU sed on -i and on \s). Two surgical replacements only.
-perl -pe 's/"realm":\s*"default"/"realm":  "'"$name"'"/' "$src" \
-  | perl -pe 's/"claim\.value":\s*"default"/"claim.value":  "'"$name"'"/' \
+perl -pe 's/"realm":\s*"demo"/"realm":  "'"$name"'"/' "$src" \
+  | perl -pe 's/"claim\.value":\s*"demo"/"claim.value":  "'"$name"'"/' \
   > "$dst"
 
 echo "Wrote $dst"

@@ -95,7 +95,7 @@ backend's MyBatis `TenantLineInnerInterceptor` both pivot off this convention.
 
 ### Adding a new tenant (recommended)
 
-Use the committed helper that clones `default-realm.json` and retargets the
+Use the committed helper that clones `demo-realm.json` and retargets the
 realm name + `tid` hardcoded-claim-mapper:
 
 ```powershell
@@ -172,7 +172,7 @@ bumps need attention here.
 `infra/keycloak/themes/access-matrix/` take effect after a Keycloak
 restart (or `Ctrl+Shift+R` in the login page if `--spi-theme-cache-themes=false`).
 
-**Activation per realm**: the committed `default-realm.json` sets
+**Activation per realm**: the committed `demo-realm.json` sets
 `"loginTheme": "access-matrix"`, so a fresh `--import-realm` picks it
 up automatically. For a realm that already exists (created before this
 theme was committed), apply the change one of two ways:
@@ -184,7 +184,7 @@ theme was committed), apply the change one of two ways:
 # Option B: one-liner via kcadm
 $KEYCLOAK_HOME/bin/kcadm.sh config credentials \
     --server http://localhost:8180 --realm master --user admin --password admin
-$KEYCLOAK_HOME/bin/kcadm.sh update realms/default -s 'loginTheme=access-matrix'
+$KEYCLOAK_HOME/bin/kcadm.sh update realms/demo -s 'loginTheme=access-matrix'
 ```
 
 Adding more themes: drop a sibling directory under
@@ -202,7 +202,7 @@ The SPA picks "which realm am I logging into right now" at runtime, in
    → realm `acme`. Reserved labels like `www`, `app`, `api`, `kc`, etc.
    fall through to the next source.
 3. `localStorage.tenant_id` (carry-over from a previous explicit pick).
-4. `"default"`.
+4. `"demo"`.
 
 Once resolved, the same value drives two things in lockstep:
 

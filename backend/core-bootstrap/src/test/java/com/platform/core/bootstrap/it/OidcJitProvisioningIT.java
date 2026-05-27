@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * stack. No mocks of Keycloak / PG / JWKS — verifies the full chain:
  *
  *   1. Boot a Keycloak container, import the committed default realm
- *      (infra/keycloak/realms/default-realm.json), create a test user
+ *      (infra/keycloak/realms/demo-realm.json), create a test user
  *      via Admin API.
  *   2. Boot Postgres + Redis containers; Flyway runs all V*.sql migrations.
  *   3. Spring Boot starts in mode=oidc, pointing JWKS at the test Keycloak.
@@ -77,7 +77,7 @@ class OidcJitProvisioningIT {
             // Filename matches what maven-resources-plugin copies into
             // target/test-classes from infra/keycloak/realms/. See
             // core-bootstrap/pom.xml <build><testResources>.
-            .withRealmImportFile("/default-realm.json");
+            .withRealmImportFile("/demo-realm.json");
 
     /** Hardcoded test user we provision into Keycloak after the realm boots. */
     private static final String TEST_USERNAME = "jit-test-user";
@@ -115,7 +115,7 @@ class OidcJitProvisioningIT {
         cred.setTemporary(false);
         u.setCredentials(List.of(cred));
 
-        try (Response r = admin.realm("default").users().create(u)) {
+        try (Response r = admin.realm("demo").users().create(u)) {
             int status = r.getStatus();
             // 201 = created; 409 = already exists from a previous run (we
             // share the imported realm across tests so this is harmless).
@@ -126,7 +126,7 @@ class OidcJitProvisioningIT {
         }
 
         // Read the user back to grab its UUID — needed by assertions later.
-        List<UserRepresentation> matches = admin.realm("default").users().search(TEST_USERNAME, true);
+        List<UserRepresentation> matches = admin.realm("demo").users().search(TEST_USERNAME, true);
         Assumptions.assumeTrue(matches != null && !matches.isEmpty(),
                 "test user creation succeeded but lookup failed; aborting IT");
         testUserKeycloakUuid = matches.get(0).getId();
@@ -169,7 +169,7 @@ class OidcJitProvisioningIT {
     @Test
     void firstCallProvisionsBusinessUser_secondCallTakesFastPath() throws Exception {
         // Confirm clean slate: no row for our test user yet.
-        assertThat(userMapper.findByKeycloakIdAndTenant(testUserKeycloakUuid, "default")).isNull();
+        assertThat(userMapper.findByKeycloakIdAndTenant(testUserKeycloakUuid, "demo")).isNull();
 
         String accessToken = acquireAccessToken();
         RestClient client = RestClient.builder()
@@ -180,21 +180,21 @@ class OidcJitProvisioningIT {
         ResponseEntity<String> res1 = client.get()
                 .uri("/user/me")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .header("X-Tenant-Id", "default")
+                .header("X-Tenant-Id", "demo")
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .toEntity(String.class);
         assertThat(res1.getStatusCode().value()).isEqualTo(200);
         assertThat(res1.getBody()).contains(TEST_USERNAME);
 
-        UserEntity provisioned = userMapper.findByKeycloakIdAndTenant(testUserKeycloakUuid, "default");
+        UserEntity provisioned = userMapper.findByKeycloakIdAndTenant(testUserKeycloakUuid, "demo");
         assertThat(provisioned)
                 .as("JIT must have inserted a core_auth_user row for the OIDC identity")
                 .isNotNull();
         assertThat(provisioned.getKeycloakId()).isEqualTo(testUserKeycloakUuid);
         assertThat(provisioned.getUsername()).isEqualTo(TEST_USERNAME);
         assertThat(provisioned.getEmail()).isEqualTo(TEST_EMAIL);
-        assertThat(provisioned.getTenantId()).isEqualTo("default");
+        assertThat(provisioned.getTenantId()).isEqualTo("demo");
         // Business ULID, NOT the Keycloak UUID — these are two different id spaces.
         assertThat(provisioned.getId()).hasSize(26);
         assertThat(provisioned.getId()).isNotEqualTo(testUserKeycloakUuid);
@@ -204,7 +204,7 @@ class OidcJitProvisioningIT {
         ResponseEntity<String> res2 = client.get()
                 .uri("/user/me")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .header("X-Tenant-Id", "default")
+                .header("X-Tenant-Id", "demo")
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .toEntity(String.class);
@@ -225,7 +225,7 @@ class OidcJitProvisioningIT {
     private String acquireAccessToken() {
         Keycloak userKc = KeycloakBuilder.builder()
                 .serverUrl(KEYCLOAK.getAuthServerUrl())
-                .realm("default")
+                .realm("demo")
                 .clientId("access-matrix-backend")
                 .grantType("password")
                 .username(TEST_USERNAME)
@@ -239,7 +239,7 @@ class OidcJitProvisioningIT {
 /*
   Realm import note:
 
-  The committed infra/keycloak/realms/default-realm.json is copied into the
+  The committed infra/keycloak/realms/demo-realm.json is copied into the
   test classpath at build time so the testcontainers-keycloak mount finds
   it. See core-bootstrap/pom.xml <build><testResources> for the wiring.
   Without that copy the container boots an empty realm and the

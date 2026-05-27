@@ -106,7 +106,7 @@ class PasswordToSsoMigrationIT {
         //    is meant to mirror into Keycloak.
         // ──────────────────────────────────────────────────────────────
         String runId = UUID.randomUUID().toString().substring(0, 8);
-        RequestContext.set("default", "test-seed", "test-seed", Locale.JAPAN, "seed-" + runId);
+        RequestContext.set("demo", "test-seed", "test-seed", Locale.JAPAN, "seed-" + runId);
         try {
             insertLegacyUser("legacy-alice-" + runId, "alice-" + runId + "@migration.local");
             insertLegacyUser("legacy-bob-"   + runId, "bob-"   + runId + "@migration.local");
@@ -118,7 +118,7 @@ class PasswordToSsoMigrationIT {
         // ──────────────────────────────────────────────────────────────
         // 2. Run the migration.
         // ──────────────────────────────────────────────────────────────
-        MigrationReport first = migration.run(List.of("default"));
+        MigrationReport first = migration.run(List.of("demo"));
         assertThat(first.tenants).hasSize(1);
         MigrationReport.TenantResult firstBucket = first.tenants.get(0);
         // KC user creation must succeed for all three; the email step
@@ -135,7 +135,7 @@ class PasswordToSsoMigrationIT {
         // ──────────────────────────────────────────────────────────────
         try (Keycloak kc = adminClient()) {
             for (String u : List.of("legacy-alice-" + runId, "legacy-bob-" + runId, "legacy-carol-" + runId)) {
-                List<UserRepresentation> hits = kc.realm("default").users().searchByUsername(u, true);
+                List<UserRepresentation> hits = kc.realm("demo").users().searchByUsername(u, true);
                 assertThat(hits)
                         .as("KC realm should contain migrated user %s", u)
                         .isNotEmpty();
@@ -146,10 +146,10 @@ class PasswordToSsoMigrationIT {
         // 4. DB rows untouched — keycloak_id is still NULL. The binding
         //    happens on first SSO login via OidcJitUserService.
         // ──────────────────────────────────────────────────────────────
-        RequestContext.set("default", "test-verify", "test-verify", Locale.JAPAN, "verify-" + runId);
+        RequestContext.set("demo", "test-verify", "test-verify", Locale.JAPAN, "verify-" + runId);
         try {
             for (String u : List.of("legacy-alice-" + runId, "legacy-bob-" + runId, "legacy-carol-" + runId)) {
-                UserEntity row = userMapper.findByIdentifier("default", u);
+                UserEntity row = userMapper.findByIdentifier("demo", u);
                 assertThat(row).as("DB row for %s", u).isNotNull();
                 assertThat(row.getKeycloakId())
                         .as("DB row's keycloak_id should still be NULL after migration — bind path writes it on first SSO login, not here")
@@ -162,7 +162,7 @@ class PasswordToSsoMigrationIT {
         // ──────────────────────────────────────────────────────────────
         // 5. Re-running is a no-op. Idempotent skip for every user.
         // ──────────────────────────────────────────────────────────────
-        MigrationReport second = migration.run(List.of("default"));
+        MigrationReport second = migration.run(List.of("demo"));
         MigrationReport.TenantResult secondBucket = second.tenants.get(0);
         // Each previously-seeded user should now appear in the skipped
         // bucket with the kc-user-already-exists reason.
@@ -186,7 +186,7 @@ class PasswordToSsoMigrationIT {
     private void insertLegacyUser(String username, String email) {
         UserEntity u = new UserEntity();
         u.setId(IdGenerator.ulid());
-        u.setTenantId("default");
+        u.setTenantId("demo");
         u.setUsername(username);
         u.setEmail(email);
         u.setDisplayName(username);

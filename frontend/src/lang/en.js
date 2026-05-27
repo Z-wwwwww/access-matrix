@@ -108,7 +108,7 @@ export default {
 
   login: {
     tenantLabel: 'Tenant',
-    tenantPlaceholder: 'default',
+    tenantPlaceholder: 'demo',
     showAdvanced: 'Advanced (switch tenant)',
     hideAdvanced: 'Hide',
     identifierLabel: 'Username / Email / Number',

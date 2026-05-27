@@ -86,8 +86,8 @@ describe('currentTenant — full resolution chain', () => {
     setLocation('http://localhost:5273/')
   })
 
-  it('falls back to "default" with nothing set', () => {
-    expect(currentTenant()).toBe('default')
+  it('falls back to "demo" with nothing set', () => {
+    expect(currentTenant()).toBe('demo')
   })
 
   it('honors ?tenant=... query and persists it to localStorage', () => {
@@ -98,7 +98,7 @@ describe('currentTenant — full resolution chain', () => {
 
   it('ignores ?tenant= with invalid value (falls through to default)', () => {
     setLocation('http://localhost:5273/?tenant=NOT_VALID!')
-    expect(currentTenant()).toBe('default')
+    expect(currentTenant()).toBe('demo')
     expect(localStorage.getItem('tenant_id')).toBeNull()
   })
 
@@ -109,7 +109,7 @@ describe('currentTenant — full resolution chain', () => {
 
   it('ignores garbage localStorage value', () => {
     localStorage.setItem('tenant_id', '!!bogus!!')
-    expect(currentTenant()).toBe('default')
+    expect(currentTenant()).toBe('demo')
   })
 
   it('caches the resolved value across calls', () => {

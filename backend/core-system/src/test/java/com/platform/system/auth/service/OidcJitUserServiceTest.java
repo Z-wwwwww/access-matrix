@@ -75,11 +75,11 @@ class OidcJitUserServiceTest {
     void fastPath_alreadyBound_returnsExistingBusinessId() {
         Jwt token = jwt(Map.of(
                 "sub", "kc-uuid-1",
-                "tid", "default",
+                "tid", "demo",
                 "preferred_username", "alice"));
         UserEntity bound = row("ULID-ALICE-26", "alice");
         bound.setKeycloakId("kc-uuid-1");
-        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-1", "default")).thenReturn(bound);
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-1", "demo")).thenReturn(bound);
 
         String businessId = service.resolveBusinessUserId(token);
 
@@ -97,13 +97,13 @@ class OidcJitUserServiceTest {
         // the "as-if-always-OIDC" end state the runbook promises.
         Jwt token = jwt(Map.of(
                 "sub", "kc-uuid-2",
-                "tid", "default",
+                "tid", "demo",
                 "preferred_username", "bob"));
-        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2", "default")).thenReturn(null);
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2", "demo")).thenReturn(null);
         UserEntity legacy = row("ULID-BOB-26", "bob");
-        when(userMapper.findByIdentifier("default", "bob")).thenReturn(legacy);
+        when(userMapper.findByIdentifier("demo", "bob")).thenReturn(legacy);
         // Bob is NOT a super-admin — role lookup returns an empty list.
-        when(roleMapper.findRoleIdsByUserId("ULID-BOB-26", "default")).thenReturn(java.util.List.of());
+        when(roleMapper.findRoleIdsByUserId("ULID-BOB-26", "demo")).thenReturn(java.util.List.of());
 
         String businessId = service.resolveBusinessUserId(token);
 
@@ -130,12 +130,12 @@ class OidcJitUserServiceTest {
         // that's how break-glass access survives the migration.
         Jwt token = jwt(Map.of(
                 "sub", "kc-uuid-2b",
-                "tid", "default",
+                "tid", "demo",
                 "preferred_username", "admin"));
-        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2b", "default")).thenReturn(null);
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2b", "demo")).thenReturn(null);
         UserEntity legacy = row("ULID-ADMIN-26", "admin");
-        when(userMapper.findByIdentifier("default", "admin")).thenReturn(legacy);
-        when(roleMapper.findRoleIdsByUserId("ULID-ADMIN-26", "default"))
+        when(userMapper.findByIdentifier("demo", "admin")).thenReturn(legacy);
+        when(roleMapper.findRoleIdsByUserId("ULID-ADMIN-26", "demo"))
                 .thenReturn(java.util.List.of(BuiltInRoles.SUPER_ADMIN_ID));
 
         String businessId = service.resolveBusinessUserId(token);
@@ -161,12 +161,12 @@ class OidcJitUserServiceTest {
         // by clearing it during a transient DB hiccup.
         Jwt token = jwt(Map.of(
                 "sub", "kc-uuid-2c",
-                "tid", "default",
+                "tid", "demo",
                 "preferred_username", "carol"));
-        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2c", "default")).thenReturn(null);
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2c", "demo")).thenReturn(null);
         UserEntity legacy = row("ULID-CAROL-26", "carol");
-        when(userMapper.findByIdentifier("default", "carol")).thenReturn(legacy);
-        when(roleMapper.findRoleIdsByUserId("ULID-CAROL-26", "default"))
+        when(userMapper.findByIdentifier("demo", "carol")).thenReturn(legacy);
+        when(roleMapper.findRoleIdsByUserId("ULID-CAROL-26", "demo"))
                 .thenThrow(new RuntimeException("transient DB blip"));
 
         service.resolveBusinessUserId(token);
@@ -217,12 +217,12 @@ class OidcJitUserServiceTest {
     void provisionPath_noNameClaim_fallsBackToGivenFamily() {
         Jwt token = jwt(Map.of(
                 "sub", "kc-uuid-4",
-                "tid", "default",
+                "tid", "demo",
                 "preferred_username", "dave",
                 "given_name", "Dave",
                 "family_name", "Smith"));
-        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-4", "default")).thenReturn(null);
-        when(userMapper.findByIdentifier("default", "dave")).thenReturn(null);
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-4", "demo")).thenReturn(null);
+        when(userMapper.findByIdentifier("demo", "dave")).thenReturn(null);
 
         service.resolveBusinessUserId(token);
 
@@ -235,10 +235,10 @@ class OidcJitUserServiceTest {
     void provisionPath_noNameOrGivenFamily_fallsBackToUsername() {
         Jwt token = jwt(Map.of(
                 "sub", "kc-uuid-5",
-                "tid", "default",
+                "tid", "demo",
                 "preferred_username", "eve"));
-        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-5", "default")).thenReturn(null);
-        when(userMapper.findByIdentifier("default", "eve")).thenReturn(null);
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-5", "demo")).thenReturn(null);
+        when(userMapper.findByIdentifier("demo", "eve")).thenReturn(null);
 
         service.resolveBusinessUserId(token);
 
@@ -250,7 +250,7 @@ class OidcJitUserServiceTest {
     @Test
     void missingTid_returnsNull_andDoesNotTouchDatabase() {
         // Fail-closed: a token without tenant claim shouldn't silently
-        // provision into "default" — that would silently fold cross-tenant
+        // provision into "demo" — that would silently fold cross-tenant
         // tokens into one tenant's data.
         Map<String, Object> noTid = new HashMap<>();
         noTid.put("sub", "kc-uuid-6");
@@ -268,14 +268,14 @@ class OidcJitUserServiceTest {
     @Test
     void missingSub_returnsNull() {
         Map<String, Object> noSub = new HashMap<>();
-        noSub.put("tid", "default");
+        noSub.put("tid", "demo");
         noSub.put("preferred_username", "grace");
         // Jwt constructor requires "sub" - we have to give it something. Use empty + reflect.
         Jwt token = new Jwt(
                 "header.payload.signature",
                 Instant.now(), Instant.now().plusSeconds(60),
                 Map.of("alg", "RS256"),
-                Map.of("sub", "", "tid", "default", "preferred_username", "grace"));
+                Map.of("sub", "", "tid", "demo", "preferred_username", "grace"));
 
         String businessId = service.resolveBusinessUserId(token);
 

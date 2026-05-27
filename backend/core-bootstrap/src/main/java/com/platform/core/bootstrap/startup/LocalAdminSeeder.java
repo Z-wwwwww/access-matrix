@@ -58,14 +58,14 @@ public class LocalAdminSeeder {
     }
 
     private UserEntity ensureAdminUser() {
-        UserEntity existing = userMapper.findByIdentifier("default", "admin");
+        UserEntity existing = userMapper.findByIdentifier("demo", "admin");
         String adminHash = encoder.encode("admin");
         LocalDateTime now = LocalDateTime.now();
 
         if (existing == null) {
             UserEntity u = new UserEntity();
             u.setId(IdGenerator.ulid());
-            u.setTenantId("default");
+            u.setTenantId("demo");
             u.setUsername("admin");
             u.setEmail("admin@platform.local");
             u.setUserNo("U00000001");

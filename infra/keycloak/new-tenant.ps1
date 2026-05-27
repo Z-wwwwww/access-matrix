@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
-    Clone the committed default-realm.json into a new <name>-realm.json
+    Clone the committed demo-realm.json into a new <name>-realm.json
     with the realm + tid hardcoded-claim-mapper retargeted at <name>.
 
 .DESCRIPTION
     Multi-tenant convention in this project:
       realm name == tenant id == subdomain label
     so adding a tenant "acme" means dropping infra/keycloak/realms/acme-realm.json
-    that's a copy of default-realm.json with two strings swapped:
-      "realm": "default"          -> "realm": "acme"
-      "claim.value": "default"    -> "claim.value": "acme"     (the tid mapper)
+    that's a copy of demo-realm.json with two strings swapped:
+      "realm": "demo"             -> "realm": "acme"
+      "claim.value": "demo"       -> "claim.value": "acme"     (the tid mapper)
 
     Everything else (client config, default scopes, etc.) carries over.
     Re-import (`kc.bat start --import-realm`) picks the new file up
@@ -33,13 +33,17 @@ if ($Name -notmatch '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$') {
     Write-Error "invalid tenant name '$Name' - must be a lowercase RFC1035 label"
     exit 1
 }
-if ($Name -eq 'default') {
-    Write-Error "'default' already exists - edit default-realm.json directly instead"
+if ($Name -eq 'demo') {
+    Write-Error "'demo' already exists - edit demo-realm.json directly instead"
+    exit 1
+}
+if ($Name -eq 'system') {
+    Write-Error "'system' is reserved for platform-ops realm - choose a different name"
     exit 1
 }
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$src  = Join-Path $here 'realms\default-realm.json'
+$src  = Join-Path $here 'realms\demo-realm.json'
 $dst  = Join-Path $here ("realms\{0}-realm.json" -f $Name)
 
 if (-not (Test-Path $src)) {
@@ -52,11 +56,11 @@ if (Test-Path $dst) {
 }
 
 # Surgical replace - only the two specific lines we know need to change.
-# Avoid a blanket s/default/$Name/ because realm JSON contains lots of
-# unrelated "default" strings (default-roles-*, defaultRole, etc.).
+# Avoid a blanket s/demo/$Name/ because realm JSON contains lots of
+# unrelated strings (default-roles-*, etc. — leftover from the demo template).
 $json = Get-Content $src -Raw
-$json = $json -replace '"realm":\s*"default"',           ('"realm":  "{0}"' -f $Name)
-$json = $json -replace '"claim\.value":\s*"default"',    ('"claim.value":  "{0}"' -f $Name)
+$json = $json -replace '"realm":\s*"demo"',          ('"realm":  "{0}"' -f $Name)
+$json = $json -replace '"claim\.value":\s*"demo"',   ('"claim.value":  "{0}"' -f $Name)
 
 Set-Content -Path $dst -Value $json -Encoding UTF8 -NoNewline
 

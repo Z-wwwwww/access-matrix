@@ -178,18 +178,18 @@ public class AuthSchemaBootstrap {
             // Built-in seeds (idempotent ON CONFLICT)
             jdbc.update("""
                     INSERT INTO core_rbac_permission (id, tenant_id, code, name, resource, action, module, is_built_in)
-                    VALUES ('00000000000000000000PERM01', 'default', '*:*', 'Super Permission', '*', '*', 'system', 1)
+                    VALUES ('00000000000000000000PERM01', 'demo', '*:*', 'Super Permission', '*', '*', 'system', 1)
                     ON CONFLICT DO NOTHING
                     """);
             jdbc.update("""
                     INSERT INTO core_rbac_role (id, tenant_id, name, description, data_scope, is_built_in)
-                    VALUES ('00000000000000000000ROLE01', 'default', 'Super Administrator',
+                    VALUES ('00000000000000000000ROLE01', 'demo', 'Super Administrator',
                             'Built-in super admin role with *:* permission', 1, 1)
                     ON CONFLICT DO NOTHING
                     """);
             jdbc.update("""
                     INSERT INTO core_rbac_role_permission (id, tenant_id, role_id, permission_id)
-                    VALUES ('00000000000000000000RPM001', 'default',
+                    VALUES ('00000000000000000000RPM001', 'demo',
                             '00000000000000000000ROLE01', '00000000000000000000PERM01')
                     ON CONFLICT DO NOTHING
                     """);

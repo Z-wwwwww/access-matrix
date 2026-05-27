@@ -95,7 +95,7 @@ app:
     mode: oidc                          # keep SSO live during the cutover window
   migration:
     run-on-startup: sso-to-password     # NEW value, third recognised mode
-    tenants: default                    # comma-separated; one realm per item
+    tenants: demo                    # comma-separated; one realm per item
 ```
 
 Restart. The runner walks `core_auth_user` rows where
@@ -103,11 +103,11 @@ Restart. The runner walks `core_auth_user` rows where
 fires off the templated reset email. Look for:
 
 ```
-[migration] starting sso-to-password for tenants=[default]
-[rev-migration] tenant=default found 47 candidates (still KC-bound)
-[reset] minted token for user 01ULID... (tenant default) expires 2026-06-03T14:15:00
+[migration] starting sso-to-password for tenants=[demo]
+[rev-migration] tenant=demo found 47 candidates (still KC-bound)
+[reset] minted token for user 01ULID... (tenant demo) expires 2026-06-03T14:15:00
 ... ×47
-[rev-migration] tenant=default emails-sent=46 skipped=1 failed=0
+[rev-migration] tenant=demo emails-sent=46 skipped=1 failed=0
 [migration] complete mode=sso-to-password created=46 skipped=1 failed=0 report=logs/migration-sso-to-password-20260527-141503.json
 ```
 
@@ -168,7 +168,7 @@ SELECT
                        AND password_hash IS NULL)     AS broken,
     COUNT(*)                                          AS total
 FROM core_auth_user
-WHERE mark = 1 AND tenant_id = 'default';
+WHERE mark = 1 AND tenant_id = 'demo';
 ```
 
 `broken` (keycloak_id NULL AND password_hash NULL) is the dangerous
@@ -226,7 +226,7 @@ app:
     mode: password       # or oidc — either direction works
   migration:
     auto-on-mode-flip: true    # off by default; opt-in per environment
-    tenants: default
+    tenants: demo
 ```
 
 The `ModeFlipDetector` reads the last-applied mode from
@@ -285,7 +285,7 @@ If you want full KC-side deletion, do it manually post-migration:
 ```sql
 -- list disabled-but-still-present KC users
 SELECT u.id, u.username FROM keycloak.user_entity u
-WHERE u.realm_id = (SELECT id FROM keycloak.realm WHERE name = 'default')
+WHERE u.realm_id = (SELECT id FROM keycloak.realm WHERE name = 'demo')
   AND u.enabled = false;
 ```
 

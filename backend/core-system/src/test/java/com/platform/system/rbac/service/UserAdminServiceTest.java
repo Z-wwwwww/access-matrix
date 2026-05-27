@@ -126,18 +126,18 @@ class UserAdminServiceTest {
     @Test
     void create_fallsBackToDefaultTenantWhenContextEmpty() {
         // RequestContext.tenantId() can be null in local / batch / test paths —
-        // the service must fall back to "default" rather than NPE.
+        // the service must fall back to "demo" rather than NPE.
         RequestContext.clear();
         when(userMapper.selectCount(any())).thenReturn(0L);
         when(encoder.encode(anyString())).thenReturn("HASHED");
-        when(numberingService.next("USER", "default")).thenReturn("U00000099");
+        when(numberingService.next("USER", "demo")).thenReturn("U00000099");
 
         UserDto.CreateRequest req = new UserDto.CreateRequest(
                 "bob", "Password!23", "bob@example.com", "Bob", null, 1,
                 UserDto.ProvisionMode.DIRECT);
         service.create(req);
 
-        verify(numberingService).next("USER", "default");
+        verify(numberingService).next("USER", "demo");
     }
 
     @Test

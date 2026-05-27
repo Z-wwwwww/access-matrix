@@ -108,7 +108,7 @@ export default {
 
   login: {
     tenantLabel: '租戶',
-    tenantPlaceholder: 'default',
+    tenantPlaceholder: 'demo',
     showAdvanced: '進階（切換租戶）',
     hideAdvanced: '收合',
     identifierLabel: '使用者名稱 / 信箱 / 編號',

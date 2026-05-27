@@ -37,7 +37,7 @@ public class UserAdminService {
 
     /** Numbering definition seeded by V4 migration. Format {@code U[%]} with 8-digit zero-pad. */
     private static final String USER_NO_KBN = "USER";
-    private static final String DEFAULT_TENANT = "default";
+    private static final String DEFAULT_TENANT = "demo";
 
     private final UserMapper userMapper;
     private final UserRoleMapper userRoleMapper;
