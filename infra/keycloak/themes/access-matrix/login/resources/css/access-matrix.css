@@ -255,7 +255,16 @@ body::after {
      band — it's the same culprit that makes `.am-realm-wrap`
      compute as 80px tall (32 + 48 margin = 80 layout box). */
   margin: 0 !important;
-  line-height: 1 !important;
+  /* line-height equals pill height: each inline text run gets a
+     line-box that fills the pill vertically, so the glyph naturally
+     sits at the box's middle (the browser uses font half-leading
+     evenly above/below). With `line-height: 1` flex's `align-items:
+     center` aligned the *line boxes* but the two different fonts
+     (Instrument Sans 11px caps for "REALM" vs JetBrains Mono 12px
+     mixed-case for the realm id) place their visible glyphs at
+     slightly different y within those tight boxes, reading as a
+     ~1px vertical offset between the two text runs. */
+  line-height: 32px !important;
   font-style: normal !important;
 }
 
@@ -269,6 +278,7 @@ body::after {
   color: var(--am-muted);
   letter-spacing: 0.14em;
   margin-right: 6px;
+  line-height: 32px;
 }
 
 /* Green status dot at left edge of pill, with halo */
@@ -395,6 +405,18 @@ body::after {
   text-align: left;
   letter-spacing: -0.005em;
 }
+/* The subheading lives in CSS `content`, not in a message file, so
+   we can't pipe it through Keycloak's msg() helper. Instead branch
+   on <html lang> set by Keycloak when the realm has multiple locales
+   enabled. If a fourth locale ever ships, add another rule here. */
+html[lang="zh-CN"] #kc-form-wrapper::before,
+html[lang="zh-cn"] #kc-form-wrapper::before,
+html[lang="zh"] #kc-form-wrapper::before {
+  content: "请登录您的 Access-matrix 工作区。使用管理员分配的凭据。";
+}
+html[lang="ja"] #kc-form-wrapper::before {
+  content: "Access-matrix ワークスペースにサインインしてください。管理者から発行された認証情報をご使用ください。";
+}
 
 /* Hide stock subtitle paragraph (e.g. "Sign in to your account") */
 .pf-c-login__main-header-desc,
@@ -479,7 +501,10 @@ label,
 *[class*="form-control"]:not(input):not(textarea):not(select):not(button):hover,
 *[class*="form-control"]:not(input):not(textarea):not(select):not(button):focus,
 *[class*="form-control"]:not(input):not(textarea):not(select):not(button):focus-within {
-  background: transparent !important;
+  /* longhand only — `background` shorthand would reset background-image
+     to `none`, wiping the globe glyph we paint on the locale picker
+     wrapper as soon as the inner <select> gets focus / :focus-within. */
+  background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
   outline: none !important;
@@ -751,26 +776,48 @@ input[type="submit"]:active {
   transform: scale(0.99);
 }
 
-/* Trailing arrow on primary — purely decorative. Important: PatternFly v5
-   uses `.pf-v5-c-button::after` for an absolutely-positioned focus/pressed
-   indicator (full-bleed overlay). Overriding only `content` would keep that
-   absolute positioning and stamp the arrow as a 350px-wide overlay at the
-   top of the button. Reset position/display/box to inline glyph. */
+/* Trailing arrow on primary — same SVG vocabulary as login.js's
+   `Icon.arrow` (the design system's "go" glyph). Important: PatternFly
+   v5 uses `.pf-v5-c-button::after` for an absolutely-positioned focus
+   indicator (full-bleed overlay). We need to fully reset its positioning
+   AND swap the visual.
+   Strategy: CSS `mask-image` instead of `background-image`. With mask,
+   the colored pixel comes from `background-color: currentColor`, so the
+   arrow tracks button text color automatically — light mode (white text
+   → white arrow) and dark mode (navy text → navy arrow) both work
+   without parallel rules. */
 #kc-login::after,
 input[name="login"]::after {
-  content: "  →";
+  content: "" !important;
   position: static !important;
-  display: inline !important;
+  display: inline-block !important;
   top: auto !important;
   right: auto !important;
   bottom: auto !important;
   left: auto !important;
-  width: auto !important;
-  height: auto !important;
+  width: 14px !important;
+  height: 14px !important;
+  margin-left: 8px !important;
+  vertical-align: -2px !important;
   border: none !important;
-  background: transparent !important;
-  font-weight: 500;
-  letter-spacing: 0;
+  background: none !important;
+  background-color: currentColor !important;
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6'><path d='M3 8h10M9 4l4 4-4 4' stroke-linecap='round' stroke-linejoin='round'/></svg>") !important;
+          mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6'><path d='M3 8h10M9 4l4 4-4 4' stroke-linecap='round' stroke-linejoin='round'/></svg>") !important;
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+          mask-position: center;
+  -webkit-mask-size: contain;
+          mask-size: contain;
+  transition: transform .15s ease-out;
+}
+/* "Go" affordance — slide the arrow 2px on hover. Matches the
+   .am-realm-menu__row hover behavior so the design system's
+   forward-motion idiom stays consistent. */
+#kc-login:hover::after,
+input[name="login"]:hover::after {
+  transform: translateX(2px);
 }
 
 /* ============================================================
@@ -858,11 +905,251 @@ a.kc-forgot,
 }
 
 /* ============================================================
-   LOCALE PICKER — bottom-left footer
+   LOCALE PICKER — bottom-left footer band
+
+   Keycloak 26's keycloak.v2 emits a vanilla
+     <div class="pf-v5-c-login__main-header-utilities">
+       <div class="pf-v5-c-form-control">
+         <select id="login-select-toggle"
+                 onchange="if(this.value) window.location.href=this.value">
+           <option value="...kc_locale=en">…</option>
+   inside the card's main-header. To match the design (globe + locale
+   name + chevron at bottom-left of the page) we:
+     1. lift the wrapper out via position: fixed onto the body footer band
+     2. strip the PF form-control chrome
+     3. swap the native select arrow + add a globe glyph using inline
+        SVG backgrounds — `appearance: none` to lose the OS chrome
+
+   The leftover `#kc-locale` rules below stay in place for older Keycloak
+   versions that still emit that markup; they're inert on v26.
    ============================================================ */
-/* Locale picker sits *inside* the bottom footer band (the body::after
-   strip). Anchor it to the same band height + horizontal padding so it
-   visually aligns with the right-side "Secured by keycloak" text. */
+.pf-v5-c-login__main-header-utilities {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  height: 56px !important;
+  padding: 0 44px !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  z-index: 2 !important;
+  background: transparent !important;
+}
+
+/* PF v5 wraps the <select> in a form-control container that ships
+   with our generic input border (the *[class*="form-control"] reset
+   block earlier neutralizes it). Re-state explicitly here for clarity
+   + add a globe glyph as the leading icon. */
+.pf-v5-c-login__main-header-utilities .pf-v5-c-form-control {
+  /* IMPORTANT: use `background-color` (longhand), NOT `background`
+     (shorthand). The shorthand would reset background-image to `none`,
+     and because it carries !important here it would beat our
+     non-important `background-image: url(...)` even within the same
+     rule, killing the globe glyph. */
+  background-color: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  height: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  box-shadow: none !important;
+  /* Anchor point for the custom pop menu (login.js builds an absolute
+     .am-locale-menu inside this wrapper). */
+  position: relative !important;
+  /* Same SVG vocabulary as login.js's `Icon.globe` — outline globe
+     in muted color, scales with `currentColor` via stroke. */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%239AA1AD' stroke-width='1.4'><circle cx='8' cy='8' r='6'/><path d='M2 8h12M8 2c2 2 2 10 0 12M8 2c-2 2-2 10 0 12'/></svg>") !important;
+  background-repeat: no-repeat !important;
+  background-position: 0 center !important;
+  background-size: 12px 12px !important;
+  padding-left: 18px !important;
+}
+
+#login-select-toggle {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  /* longhand: see other locale rules — shorthand would compete with
+     the chevron background-image. */
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  font-family: var(--am-sans) !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  color: var(--am-faint) !important;
+  letter-spacing: 0.02em !important;
+  height: 18px !important;
+  /* The width is set imperatively from login.js based on the rendered
+     width of the currently-selected option (a native <select> with
+     `appearance: none` sizes itself to the LONGEST option's text, so
+     the chevron would otherwise float a 15–25px gap right of the
+     visible label). 16px padding-right reserves room for the chevron. */
+  padding: 0 16px 0 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  /* Chevron-down glyph on the trailing edge, matching login.js
+     `Icon.chevron`. The url-encoded stroke is --am-faint #9AA1AD. */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%239AA1AD' stroke-width='1.5'><path d='M4 6l4 4 4-4' stroke-linecap='round' stroke-linejoin='round'/></svg>") !important;
+  background-repeat: no-repeat !important;
+  background-position: right center !important;
+  background-size: 10px 10px !important;
+  /* Suppress focus indicator overlay so the picker reads as
+     plain text + glyphs */
+  box-shadow: none !important;
+  /* Slow the bg swap so hover/focus chevron transitions read instead
+     of snap. Color animates simultaneously. */
+  transition: color .15s ease-out, background-image .12s ease-out;
+}
+/* Hover — chevron stroke darkens to --am-foreground (#14202E),
+   text color follows for unified feedback. */
+#login-select-toggle:hover {
+  color: var(--am-foreground) !important;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2314202E' stroke-width='1.5'><path d='M4 6l4 4 4-4' stroke-linecap='round' stroke-linejoin='round'/></svg>") !important;
+}
+/* Focus (the native dropdown is open) — flip the chevron to point up.
+   We can't `transform: rotate(180deg)` a background-image, so swap to a
+   second SVG whose `path d` is the y-mirrored arrow. */
+#login-select-toggle:focus {
+  color: var(--am-foreground) !important;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2314202E' stroke-width='1.5'><path d='M4 10l4-4 4 4' stroke-linecap='round' stroke-linejoin='round'/></svg>") !important;
+}
+/* PF v5 inserts a `<span class="pf-v5-c-form-control__utilities">`
+   sibling holding its own chevron SVG. We paint our chevron via the
+   select's background-image (no-JS fallback) and via the custom button
+   trigger when JS is on. Either way the PF span must go. */
+.pf-v5-c-login__main-header-utilities .pf-v5-c-form-control__utilities,
+.pf-v5-c-login__main-header-utilities .pf-v5-c-form-control__toggle-icon {
+  display: none !important;
+}
+
+/* ============================================================
+   LOCALE POP — custom trigger + pop, mirrors `.am-realm-menu`
+   Built by login.js's `enhanceLocalePicker()`. The native <select>
+   is hidden once we successfully append `.am-locale-trigger` and
+   `.am-locale-menu` as siblings inside `.pf-v5-c-form-control`.
+   Anchored to the bottom of the trigger (opens UPWARD), so the
+   fadeUp animation runs in mirror: translateY(-8) → 0 instead of
+   the realm menu's +8 → 0.
+   ============================================================ */
+.am-locale-trigger {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+  font-family: var(--am-sans);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--am-faint);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  height: 18px;
+  transition: color .15s ease-out;
+}
+.am-locale-trigger:hover,
+.am-locale-trigger:focus-visible,
+.pf-v5-c-form-control.am-locale-open .am-locale-trigger {
+  color: var(--am-foreground);
+}
+.am-locale-trigger__chevron {
+  display: inline-flex;
+  color: inherit;
+  /* Spring chevron flip on open — single transform property, no SVG swap,
+     so the rotation actually plays vs. discrete background-image. */
+  transition: transform .22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pf-v5-c-form-control.am-locale-open .am-locale-trigger__chevron {
+  transform: rotate(180deg);
+}
+
+.am-locale-menu {
+  position: absolute;
+  /* Anchor ABOVE the trigger — the trigger sits in the fixed bottom band */
+  bottom: calc(100% + 10px);
+  left: -10px;
+  width: 220px;
+  padding: 6px;
+  background: var(--am-card);
+  border: 0.8px solid var(--am-border);
+  border-radius: var(--am-radius-sm);
+  /* Same four-layer lift as the realm pop */
+  box-shadow:
+    0 18px 44px -16px rgba(10, 18, 30, 0.18),
+    0 6px 16px -8px rgba(10, 18, 30, 0.10),
+    0 1px 0 rgba(0, 0, 0, 0.02),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  z-index: 50;
+  opacity: 0;
+  /* MIRROR-direction fade — closer to trigger (which sits BELOW)
+     means a -8px offset; settles UP to 0. Mirror of realm menu's +8→0. */
+  transform: translateY(-8px);
+  transition:
+    opacity .22s cubic-bezier(0.16, 1, 0.3, 1),
+    transform .22s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  font-family: var(--am-sans);
+}
+.pf-v5-c-form-control.am-locale-open > .am-locale-menu {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.am-locale-menu__head {
+  padding: 8px 10px 6px;
+}
+.am-locale-menu__eyebrow {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--am-faint);
+}
+.am-locale-menu__divider {
+  height: 1px;
+  background: var(--am-border);
+  margin: 4px 6px;
+}
+.am-locale-menu__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  color: var(--am-muted);
+  font-size: 12px;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: background-color .16s ease-out, color .16s ease-out;
+}
+.am-locale-menu__row:hover {
+  background: var(--am-bg);
+  color: var(--am-foreground);
+  text-decoration: none;
+}
+/* Current locale — full ink, accent-tinted check */
+.am-locale-menu__row--current {
+  color: var(--am-foreground);
+}
+.am-locale-menu__row--current svg {
+  color: var(--am-accent);
+}
+/* Native option styling — only the colors browsers honor cross-platform */
+#login-select-toggle option {
+  background: var(--am-card);
+  color: var(--am-foreground);
+  font-family: var(--am-sans);
+  font-size: 13px;
+}
+
+/* Legacy hook (older Keycloak emitting `#kc-locale`) — kept as a no-op
+   on v26 since the element isn't rendered there. */
 #kc-locale {
   position: fixed;
   bottom: 0;
@@ -886,21 +1173,6 @@ a.kc-forgot,
 #kc-locale a:hover,
 #kc-locale button:hover {
   color: var(--am-foreground) !important;
-}
-#kc-locale-dropdown ul {
-  background: var(--am-card) !important;
-  border: 0.8px solid var(--am-border) !important;
-  border-radius: var(--am-radius-sm) !important;
-  box-shadow: 0 8px 24px rgba(10, 18, 30, 0.10) !important;
-  padding: 6px !important;
-}
-#kc-locale-dropdown ul li a {
-  padding: 6px 10px !important;
-  color: var(--am-foreground) !important;
-  border-radius: 6px !important;
-}
-#kc-locale-dropdown ul li a:hover {
-  background: var(--am-bg) !important;
 }
 
 /* ============================================================
@@ -1015,10 +1287,14 @@ a.kc-forgot,
   background: var(--am-card);
   border: 0.8px solid var(--am-border);
   border-radius: var(--am-radius-sm);
-  /* Slightly stronger lift than the card — pulls the menu off the page */
+  /* Two-layer lift: the deep blurred drop ground the menu on the page,
+     a tighter close-in shadow + 1px hairline give it a crisp edge. The
+     inset highlight on top mimics a 1px specular for a premium read. */
   box-shadow:
-    0 12px 32px rgba(10, 18, 30, 0.10),
-    0 1px 0 rgba(0, 0, 0, 0.02);
+    0 18px 44px -16px rgba(10, 18, 30, 0.18),
+    0 6px 16px -8px rgba(10, 18, 30, 0.10),
+    0 1px 0 rgba(0, 0, 0, 0.02),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
   z-index: 50;
   /* Default-closed: invisible AND non-interactive.
      `visibility` was tempting here (it has a tab-order benefit) BUT
@@ -1032,7 +1308,12 @@ a.kc-forgot,
      the entrance animation. */
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity .18s ease-out, transform .18s ease-out;
+  /* Quartic ease-out (cubic-bezier 0.16,1,0.3,1) snaps in fast and
+     settles soft — reads more "premium pop" than the symmetric ease-out
+     curve. Same duration spec calls for. */
+  transition:
+    opacity .22s cubic-bezier(0.16, 1, 0.3, 1),
+    transform .22s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
   font-family: var(--am-sans);
 }
@@ -1060,7 +1341,10 @@ a.kc-forgot,
   line-height: 1.2;
   margin-top: 4px;
   color: var(--am-foreground);
-  letter-spacing: -0.01em;
+  /* -0.015em pulls the serif a hair tighter than body letter-spacing —
+     matches the design's display-type rhythm where the display column
+     sits more compactly than the surrounding sans copy. */
+  letter-spacing: -0.015em;
 }
 .am-realm-menu__id {
   font-family: var(--am-mono);
@@ -1083,7 +1367,10 @@ a.kc-forgot,
   font-size: 12px;
   text-decoration: none;
   border-radius: 6px;
-  transition: background-color .12s, color .12s;
+  /* Slightly slower than the previous .12 — at 160ms the hover feels
+     intentional rather than reactive, more in line with the menu's
+     overall rhythm (220ms entrance). */
+  transition: background-color .16s ease-out, color .16s ease-out;
 }
 .am-realm-menu__row:hover {
   background: var(--am-bg);
@@ -1099,7 +1386,21 @@ a.kc-forgot,
 }
 .am-realm-menu__row svg {
   opacity: .55;
+  /* Independent transition on the icon — opacity + 2px translate on
+     hover read as a "go" affordance without an outright arrow swap. */
+  transition: opacity .16s ease-out, transform .16s ease-out;
 }
+.am-realm-menu__row:hover svg {
+  opacity: .9;
+  transform: translateX(2px);
+}
+/* Static rows (e.g. Tenant status) shouldn't get the hover translate
+   on their indicator block. */
+.am-realm-menu__row--static:hover svg {
+  transform: none;
+  opacity: .55;
+}
+
 .am-realm-menu__status {
   display: inline-flex;
   align-items: center;
@@ -1108,10 +1409,82 @@ a.kc-forgot,
   color: var(--am-success);
 }
 .am-realm-menu__dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--am-success);
+  /* Same halo the pill's status dot carries — spec calls it out as
+     part of the dropdown's "tenant status" row too. */
+  box-shadow: 0 0 0 3px rgba(63, 122, 78, 0.16);
+}
+
+/* The Switch-tenant row is a <button> styled as a flex row identical
+   to the <a> sibling. Reset native button chrome. */
+.am-realm-menu__row--switch {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* Expanded state — the row hosts an inline input + go button.
+   No background change since the input itself reads as the focused
+   surface; keeps the menu visually quiet. */
+.am-realm-menu__row--input {
+  background: transparent !important;
+  color: var(--am-foreground) !important;
+  padding: 4px 6px 4px 10px;
+  gap: 6px;
+  cursor: default;
+}
+.am-realm-menu__row--input:hover {
+  background: transparent !important;
+}
+.am-realm-menu__input {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 4px 0;
+  font: inherit;
+  font-family: var(--am-mono);
+  font-size: 12px;
+  color: var(--am-foreground);
+  letter-spacing: -0.01em;
+}
+.am-realm-menu__input::placeholder {
+  color: var(--am-faint);
+  font-family: var(--am-mono);
+}
+.am-realm-menu__input--err {
+  animation: am-shake .4s ease-in-out;
+  color: var(--am-danger-fg);
+}
+.am-realm-menu__input-go {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: var(--am-muted);
+  display: inline-flex;
+  align-items: center;
+  transition: color .15s, background-color .15s, transform .15s;
+}
+.am-realm-menu__input-go:hover {
+  background: var(--am-bg);
+  color: var(--am-foreground);
+  transform: translateX(2px);
 }
 
 /* ============================================================
