@@ -144,6 +144,15 @@ export default {
     }
   },
 
+  signOut: {
+    title: '로그아웃 중...',
+    body: '로컬 세션을 정리하고 ID 공급자(Keycloak)에게 알리는 중입니다.',
+    failed: {
+      title: '로그아웃 실패',
+      goLogin: '로그인 화면으로'
+    }
+  },
+
   invite: {
     title: '계정 설정',
     tenantPrefix: '테넌트:',

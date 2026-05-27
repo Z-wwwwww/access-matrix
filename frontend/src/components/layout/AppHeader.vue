@@ -110,20 +110,13 @@ function openBreakGlass() {
   breakGlassDialogOpen.value = true
 }
 
-async function handleLogout() {
+function handleLogout() {
   userOpen.value = false
-  // OIDC mode: logout() navigates to Keycloak's end_session_endpoint and
-  // returns true — we MUST NOT router.push afterwards, the page is
-  // already on its way out. Password mode: returns false, we handle the
-  // /login navigation here. OIDC mode but KC unreachable: returns false
-  // AND wasLastLogoutLocalOnly()=true, so we attach a query hint that
-  // /login uses to surface a "logged out locally; KC was unreachable"
-  // notice rather than silently looking like a normal logout.
-  const navigatedAway = await authStore.logout()
-  if (!navigatedAway) {
-    const localOnly = authStore.wasLastLogoutLocalOnly()
-    router.push(localOnly ? '/login?logout=local-only' : '/login')
-  }
+  // Route to the SignOut transition page. It handles the entire logout
+  // flow (backend revoke, KC probe, redirect or local routing) and
+  // shows a spinner + status while the work is in flight, which is
+  // crucial UX — the KC probe alone can take up to 3 s.
+  router.push('/signout')
 }
 
 onBeforeUnmount(() => {

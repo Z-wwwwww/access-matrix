@@ -144,6 +144,15 @@ export default {
     }
   },
 
+  signOut: {
+    title: '正在登出...',
+    body: '正在清除本地会话并通知身份提供方（Keycloak）。',
+    failed: {
+      title: '登出失败',
+      goLogin: '前往登录'
+    }
+  },
+
   invite: {
     title: '设置账号',
     tenantPrefix: '租户:',

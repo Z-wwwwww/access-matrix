@@ -144,6 +144,15 @@ export default {
     }
   },
 
+  signOut: {
+    title: 'Signing out...',
+    body: 'Clearing your local session and notifying the identity provider (Keycloak).',
+    failed: {
+      title: 'Sign-out failed',
+      goLogin: 'Go to login'
+    }
+  },
+
   invite: {
     title: 'Set up your account',
     tenantPrefix: 'Tenant:',
