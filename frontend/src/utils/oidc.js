@@ -10,20 +10,48 @@
  */
 
 import { newCodeVerifier, deriveCodeChallenge, newState } from './pkce'
+import { currentTenant } from './tenant'
 
 const SS_VERIFIER = 'oidc_pkce_verifier'
 const SS_STATE    = 'oidc_state'
 const SS_FROM     = 'oidc_post_login_from'
 
-/** Read OIDC config out of Vite env (build-time). */
+/**
+ * Read OIDC config. Mix of build-time (`import.meta.env`) and runtime
+ * (current subdomain → realm, current origin → redirect URI) so the same
+ * SPA build can serve multiple tenants over different subdomains.
+ *
+ * Precedence:
+ *
+ *   issuer
+ *     - `VITE_OIDC_ISSUER` if set         (legacy single-realm pinning)
+ *     - else `VITE_OIDC_ISSUER_BASE/realms/${currentTenant()}`  (multi-realm)
+ *
+ *   redirectUri
+ *     - `VITE_OIDC_REDIRECT_URI` if set   (pin behind a proxy)
+ *     - else `${window.location.origin}/sso/callback`           (per-host)
+ *
+ * The Keycloak client must have valid-redirect-uris that match — for the
+ * subdomain rollout, register a wildcard such as
+ * `https://*.access-matrix.com/sso/callback`.
+ */
 export function oidcConfig() {
   const env = import.meta.env
+  const tenant = currentTenant()
+  let issuer = env.VITE_OIDC_ISSUER
+  if (!issuer) {
+    const base = (env.VITE_OIDC_ISSUER_BASE || '').replace(/\/$/, '')
+    if (base) issuer = `${base}/realms/${tenant}`
+  }
+  const redirectUri = env.VITE_OIDC_REDIRECT_URI
+    || (typeof window !== 'undefined' ? `${window.location.origin}/sso/callback` : '')
   return {
     enabled:     env.VITE_OIDC_ENABLED === 'true',
-    issuer:      env.VITE_OIDC_ISSUER,
+    issuer,
     clientId:    env.VITE_OIDC_CLIENT_ID,
-    redirectUri: env.VITE_OIDC_REDIRECT_URI,
-    scopes:      env.VITE_OIDC_SCOPES || 'openid profile email'
+    redirectUri,
+    scopes:      env.VITE_OIDC_SCOPES || 'openid profile email',
+    tenant
   }
 }
 

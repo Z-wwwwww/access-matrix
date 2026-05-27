@@ -84,20 +84,58 @@ The first boot lets Keycloak run its own Liquibase migrations against the
 
 ## Defining a tenant (realm)
 
-For each tenant in the application, create a Keycloak realm with the **same
-name as the tenant_id**. The `default` tenant maps to a realm named `default`.
+Multi-tenancy convention:
 
-1. Top-left realm picker → **Create realm**
-2. Realm name → `default` (or the tenant id from the X-Tenant-Id header)
+> **realm name == tenant id == subdomain label**
+
+so adding tenant "acme" means there's a realm `acme` in Keycloak, every JWT
+out of that realm has `tid="acme"`, and the SPA reaches it at
+`https://acme.access-matrix.com/`. The frontend's `utils/tenant.js` and the
+backend's MyBatis `TenantLineInnerInterceptor` both pivot off this convention.
+
+### Adding a new tenant (recommended)
+
+Use the committed helper that clones `default-realm.json` and retargets the
+realm name + `tid` hardcoded-claim-mapper:
+
+```powershell
+# Windows
+.\infra\keycloak\new-tenant.ps1 -Name acme
+```
+
+```bash
+# macOS / Linux
+infra/keycloak/new-tenant.sh acme
+```
+
+Then restart Keycloak — `start-keycloak.{bat,sh}` already passes
+`--import-realm`, so the new file is picked up on next boot. Verify in the
+admin console (realm picker → `acme`), then provision the first admin user
+via the Users tab.
+
+### Adding a tenant manually via the admin UI
+
+For one-offs without going through the helper:
+
+1. Top-left realm picker → **Create realm**.
+2. Realm name → the tenant id (e.g. `acme`).
 3. Inside the realm:
-   - **Clients** → create one for the backend (`access-matrix-backend`)
-     with Client authentication = OFF, Standard flow ON, root URL =
-     `http://localhost:9135/api`, valid redirect URIs =
-     `http://localhost:9135/api/login/oauth2/code/keycloak`.
+   - **Clients** → create `access-matrix-backend` with Client authentication
+     = OFF, Standard flow ON, valid redirect URIs =
+     `https://acme.access-matrix.com/sso/callback` (or
+     `http://localhost:5273/sso/callback` for dev). A wildcard registration
+     `https://*.access-matrix.com/sso/callback` on every realm's client
+     covers every tenant in one entry.
+   - **Client scopes** → on the `access-matrix-backend`-dedicated scope, add
+     a hardcoded-claim mapper named `tid`, claim name `tid`, claim value
+     equal to the realm name. This is what wires `tenant_id` through to
+     every downstream API call.
    - **Client scopes** → ensure `email`, `profile`, `roles` are in the
      "Default" assigned scopes.
-   - **Users** → create at least one test user with credentials and at
-     least one role (mapped via "Realm roles" tab).
+   - **Users** → create at least one admin with credentials, password set
+     to non-temporary, email verified.
+   - **Realm settings → Themes → Login theme** → `access-matrix` (the
+     branded theme committed under `infra/keycloak/themes/`).
 
 ## Exporting / committing realm configuration
 
@@ -153,17 +191,48 @@ Adding more themes: drop a sibling directory under
 `infra/keycloak/themes/<name>/` and set the realm's `loginTheme` /
 `accountTheme` / `adminTheme` / `emailTheme` to that name.
 
-## Backend wiring (next PR)
+## Multi-tenant routing (frontend ↔ realm)
 
-Not yet wired — the backend still uses the local `AdminAuthController.login`
-flow. The plan once the dev realm exists:
+The SPA picks "which realm am I logging into right now" at runtime, in
+`frontend/src/utils/tenant.js`. Resolution priority:
 
-- Add `spring-boot-starter-oauth2-resource-server` to `core-bootstrap`.
-- Set `spring.security.oauth2.resourceserver.jwt.issuer-uri =
-  http://localhost:8180/realms/default`.
-- Map `tid` claim to `RequestContext.tenantId`, `sub` to user id.
-- Keep `AdminAuthController.login` behind a feature flag for
-  break-glass / no-Keycloak local runs (`CORE_AUTH_MODE=password`).
+1. `?tenant=<name>` query string (dev override on localhost, sticky to
+   localStorage for subsequent reloads).
+2. Subdomain of `window.location.hostname` — e.g. `acme.access-matrix.com`
+   → realm `acme`. Reserved labels like `www`, `app`, `api`, `kc`, etc.
+   fall through to the next source.
+3. `localStorage.tenant_id` (carry-over from a previous explicit pick).
+4. `"default"`.
+
+Once resolved, the same value drives two things in lockstep:
+
+- `oidcConfig().issuer` becomes `${VITE_OIDC_ISSUER_BASE}/realms/<tenant>`,
+  i.e. which realm the OIDC redirect targets.
+- `X-Tenant-Id: <tenant>` rides on every axios request as a pre-auth fallback
+  (post-auth the backend prefers the JWT's `tid` claim).
+
+The redirect URI is derived from `window.location.origin` so subdomain
+hosts come back to themselves. Register a wildcard pattern such as
+`https://*.access-matrix.com/sso/callback` in the Keycloak client config so
+adding a new tenant doesn't require touching valid-redirect-uri lists.
+
+## Backend wiring (already done — `app.security.mode=oidc`)
+
+Wired across two beans:
+
+- `MultiRealmJwtDecoder` (in `core-infrastructure/security`) accepts tokens
+  from any realm under `app.security.oidc.issuer-base-uri`. JWKS for each
+  realm is fetched lazily on first sighting and cached. Falls back to
+  single-realm `issuer-uri` for hardened single-tenant deploys.
+- `OidcJitUserService` provisions a business `core_auth_user` row on first
+  SSO login per tenant — gates JIT on the same trust prefix so an HS256
+  break-glass token signed by `AdminAuthController.login` is correctly
+  passed through.
+
+The `AdminAuthController.login` password path stays available as
+break-glass (`app.security.mode=jwt` or HS256 tokens accepted alongside
+RS256 via `DualModeJwtDecoder`) so Keycloak being unavailable doesn't
+lock everyone out.
 
 ## Troubleshooting
 

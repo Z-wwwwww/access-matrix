@@ -139,11 +139,16 @@ app:
       username-claim: preferred_username
       authorities-claim: scope
     oidc:
-      # Only consulted when mode=oidc. Points at the IdP realm's well-known
-      # discovery doc — Spring fetches /.well-known/openid-configuration from
-      # this base and wires JWKS validation + issuer assertion automatically.
-      # Default points at the locally-launched Keycloak in infra/keycloak/.
-      issuer-uri: ${CORE_OIDC_ISSUER_URI:http://localhost:8180/realms/default}
+      # Multi-tenant trust prefix — recommended. When set, the backend accepts
+      # tokens from ANY realm hosted under this Keycloak base (one realm per
+      # tenant; realm name == tenant id). JWKS for each realm is fetched
+      # lazily on first sighting and cached. Default points at the locally-
+      # launched Keycloak in infra/keycloak/.
+      issuer-base-uri: ${CORE_OIDC_ISSUER_BASE_URI:http://localhost:8180}
+      # Single-realm pin (legacy / locked-down deploys). When set AND
+      # issuer-base-uri is unset, the backend only accepts tokens from this
+      # exact realm. Use one or the other — base-uri wins if both are set.
+      issuer-uri: ${CORE_OIDC_ISSUER_URI:}
     rate-limit:
       enabled: true
       requests-per-minute: 30

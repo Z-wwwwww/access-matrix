@@ -12,6 +12,7 @@ import axios from 'axios'
 import qs from 'qs'
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
+import { currentTenant } from '@/utils/tenant'
 
 const request = axios.create({
   baseURL: '/proxy_url',
@@ -35,13 +36,6 @@ function isAuthEndpoint(url) {
   return url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/logout')
 }
 
-// Tenant id is stored in localStorage so the same browser can keep one tenant
-// across reloads. Login page lets the user change it; default = "default".
-const TENANT_KEY = 'tenant_id'
-function currentTenantId() {
-  return localStorage.getItem(TENANT_KEY) || 'default'
-}
-
 // ─── Request Interceptor ───
 request.interceptors.request.use((config) => {
   const token = useAuthStore().accessToken
@@ -50,7 +44,9 @@ request.interceptors.request.use((config) => {
   config.headers['Accept-language'] = LANG_MAP[lang] || 'ja-JP'
   // X-Tenant-Id：post-auth は JWT の `tid` クレームが正、pre-auth (/auth/login など)
   // はこのヘッダがバックエンドの RequestContextFilter に拾われる。
-  config.headers['X-Tenant-Id'] = currentTenantId()
+  // utils/tenant.js が subdomain / ?tenant= / localStorage / "default" の
+  // 優先順位で唯一の真実を返す（同じ値を oidcConfig() も使うので両者がズレない）。
+  config.headers['X-Tenant-Id'] = currentTenant()
   return config
 })
 
