@@ -170,7 +170,23 @@ function useBreakGlass() {
   autoRedirecting.value = false
 }
 
-function handleForgotPassword() {
+async function handleForgotPassword() {
+  // Same probe-before-redirect pattern as handleSsoLogin and the logout
+  // flow. Forgot-password navigates to Keycloak's reset-credentials
+  // endpoint; without the probe, a down KC would dead-end on the
+  // browser's "refused to connect" page with no way back. Surface the
+  // unreachable banner instead — the user wanted to recover their KC
+  // password, but if KC is down that's not possible right now AND they
+  // may want to break-glass into the system in the meantime.
+  errorMsg.value = ''
+  ssoErrorFromQuery.value = ''
+  ssoRetrying.value = true
+  const reachable = await isSsoReachable()
+  ssoRetrying.value = false
+  if (!reachable) {
+    ssoUnreachable.value = true
+    return
+  }
   const url = keycloakForgotPasswordUrl()
   if (url) {
     stashReturnTo(route.query.from || '/')
