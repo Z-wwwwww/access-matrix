@@ -155,6 +155,30 @@ export default {
     }
   },
 
+  passwordReset: {
+    title: 'Set your password',
+    tenantPrefix: 'Tenant:',
+    intro: 'We are switching from SSO to password login. Please set a new password below.',
+    passwordLabel: 'New password',
+    passwordPlaceholder: 'At least 8 characters',
+    passwordConfirmLabel: 'Confirm password',
+    passwordConfirmPlaceholder: 'Re-enter your password',
+    button: {
+      submit: 'Set password',
+      submitting: 'Submitting...',
+      goLogin: 'Go to login'
+    },
+    message: {
+      checking: 'Validating link...',
+      invalidLink: 'Reset link is malformed',
+      notValid: 'This link is invalid, expired, or already used',
+      passwordTooShort: 'Password must be at least 8 characters',
+      passwordMismatch: 'Passwords do not match',
+      acceptFailed: 'Failed to set password',
+      done: 'Password set. You can now sign in.'
+    }
+  },
+
   forget: {
     title: 'Reset password',
     mobileLabel: 'Mobile number',

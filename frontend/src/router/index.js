@@ -56,6 +56,14 @@ const routes = [
     meta: { title: 'アカウント設定' }
   },
   {
+    // Password-reset landing page — used by the SSO → password reverse
+    // migration. Email lands here with a single-use reset token. No
+    // session required.
+    path: '/reset-password/:token',
+    component: () => import('@/views/login/ResetPasswordAccept.vue'),
+    meta: { title: 'パスワード設定' }
+  },
+  {
     path: '/:pathMatch(.*)*',
     component: () => import('@/views/404.vue'),
     meta: { title: '404' }

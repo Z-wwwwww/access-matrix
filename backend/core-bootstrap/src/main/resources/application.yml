@@ -223,6 +223,18 @@ app:
     tenants:        ${CORE_MIGRATION_TENANTS:default}
     # Where the per-user JSON report lands. One file per run, timestamped.
     report-dir:     ${CORE_MIGRATION_REPORT_DIR:logs}
+    # Auto-detect mode flips and trigger the matching migration. Off by
+    # default — explicitly setting it to "true" lets the operator change
+    # only `app.security.mode` and have the right migration fire without
+    # also remembering to set `run-on-startup`. Detection compares the
+    # current value against the last-applied value stored in core_meta
+    # (key: security.last_applied_mode) and dispatches:
+    #   password → oidc:     PasswordToSsoMigrationService.run
+    #   oidc → password:     SsoToPasswordMigrationService.run
+    # Other transitions (anything involving permit-all, no baseline yet,
+    # same-as-last) are no-ops; in all cases the current mode is recorded
+    # back to core_meta so the next boot picks up from there.
+    auto-on-mode-flip: ${CORE_MIGRATION_AUTO_ON_MODE_FLIP:false}
   mybatis:
     tenant:
       enabled: false

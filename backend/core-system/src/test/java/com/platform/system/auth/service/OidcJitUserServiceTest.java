@@ -1,7 +1,11 @@
 package com.platform.system.auth.service;
 
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.platform.core.common.security.BuiltInRoles;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
+import com.platform.system.rbac.mapper.RoleMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +43,7 @@ import static org.mockito.Mockito.when;
 class OidcJitUserServiceTest {
 
     @Mock UserMapper userMapper;
+    @Mock RoleMapper roleMapper;
     @InjectMocks OidcJitUserService service;
 
     @BeforeEach
@@ -85,10 +90,11 @@ class OidcJitUserServiceTest {
     }
 
     @Test
-    void bindPath_legacyUsernameMatch_writesKeycloakIdAndReturnsLegacyId() {
+    void bindPath_legacyNonSuperAdminUser_writesKeycloakIdAndClearsPasswordHash() {
         // First SSO login for a user that pre-existed in the password flow.
-        // The bind must be done with updateById (not @TableLogic — we're not
-        // changing mark, just keycloak_id), otherwise the link doesn't land.
+        // The bind UPDATE writes keycloak_id AND nulls out password_hash so
+        // the row ends up byte-identical to a fresh OIDC JIT user — that's
+        // the "as-if-always-OIDC" end state the runbook promises.
         Jwt token = jwt(Map.of(
                 "sub", "kc-uuid-2",
                 "tid", "default",
@@ -96,16 +102,84 @@ class OidcJitUserServiceTest {
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2", "default")).thenReturn(null);
         UserEntity legacy = row("ULID-BOB-26", "bob");
         when(userMapper.findByIdentifier("default", "bob")).thenReturn(legacy);
+        // Bob is NOT a super-admin — role lookup returns an empty list.
+        when(roleMapper.findRoleIdsByUserId("ULID-BOB-26", "default")).thenReturn(java.util.List.of());
 
         String businessId = service.resolveBusinessUserId(token);
 
         assertThat(businessId).isEqualTo("ULID-BOB-26");
-        ArgumentCaptor<UserEntity> cap = ArgumentCaptor.forClass(UserEntity.class);
-        verify(userMapper).updateById(cap.capture());
-        assertThat(cap.getValue().getKeycloakId()).isEqualTo("kc-uuid-2");
-        assertThat(cap.getValue().getId()).isEqualTo("ULID-BOB-26");
+        ArgumentCaptor<UpdateWrapper<UserEntity>> cap = ArgumentCaptor.forClass(UpdateWrapper.class);
+        verify(userMapper).update(org.mockito.ArgumentMatchers.isNull(), cap.capture());
+        // MP UpdateWrapper parameterises values into paramNameValuePairs;
+        // getSqlSet() returns the placeholder template. Read both to
+        // verify intent.
+        String sql = cap.getValue().getSqlSet();
+        java.util.Map<String, Object> params = cap.getValue().getParamNameValuePairs();
+        assertThat(sql).contains("keycloak_id=");
+        assertThat(sql).contains("password_hash=");           // password_hash IS in the SET clause
+        assertThat(params.values()).contains("kc-uuid-2");
+        assertThat(params.values()).contains((Object) null);  // and its value is NULL
         // No JIT insert when we successfully bound.
         verify(userMapper, never()).insert(any(UserEntity.class));
+    }
+
+    @Test
+    void bindPath_legacySuperAdminUser_preservesPasswordHashForBreakGlass() {
+        // Same bind path as the non-super-admin case, but the role lookup
+        // returns SUPER_ADMIN_ID so the UPDATE must skip password_hash —
+        // that's how break-glass access survives the migration.
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-2b",
+                "tid", "default",
+                "preferred_username", "admin"));
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2b", "default")).thenReturn(null);
+        UserEntity legacy = row("ULID-ADMIN-26", "admin");
+        when(userMapper.findByIdentifier("default", "admin")).thenReturn(legacy);
+        when(roleMapper.findRoleIdsByUserId("ULID-ADMIN-26", "default"))
+                .thenReturn(java.util.List.of(BuiltInRoles.SUPER_ADMIN_ID));
+
+        String businessId = service.resolveBusinessUserId(token);
+
+        assertThat(businessId).isEqualTo("ULID-ADMIN-26");
+        ArgumentCaptor<UpdateWrapper<UserEntity>> cap = ArgumentCaptor.forClass(UpdateWrapper.class);
+        verify(userMapper).update(org.mockito.ArgumentMatchers.isNull(), cap.capture());
+        String sql = cap.getValue().getSqlSet();
+        java.util.Map<String, Object> params = cap.getValue().getParamNameValuePairs();
+        assertThat(sql).contains("keycloak_id=");
+        // The break-glass exemption: password_hash must NOT be in the SET clause at all.
+        assertThat(sql).doesNotContain("password_hash");
+        assertThat(params.values()).contains("kc-uuid-2b");
+        assertThat(params.values()).doesNotContain((Object) null);
+        verify(userMapper, never()).insert(any(UserEntity.class));
+    }
+
+    @Test
+    void bindPath_roleLookupFails_preservesPasswordHashDefensively() {
+        // If the role-id lookup itself throws, the safety-first default is
+        // to treat the user as super-admin (preserve their hash). Better
+        // to leak a stale hash than to silently lock an actual admin out
+        // by clearing it during a transient DB hiccup.
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-2c",
+                "tid", "default",
+                "preferred_username", "carol"));
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2c", "default")).thenReturn(null);
+        UserEntity legacy = row("ULID-CAROL-26", "carol");
+        when(userMapper.findByIdentifier("default", "carol")).thenReturn(legacy);
+        when(roleMapper.findRoleIdsByUserId("ULID-CAROL-26", "default"))
+                .thenThrow(new RuntimeException("transient DB blip"));
+
+        service.resolveBusinessUserId(token);
+
+        ArgumentCaptor<UpdateWrapper<UserEntity>> cap = ArgumentCaptor.forClass(UpdateWrapper.class);
+        verify(userMapper).update(org.mockito.ArgumentMatchers.isNull(), cap.capture());
+        String sql = cap.getValue().getSqlSet();
+        java.util.Map<String, Object> params = cap.getValue().getParamNameValuePairs();
+        assertThat(sql).contains("keycloak_id=");
+        // Defensive: password_hash absent from SET clause (treat as super-admin
+        // on role-lookup failure).
+        assertThat(sql).doesNotContain("password_hash");
+        assertThat(params.values()).contains("kc-uuid-2c");
     }
 
     @Test

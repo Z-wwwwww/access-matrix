@@ -3,6 +3,7 @@ package com.platform.core.bootstrap.migration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
@@ -28,11 +29,11 @@ import java.util.function.Function;
  *   security:
  *     mode: oidc                                # required — migration only makes sense in oidc mode
  *   migration:
- *     run-on-startup: password-to-sso           # | password-to-sso-resend
+ *     run-on-startup: password-to-sso           # | password-to-sso-resend | sso-to-password
  *     tenants: default,acme,beta                # one realm/tenant id per item
  * </pre>
  *
- * <h3>Two modes</h3>
+ * <h3>Three modes</h3>
  * <ul>
  *   <li><b>password-to-sso</b> — first-time mirror. Reads
  *       {@code core_auth_user} rows with {@code keycloak_id IS NULL},
@@ -48,6 +49,13 @@ import java.util.function.Function;
  *       (use {@code password-to-sso} for that) and does NOT touch
  *       users who have already completed SSO (the bind path writes
  *       {@code keycloak_id} so they fall out of the candidate query).</li>
+ *   <li><b>sso-to-password</b> — reverse migration. For every user that
+ *       still claims a KC identity ({@code keycloak_id IS NOT NULL}),
+ *       mint a single-use token and email a link landing on our own
+ *       {@code /auth/password-reset/{token}} endpoint. When the user
+ *       sets a new password through that flow, their row is detached
+ *       from KC and starts behaving like a born-in-password user;
+ *       subsequent runs skip them automatically.</li>
  * </ul>
  *
  * <p>Runs ONCE per backend start. After completion:
@@ -71,19 +79,25 @@ import java.util.function.Function;
  * a one-shot.
  */
 @Component
-// Match either of the two recognised modes. We deliberately do NOT use
+// Match any of the three recognised modes. We deliberately do NOT use
 // `havingValue` (which is single-valued) — a SpEL expression keeps the
 // recognised set in one place and lets startup fail loudly on a typo
 // (see run() — unknown values are flagged at runtime).
 @ConditionalOnExpression(
         "'${app.migration.run-on-startup:}' == 'password-to-sso' "
-        + "or '${app.migration.run-on-startup:}' == 'password-to-sso-resend'")
+        + "or '${app.migration.run-on-startup:}' == 'password-to-sso-resend' "
+        + "or '${app.migration.run-on-startup:}' == 'sso-to-password'")
 public class PasswordToSsoMigrationRunner implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(PasswordToSsoMigrationRunner.class);
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private final PasswordToSsoMigrationService service;
+    // ObjectProvider so the runner stays usable without the reverse-migration
+    // bean (e.g. in tests where MailService isn't wired). The conditional on
+    // the class restricts to one of three modes; the dispatch below will
+    // refuse `sso-to-password` if the reverse service is genuinely absent.
+    private final ObjectProvider<SsoToPasswordMigrationService> reverseProvider;
     private final JsonMapper json;
 
     @Value("${app.migration.run-on-startup:}")
@@ -95,8 +109,11 @@ public class PasswordToSsoMigrationRunner implements ApplicationRunner {
     @Value("${app.migration.report-dir:logs}")
     private String reportDir;
 
-    public PasswordToSsoMigrationRunner(PasswordToSsoMigrationService service, JsonMapper json) {
+    public PasswordToSsoMigrationRunner(PasswordToSsoMigrationService service,
+                                        ObjectProvider<SsoToPasswordMigrationService> reverseProvider,
+                                        JsonMapper json) {
         this.service = service;
+        this.reverseProvider = reverseProvider;
         this.json = json;
     }
 
@@ -125,6 +142,16 @@ public class PasswordToSsoMigrationRunner implements ApplicationRunner {
             case "password-to-sso-resend" -> {
                 work = service::resend;
                 reportPrefix = "migration-password-to-sso-resend";
+            }
+            case "sso-to-password" -> {
+                SsoToPasswordMigrationService reverse = reverseProvider.getIfAvailable();
+                if (reverse == null) {
+                    log.error("[migration] mode=sso-to-password but reverse service is not on the classpath — "
+                            + "this should not happen in a normal deployment");
+                    return;
+                }
+                work = reverse::run;
+                reportPrefix = "migration-sso-to-password";
             }
             default -> {
                 log.error("[migration] unrecognised mode '{}' — nothing to do", mode);

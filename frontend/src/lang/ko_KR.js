@@ -155,6 +155,30 @@ export default {
     }
   },
 
+  passwordReset: {
+    title: '비밀번호 설정',
+    tenantPrefix: '테넌트:',
+    intro: '시스템이 SSO 에서 비밀번호 로그인으로 전환됩니다. 아래에서 새 비밀번호를 설정해 주세요.',
+    passwordLabel: '새 비밀번호',
+    passwordPlaceholder: '8자 이상',
+    passwordConfirmLabel: '비밀번호 확인',
+    passwordConfirmPlaceholder: '비밀번호를 다시 입력하세요',
+    button: {
+      submit: '비밀번호 설정',
+      submitting: '전송 중...',
+      goLogin: '로그인 화면으로'
+    },
+    message: {
+      checking: '링크 확인 중...',
+      invalidLink: '링크가 잘못되었습니다',
+      notValid: '이 링크는 유효하지 않거나 만료되었거나 이미 사용되었습니다',
+      passwordTooShort: '비밀번호는 8자 이상이어야 합니다',
+      passwordMismatch: '두 비밀번호가 일치하지 않습니다',
+      acceptFailed: '비밀번호 설정 실패',
+      done: '비밀번호가 설정되었습니다. 로그인하세요.'
+    }
+  },
+
   forget: {
     title: '비밀번호 재설정',
     mobileLabel: '휴대폰 번호',
