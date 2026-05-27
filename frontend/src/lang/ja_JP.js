@@ -136,6 +136,10 @@ export default {
       retry: 'SSO を再試行',
       retrying: '確認中...'
     },
+    localLogoutOnly: {
+      title: 'ローカルでログアウト済み',
+      body: 'Keycloak に接続できなかったため IdP セッションのクリアはスキップされました。本アプリ側の認証情報は破棄されています。情報漏洩が疑われる場合はブラウザの Cookie を手動で削除してください。'
+    },
     passwordBreakGlass: 'パスワードログインモード（緊急用）',
     backToSso: 'SSO に戻す',
     passwordModeHotzone: 'パスワードログインを解除するには 2 秒以内に 5 回クリック',

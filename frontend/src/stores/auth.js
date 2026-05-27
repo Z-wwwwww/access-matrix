@@ -18,7 +18,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { loginApi, refreshApi, logoutApi, getMeApi } from '../../services/auth'
 import { decodeJwt } from '@/utils/jwt-decode'
-import { keycloakLogoutUrl, oidcConfig } from '@/utils/oidc'
+import { keycloakLogoutUrl, oidcConfig, isSsoReachable } from '@/utils/oidc'
 
 const ACCESS_KEY = 'access_token'
 const ID_TOKEN_KEY = 'id_token'
@@ -76,32 +76,60 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Sign the user out. Two-stage:
+   * Sign the user out. Three-stage in OIDC mode:
    *
-   *   1. Best-effort backend call to revoke the refresh token (password
-   *      mode) and trigger ForceLogoutService (kills lingering access
-   *      token across all backend pods).
-   *   2. Clear local state. In OIDC mode, ALSO navigate to Keycloak's
-   *      end_session_endpoint so the IdP wipes its session cookie;
-   *      otherwise the next "Sign in with SSO" silent-logs the user
-   *      back in and they can never actually log out. The Keycloak
-   *      logout page redirects back to /login when done.
+   *   1. Best-effort backend call to revoke the refresh token and
+   *      trigger ForceLogoutService (kills lingering access tokens
+   *      across pods).
+   *   2. Clear local state (access token, id token, userInfo).
+   *   3. In OIDC mode: probe Keycloak's reachability, then navigate to
+   *      its end_session_endpoint so the IdP wipes its own session
+   *      cookie. Without that step, the next "Sign in with SSO" would
+   *      silent-login the user back in via KC's still-valid cookie.
+   *
+   * If Keycloak is unreachable in step 3, we skip the redirect and
+   * return false. The caller (AppHeader.handleLogout) then routes the
+   * user to /login locally with a `?logout=local-only` query hint so
+   * the login page can surface "logged out locally; IdP session may
+   * still be alive" rather than throwing them at the browser's native
+   * "refused to connect" page with no way back to the SPA.
    *
    * Returns true if we navigated away (caller should NOT router.push
    * afterwards); false if we stayed in the SPA and the caller should
-   * handle the post-logout navigation.
+   * handle the post-logout navigation. The caller can read
+   * {@link wasLastLogoutLocalOnly} to decide whether to attach the
+   * `?logout=local-only` query.
    */
+  let lastLogoutLocalOnly = false
+  function wasLastLogoutLocalOnly() {
+    const v = lastLogoutLocalOnly
+    lastLogoutLocalOnly = false   // single-read, then reset
+    return v
+  }
+
   async function logout() {
+    lastLogoutLocalOnly = false
     const idTokenSnapshot = idToken.value
     try { await logoutApi() } catch { /* best-effort */ }
     clearAuth()
 
     if (oidcConfig().enabled) {
-      const postLogoutTo = window.location.origin + '/login'
-      const url = keycloakLogoutUrl(idTokenSnapshot, postLogoutTo)
-      if (url) {
-        window.location.assign(url)
-        return true
+      // Probe BEFORE the navigation commits — same defensive pattern as
+      // login. If KC is down, navigating to end_session_endpoint dead-
+      // ends on the browser's "refused to connect" page with no path
+      // back. Local logout is already done (clearAuth above); KC's
+      // session cookie stays alive until KC is reachable again, which
+      // is a degraded state we surface explicitly on /login.
+      const reachable = await isSsoReachable()
+      if (reachable) {
+        const postLogoutTo = window.location.origin + '/login'
+        const url = keycloakLogoutUrl(idTokenSnapshot, postLogoutTo)
+        if (url) {
+          window.location.assign(url)
+          return true
+        }
+      } else {
+        lastLogoutLocalOnly = true
       }
     }
     return false
@@ -130,6 +158,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     refresh,
     logout,
+    wasLastLogoutLocalOnly,
     fetchUserInfo
   }
 })

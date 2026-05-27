@@ -129,6 +129,10 @@ export default {
       retry: 'Retry SSO',
       retrying: 'Checking...'
     },
+    localLogoutOnly: {
+      title: 'Logged out locally',
+      body: 'Your local session was cleared, but Keycloak was unreachable so the IdP-side session could not be ended. If you suspect compromise, clear your browser cookies manually.'
+    },
     passwordBreakGlass: 'Password login mode (break-glass)',
     backToSso: 'Back to SSO',
     passwordModeHotzone: 'Click 5 times within 2 seconds to unlock password login',
