@@ -104,9 +104,9 @@ SystemKeycloakAdminSeeder → mirrors the user into Keycloak's system realm (mod
 V26                       → seeds PLATFORM_ADMIN role + platform:* permission
 ```
 
-Sign in as `ops` / `ops` at the platform login URL. (Platform UI is a
-follow-up PR — currently there's no `/platform/...` route, so the
-`system` user has a valid SSO session but no place to use it yet.)
+Sign in as `ops` / `ops` and navigate to `/platform/tenants` — the
+tenant management console (see "Managing business tenants" below) lets
+you create / soft-delete business tenants from there.
 
 ## Production setup
 

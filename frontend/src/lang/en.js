@@ -140,6 +140,65 @@ export default {
     }
   },
 
+  platform: {
+    tenant: {
+      column: {
+        tenantCode: 'Tenant code',
+        displayName: 'Display name',
+        contactEmail: 'Contact email',
+        status: 'Status',
+        createTime: 'Created',
+        actions: 'Actions'
+      },
+      status: { active: 'Active', suspended: 'Suspended' },
+      search: { placeholder: 'Search by code or name' },
+      softDeleteHint: {
+        title: 'Soft delete only:',
+        body: 'Deleting a tenant disables its Keycloak realm (users can no longer sign in) but preserves the business data. Hard delete is a separate ops procedure.'
+      },
+      tooltip: {
+        softDelete: 'Soft-delete tenant',
+        builtInLocked: 'Built-in tenants (system / demo) cannot be deleted'
+      },
+      confirm: {
+        deleteTitle: 'Delete tenant',
+        deleteMessage: 'Soft-delete "{displayName}" ({tenantCode})?\n\n• The Keycloak realm will be disabled — users cannot sign in\n• Business data is preserved\n• Re-enabling requires manual intervention in the KC admin console',
+        deleteConfirm: 'Soft delete'
+      },
+      button: { new: 'New tenant' },
+      message: {
+        loadFailed: 'Failed to load tenants',
+        createSuccess: 'Tenant created',
+        createFailed: 'Tenant creation failed',
+        deleteSuccess: 'Tenant soft-deleted',
+        deleteFailed: 'Tenant deletion failed'
+      },
+      edit: {
+        titleCreate: 'New tenant',
+        intro: 'Creates the Keycloak realm + central registry row in one action. The tenant code cannot be changed after creation.',
+        label: {
+          tenantCode: 'Tenant code',
+          displayName: 'Display name',
+          contactEmail: 'Contact email'
+        },
+        placeholder: {
+          tenantCode: 'acme',
+          displayName: 'Acme Corp.',
+          contactEmail: 'admin@acme.example'
+        },
+        hint: {
+          tenantCode: 'Lowercase RFC1035 label (a-z, 0-9, hyphen). Used as the Keycloak realm name and the subdomain.',
+          contactEmail: 'Optional — used to invite the first admin'
+        },
+        error: {
+          invalidCode: 'Tenant code must be a lowercase RFC1035 label (a-z, 0-9, hyphen)',
+          missingDisplayName: 'Display name is required'
+        },
+        saving: 'Saving...'
+      }
+    }
+  },
+
   signOut: {
     title: 'Signing out...',
     body: 'Clearing your local session and notifying the identity provider (Keycloak).',

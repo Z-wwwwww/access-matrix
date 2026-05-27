@@ -147,6 +147,70 @@ export default {
     }
   },
 
+  platform: {
+    tenant: {
+      column: {
+        tenantCode: 'テナントコード',
+        displayName: '表示名',
+        contactEmail: '連絡先メール',
+        status: '状態',
+        createTime: '作成日時',
+        actions: '操作'
+      },
+      status: {
+        active: '稼働中',
+        suspended: '停止'
+      },
+      search: { placeholder: 'コードまたは名前で検索' },
+      softDeleteHint: {
+        title: 'ソフト削除のみ：',
+        body: 'テナントを削除すると Keycloak realm が無効化され、利用者はサインインできなくなりますが、ビジネスデータは保持されます。完全削除は別途オペレーション手順で行います。'
+      },
+      tooltip: {
+        softDelete: 'テナントをソフト削除',
+        builtInLocked: '組み込みテナント（system / demo）は削除不可'
+      },
+      confirm: {
+        deleteTitle: 'テナント削除',
+        deleteMessage: '「{displayName}」（{tenantCode}）をソフト削除しますか？\n\n• Keycloak realm が disabled になり、ユーザーはサインインできなくなります\n• 業務データはそのまま残ります\n• 再有効化は KC 管理コンソールから手動で行う必要があります',
+        deleteConfirm: 'ソフト削除を実行'
+      },
+      button: {
+        new: '新規テナント'
+      },
+      message: {
+        loadFailed: 'テナント一覧の取得に失敗',
+        createSuccess: 'テナントを作成しました',
+        createFailed: 'テナント作成に失敗',
+        deleteSuccess: 'テナントをソフト削除しました',
+        deleteFailed: 'テナント削除に失敗'
+      },
+      edit: {
+        titleCreate: '新規テナント',
+        intro: 'Keycloak realm + 中央レジストリ行を 1 操作で作成します。テナントコードは作成後の変更不可です。',
+        label: {
+          tenantCode: 'テナントコード',
+          displayName: '表示名',
+          contactEmail: '連絡先メール'
+        },
+        placeholder: {
+          tenantCode: 'acme',
+          displayName: 'Acme 株式会社',
+          contactEmail: 'admin@acme.example'
+        },
+        hint: {
+          tenantCode: '小文字英数字・ハイフン（RFC1035 ラベル）。Keycloak realm 名・サブドメインに使われます。',
+          contactEmail: '最初の管理者を招待する宛先（任意）'
+        },
+        error: {
+          invalidCode: 'テナントコードは小文字英数字・ハイフン（RFC1035 ラベル）で入力してください',
+          missingDisplayName: '表示名を入力してください'
+        },
+        saving: '送信中...'
+      }
+    }
+  },
+
   signOut: {
     title: 'サインアウト中...',
     body: 'セッションをクリアし、ID プロバイダー（Keycloak）に通知しています。',

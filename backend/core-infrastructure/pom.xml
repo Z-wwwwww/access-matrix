@@ -166,4 +166,24 @@
             <scope>provided</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <!-- Copy infra/keycloak/realms/demo-realm.json into the main
+             classpath under keycloak/ so KeycloakRealmService can load it
+             as a template when creating new business realms via the
+             platform admin UI. Read-only — edits go through
+             infra/keycloak/realms/demo-realm.json. -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/../../infra/keycloak/realms</directory>
+                <includes>
+                    <include>demo-realm.json</include>
+                </includes>
+                <targetPath>keycloak</targetPath>
+            </resource>
+        </resources>
+    </build>
 </project>

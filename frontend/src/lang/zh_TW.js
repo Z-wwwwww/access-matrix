@@ -140,6 +140,65 @@ export default {
     }
   },
 
+  platform: {
+    tenant: {
+      column: {
+        tenantCode: '租戶代碼',
+        displayName: '顯示名稱',
+        contactEmail: '聯絡信箱',
+        status: '狀態',
+        createTime: '建立時間',
+        actions: '操作'
+      },
+      status: { active: '運作中', suspended: '已停用' },
+      search: { placeholder: '依代碼或名稱搜尋' },
+      softDeleteHint: {
+        title: '僅軟刪除：',
+        body: '刪除租戶會停用其 Keycloak realm（使用者無法登入），但保留業務資料。完全刪除需透過獨立的維運流程執行。'
+      },
+      tooltip: {
+        softDelete: '軟刪除租戶',
+        builtInLocked: '內建租戶（system / demo）不可刪除'
+      },
+      confirm: {
+        deleteTitle: '刪除租戶',
+        deleteMessage: '確認軟刪除「{displayName}」（{tenantCode}）？\n\n• Keycloak realm 將被停用，使用者無法登入\n• 業務資料將保留\n• 重新啟用需在 KC 管理控制台手動操作',
+        deleteConfirm: '執行軟刪除'
+      },
+      button: { new: '新增租戶' },
+      message: {
+        loadFailed: '載入租戶清單失敗',
+        createSuccess: '租戶已建立',
+        createFailed: '租戶建立失敗',
+        deleteSuccess: '租戶已軟刪除',
+        deleteFailed: '刪除租戶失敗'
+      },
+      edit: {
+        titleCreate: '新增租戶',
+        intro: '一次操作建立 Keycloak realm + 中央註冊表條目。租戶代碼建立後不可修改。',
+        label: {
+          tenantCode: '租戶代碼',
+          displayName: '顯示名稱',
+          contactEmail: '聯絡信箱'
+        },
+        placeholder: {
+          tenantCode: 'acme',
+          displayName: 'Acme 公司',
+          contactEmail: 'admin@acme.example'
+        },
+        hint: {
+          tenantCode: '小寫字母、數字、連字號（RFC1035 標籤）。將用作 Keycloak realm 名稱和子網域。',
+          contactEmail: '選填 — 用於邀請第一位管理員'
+        },
+        error: {
+          invalidCode: '租戶代碼必須是小寫 RFC1035 標籤（小寫字母、數字、連字號）',
+          missingDisplayName: '請輸入顯示名稱'
+        },
+        saving: '儲存中...'
+      }
+    }
+  },
+
   signOut: {
     title: '正在登出...',
     body: '正在清除本機作業階段並通知身分提供方（Keycloak）。',
