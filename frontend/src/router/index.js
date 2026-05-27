@@ -49,6 +49,15 @@ const routes = [
     meta: { title: 'Signing in…' }
   },
   {
+    // Sign-out transition page. AppHeader routes here instead of doing
+    // the logout call inline so the user sees visible progress during
+    // the KC probe + redirect, and so unexpected failures have somewhere
+    // to render.
+    path: '/signout',
+    component: () => import('@/views/login/SignOut.vue'),
+    meta: { title: 'Signing out…' }
+  },
+  {
     // Invite-acceptance landing page — the email link lands here with a
     // single-use token in the path. No session required.
     path: '/invite/:token',

@@ -151,6 +151,15 @@ export default {
     }
   },
 
+  signOut: {
+    title: 'サインアウト中...',
+    body: 'セッションをクリアし、ID プロバイダー（Keycloak）に通知しています。',
+    failed: {
+      title: 'サインアウトに失敗しました',
+      goLogin: 'ログイン画面へ'
+    }
+  },
+
   invite: {
     title: 'アカウントの設定',
     tenantPrefix: 'テナント:',
