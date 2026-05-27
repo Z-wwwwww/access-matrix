@@ -59,6 +59,14 @@ public final class SystemPermissions {
     public static final String AUTH_UNLOCK         = "auth:unlock";
     public static final String AUTH_RESET_PASSWORD = "auth:reset-password";
 
+    // ---- platform (system-tenant only — held by PLATFORM_ADMIN role) ----
+    // These are deliberately NOT covered by the business-tenant '*:*'
+    // wildcard. A SUPER_ADMIN of 'acme' cannot reach platform:tenant:read;
+    // a PLATFORM_ADMIN can. The two scopes don't shadow each other.
+    public static final String PLATFORM_TENANT_READ   = "platform:tenant:read";
+    public static final String PLATFORM_TENANT_CREATE = "platform:tenant:create";
+    public static final String PLATFORM_TENANT_DELETE = "platform:tenant:delete";
+
     static {
         PermissionCode.registerAll(SystemPermissions.class, "system");
     }
