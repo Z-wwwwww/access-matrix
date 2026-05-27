@@ -162,6 +162,30 @@ export default {
     }
   },
 
+  passwordReset: {
+    title: 'パスワード再設定',
+    tenantPrefix: 'テナント:',
+    intro: 'SSO から従来のパスワードログインへ移行します。以下に新しいパスワードを設定してください。',
+    passwordLabel: '新しいパスワード',
+    passwordPlaceholder: '8 文字以上',
+    passwordConfirmLabel: 'パスワード（確認）',
+    passwordConfirmPlaceholder: 'もう一度入力してください',
+    button: {
+      submit: 'パスワードを設定',
+      submitting: '送信中...',
+      goLogin: 'ログイン画面へ'
+    },
+    message: {
+      checking: 'リンクを確認しています...',
+      invalidLink: 'リンクが不正です',
+      notValid: 'このリンクは無効、期限切れ、または既に使用済みです',
+      passwordTooShort: 'パスワードは 8 文字以上にしてください',
+      passwordMismatch: '2 回入力したパスワードが一致しません',
+      acceptFailed: 'パスワード設定に失敗しました',
+      done: 'パスワードを設定しました。ログインしてください。'
+    }
+  },
+
   forget: {
     title: 'パスワード再設定',
     mobileLabel: '携帯番号',

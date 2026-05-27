@@ -38,7 +38,7 @@ Nothing else needs to be re-entered. The user keeps their:
 | Piece | Role |
 |---|---|
 | `core_auth_user.keycloak_id` column (V21) | nullable FK to KC user UUID, partial-unique on `(tenant_id, keycloak_id)` |
-| `OidcJitUserService` "bind path" | on first SSO login, finds the legacy row by `(tenant, username)` and writes its `keycloak_id` |
+| `OidcJitUserService` "bind path" | on first SSO login, finds the legacy row by `(tenant, username)`, writes its `keycloak_id`, AND clears `password_hash` (non-super-admin) so the row ends up in the same shape as a JIT-provisioned user |
 | `KeycloakUserService.createUser` + `executeActionsEmail` | mirror DB user into KC realm and trigger the reset-password email |
 | `PasswordToSsoMigrationService` | batches the above over every legacy row, idempotent, multi-tenant aware |
 | `PasswordToSsoMigrationRunner` | `ApplicationRunner` triggered by `app.migration.run-on-startup=password-to-sso` |
@@ -165,7 +165,17 @@ app:
 
 Restart. Normal startup resumes.
 
-### Step 6 — Watch the bind path land
+### Step 6 — Watch the bind path land (and clean state along the way)
+
+The bind path in `OidcJitUserService` does more than just write
+`keycloak_id`. On each user's first SSO login it ALSO clears their
+`password_hash` (unless they hold `SUPER_ADMIN`, in which case the hash
+is preserved so they can still break-glass when KC is unreachable).
+This means migrated users end up byte-identical to a fresh JIT user —
+the "as if always OIDC" final state is reached automatically as people
+log in, without a separate cleanup step.
+
+
 
 As users complete the reset-password flow and log in via SSO,
 `OidcJitUserService.bind path` writes `keycloak_id` back to their row.
@@ -185,11 +195,12 @@ WHERE mark = 1
 Run daily during the cutover window. When `not_yet_bound` reaches an
 acceptable residual (people on holiday, etc.), enter cleanup.
 
-### Step 7 — (Optional) Cleanup of dead `password_hash` values
+### Step 7 — (Optional) Cleanup of dead `password_hash` values for non-logged-in users
 
-Once SSO is the only login path you support, the `password_hash` column
-is dead weight for migrated users. You can NULL it out for everyone
-EXCEPT designated break-glass administrators:
+Step 6 covers users who actually log in via SSO. For laggards who have
+been migrated to KC but never logged in (their `password_hash` is still
+the stale bcrypt from the password era, and they haven't completed SSO
+so the bind path hasn't fired yet), you can NULL out their hash explicitly:
 
 ```sql
 -- DRY RUN — count first
@@ -216,9 +227,7 @@ UPDATE core_auth_user
    );
 ```
 
-(Make `password_hash` nullable first via a one-off migration if the
-`NOT NULL` constraint from V2 is still in effect — see the schema-drift
-note below.)
+(V24 already relaxed `password_hash` to NULL — no separate ALTER needed.)
 
 ---
 

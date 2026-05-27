@@ -155,6 +155,30 @@ export default {
     }
   },
 
+  passwordReset: {
+    title: '設定您的密碼',
+    tenantPrefix: '租戶:',
+    intro: '系統正從 SSO 切換為密碼登入，請於下方設定新密碼。',
+    passwordLabel: '新密碼',
+    passwordPlaceholder: '至少 8 個字元',
+    passwordConfirmLabel: '確認密碼',
+    passwordConfirmPlaceholder: '再次輸入密碼',
+    button: {
+      submit: '設定密碼',
+      submitting: '提交中...',
+      goLogin: '前往登入'
+    },
+    message: {
+      checking: '正在驗證連結...',
+      invalidLink: '連結格式錯誤',
+      notValid: '連結已失效、過期或已被使用',
+      passwordTooShort: '密碼至少需要 8 個字元',
+      passwordMismatch: '兩次輸入的密碼不一致',
+      acceptFailed: '設定密碼失敗',
+      done: '密碼已設定，現在可以登入'
+    }
+  },
+
   forget: {
     title: '重設密碼',
     mobileLabel: '手機號碼',

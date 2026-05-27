@@ -155,6 +155,30 @@ export default {
     }
   },
 
+  passwordReset: {
+    title: '设置您的密码',
+    tenantPrefix: '租户:',
+    intro: '系统正从 SSO 切换为密码登录，请在下方设置新密码。',
+    passwordLabel: '新密码',
+    passwordPlaceholder: '至少 8 个字符',
+    passwordConfirmLabel: '确认密码',
+    passwordConfirmPlaceholder: '再次输入密码',
+    button: {
+      submit: '设置密码',
+      submitting: '提交中...',
+      goLogin: '前往登录'
+    },
+    message: {
+      checking: '正在验证链接...',
+      invalidLink: '链接格式错误',
+      notValid: '链接已失效、过期或已被使用',
+      passwordTooShort: '密码至少需要 8 个字符',
+      passwordMismatch: '两次输入的密码不一致',
+      acceptFailed: '设置密码失败',
+      done: '密码已设置，现在可以登录'
+    }
+  },
+
   forget: {
     title: '重置密码',
     mobileLabel: '手机号',

@@ -29,7 +29,7 @@ access-matrix/
 | **数据范围** | 5 种 scope（ALL / DEPT_AND_SUB / DEPT / SELF / CUSTOM），切面强制注入 SQL 条件 |
 | **多租户** | MyBatis-Plus 拦截器自动注入 `tenant_id`；JWT `tid` claim + `X-Tenant-Id` header 双路径 |
 | **用户开通** | 邀请邮件（用户自设密码）/ 直接创建（管理员设临时密码）双模式 |
-| **password→SSO 迁移** | 改一行 yml + 重启 = 老用户全员 mirror 进 Keycloak + 自动群发改密邮件；含**链接过期批量重发**模式；幂等，可回滚，业务 ULID/角色/审计全保留 |
+| **password ↔ SSO 双向迁移** | 改一行 yml + 重启 = 全员自动迁移；**正向**（password→SSO）走 KC 自助改密邮件，**反向**（SSO→password）走自家 reset 落地页；含链接过期重发模式；可选 `auto-on-mode-flip` 只切 mode 自动派发；幂等可回滚；业务 ULID / 角色 / 审计全保留 |
 | **强制下线** | `ForceLogoutService` + Redis 黑名单，权限变更立即生效 |
 | **审计** | `@OpLog` 注解 → `core_oplog` 表异步落库 |
 | **国际化** | 邮件模板 5 语言（ja_JP / en / zh_CN / zh_TW / ko_KR），UI 同步 |
@@ -76,7 +76,8 @@ npm install && npm run dev
 | [Contributing](CONTRIBUTING.md) | 贡献指南、Conventional Commits、PR 规范 |
 | [data-scope demo](docs/data-scope-demo.md) | 5 种数据范围实际效果演示（5 个 demo 用户） |
 | [Keycloak setup](infra/keycloak/README.md) | 本地 Keycloak 启动 + realm 配置 |
-| [**password→SSO 迁移**](docs/migration-password-to-sso.md) | 已上线的 password 项目零数据损失切到 SSO 的完整 runbook，含邮件过期重发、5 大坑、健康检查 SQL、回滚步骤 |
+| [**password → SSO 迁移**](docs/migration-password-to-sso.md) | password 项目零数据损失切到 SSO 的 runbook：自动 mirror + 邮件过期重发 + 5 大坑 + 健康检查 SQL + 回滚步骤 |
+| [**SSO → password 迁移**](docs/migration-sso-to-password.md) | 反向 runbook：自家 reset 落地页 + token 表 + 5 语言邮件；含 `auto-on-mode-flip` 自动派发说明 |
 
 模块级（给开发者看）：
 - [backend/AGENTS.md](backend/AGENTS.md) — 模块边界 / Flyway / 安全 / API 约定
@@ -154,35 +155,54 @@ npm install && npm run dev
 
 ---
 
-## 🔄 已上线项目无缝切到 SSO
+## 🔄 mode 切换零数据损失（双向自动迁移）
 
-如果你的项目已经用 password 模式跑了一段时间，可以零数据损失切到 SSO：
+支持 **password ↔ SSO 任意方向**切换，业务数据 0 损失，每个用户只需要"重新设一次密码"一个动作。
+
+### password → SSO
 
 ```yaml
-# application.yml — 加 2 个开关
 app:
   security:
     mode: oidc
   migration:
-    run-on-startup: password-to-sso   # 首次群发
+    run-on-startup: password-to-sso     # 首次群发
     tenants: default
 ```
 
-重启 → 后端遍历 `core_auth_user` 表，每个用户：
+重启 → 后端为每个 `core_auth_user` 在 Keycloak realm 建一个无密码用户，触发 KC `executeActionsEmail(UPDATE_PASSWORD)`，用户收到"设置密码"链接。点击 → 在 KC 自助页选新密码 → 首次 SSO 登录 → **bind path** 把 `keycloak_id` 写回原行 + 清掉 `password_hash`（super-admin 例外，保留 break-glass）。业务 ULID / 角色 / 部门 / 审计 / 编号全部保留，最终行状态跟"一直 OIDC 模式"完全一致。
 
-1. 在对应 Keycloak realm 建一个**无密码**的 user，绑邮件
-2. 触发 KC `executeActionsEmail(UPDATE_PASSWORD)` → 用户收到"设置密码"链接
-3. 用户点链接、自选密码、首次 SSO 登录后，`OidcJitUserService` **bind path** 把 `keycloak_id` 写回原行 — 业务 ULID / 角色 / 部门 / 审计 / 编号全部保留
+链接过期了？KC 默认 12h 过期 — 改成 `password-to-sso-resend` 重启即可批量补发（仅对未绑用户）。
 
-**链接过期了？** KC 默认重置链接 12h 过期。批量补发也是改一个值的事：
+### SSO → password
+
+```yaml
+app:
+  security:
+    mode: password
+  migration:
+    run-on-startup: sso-to-password     # 反向迁移
+    tenants: default
+```
+
+重启 → 后端为每个 KC 绑定的用户 mint 一个 reset token，MailService 发 5 语言邮件，链接落到自家 `/reset-password/{token}` 页面。点击 → 在我们自己的页面选新密码 → 后端 bcrypt 写 `password_hash` + NULL 掉 `keycloak_id` + `KC.disableUser`。最终行状态跟"一直 password 模式"完全一致。
+
+### 自动派发（可选，opt-in）
+
+如果想极致简化为"只改 mode 一行"：
 
 ```yaml
 app:
   migration:
-    run-on-startup: password-to-sso-resend   # 仅对没绑完的用户补发
+    auto-on-mode-flip: true   # 默认 false；显式打开后只切 mode 自动派发对应迁移
 ```
 
-整个过程幂等（重复跑安全），可回滚（mode 改回 `password` + 重启即可），并生成 `logs/migration-password-to-sso-*.json` 报告供事后审计。完整 runbook、5 大坑、健康检查 SQL 在 [docs/migration-password-to-sso.md](docs/migration-password-to-sso.md)。
+`ModeFlipDetector` 比对 `core_meta` 里的 last-applied 与当前 mode，自动调对应 service。默认 `false` 是因为在 dev 环境无意切 mode 不应该触发千人邮件 — 每个环境显式开启更安全。
+
+整个过程**幂等**（重复跑安全），**可回滚**（mode 改回 + 重启），并生成 `logs/migration-*-*.json` 报告供审计。完整 runbook：
+
+- 正向：[docs/migration-password-to-sso.md](docs/migration-password-to-sso.md)
+- 反向：[docs/migration-sso-to-password.md](docs/migration-sso-to-password.md)
 
 ---
 

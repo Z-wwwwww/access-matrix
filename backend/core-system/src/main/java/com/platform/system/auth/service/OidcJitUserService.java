@@ -1,9 +1,12 @@
 package com.platform.system.auth.service;
 
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.platform.core.common.id.IdGenerator;
+import com.platform.core.common.security.BuiltInRoles;
 import com.platform.core.infrastructure.security.OidcUserResolver;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
+import com.platform.system.rbac.mapper.RoleMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,6 +46,7 @@ public class OidcJitUserService implements OidcUserResolver {
     private static final Logger log = LoggerFactory.getLogger(OidcJitUserService.class);
 
     private final UserMapper userMapper;
+    private final RoleMapper roleMapper;
 
     /**
      * Defaults match {@link com.platform.core.infrastructure.config.properties.AppSecurityProperties.Jwt}
@@ -77,8 +81,9 @@ public class OidcJitUserService implements OidcUserResolver {
     @Value("${app.security.oidc.issuer-base-uri:}")
     private String expectedIssuerBase;
 
-    public OidcJitUserService(UserMapper userMapper) {
+    public OidcJitUserService(UserMapper userMapper, RoleMapper roleMapper) {
         this.userMapper = userMapper;
+        this.roleMapper = roleMapper;
     }
 
     @Override
@@ -120,20 +125,48 @@ public class OidcJitUserService implements OidcUserResolver {
         if (bound != null) return bound.getId();
 
         // 2. Legacy user with same username — bind.
+        //
+        // Reaching this branch means the user successfully completed SSO
+        // login (KC verified credentials, signed an RS256 token, we got it
+        // here). That's our trigger to clean up the legacy password_hash
+        // for non-super-admin users — at this point keeping the stale
+        // bcrypt around would be the source of all the divergence headaches
+        // we documented in docs/migration-password-to-sso.md. After this
+        // UPDATE the row looks byte-identical to a fresh OIDC JIT user
+        // (`password_hash=NULL`, `keycloak_id=<kcId>`), achieving the
+        // "as if always OIDC" final state the migration runbook promises.
+        //
+        // Super-admin exemption: any user that holds the SUPER_ADMIN role
+        // keeps their password_hash so they can still break-glass when KC
+        // is unreachable. The exemption is exactly the same one the
+        // post-migration cleanup SQL in the runbook uses, just applied
+        // continuously rather than as a one-shot.
         String username = jwt.getClaimAsString(usernameClaim);
         if (username != null && !username.isBlank()) {
             UserEntity legacy = userMapper.findByIdentifier(tid, username);
             if (legacy != null) {
-                // mark is @TableLogic so we cannot setMark + updateById here;
-                // we're not changing mark, just keycloak_id + update_user, so
-                // updateById is safe. The link is exclusive (unique index on
-                // (tenant_id, keycloak_id) WHERE mark=1) — duplicate-on-update
-                // would mean some other row in this tenant already grabbed
-                // this kcId, which shouldn't be possible given Step 1 missed.
-                legacy.setKeycloakId(kcId);
-                userMapper.updateById(legacy);
-                log.info("OIDC JIT: bound existing legacy user {} (tenant {}) to keycloak id {}",
-                        legacy.getId(), tid, kcId);
+                // mark is @TableLogic — UpdateWrapper is the safe shape
+                // for SET clauses where some columns are nullable (the
+                // entity setter + updateById path would also work for
+                // keycloak_id alone, but for nullable password_hash MP's
+                // NOT_NULL field strategy would strip the SET column).
+                boolean isSuperAdmin = isSuperAdmin(legacy.getId(), tid);
+                UpdateWrapper<UserEntity> upd = new UpdateWrapper<UserEntity>()
+                        .eq("id", legacy.getId())
+                        .eq("tenant_id", tid)
+                        .set("keycloak_id", kcId)
+                        .set("update_user", "oidc-jit-bind");
+                if (!isSuperAdmin) {
+                    upd.set("password_hash", null);
+                }
+                userMapper.update(null, upd);
+                if (isSuperAdmin) {
+                    log.info("OIDC JIT: bound super-admin {} (tenant {}) to keycloak id {} — password_hash preserved for break-glass",
+                            legacy.getId(), tid, kcId);
+                } else {
+                    log.info("OIDC JIT: bound legacy user {} (tenant {}) to keycloak id {} — password_hash cleared",
+                            legacy.getId(), tid, kcId);
+                }
                 return legacy.getId();
             }
         }
@@ -169,6 +202,26 @@ public class OidcJitUserService implements OidcUserResolver {
 
     private static String stripTrailingSlash(String s) {
         return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
+    }
+
+    /**
+     * Does this user hold the {@link BuiltInRoles#SUPER_ADMIN_ID} role
+     * in the given tenant? Single role-id lookup; the role-bindings table
+     * is small per user so the query is cheap.
+     */
+    private boolean isSuperAdmin(String userId, String tenantId) {
+        try {
+            return roleMapper.findRoleIdsByUserId(userId, tenantId)
+                    .contains(BuiltInRoles.SUPER_ADMIN_ID);
+        } catch (Exception e) {
+            // If the role lookup itself fails, err on the side of caution
+            // and treat the user as super-admin — keeping their break-glass
+            // hash is much less damaging than accidentally clearing the
+            // hash of an actual admin during a transient DB hiccup.
+            log.warn("OIDC JIT: super-admin check failed for {} in {} ({}), preserving password_hash defensively",
+                    userId, tenantId, e.toString());
+            return true;
+        }
     }
 
 }
