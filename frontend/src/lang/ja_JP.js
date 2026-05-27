@@ -312,6 +312,7 @@ export default {
     },
     tooltip: {
       editDisabled: '内蔵ユーザーは編集不可',
+      editAdminContactOnly: '内蔵 admin：連絡先情報（メール・表示名）のみ編集可能',
       edit: '編集',
       resetPassword: 'パスワードリセット',
       resetPasswordDisabledSso: 'SSO モードでは無効：ユーザーは Keycloak アカウントコンソールで自分のパスワードを変更します',
@@ -333,7 +334,7 @@ export default {
     edit: {
       titleEdit: 'ユーザー編集',
       titleCreate: 'ユーザー新規',
-      lockedHint: '内蔵 admin ユーザーは読み取り専用です。パスワードの変更のみ可能（『パスワードリセット』API 経由）。',
+      lockedHint: '内蔵 admin ユーザーは「連絡先のみ編集可能」です。メールアドレスと表示名は変更できます（ブレークグラス通知のため）。部署・状態・ロールは変更できません。',
       label: {
         username: 'ログインID',
         password: 'パスワード',

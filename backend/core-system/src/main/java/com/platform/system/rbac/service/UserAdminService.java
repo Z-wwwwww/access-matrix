@@ -227,12 +227,33 @@ public class UserAdminService {
     @Transactional
     public void update(String id, UserDto.UpdateRequest req) {
         UserEntity u = require(id);
-        assertNotBuiltInAdmin(u, "update");
+        // Built-in admin is partially editable: contact fields (email,
+        // displayName) are allowed because break-glass alerts need a
+        // reachable inbox and a recognisable sender name. Structural
+        // fields (deptId, status) stay locked — changing them would
+        // break invariants the rest of the codebase depends on (e.g.
+        // disabling the only super-admin would lock everyone out).
+        // The other mutating paths (delete / changeStatus / assignRoles
+        // / changeDept) still call assertNotBuiltInAdmin themselves and
+        // remain fully blocked.
+        boolean isBuiltIn = BUILTIN_ADMIN_USERNAME.equalsIgnoreCase(u.getUsername());
+        if (isBuiltIn) {
+            if (req.deptId() != null && !java.util.Objects.equals(req.deptId(), u.getDeptId())) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                        "Built-in admin user cannot change department");
+            }
+            if (req.status() != null && !java.util.Objects.equals(req.status(), u.getStatus())) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                        "Built-in admin user cannot change status");
+            }
+        }
         if (req.email() != null) u.setEmail(req.email());
         // userNo は採番（read-only）。クライアントから来ても無視（DTO にも無い）。
         if (req.displayName() != null) u.setDisplayName(req.displayName());
-        if (req.deptId() != null) u.setDeptId(req.deptId());
-        if (req.status() != null) u.setStatus(req.status());
+        if (!isBuiltIn) {
+            if (req.deptId() != null) u.setDeptId(req.deptId());
+            if (req.status() != null) u.setStatus(req.status());
+        }
         userMapper.updateById(u);
         cacheService.evictUser(id);
     }

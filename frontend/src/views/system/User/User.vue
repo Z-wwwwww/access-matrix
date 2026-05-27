@@ -213,9 +213,8 @@ onMounted(() => {
         <template #cell-actions="{ row }">
           <div class="inline-flex items-center gap-1">
             <button v-permission="'user:update'"
-                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                    :disabled="row.username === 'admin'"
-                    :title="row.username === 'admin' ? t('user.tooltip.editDisabled') : t('user.tooltip.edit')"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
+                    :title="row.username === 'admin' ? t('user.tooltip.editAdminContactOnly') : t('user.tooltip.edit')"
                     @click="openEdit(row)">
               <Pencil class="size-3.5" />
             </button>
