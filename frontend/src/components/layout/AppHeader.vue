@@ -115,9 +115,15 @@ async function handleLogout() {
   // OIDC mode: logout() navigates to Keycloak's end_session_endpoint and
   // returns true — we MUST NOT router.push afterwards, the page is
   // already on its way out. Password mode: returns false, we handle the
-  // /login navigation here.
+  // /login navigation here. OIDC mode but KC unreachable: returns false
+  // AND wasLastLogoutLocalOnly()=true, so we attach a query hint that
+  // /login uses to surface a "logged out locally; KC was unreachable"
+  // notice rather than silently looking like a normal logout.
   const navigatedAway = await authStore.logout()
-  if (!navigatedAway) router.push('/login')
+  if (!navigatedAway) {
+    const localOnly = authStore.wasLastLogoutLocalOnly()
+    router.push(localOnly ? '/login?logout=local-only' : '/login')
+  }
 }
 
 onBeforeUnmount(() => {
