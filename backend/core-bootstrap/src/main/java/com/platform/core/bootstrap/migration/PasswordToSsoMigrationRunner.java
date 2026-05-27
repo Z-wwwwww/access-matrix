@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Auto-runs {@link PasswordToSsoMigrationService} once on backend startup
@@ -25,23 +26,40 @@ import java.util.List;
  * <pre>
  * app:
  *   security:
- *     mode: oidc                           # required — migration only makes sense in oidc mode
+ *     mode: oidc                                # required — migration only makes sense in oidc mode
  *   migration:
- *     run-on-startup: password-to-sso      # explicit opt-in (default off)
- *     tenants: default,acme,beta           # one realm/tenant id per item
+ *     run-on-startup: password-to-sso           # | password-to-sso-resend
+ *     tenants: default,acme,beta                # one realm/tenant id per item
  * </pre>
  *
- * Runs ONCE per backend start. After the migration completes:
+ * <h3>Two modes</h3>
+ * <ul>
+ *   <li><b>password-to-sso</b> — first-time mirror. Reads
+ *       {@code core_auth_user} rows with {@code keycloak_id IS NULL},
+ *       creates a matching Keycloak user (without credentials), and
+ *       triggers the {@code UPDATE_PASSWORD} reset-email so the user
+ *       finishes enrollment. Idempotent — users already in KC are
+ *       <em>skipped</em>, not re-emailed.</li>
+ *   <li><b>password-to-sso-resend</b> — companion entry point for the
+ *       case where users let Keycloak's reset link expire (the default
+ *       window is 12 h). Walks the same {@code keycloak_id IS NULL}
+ *       set, finds the existing KC user, and fires a fresh
+ *       {@code executeActionsEmail}. Does NOT create new KC users
+ *       (use {@code password-to-sso} for that) and does NOT touch
+ *       users who have already completed SSO (the bind path writes
+ *       {@code keycloak_id} so they fall out of the candidate query).</li>
+ * </ul>
+ *
+ * <p>Runs ONCE per backend start. After completion:
  * <ul>
  *   <li>Summary line lands in the app log at INFO level.</li>
  *   <li>Full per-user breakdown lands at
  *       {@code logs/migration-password-to-sso-yyyyMMdd-HHmmss.json}
- *       (next to the app's other rotated logs).</li>
- *   <li>If everything succeeds, the operator should remove the
- *       {@code app.migration.run-on-startup} property — leaving it on
- *       doesn't cause harm (the service is idempotent — re-runs skip
- *       already-migrated users), but it does add a few seconds of admin
- *       API roundtrip to every restart.</li>
+ *       (for {@code resend}: {@code logs/migration-password-to-sso-resend-...}).</li>
+ *   <li>Once green, remove the {@code app.migration.run-on-startup}
+ *       property so subsequent restarts skip the migration overhead.
+ *       Leaving it on doesn't cause harm (both modes are idempotent)
+ *       but does add an admin-API roundtrip per user on every start.</li>
  * </ul>
  *
  * <h3>Why a startup runner and not an HTTP endpoint?</h3>
@@ -53,7 +71,13 @@ import java.util.List;
  * a one-shot.
  */
 @Component
-@ConditionalOnProperty(name = "app.migration.run-on-startup", havingValue = "password-to-sso")
+// Match either of the two recognised modes. We deliberately do NOT use
+// `havingValue` (which is single-valued) — a SpEL expression keeps the
+// recognised set in one place and lets startup fail loudly on a typo
+// (see run() — unknown values are flagged at runtime).
+@ConditionalOnExpression(
+        "'${app.migration.run-on-startup:}' == 'password-to-sso' "
+        + "or '${app.migration.run-on-startup:}' == 'password-to-sso-resend'")
 public class PasswordToSsoMigrationRunner implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(PasswordToSsoMigrationRunner.class);
@@ -61,6 +85,9 @@ public class PasswordToSsoMigrationRunner implements ApplicationRunner {
 
     private final PasswordToSsoMigrationService service;
     private final JsonMapper json;
+
+    @Value("${app.migration.run-on-startup:}")
+    private String mode;
 
     @Value("${app.migration.tenants:default}")
     private String tenantsCsv;
@@ -80,25 +107,47 @@ public class PasswordToSsoMigrationRunner implements ApplicationRunner {
                 .filter(s -> !s.isEmpty())
                 .toList();
         if (tenants.isEmpty()) {
-            log.warn("[migration] run-on-startup=password-to-sso but app.migration.tenants is empty — nothing to do");
+            log.warn("[migration] run-on-startup={} but app.migration.tenants is empty — nothing to do", mode);
             return;
         }
-        log.info("[migration] starting password-to-sso for tenants={}", tenants);
-        MigrationReport report = service.run(tenants);
-        Path out = writeReport(report);
-        log.info("[migration] complete: created={} skipped={} failed={} report={}",
-                report.totalCreated(), report.totalSkipped(), report.totalFailed(), out);
+
+        // Dispatch by mode. The @ConditionalOnExpression on the class
+        // already restricts to one of these two values, so the default
+        // branch is genuinely unreachable — but we log it loudly anyway
+        // in case someone bypasses the condition (e.g. via profile-import).
+        Function<List<String>, MigrationReport> work;
+        String reportPrefix;
+        switch (mode) {
+            case "password-to-sso" -> {
+                work = service::run;
+                reportPrefix = "migration-password-to-sso";
+            }
+            case "password-to-sso-resend" -> {
+                work = service::resend;
+                reportPrefix = "migration-password-to-sso-resend";
+            }
+            default -> {
+                log.error("[migration] unrecognised mode '{}' — nothing to do", mode);
+                return;
+            }
+        }
+
+        log.info("[migration] starting {} for tenants={}", mode, tenants);
+        MigrationReport report = work.apply(tenants);
+        Path out = writeReport(report, reportPrefix);
+        log.info("[migration] complete mode={} created={} skipped={} failed={} report={}",
+                mode, report.totalCreated(), report.totalSkipped(), report.totalFailed(), out);
         if (report.totalFailed() > 0) {
             // Surface the failure count loudly. We don't fail the boot — the
             // app should still come up so operators can debug + retry — but
             // we want a grep-able marker for monitoring.
-            log.error("[migration] {} user(s) failed to migrate — see {}",
-                    report.totalFailed(), out);
+            log.error("[migration] {} user(s) failed in mode={} — see {}",
+                    report.totalFailed(), mode, out);
         }
     }
 
-    private Path writeReport(MigrationReport report) {
-        String filename = "migration-password-to-sso-" + LocalDateTime.now().format(TS) + ".json";
+    private Path writeReport(MigrationReport report, String prefix) {
+        String filename = prefix + "-" + LocalDateTime.now().format(TS) + ".json";
         Path out = Paths.get(reportDir, filename);
         try {
             Files.createDirectories(out.getParent());

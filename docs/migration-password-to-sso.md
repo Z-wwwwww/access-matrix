@@ -222,6 +222,68 @@ note below.)
 
 ---
 
+## Email expired — bulk resend (mode: `password-to-sso-resend`)
+
+Keycloak's reset-credentials link expires after 12 hours by default
+(controlled by `actionTokenGeneratedByAdminLifespan` on the realm).
+Users who don't click in time can't recover on their own. For one or
+two laggards, ask them to ping you and re-issue from the KC admin
+console one at a time. For a meaningful batch (dozens of users) use
+the dedicated resend mode:
+
+```yaml
+app:
+  security:
+    mode: oidc
+  migration:
+    run-on-startup: password-to-sso-resend   # NOT "password-to-sso"
+    tenants: default
+```
+
+Restart. The runner walks `core_auth_user` rows where `keycloak_id IS NULL`
+(== users who haven't completed SSO yet), looks up the existing KC user
+by username, and fires a fresh `executeActionsEmail` against them. Users
+whose link is still valid get a duplicate email — Keycloak handles that
+gracefully by invalidating the old token in favor of the new.
+
+Report lands at `logs/migration-password-to-sso-resend-<timestamp>.json`
+with the same bucket shape as the initial migration:
+
+| Bucket | Meaning |
+|---|---|
+| `created` | Re-sent successfully (the bucket name is reused — read as "emails issued") |
+| `skipped[reason=no-kc-user-yet-run-migration-first]` | The row was never run through the initial migration. Run `password-to-sso` first. |
+| `skipped[reason=missing-username]` | Data quality — investigate manually. |
+| `failed[stage=send-reset-email]` | SMTP failure on that specific user. |
+| `failed[stage=lookup-kc-user]` | Keycloak unreachable. |
+
+### Safety properties of resend mode
+
+- **Does NOT create KC users** — that's the initial migration's job.
+  Catching the misconfig case ("row exists in DB but never had its KC
+  side mirrored") explicitly lands users in a skipped bucket so the
+  operator notices.
+- **Does NOT touch already-bound users** — the candidate query filters
+  on `keycloak_id IS NULL`, so once a user has completed SSO, they fall
+  out of every subsequent resend run automatically.
+- **Idempotent** — re-running fires the same emails again. Useful for
+  multi-batch communication (e.g. day-7 reminder).
+- **Same trace pattern as initial migration** — synthetic
+  `RequestContext` per tenant, MP tenant interceptor scopes correctly,
+  multi-tenant deployments use the same `app.migration.tenants` list.
+
+### When to use which mode
+
+| Situation | Mode |
+|---|---|
+| First time switching to OIDC | `password-to-sso` |
+| Operator added a new column to `core_auth_user.email`, retry the few `skipped[missing-email]` rows | `password-to-sso` (idempotent — others get skipped as `kc-user-already-exists`) |
+| 12 h passed, ~30% of users haven't clicked their link | `password-to-sso-resend` |
+| SMTP went down during initial run — KC users created but no emails went out | `password-to-sso-resend` (the resend re-fires email against the now-existing KC users) |
+| One specific user lost their email | KC admin console → user → Credentials → Credential Reset → check UPDATE_PASSWORD → Send email (faster than a restart) |
+
+---
+
 ## Rollback
 
 If something goes badly wrong:

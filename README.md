@@ -29,6 +29,7 @@ access-matrix/
 | **数据范围** | 5 种 scope（ALL / DEPT_AND_SUB / DEPT / SELF / CUSTOM），切面强制注入 SQL 条件 |
 | **多租户** | MyBatis-Plus 拦截器自动注入 `tenant_id`；JWT `tid` claim + `X-Tenant-Id` header 双路径 |
 | **用户开通** | 邀请邮件（用户自设密码）/ 直接创建（管理员设临时密码）双模式 |
+| **password→SSO 迁移** | 改一行 yml + 重启 = 老用户全员 mirror 进 Keycloak + 自动群发改密邮件；含**链接过期批量重发**模式；幂等，可回滚，业务 ULID/角色/审计全保留 |
 | **强制下线** | `ForceLogoutService` + Redis 黑名单，权限变更立即生效 |
 | **审计** | `@OpLog` 注解 → `core_oplog` 表异步落库 |
 | **国际化** | 邮件模板 5 语言（ja_JP / en / zh_CN / zh_TW / ko_KR），UI 同步 |
@@ -60,6 +61,7 @@ npm install && npm run dev
 浏览器开 http://localhost:5273/login → `admin` / `admin` → 进入系统。
 
 > 默认走传统 password 登录。要启用 SSO（Keycloak），见 [完整启动指南](docs/getting-started.md#启用-sso-keycloak-模式)。
+> **已有 password 项目要切 SSO**？走自动化迁移：[docs/migration-password-to-sso.md](docs/migration-password-to-sso.md) — 改一行 yml + 重启搞定，业务数据零损失。
 
 ---
 
@@ -74,6 +76,7 @@ npm install && npm run dev
 | [Contributing](CONTRIBUTING.md) | 贡献指南、Conventional Commits、PR 规范 |
 | [data-scope demo](docs/data-scope-demo.md) | 5 种数据范围实际效果演示（5 个 demo 用户） |
 | [Keycloak setup](infra/keycloak/README.md) | 本地 Keycloak 启动 + realm 配置 |
+| [**password→SSO 迁移**](docs/migration-password-to-sso.md) | 已上线的 password 项目零数据损失切到 SSO 的完整 runbook，含邮件过期重发、5 大坑、健康检查 SQL、回滚步骤 |
 
 模块级（给开发者看）：
 - [backend/AGENTS.md](backend/AGENTS.md) — 模块边界 / Flyway / 安全 / API 约定
@@ -148,6 +151,38 @@ npm install && npm run dev
 ```
 
 每个租户 = 一个 Keycloak realm。用户在 Keycloak 登录拿 JWT，业务侧根据 JWT 的 `tid` claim 自动隔离数据。
+
+---
+
+## 🔄 已上线项目无缝切到 SSO
+
+如果你的项目已经用 password 模式跑了一段时间，可以零数据损失切到 SSO：
+
+```yaml
+# application.yml — 加 2 个开关
+app:
+  security:
+    mode: oidc
+  migration:
+    run-on-startup: password-to-sso   # 首次群发
+    tenants: default
+```
+
+重启 → 后端遍历 `core_auth_user` 表，每个用户：
+
+1. 在对应 Keycloak realm 建一个**无密码**的 user，绑邮件
+2. 触发 KC `executeActionsEmail(UPDATE_PASSWORD)` → 用户收到"设置密码"链接
+3. 用户点链接、自选密码、首次 SSO 登录后，`OidcJitUserService` **bind path** 把 `keycloak_id` 写回原行 — 业务 ULID / 角色 / 部门 / 审计 / 编号全部保留
+
+**链接过期了？** KC 默认重置链接 12h 过期。批量补发也是改一个值的事：
+
+```yaml
+app:
+  migration:
+    run-on-startup: password-to-sso-resend   # 仅对没绑完的用户补发
+```
+
+整个过程幂等（重复跑安全），可回滚（mode 改回 `password` + 重启即可），并生成 `logs/migration-password-to-sso-*.json` 报告供事后审计。完整 runbook、5 大坑、健康检查 SQL 在 [docs/migration-password-to-sso.md](docs/migration-password-to-sso.md)。
 
 ---
 

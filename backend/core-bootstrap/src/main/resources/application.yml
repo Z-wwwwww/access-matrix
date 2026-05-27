@@ -200,13 +200,20 @@ app:
   migration:
     # One-shot password→SSO migration. Only honoured when
     #   app.security.mode = oidc
-    # When set to "password-to-sso" on a backend restart, mirrors every
-    # legacy core_auth_user row (where keycloak_id IS NULL) into the matching
-    # Keycloak realm and triggers a UPDATE_PASSWORD reset-email so the user
-    # finishes enrollment unattended. Idempotent — re-runs skip users that
-    # already live in Keycloak. See docs/migration-password-to-sso.md for the
-    # full playbook, gotchas, and rollback procedure.
     #
+    # Two recognised values:
+    #   password-to-sso          Mirror every legacy core_auth_user row
+    #                            (keycloak_id IS NULL) into the matching
+    #                            Keycloak realm and trigger UPDATE_PASSWORD
+    #                            reset-email. Idempotent — users already in
+    #                            KC are skipped, not re-emailed.
+    #   password-to-sso-resend   Companion mode: for users mirrored already
+    #                            but who let Keycloak's reset link expire
+    #                            (default 12h), fire a fresh reset-email
+    #                            against the existing KC user. Does NOT
+    #                            create new KC users.
+    #
+    # See docs/migration-password-to-sso.md for the full playbook + gotchas.
     # Leave UNSET in normal operation. Set, restart, verify report, UNSET, restart.
     run-on-startup: ${CORE_MIGRATION_RUN_ON_STARTUP:}
     # Comma-separated list of tenant ids (== realm names) to migrate. The

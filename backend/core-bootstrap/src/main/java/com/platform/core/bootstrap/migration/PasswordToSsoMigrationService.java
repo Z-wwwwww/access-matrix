@@ -163,6 +163,107 @@ public class PasswordToSsoMigrationService {
                 tenantId, bucket.created.size(), bucket.skipped.size(), bucket.failed.size());
     }
 
+    /**
+     * Re-send the {@code UPDATE_PASSWORD} required-action email to every
+     * user who has been mirrored into Keycloak but hasn't completed
+     * enrollment yet — i.e. {@code core_auth_user.keycloak_id IS NULL}
+     * AND a KC user with the same username already exists in the realm.
+     *
+     * <p>Why this is a separate entry point from {@link #run}:
+     * <ul>
+     *   <li>Keycloak's reset-credentials link expires in 12 h by default
+     *       ({@code actionTokenGeneratedByAdminLifespan} on the realm).
+     *       Users who don't click in time can't recover on their own —
+     *       admin has to re-trigger.</li>
+     *   <li>{@code run} is idempotent by design: it SKIPS users that
+     *       already have KC accounts. That's the right call to avoid
+     *       spamming people on every restart, but it means {@code run}
+     *       alone can't help expired-link victims.</li>
+     *   <li>{@code resend} is the explicit opposite: it ONLY touches
+     *       users with KC accounts that haven't bound yet. Users whose
+     *       link is still valid get a duplicate email — KC handles that
+     *       gracefully by invalidating the old token in favor of the new.</li>
+     * </ul>
+     *
+     * <p>Safety properties (same as {@link #run}):
+     * <ul>
+     *   <li>Idempotent at the bind level: once a user logs in via SSO
+     *       and gets their {@code keycloak_id} written, this method
+     *       skips them forever — the candidate query already filters
+     *       on {@code keycloak_id IS NULL}.</li>
+     *   <li>Does NOT recreate KC users / does NOT touch passwords / does
+     *       NOT alter DB rows. Pure side-effect: one email per candidate.</li>
+     *   <li>If the row has no KC user yet (e.g. it was created
+     *       post-migration via the admin UI in a separate broken flow),
+     *       lands in the {@code skipped} bucket so the operator can
+     *       investigate; we do NOT silently create the missing user
+     *       here — that's the {@link #run} entry point's job.</li>
+     * </ul>
+     */
+    public MigrationReport resend(List<String> tenantIds) {
+        MigrationReport report = new MigrationReport();
+        for (String tid : tenantIds) {
+            if (tid == null || tid.isBlank()) continue;
+            MigrationReport.TenantResult bucket = report.forTenant(tid);
+            String traceId = "resend-" + UUID.randomUUID().toString().replace("-", "");
+            RequestContext.set(tid, "system-migration", "system-migration", Locale.JAPAN, traceId);
+            try {
+                resendTenant(tid, bucket);
+            } finally {
+                RequestContext.clear();
+            }
+        }
+        report.finishedAt = java.time.Instant.now();
+        return report;
+    }
+
+    private void resendTenant(String tenantId, MigrationReport.TenantResult bucket) {
+        List<UserEntity> candidates = userMapper.selectList(
+                new QueryWrapper<UserEntity>()
+                        .eq("mark", 1)
+                        .isNull("keycloak_id")
+                        .orderByAsc("create_time"));
+        log.info("[migration:resend] tenant={} found {} candidates (unbound users)", tenantId, candidates.size());
+
+        for (UserEntity u : candidates) {
+            if (u.getUsername() == null || u.getUsername().isBlank()) {
+                bucket.skipped.add(skipped(u, "missing-username"));
+                continue;
+            }
+            String kcId;
+            try {
+                kcId = keycloak.findUserIdByUsername(tenantId, u.getUsername());
+            } catch (Exception e) {
+                bucket.failed.add(failed(u, "lookup-kc-user", e));
+                continue;
+            }
+            if (kcId == null) {
+                // The DB row has no matching KC user — likely never had
+                // run() applied to it, or someone deleted the KC user.
+                // Don't paper over by silently creating it here; that's
+                // run()'s job. Surface this as a skip so the operator
+                // can decide whether to follow up with run().
+                bucket.skipped.add(skipped(u, "no-kc-user-yet-run-migration-first"));
+                continue;
+            }
+            try {
+                keycloak.executeActionsEmail(tenantId, kcId, List.of("UPDATE_PASSWORD"));
+            } catch (Exception e) {
+                bucket.failed.add(failed(u, "send-reset-email", e));
+                continue;
+            }
+            MigrationReport.Created c = new MigrationReport.Created();
+            c.userId = u.getId();
+            c.username = u.getUsername();
+            c.email = u.getEmail();
+            c.keycloakId = kcId;
+            c.emailSent = true;
+            bucket.created.add(c);  // "created" bucket reused for "email re-issued" tally
+        }
+        log.info("[migration:resend] tenant={} emails-sent={} skipped={} failed={}",
+                tenantId, bucket.created.size(), bucket.skipped.size(), bucket.failed.size());
+    }
+
     private String safeFindKcId(String realm, String username) {
         try {
             return keycloak.findUserIdByUsername(realm, username);
