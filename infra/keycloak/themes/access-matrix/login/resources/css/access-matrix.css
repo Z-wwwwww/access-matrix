@@ -610,6 +610,53 @@ input[type="tel"]:focus,
   height: 100% !important;
   flex: 1 1 auto !important;
 }
+
+/* Hide every browser-native password-field decoration so it doesn't
+   double up with our custom eye toggle inside `.pf-v5-c-input-group`.
+   - `::-ms-reveal` — Edge/IE eye that appears once the field has any
+     value (the actual culprit users hit most often)
+   - `::-ms-clear` — Edge X-to-clear button
+   - `::-webkit-credentials-auto-fill-button` — Chrome's password-manager
+     "use saved credential" icon
+   - `::-webkit-strong-password-auto-fill-button` — Chrome's "use
+     suggested strong password" icon
+   - `::-webkit-textfield-decoration-container` — Chrome's wrapper for
+     all the above, belt-and-suspenders
+   Scoped to `input[type="password"]` to avoid affecting other inputs. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  /* Triple-layer hide. Edge Chromium ignores some of these individually
+     in different builds — combined they're load-bearing across all
+     known versions. `display: none` alone has been observed to leave
+     the icon clickable in dev builds; `position: absolute` + a -9999px
+     offset is the canonical bulletproof exile. */
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+}
+/* Unscoped backup — some Edge builds were observed to not match the
+   `input[type="password"]` prefix on ::-ms-reveal. The pseudo only ever
+   renders on password fields anyway, so an unscoped selector is safe. */
+::-ms-reveal,
+::-ms-clear {
+  display: none !important;
+}
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="password"]::-webkit-strong-password-auto-fill-button,
+input[type="password"]::-webkit-textfield-decoration-container {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  right: 0;
+}
 .pf-c-input-group input:focus,
 .pf-v5-c-input-group input:focus,
 *[class*="input-group"] input:focus {
