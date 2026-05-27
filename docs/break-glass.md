@@ -132,6 +132,50 @@ the SSO path actually checks.
 
 ---
 
+## Self-alert on use
+
+Every successful `/auth/login` in OIDC mode fires a fire-and-forget
+email to the user's own address with:
+
+- timestamp of the login
+- client IP and user agent
+- tenant id
+- a prominent "Sign in via SSO and rotate" button linking to the SPA
+
+The semantics: in OIDC mode, `/auth/login` is the **only** path that
+takes a username + password. A successful one means break-glass was
+used. The alert lets the legitimate owner detect "wait, that wasn't me"
+within minutes:
+
+```
+T0  attacker uses leaked break-glass credential
+T1  AuthService.login succeeds → MailService.sendHtmlAsync dispatched
+T2  owner's inbox dings ~seconds later (provided SMTP is healthy)
+T3  owner sees "From IP 198.51.100.x" — not them — opens SPA, rotates
+```
+
+The alert is **self-only** (sent to the user who authenticated, not all
+super-admins). Two reasons:
+
+1. **Targeting**: a "someone is attacking my account" notification
+   should go where the legitimate owner reads mail, not where the
+   org-wide noise floor swallows it.
+2. **Privacy**: super-admin login events aren't broadcast across the
+   admin pool for free; lateral surveillance is a different feature
+   request with different trust assumptions.
+
+If you want broader broadcasting (e.g. PagerDuty webhook, Slack
+channel, every super-admin), add a downstream consumer of the audit
+log — `LoginAuditService.record(...)` writes every login attempt to
+`core_auth_login_log` with `success` and `failure_reason`. A scheduled
+job that watches for `success=true AND mode=oidc` rows on accounts
+with SUPER_ADMIN role gives you the same signal at any granularity.
+
+Mail dispatch is **best-effort** — if SMTP is down (likely in the same
+incident that drove the operator to break-glass in the first place),
+the login still succeeds. Audit log + console log still capture the
+event regardless of email health.
+
 ## Threat model
 
 | Attack | Mitigation |
