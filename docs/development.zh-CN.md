@@ -255,6 +255,125 @@ CREATE INDEX IF NOT EXISTS idx_core_dict_tenant ON core_dict (tenant_id) WHERE m
 
 ---
 
+## 加一个新业务模块（端到端 checklist）
+
+"加订单模块 / 库存模块 / 计费模块" 的标准配方。完全跟 `TenantSchemaGuard` / `PermissionConsistencyGuard` / `core-system` 里 ArchUnit 测试的约定一致。参考实现：[`backend/business-demo/`](../backend/business-demo/)。
+
+### 1. 选版本号 + 写迁移
+
+业务模块从 **V1000+** 起跳（V1-V999 给框架保留）。在你的模块号段里选下一个空号：
+
+```
+backend/business-<module>/src/main/resources/db/migration/V1000__create_business_xxx.sql
+```
+
+每个 per-tenant 业务表必备字段：
+
+```sql
+CREATE TABLE business_xxx (
+    id            CHAR(26)     NOT NULL PRIMARY KEY,
+    tenant_id     VARCHAR(64)  NOT NULL,                   -- 必给；漏写 TenantSchemaGuard 启动期 fail-fast
+    -- ... 业务字段 ...
+    mark          SMALLINT     NOT NULL DEFAULT 1,
+    create_user   VARCHAR(64),
+    update_user   VARCHAR(64),
+    create_time   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 业务唯一约束必须 tenant_id 打头，让多个租户能各自有同名行：
+CREATE UNIQUE INDEX uk_xxx_code
+    ON business_xxx (tenant_id, code) WHERE mark = 1;
+```
+
+### 2. Entity 继承 BaseEntity
+
+```java
+@TableName("business_xxx")
+@Getter @Setter
+public class XxxEntity extends BaseEntity {
+    // 不要再声明 id / tenantId / mark / create_user / create_time
+    // / update_user / update_time — BaseEntity 已经有了
+    private String code;
+    private String name;
+    // ... 仅业务字段
+}
+```
+
+INSERT 时 `AuditMetaObjectHandler` 自动从 `RequestContext.tenantId()` 填 `tenant_id`。
+
+### 3. Mapper 继承 BaseMapper
+
+```java
+@Mapper
+public interface XxxMapper extends BaseMapper<XxxEntity> { }
+```
+
+自定义 `@Select` 查询**必须显式写** `tenant_id = #{tenantId}` 条件。
+
+### 4. Service + Controller
+
+```java
+@Service
+public class XxxService { /* 业务逻辑 */ }
+
+@RestController
+@RequestMapping("/business-xxx")
+public class XxxController {
+
+    private final XxxService service;
+
+    @GetMapping
+    @RequiresPermission(XxxPermissions.XXX_READ)   // 来自 *Permissions 常量类
+    public JsonResult<PageResult<XxxDto.View>> list(...) { ... }
+}
+```
+
+### 5. 权限常量
+
+```java
+@Component
+public final class XxxPermissions {
+    public static final String XXX_READ   = "xxx:read";
+    public static final String XXX_CREATE = "xxx:create";
+    public static final String XXX_UPDATE = "xxx:update";
+    public static final String XXX_DELETE = "xxx:delete";
+
+    static { PermissionCode.registerAll(XxxPermissions.class, "xxx"); }
+    XxxPermissions() {}
+}
+```
+
+启动期 `PermissionConsistencyGuard` 自动把这些 code 写进 `core_rbac_permission`；如果哪个 `@RequiresPermission("xxx:yyy")` 用了未注册的字符串，fail-fast 拒绝启动。
+
+### 6. 启动 — 后面 guard 接管
+
+```bash
+./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+三层防线兜底：
+
+| 层 | 抓什么 |
+|---|---|
+| 编译 (`./mvnw test`) | ArchUnit：entity 漏继承 BaseEntity、controller 漏 @RequiresPermission、mapper 不在 mapper 包 |
+| 启动 | `TenantSchemaGuard`（漏 tenant_id 列）、`PermissionConsistencyGuard`（字面量/未注册 code）、`FlywayMigration`（SQL 语法错） |
+| 运行时 | `TenantLineInnerInterceptor`（自动注入 `WHERE tenant_id=?`）、`@DataScope` 切面（部门范围过滤） |
+
+三层都绿即说明模块正确接入了多租户 + RBAC 框架。
+
+### 参考实现
+
+抄 `backend/business-demo/task/` 的结构：
+- `entity/TaskEntity.java`
+- `mapper/TaskMapper.java`
+- `service/TaskService.java`
+- `controller/TaskController.java`
+- `security/DemoPermissions.java`
+- `db/migration/V10__demo_task.sql`
+
+---
+
 ## 5. 测试规范
 
 ### 5.1 后端单测（Mockito）

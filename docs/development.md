@@ -255,6 +255,125 @@ Seeing `Successfully applied migration V23` in the startup log means you're good
 
 ---
 
+## Adding a new business module (end-to-end checklist)
+
+The single canonical recipe for "add an orders / inventory / billing module". Follows every convention enforced by `TenantSchemaGuard`, `PermissionConsistencyGuard`, and the ArchUnit tests in `core-system`. Use [`backend/business-demo/`](../backend/business-demo/) as the reference shape.
+
+### 1. Pick a version range and create the migration
+
+Business modules use **V1000+** (V1-V999 reserved for the framework). Pick the next free V number within your module's range:
+
+```
+backend/business-<module>/src/main/resources/db/migration/V1000__create_business_xxx.sql
+```
+
+Mandatory shape for every per-tenant business table:
+
+```sql
+CREATE TABLE business_xxx (
+    id            CHAR(26)     NOT NULL PRIMARY KEY,
+    tenant_id     VARCHAR(64)  NOT NULL,                   -- required; TenantSchemaGuard fail-fasts otherwise
+    -- ... business fields ...
+    mark          SMALLINT     NOT NULL DEFAULT 1,
+    create_user   VARCHAR(64),
+    update_user   VARCHAR(64),
+    create_time   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Unique indexes lead with tenant_id so two tenants can each have a 'foo':
+CREATE UNIQUE INDEX uk_xxx_code
+    ON business_xxx (tenant_id, code) WHERE mark = 1;
+```
+
+### 2. Entity extends BaseEntity
+
+```java
+@TableName("business_xxx")
+@Getter @Setter
+public class XxxEntity extends BaseEntity {
+    // DO NOT redeclare id / tenantId / mark / create_user / create_time
+    // / update_user / update_time — BaseEntity owns those.
+    private String code;
+    private String name;
+    // ... business fields only
+}
+```
+
+`AuditMetaObjectHandler` auto-fills `tenant_id` from `RequestContext.tenantId()` on INSERT.
+
+### 3. Mapper extends BaseMapper
+
+```java
+@Mapper
+public interface XxxMapper extends BaseMapper<XxxEntity> { }
+```
+
+Custom `@Select` queries MUST include `tenant_id = #{tenantId}` predicates explicitly.
+
+### 4. Service + Controller
+
+```java
+@Service
+public class XxxService { /* business logic */ }
+
+@RestController
+@RequestMapping("/business-xxx")
+public class XxxController {
+
+    private final XxxService service;
+
+    @GetMapping
+    @RequiresPermission(XxxPermissions.XXX_READ)   // constant from a *Permissions class
+    public JsonResult<PageResult<XxxDto.View>> list(...) { ... }
+}
+```
+
+### 5. Permission constants
+
+```java
+@Component
+public final class XxxPermissions {
+    public static final String XXX_READ   = "xxx:read";
+    public static final String XXX_CREATE = "xxx:create";
+    public static final String XXX_UPDATE = "xxx:update";
+    public static final String XXX_DELETE = "xxx:delete";
+
+    static { PermissionCode.registerAll(XxxPermissions.class, "xxx"); }
+    XxxPermissions() {}
+}
+```
+
+`PermissionConsistencyGuard` will auto-insert these rows into `core_rbac_permission` at startup and fail-fast if any `@RequiresPermission("xxx:yyy")` references a code that isn't registered.
+
+### 6. Boot — guards do the rest
+
+```bash
+./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+Three layers catch deviations:
+
+| Layer | Catches |
+|---|---|
+| Compile (`./mvnw test`) | ArchUnit: entity without BaseEntity, controller without @RequiresPermission, mapper outside the mapper package |
+| Boot | `TenantSchemaGuard` (missing tenant_id), `PermissionConsistencyGuard` (literal/unregistered codes), `FlywayMigration` (syntax errors) |
+| Runtime | `TenantLineInnerInterceptor` (auto-injects `WHERE tenant_id=?`), `@DataScope` AOP (department scoping) |
+
+If all three are green, the module is correctly wired into the multi-tenant + RBAC framework.
+
+### Reference implementation
+
+Copy the shape of `backend/business-demo/task/`:
+- `entity/TaskEntity.java`
+- `mapper/TaskMapper.java`
+- `service/TaskService.java`
+- `controller/TaskController.java`
+- `security/DemoPermissions.java`
+- `db/migration/V10__demo_task.sql`
+
+---
+
 ## 5. Test conventions
 
 ### 5.1 Backend unit tests (Mockito)

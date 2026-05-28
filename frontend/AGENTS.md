@@ -1,7 +1,5 @@
 # Access Matrix — Frontend AI Development Guide
 
-**English** · [中文](AGENTS.zh-CN.md)
-
 > Companion backend: `../backend/` (Spring Boot 4 + Spring Security 6 + JWT + multi-tenant RBAC), listens on `:9135`. This repo is a monorepo; for the root-level cross-stack conventions see [../AGENTS.md](../AGENTS.md).
 > Vite proxies to the backend via `/proxy_url`; the dev port defaults to `5273`.
 
