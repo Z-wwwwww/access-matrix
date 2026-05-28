@@ -1,5 +1,7 @@
 # Migration: SSO (Keycloak / OIDC) → password
 
+**English** · [中文](migration-sso-to-password.zh-CN.md)
+
 Reverse counterpart of [migration-password-to-sso.md](migration-password-to-sso.md):
 take a deployment that's been running `app.security.mode=oidc` and move it
 back to in-house password auth (`mode=password` or `mode=jwt`) **without

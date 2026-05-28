@@ -1,5 +1,7 @@
 # Migration: password-only → SSO (Keycloak / OIDC)
 
+**English** · [中文](migration-password-to-sso.zh-CN.md)
+
 This runbook walks an operator through switching a running access-matrix
 deployment from `app.security.mode=password` (HS256, `AuthController.login`
 validates against `core_auth_user.password_hash`) to

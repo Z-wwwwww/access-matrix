@@ -1,63 +1,65 @@
-# Access Matrix — 后端 AI 开发规约
+# Access Matrix — Backend AI Development Guide
 
-> 配套前端: `../frontend/`（Vue 3 + Vite + Tailwind v4）。本仓是 monorepo，根级跨栈规约见 [../AGENTS.md](../AGENTS.md)。
-> 后端默认监听 `:9135`，context-path `/api`，dev profile 强制 `Asia/Tokyo` 时区。
+**English** · [中文](AGENTS.zh-CN.md)
+
+> Companion frontend: `../frontend/` (Vue 3 + Vite + Tailwind v4). This repo is a monorepo; for the root-level cross-stack conventions see [../AGENTS.md](../AGENTS.md).
+> Backend listens on `:9135` by default, context-path `/api`, dev profile forces `Asia/Tokyo` timezone.
 
 ## Project Overview
 
-**Access Matrix** 是平台级账号 + 权限 + 多租户基盘。一个 Spring Boot 4 多模块 Maven 项目，按"系统域"/"业务域"严格分模块：
+**Access Matrix** is a platform-level accounts + permissions + multi-tenant foundation. A Spring Boot 4 multi-module Maven project, strictly split between "system domain" and "business domain":
 
-- **system features** —— 账号 / 角色 / 权限 / 菜单 / 部门 / 操作日志 / 审计 / 强制下线 —— 由 `core-system` 模块提供
-- **business features** —— 各业务系统（如 PMS）—— 各自起一个 `business-{module}` 模块，**不允许**侵入 `core-*` 包
-- **基础设施** —— 跨域共用的安全 / 缓存 / 持久化 / Web 切面 —— 在 `core-infrastructure`
-- **可复用类型** —— Result / 错误码 / 注解 / 上下文 —— 在 `core-common`
-- **启动器** —— `main()` + Flyway 迁移 + 全局配置 —— 在 `core-bootstrap`
+- **system features** — accounts / roles / permissions / menus / departments / op log / audit / force-logout — provided by the `core-system` module
+- **business features** — individual business systems (e.g. PMS) — each starts its own `business-{module}` module and is **not allowed** to leak into `core-*` packages
+- **infrastructure** — cross-domain shared security / cache / persistence / web aspects — in `core-infrastructure`
+- **reusable types** — Result / error codes / annotations / context — in `core-common`
+- **bootstrapper** — `main()` + Flyway migrations + global config — in `core-bootstrap`
 
 ## Tech Stack
 
-| 类别 | 选型 |
-|------|------|
+| Category | Choice |
+|----------|--------|
 | Java | **25** |
-| 框架 | Spring Boot 4.0.6 + Spring Security 6 (OAuth2 Resource Server) |
+| Framework | Spring Boot 4.0.6 + Spring Security 6 (OAuth2 Resource Server) |
 | ORM | MyBatis-Plus 3.5.16 |
 | DB | PostgreSQL |
-| 迁移 | Flyway 11（`repair-on-migrate` 通过 `FlywayMigrationStrategy` bean 实现） |
-| 缓存 | Caffeine（L1）；Redis（refresh token / lockout / force-logout 状态） |
-| 鉴权 | JWT（HS256）+ HttpOnly Cookie refresh token |
-| 密码 | BCrypt（cost = 12） |
-| 限流 | bucket4j |
-| ID | ULID Creator（CHAR(26) PK） |
-| 时区 | `Asia/Tokyo` |
+| Migration | Flyway 11 (`repair-on-migrate` via a `FlywayMigrationStrategy` bean) |
+| Cache | Caffeine (L1); Redis (refresh token / lockout / force-logout state) |
+| Auth | JWT (HS256) + HttpOnly Cookie refresh token |
+| Password | BCrypt (cost = 12) |
+| Rate limit | bucket4j |
+| ID | ULID Creator (CHAR(26) PK) |
+| Timezone | `Asia/Tokyo` |
 
-## 模块边界（最重要的规则）
+## Module Boundaries (the most important rule)
 
 ```
-core-bootstrap        ─┐ 启动 + Flyway + 全局配置 (application*.yml)
+core-bootstrap        ─┐ bootstrap + Flyway + global config (application*.yml)
                        │
-core-system          ─┤ 系统域: auth / rbac / menu / dept / oplog (controller/service/mapper/entity/dto)
-business-pms         ─┤ 业务域: PMS (目前为空 package-info.java 占位)
-business-{module}    ─┤ 后续业务: 各自一个 maven 模块
+core-system          ─┤ system domain: auth / rbac / menu / dept / oplog (controller/service/mapper/entity/dto)
+business-pms         ─┤ business domain: PMS (currently an empty package-info.java placeholder)
+business-{module}    ─┤ future businesses: one Maven module each
                        │
-core-infrastructure  ─┤ 横切: security 切面 / 审计 / web filter / 缓存配置 / MybatisPlusConfig
+core-infrastructure  ─┤ cross-cutting: security aspects / audit / web filter / cache config / MybatisPlusConfig
                        │
-core-common         ──┘ 纯类型: BusinessException / ErrorCode / JsonResult / PageResult / @OpLog / @RequiresPermission / @DataScope / PermissionMatcher / IdGenerator / RequestContext
+core-common         ──┘ pure types: BusinessException / ErrorCode / JsonResult / PageResult / @OpLog / @RequiresPermission / @DataScope / PermissionMatcher / IdGenerator / RequestContext
 ```
 
-依赖方向**只能往下**：
+Dependencies **only flow downward**:
 
 ```
 core-bootstrap → core-system & business-* → core-infrastructure → core-common
 ```
 
-绝不允许：
-- `core-common` 反向依赖任何其它模块
-- `core-infrastructure` 依赖 `core-system` 或 `business-*`
-- `core-system` 依赖 `business-*`，或反过来
-- 跨业务模块互引（`business-pms` 不能依赖 `business-crm`，反之亦然）—— 跨业务协作走事件/接口/HTTP
+Never allowed:
+- `core-common` depending on any other module in reverse
+- `core-infrastructure` depending on `core-system` or `business-*`
+- `core-system` depending on `business-*`, or vice versa
+- Cross-business imports (`business-pms` cannot depend on `business-crm`, and vice versa) — cross-business collaboration goes through events / interfaces / HTTP
 
-## 系统文件 vs 业务文件 — 放哪
+## System files vs business files — where do they go
 
-### 系统功能（账号/RBAC/审计） → `core-system`
+### System features (accounts / RBAC / audit) → `core-system`
 
 ```
 core-system/src/main/java/com/platform/system/
@@ -77,11 +79,11 @@ core-system/src/main/java/com/platform/system/
                   PermissionQueryService / PermissionCacheService / DataScopeQueryService / OpLogService
     mapper/       RoleMapper / PermissionMapper / MenuMapper / DeptMapper
                   UserRoleMapper / RolePermissionMapper / RoleMenuMapper / RoleDeptMapper
-    entity/       RoleEntity / PermissionEntity / MenuEntity / DeptEntity / 链接表 entity / OpLogEntity
-    dto/          RoleDto / UserDto / MenuNode / DeptNode / DeptAdminDto / OpLogQuery 等
+    entity/       RoleEntity / PermissionEntity / MenuEntity / DeptEntity / link-table entities / OpLogEntity
+    dto/          RoleDto / UserDto / MenuNode / DeptNode / DeptAdminDto / OpLogQuery, etc.
 ```
 
-### 业务功能（PMS / CRM / 等）→ `business-{module}`
+### Business features (PMS / CRM / etc.) → `business-{module}`
 
 ```
 business-pms/src/main/java/com/platform/business/pms/
@@ -93,17 +95,17 @@ business-pms/src/main/java/com/platform/business/pms/
     dto/
 ```
 
-约定：
-- 业务接口路径：`/{businessModule}/{feature}/...`（**不要**用 `/admin/` 前缀，那是系统域 RBAC 写接口的命名）
-- 业务表名：`{businessModule}_{feature}_{noun}`，例：`pms_reservation`
-- 业务字段要参与数据范围：表带 `dept_id` (部门维度) 和/或 `create_user` (个人维度)，Mapper 方法挂 `@DataScope`，Service 调 `DataScopeHelper.apply`（详见 §"数据范围"）
+Conventions:
+- Business endpoint paths: `/{businessModule}/{feature}/...` (**do not** use the `/admin/` prefix — that naming is reserved for system-domain RBAC write endpoints)
+- Business table names: `{businessModule}_{feature}_{noun}`, e.g. `pms_reservation`
+- Business columns must participate in data scoping: tables carry `dept_id` (department dimension) and/or `create_user` (personal dimension); annotate Mapper methods with `@DataScope`, and have the Service call `DataScopeHelper.apply` (see the "Data scope" section)
 
-### 横切（多业务公用）→ `core-infrastructure`
+### Cross-cutting (shared across businesses) → `core-infrastructure`
 
 ```
 core-infrastructure/src/main/java/com/platform/core/infrastructure/
   security/
-    JwtIssuer / JwtDecoder 配置
+    JwtIssuer / JwtDecoder config
     AccountLockoutService / ForceLogoutService / ForceLogoutFilter
     PasswordPolicyService / RefreshTokenStore / RefreshCookieService
     AuthRateLimitFilter / SecurityConfig
@@ -113,20 +115,20 @@ core-infrastructure/src/main/java/com/platform/core/infrastructure/
   audit/
     OpLogAspect / OpLogRecord / OpLogSink
   web/
-    CoreRequestContextFilter（traceId / tenantId / userId 注入 RequestContext + MDC）
+    CoreRequestContextFilter (injects traceId / tenantId / userId into RequestContext + MDC)
   persistence/
-    BaseEntity / AuditMetaObjectHandler（create_user / update_time 自动填充）
+    BaseEntity / AuditMetaObjectHandler (auto-fills create_user / update_time)
   config/
-    MybatisPlusConfig（TenantLineInnerInterceptor / PaginationInnerInterceptor / OptimisticLockerInnerInterceptor / BlockAttackInnerInterceptor）
+    MybatisPlusConfig (TenantLineInnerInterceptor / PaginationInnerInterceptor / OptimisticLockerInnerInterceptor / BlockAttackInnerInterceptor)
     properties/ AppSecurityProperties / AppMybatisProperties
-  numbering/ NumberingService（编号生成器，跨业务复用）
+  numbering/ NumberingService (number generator, reusable across businesses)
 ```
 
-### 共享 API 类型 → `core-common`
+### Shared API types → `core-common`
 
 ```
 core-common/src/main/java/com/platform/core/common/
-  audit/        @OpLog 注解
+  audit/        @OpLog annotation
   context/      RequestContext (ThreadLocal: tenantId / userId / username / locale / traceId)
   error/        BusinessException / ErrorCode
   id/           IdGenerator (ULID)
@@ -134,157 +136,157 @@ core-common/src/main/java/com/platform/core/common/
   security/     @RequiresPermission / @DataScope / PermissionMatcher
 ```
 
-`core-common` **绝对纯净**：不能依赖任何 Spring 上下文 / DB / Redis / Web。
+`core-common` is **absolutely pure**: must not depend on any Spring context / DB / Redis / Web.
 
-### 启动 + 全局配置 → `core-bootstrap`
+### Bootstrap + global config → `core-bootstrap`
 
 ```
 core-bootstrap/
   src/main/java/com/platform/core/bootstrap/
-    CoreApplication.java       @SpringBootApplication，main()
+    CoreApplication.java       @SpringBootApplication, main()
     startup/
-      AuthSchemaBootstrap      启动期 sanity check
-      LocalAdminSeeder         dev 环境种 demo-admin/demo-admin 用户 (@Profile("local"))
-      FlywayRepairConfig       FlywayMigrationStrategy bean，repair()+migrate()
+      AuthSchemaBootstrap      startup sanity check
+      LocalAdminSeeder         seeds demo-admin/demo-admin user in dev (@Profile("local"))
+      FlywayRepairConfig       FlywayMigrationStrategy bean, repair() + migrate()
   src/main/resources/
-    application.yml            通用配置 (mybatis-plus / management / actuator / springdoc)
-    application-local.yml      本地 (security.mode=permit-all, tenant.enabled=false, log expose-error-details=true)
-    application-dev.yml        测试环境 (security.mode=jwt, tenant.enabled=true)
-    application-prod.yml       生产 (同 dev + Redis SSL)
-    application-test.yml       junit 用
-    db/migration/V*.sql        Flyway 迁移 (规则见 §"Flyway")
-    log4j2-spring.xml          日志配置 (MDC: traceId / tenantId / userId)
+    application.yml            shared config (mybatis-plus / management / actuator / springdoc)
+    application-local.yml      local (security.mode=permit-all, tenant.enabled=false, log expose-error-details=true)
+    application-dev.yml        staging (security.mode=jwt, tenant.enabled=true)
+    application-prod.yml       production (same as dev + Redis SSL)
+    application-test.yml       for junit
+    db/migration/V*.sql        Flyway migrations (rules in the "Flyway" section)
+    log4j2-spring.xml          logging config (MDC: traceId / tenantId / userId)
 ```
 
 ## Hard Rules
 
-1. **NO business code in core-system** —— `core-system` 只放系统域。新业务必开新模块
-2. **NO system code leaks into business modules** —— `business-pms` 不允许定义 user / role / permission 表，使用现有 `core_*` 表
-3. **NO cross-business deps** —— business 模块互相不能 import
-4. **NO raw SQL outside `@Select` / `@Update` / `@Delete` annotations OR `V*__*.sql` migrations** —— 临时调试除外
-5. **NO new tenant-bypassing query without justification** —— 默认所有查询走 MyBatis-Plus 租户拦截器；手写 `@Select` 必须显式带 `tenant_id` 条件（参考 `UserMapper.findByIdentifier`）
-6. **NO `@PreAuthorize`** —— 接口鉴权统一用 `@RequiresPermission`（自定义 AOP，可读、支持通配）
-7. **NO inline permission checks in controllers** —— 鉴权切面 + `RequestContext` 用户身份；controller 里不要 `if (currentUser.isAdmin())`
-8. **NO `BaseMapper.selectList` 不带 `@DataScope`** 跨部门数据查询 —— 任何按用户视角的列表查询都要走 `@DataScope` + `DataScopeHelper.apply`
-9. **NO `confirm()` 风格的命令式审批跳过** —— 风险动作（删除 SUPER_ADMIN / 改租户 / 改密码策略）必须走 `core_oplog` 审计 + 二级确认
-10. **NO unchecked `selectById` after JWT** in 多租户开启路径 —— 注意 refresh token 路径使用 `findByIdAndTenant`，避免 MyBatis-Plus 租户拦截器把 `X-Tenant-Id` header 误用到 token 持有者
-11. **NEVER 改已上线的 `V*__*.sql`** —— 加列/改列必须新建 `V{N+1}__*.sql`。`FlywayRepairConfig` 容忍 checksum 漂移，但 schema 历史可读性仍要靠 append-only 维持
+1. **NO business code in core-system** — `core-system` is system-domain only. New businesses must open a new module.
+2. **NO system code leaks into business modules** — `business-pms` may not define user / role / permission tables; reuse the existing `core_*` tables.
+3. **NO cross-business deps** — business modules may not import one another.
+4. **NO raw SQL outside `@Select` / `@Update` / `@Delete` annotations OR `V*__*.sql` migrations** — temporary debugging aside.
+5. **NO new tenant-bypassing query without justification** — by default all queries go through the MyBatis-Plus tenant interceptor; hand-written `@Select` must explicitly include a `tenant_id` predicate (see `UserMapper.findByIdentifier`).
+6. **NO `@PreAuthorize`** — endpoint authorization uses `@RequiresPermission` uniformly (custom AOP, readable, supports wildcards).
+7. **NO inline permission checks in controllers** — use the permission aspect + `RequestContext` user identity; do not write `if (currentUser.isAdmin())` in controllers.
+8. **NO `BaseMapper.selectList` without `@DataScope`** for cross-department queries — any user-perspective list query must go through `@DataScope` + `DataScopeHelper.apply`.
+9. **NO `confirm()`-style imperative approval skipping** — risky actions (deleting SUPER_ADMIN / changing tenant / changing password policy) must go through `core_oplog` audit + a secondary confirmation.
+10. **NO unchecked `selectById` after JWT** on multi-tenant-enabled paths — note that the refresh token path uses `findByIdAndTenant` to prevent the MyBatis-Plus tenant interceptor from mis-applying the `X-Tenant-Id` header to the token holder.
+11. **NEVER modify an already-shipped `V*__*.sql`** — adding/changing columns means creating `V{N+1}__*.sql`. `FlywayRepairConfig` tolerates checksum drift, but schema-history readability still relies on append-only.
 
-## Flyway 约定
+## Flyway conventions
 
-- 迁移文件命名：`V{N}__{snake_case_description}.sql`，版本号连续
-- 全部脚本必须**幂等**：
-  - 建表：`CREATE TABLE IF NOT EXISTS`
-  - 索引：`CREATE [UNIQUE] INDEX IF NOT EXISTS`
-  - 约束：包在 `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '...') THEN ALTER TABLE ... ADD CONSTRAINT ... END IF; END $$;`
-  - 种子：`INSERT ... ON CONFLICT DO NOTHING`
-- 软删除：所有业务表带 `mark SMALLINT NOT NULL DEFAULT 1`（1=有效，0=删除）；唯一索引带 `WHERE mark = 1`
-- 多租户：所有租户级表带 `tenant_id VARCHAR(64) NOT NULL DEFAULT 'default'`，唯一索引前置 `tenant_id`；非租户表（如 `core_numbering_*`）要加入 `MybatisPlusConfig.TENANT_EXCLUDED_TABLES`
-- 审计列：业务表带 `create_user / update_user / create_time / update_time`，由 `AuditMetaObjectHandler` 自动填充
-- 链接表（user_role / role_permission 等）FK 用 `ON DELETE RESTRICT`（参考 `V9__core_rbac_fk.sql`）
-- 启动期 `FlywayRepairConfig` 会先 `repair()` 再 `migrate()`，吸收开发期 checksum 漂移；**但仍不允许故意修改老 V 文件**
+- Migration file naming: `V{N}__{snake_case_description}.sql`, version numbers sequential
+- All scripts must be **idempotent**:
+  - Tables: `CREATE TABLE IF NOT EXISTS`
+  - Indexes: `CREATE [UNIQUE] INDEX IF NOT EXISTS`
+  - Constraints: wrap in `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '...') THEN ALTER TABLE ... ADD CONSTRAINT ... END IF; END $$;`
+  - Seeds: `INSERT ... ON CONFLICT DO NOTHING`
+- Soft delete: all business tables carry `mark SMALLINT NOT NULL DEFAULT 1` (1 = active, 0 = deleted); unique indexes use `WHERE mark = 1`
+- Multi-tenant: all tenant-scoped tables carry `tenant_id VARCHAR(64) NOT NULL DEFAULT 'default'`, with `tenant_id` first in unique indexes; non-tenant tables (e.g. `core_numbering_*`) must be added to `MybatisPlusConfig.TENANT_EXCLUDED_TABLES`
+- Audit columns: business tables carry `create_user / update_user / create_time / update_time`, auto-filled by `AuditMetaObjectHandler`
+- Link tables (user_role / role_permission, etc.) use `ON DELETE RESTRICT` on FKs (see `V9__core_rbac_fk.sql`)
+- At startup `FlywayRepairConfig` runs `repair()` then `migrate()` to absorb dev-time checksum drift; **even so, intentionally modifying old V files is not allowed**
 
-## 安全 & 认证
+## Security & authentication
 
-| 主题 | 实现 | 文件 |
-|------|------|------|
-| JWT 签发 | HS256，载荷 `sub`(userId) / `tid`(tenant) / `preferred_username` / `scope` / `roles`(JSONB) / `iat` / `exp` | `JwtIssuer` |
-| JWT 校验 | Spring Security `oauth2.jwt()` 自动；permit-all profile 走手动 decode | `SecurityConfig` + `PermissionResolver` |
-| scope claim | **只用 `*:*`（超管）或 `__compact__`（其它）**，绝不 inline 权限码 → 解析时走 `UserPermissionsLookup`（Caffeine 缓存）实现"权限变更立即生效" | `AuthService.chooseScopeClaim` |
-| refresh token | Redis key `auth:refresh:{token}` → value `userId\|tenantId\|issuedAtSec`，TTL 7d；rotate 用 `GETDEL` 原子操作 | `RefreshTokenStore` |
-| refresh tenant 解耦 | refresh 路径用 `UserMapper.findByIdAndTenant`（手写 SQL 不被租户拦截器改写） | `AuthService.refresh` |
-| force-logout | Redis key `core:auth:logout:{userId}` → epoch sec，TTL 8d（> refresh 7d） | `ForceLogoutService` |
-| force-logout 全局 | `ForceLogoutFilter`（OncePerRequestFilter, order = HIGHEST + 30）每个带 JWT 的请求都校验 `iat <= kickOutAt` | `ForceLogoutFilter` + `SecurityConfig` |
-| 账号锁定 | Redis key `auth:fail:{tenant}:{id}` + `auth:lock:{tenant}:{id}`，**租户隔离** | `AccountLockoutService` |
-| 密码策略 | 长度/字符类 + HIBP 远端检查（可降级 fail-open） | `PasswordPolicyService` |
-| 限流 | bucket4j；登录路径前置 | `AuthRateLimitFilter` |
+| Topic | Implementation | File |
+|-------|----------------|------|
+| JWT issuance | HS256; payload `sub` (userId) / `tid` (tenant) / `preferred_username` / `scope` / `roles` (JSONB) / `iat` / `exp` | `JwtIssuer` |
+| JWT validation | Automatic via Spring Security `oauth2.jwt()`; permit-all profile uses manual decode | `SecurityConfig` + `PermissionResolver` |
+| scope claim | **Only `*:*` (super admin) or `__compact__` (others)** — never inline permission codes; resolution goes through `UserPermissionsLookup` (Caffeine cache) so "permission changes take effect immediately" | `AuthService.chooseScopeClaim` |
+| refresh token | Redis key `auth:refresh:{token}` → value `userId\|tenantId\|issuedAtSec`, TTL 7d; rotation uses atomic `GETDEL` | `RefreshTokenStore` |
+| refresh tenant decoupling | The refresh path uses `UserMapper.findByIdAndTenant` (hand-written SQL is not rewritten by the tenant interceptor) | `AuthService.refresh` |
+| force-logout | Redis key `core:auth:logout:{userId}` → epoch sec, TTL 8d (> refresh 7d) | `ForceLogoutService` |
+| force-logout global | `ForceLogoutFilter` (OncePerRequestFilter, order = HIGHEST + 30) checks `iat <= kickOutAt` on every JWT-bearing request | `ForceLogoutFilter` + `SecurityConfig` |
+| Account lockout | Redis key `auth:fail:{tenant}:{id}` + `auth:lock:{tenant}:{id}`, **tenant-isolated** | `AccountLockoutService` |
+| Password policy | Length / character class + HIBP remote check (degrades fail-open) | `PasswordPolicyService` |
+| Rate limit | bucket4j; positioned in front of the login path | `AuthRateLimitFilter` |
 
-## API 约定
+## API conventions
 
-| 项 | 规则 |
-|----|------|
-| context-path | 全局 `/api` |
-| 系统管理写接口 | `/admin/{module}/...`，例：`POST /admin/role`, `PUT /admin/user/{id}/roles` |
-| 系统管理读接口 | `/admin/{module}/list` 或 `/admin/{module}/{id}`（受 `@RequiresPermission` 保护） |
-| Me-endpoints | `GET /menu/me`、`GET /permission/me`、`GET /scope/me`、`GET /dept/tree`（仅需登录，不需要细粒度权限） |
-| 业务接口 | `/{businessModule}/{feature}/...`（**不要**滥用 `/admin/`） |
-| 鉴权 | 接口方法挂 `@RequiresPermission("module:action")` 或 `@RequiresPermission(anyOf={...})` |
-| 审计 | 写接口挂 `@OpLog(module, action, targetType)`，自动落 `core_oplog` |
-| 分页 | `page` (1-based) + `size`（max 500）；返回 `PageResult<T>(records, total, page, limit)` |
-| 响应 | 全部包 `JsonResult<T>`：`{ code, msg, data }`；错误用 `BusinessException(ErrorCode.X, msg)` |
-| 时间 | `LocalDateTime`，Jackson 配置写 ISO + `Asia/Tokyo` 时区 |
+| Item | Rule |
+|------|------|
+| context-path | global `/api` |
+| System admin write endpoints | `/admin/{module}/...`, e.g. `POST /admin/role`, `PUT /admin/user/{id}/roles` |
+| System admin read endpoints | `/admin/{module}/list` or `/admin/{module}/{id}` (protected by `@RequiresPermission`) |
+| Me-endpoints | `GET /menu/me`, `GET /permission/me`, `GET /scope/me`, `GET /dept/tree` (login only, no fine-grained permission needed) |
+| Business endpoints | `/{businessModule}/{feature}/...` (**do not** overuse `/admin/`) |
+| Authorization | Annotate methods with `@RequiresPermission("module:action")` or `@RequiresPermission(anyOf={...})` |
+| Audit | Annotate write endpoints with `@OpLog(module, action, targetType)`; rows land in `core_oplog` automatically |
+| Pagination | `page` (1-based) + `size` (max 500); returns `PageResult<T>(records, total, page, limit)` |
+| Response | All wrapped in `JsonResult<T>`: `{ code, msg, data }`; errors via `BusinessException(ErrorCode.X, msg)` |
+| Time | `LocalDateTime`; Jackson configured to write ISO + `Asia/Tokyo` timezone |
 
-## 多租户
+## Multi-tenant
 
-- 开关：`app.mybatis.tenant.enabled`；local profile = false，dev/prod = true
-- 解析：
-  - 已登录请求：`CoreRequestContextFilter` 从 JWT `tid` claim 取 → 写入 `RequestContext`
-  - 未登录请求：fallback 到 `X-Tenant-Id` header，再 fallback `default`
-- 拦截器：`TenantLineInnerInterceptor` 自动给 MyBatis-Plus 生成的 SQL 追加 `tenant_id = ?` 条件
-- 例外表：`MybatisPlusConfig.TENANT_EXCLUDED_TABLES` —— flyway_*、core_meta、core_numbering_*
-- 手写 SQL（`@Select` / `@Update`）**不受拦截器影响**，必须显式带 `tenant_id` 条件
-- 跨租户操作（如平台超管）—— 暂未支持，需要时新加一个 `app.mybatis.tenant.bypass-role` 配置 + 切面
+- Switch: `app.mybatis.tenant.enabled`; local profile = false, dev/prod = true
+- Resolution:
+  - Authenticated requests: `CoreRequestContextFilter` reads from the JWT `tid` claim → writes to `RequestContext`
+  - Unauthenticated requests: fall back to the `X-Tenant-Id` header, then to `default`
+- Interceptor: `TenantLineInnerInterceptor` automatically appends `tenant_id = ?` to MyBatis-Plus-generated SQL
+- Exception tables: `MybatisPlusConfig.TENANT_EXCLUDED_TABLES` — flyway_*, core_meta, core_numbering_*
+- Hand-written SQL (`@Select` / `@Update`) is **not affected by the interceptor** and must include an explicit `tenant_id` predicate
+- Cross-tenant operations (e.g. platform super admin) — not supported yet; if needed, add an `app.mybatis.tenant.bypass-role` config + aspect
 
-## 数据范围（@DataScope）
+## Data scope (@DataScope)
 
-5 种预设：
+Five presets:
 
-| value | 名称 | SQL 条件 |
-|------:|------|----------|
-| 1 | ALL | 无 |
-| 2 | DEPT_AND_SUB | `dept_id IN (本部门子树)` |
-| 3 | DEPT | `dept_id = 当前部门` |
-| 4 | SELF | `create_user = 当前用户` |
-| 5 | CUSTOM | `dept_id IN (角色显式选定部门子树)` |
+| value | Name | SQL condition |
+|------:|------|---------------|
+| 1 | ALL | none |
+| 2 | DEPT_AND_SUB | `dept_id IN (current dept subtree)` |
+| 3 | DEPT | `dept_id = current dept` |
+| 4 | SELF | `create_user = current user` |
+| 5 | CUSTOM | `dept_id IN (role-specified dept subtrees)` |
 
-**使用方式**：
-1. 业务表带 `dept_id` 列和/或 `create_user` 列
-2. Mapper 方法挂 `@DataScope`（注解本身是信息性的）
-3. Service 内调用：
+**How to use**:
+1. Business table carries a `dept_id` column and/or a `create_user` column.
+2. Annotate the Mapper method with `@DataScope` (the annotation itself is informational).
+3. In the Service:
    ```java
    DataScopeDecision dec = dataScopeResolver.currentDecision();
    LambdaQueryWrapper<Foo> w = new LambdaQueryWrapper<>();
    DataScopeHelper.apply(w, dec, Foo::getDeptId, Foo::getCreateUser);
    return mapper.selectPage(page, w);
    ```
-4. `DataScopeAspect` 在 Mapper 调用前校验本请求是否调过 `apply()` —— **没调就 local/dev/test 抛 500，prod 写 WARN**
+4. `DataScopeAspect` verifies, prior to the Mapper call, that this request invoked `apply()` — **if not, throw 500 in local/dev/test and log a WARN in prod**.
 
-参考：`DataScopeHelper` / `DataScopeContext` / `DataScopeAspect`。
+See: `DataScopeHelper` / `DataScopeContext` / `DataScopeAspect`.
 
-## 审计（@OpLog）
+## Audit (@OpLog)
 
-- 写接口（POST/PUT/DELETE）挂 `@OpLog(module="system", action="user.delete", targetType="user")`
-- `OpLogAspect` (order=50, 在 `PermissionAspect` order=10 之后) 自动落库 `core_oplog`：操作人 / 时间 / 模块 / 动作 / 目标 ID / 请求 URI / 请求体（密码字段强制脱敏）/ 客户端 IP / UA / 是否成功 / 错误信息 / 耗时毫秒
-- 异步写：`@Async`，失败仅 WARN，不阻塞业务
-- 登录审计单独走 `LoginAuditService.record(tenantId, ...)`（注意：参数必须显式传 tenantId，因为 worker 线程不继承 ThreadLocal）
+- Annotate write endpoints (POST/PUT/DELETE) with `@OpLog(module="system", action="user.delete", targetType="user")`
+- `OpLogAspect` (order=50, runs after `PermissionAspect` order=10) automatically persists to `core_oplog`: operator / time / module / action / target ID / request URI / request body (password fields force-masked) / client IP / UA / success flag / error message / elapsed ms
+- Async write: `@Async`; failures only WARN and never block the business flow
+- Login audit goes through `LoginAuditService.record(tenantId, ...)` separately (note: tenantId must be passed explicitly because worker threads do not inherit the ThreadLocal)
 
-## 错误码 & 异常
+## Error codes & exceptions
 
-- 业务异常：`throw new BusinessException(ErrorCode.X, "msg")`
-- 全局异常处理器（在 `core-infrastructure.web` 或 `core-common`）把 `BusinessException` 转成 `JsonResult.error(code, msg)`，HTTP 400/401/403
-- 不要 `throw new RuntimeException(...)`；不要 catch + 包装 + 抛新
-- 校验：`@Valid` + `@NotBlank` / `@Size` / `@Email`；DTO 用 Java record
+- Business exception: `throw new BusinessException(ErrorCode.X, "msg")`
+- The global exception handler (in `core-infrastructure.web` or `core-common`) converts `BusinessException` to `JsonResult.error(code, msg)`, HTTP 400/401/403
+- Do not `throw new RuntimeException(...)`; do not catch + wrap + rethrow
+- Validation: `@Valid` + `@NotBlank` / `@Size` / `@Email`; DTOs use Java records
 
-## 测试
+## Tests
 
-目前无 `src/test`。新加测试约定：
-- 单元：`{Module}ServiceTest` 在该模块的 `src/test/java/`，覆盖核心 service
-- 集成：`@SpringBootTest` 走 `test` profile + Testcontainers PostgreSQL/Redis
-- ArchUnit：在 `core-bootstrap/src/test/java/` 写模块边界守卫（禁止反向依赖、禁止 `business-pms` 用 `core_*` 表的 Mapper 等）
+There is no `src/test` yet. Conventions for adding tests:
+- Unit: `{Module}ServiceTest` in that module's `src/test/java/`, covering core services
+- Integration: `@SpringBootTest` against the `test` profile + Testcontainers PostgreSQL/Redis
+- ArchUnit: write module boundary guards in `core-bootstrap/src/test/java/` (forbid reverse deps, forbid `business-pms` from using `core_*` table Mappers, etc.)
 
-## 命名规范
+## Naming conventions
 
-| 类型 | 规则 | 例 |
-|------|------|----|
-| 表 | snake_case，前缀 `core_` (系统域) / `{module}_` (业务域) | `core_auth_user`、`pms_reservation` |
-| 列 | snake_case | `tenant_id` / `created_at` |
-| Java 类 | PascalCase，模块包内不重名 | `UserAdminService` |
-| Java 字段 | camelCase | `tenantId` |
-| API 路径 | kebab-case 段；动作用 RESTful 动词 + 资源名 | `/admin/user/list`、`/auth/force-logout/{id}` |
-| 权限码 | `resource:action`，支持 `*:*` / `resource:*` 通配 | `user:delete`、`auth:unlock`、`*:*` |
-| Bean 注入 | 构造器注入（无 `@Autowired` field）；私有 final 字段 | 参考所有 `*Service` |
+| Type | Rule | Example |
+|------|------|---------|
+| Table | snake_case, prefixed with `core_` (system domain) / `{module}_` (business domain) | `core_auth_user`, `pms_reservation` |
+| Column | snake_case | `tenant_id` / `created_at` |
+| Java class | PascalCase, unique within the module package | `UserAdminService` |
+| Java field | camelCase | `tenantId` |
+| API path | kebab-case segments; actions use RESTful verb + resource | `/admin/user/list`, `/auth/force-logout/{id}` |
+| Permission code | `resource:action`, supports `*:*` / `resource:*` wildcards | `user:delete`, `auth:unlock`, `*:*` |
+| Bean injection | Constructor injection (no `@Autowired` fields); private final fields | see all `*Service` |
 
-## Profile 矩阵
+## Profile matrix
 
 | profile | security.mode | tenant | refresh-cookie.secure | debug.expose-error-details |
 |---------|---------------|--------|------------------------|----------------------------|
@@ -298,29 +300,29 @@ core-bootstrap/
 ## Behavioral Guidelines
 
 ### 1. Think Before Coding
-- 先表态假设，不确定就问
-- 多解时把选项摊开，别静悄悄选
-- 看到现成简方案就建议
-- 不懂的点直接停下、命名困惑、问
+- State your assumptions first; ask when unsure
+- When there are multiple solutions, lay out the options instead of silently picking one
+- If you spot an existing simple approach, suggest it
+- If something is unclear or naming is confusing, stop and ask
 
 ### 2. Simplicity First
-- 最少代码解决问题
-- 不为单次用法做抽象
-- 不加未要求的"灵活性"
-- 不为不可能的场景写错误处理
-- 写到 200 行能写成 50 行 → 重写
+- Solve the problem with the least code
+- Do not abstract for single-use cases
+- Do not add unrequested "flexibility"
+- Do not write error handling for impossible scenarios
+- If 200 lines could have been 50 → rewrite
 
 ### 3. Surgical Changes
-- 只动该动的
-- 不顺手"改进"附近代码
-- 不重构没坏的东西
-- 自己产生的孤儿代码自己清；既有的死代码不主动删
+- Touch only what needs to change
+- Do not casually "improve" nearby code
+- Do not refactor what isn't broken
+- Clean up orphan code you produced; do not proactively delete pre-existing dead code
 
 ### 4. Goal-Driven Execution
-- "加校验" → "为非法输入写测试，跑通"
-- "修 bug" → "写一个能复现的测试，再修"
-- 多步任务给出可验证步骤计划
+- "Add validation" → "write a test for the invalid input, make it pass"
+- "Fix the bug" → "write a reproducing test, then fix"
+- For multi-step tasks, give a verifiable step plan
 
 ---
 
-**这些规约生效的信号**：模块边界整洁、新功能能用现有 Aspect 落地（@RequiresPermission/@OpLog/@DataScope）、Flyway 历史 append-only。
+**Signs these conventions are taking hold**: clean module boundaries, new features that land on the existing aspects (@RequiresPermission/@OpLog/@DataScope), and an append-only Flyway history.
