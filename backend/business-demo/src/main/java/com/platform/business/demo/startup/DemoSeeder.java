@@ -240,7 +240,7 @@ public class DemoSeeder {
 
     private String resolveAdminUserId() {
         List<UserEntity> admins = userMapper.selectList(
-                new QueryWrapper<UserEntity>().eq("username", "admin").eq("mark", 1));
+                new QueryWrapper<UserEntity>().eq("username", "demo-admin").eq("mark", 1));
         return admins.isEmpty() ? "system" : admins.get(0).getId();
     }
 }

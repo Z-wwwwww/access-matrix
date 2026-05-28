@@ -144,7 +144,7 @@ core-bootstrap/
     CoreApplication.java       @SpringBootApplication，main()
     startup/
       AuthSchemaBootstrap      启动期 sanity check
-      LocalAdminSeeder         dev 环境种 admin/admin 用户 (@Profile("local"))
+      LocalAdminSeeder         dev 环境种 demo-admin/demo-admin 用户 (@Profile("local"))
       FlywayRepairConfig       FlywayMigrationStrategy bean，repair()+migrate()
   src/main/resources/
     application.yml            通用配置 (mybatis-plus / management / actuator / springdoc)

@@ -33,7 +33,7 @@ class LocalKeycloakAdminSeederTest {
 
     @Test
     void existingAdmin_isNoOp() {
-        when(keycloakUserService.userExists("demo", "admin")).thenReturn(true);
+        when(keycloakUserService.userExists("demo", "demo-admin")).thenReturn(true);
 
         seeder.seed();
 
@@ -43,19 +43,19 @@ class LocalKeycloakAdminSeederTest {
 
     @Test
     void missingAdmin_createsThenSetsPermanentPassword() {
-        when(keycloakUserService.userExists("demo", "admin")).thenReturn(false);
+        when(keycloakUserService.userExists("demo", "demo-admin")).thenReturn(false);
         when(keycloakUserService.createUser(
-                eq("demo"), eq("admin"), eq("admin@platform.local"), eq("Local Admin"), eq("admin")))
-                .thenReturn("kc-uuid-admin");
+                eq("demo"), eq("demo-admin"), eq("demo-admin@platform.local"), eq("Demo Admin"), eq("demo-admin")))
+                .thenReturn("kc-uuid-demo-admin");
 
         seeder.seed();
 
         verify(keycloakUserService).createUser(
-                eq("demo"), eq("admin"), eq("admin@platform.local"), eq("Local Admin"), eq("admin"));
-        // Must be temporary=false — otherwise admin/admin triggers
+                eq("demo"), eq("demo-admin"), eq("demo-admin@platform.local"), eq("Demo Admin"), eq("demo-admin"));
+        // Must be temporary=false — otherwise demo-admin/demo-admin triggers
         // UPDATE_PASSWORD required action on first login, breaking the
-        // "fresh setup → log in as admin/admin" promise.
-        verify(keycloakUserService).setPassword(eq("demo"), eq("kc-uuid-admin"), eq("admin"), eq(false));
+        // "fresh setup → log in as demo-admin/demo-admin" promise.
+        verify(keycloakUserService).setPassword(eq("demo"), eq("kc-uuid-demo-admin"), eq("demo-admin"), eq(false));
     }
 
     @Test

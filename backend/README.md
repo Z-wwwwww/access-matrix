@@ -85,11 +85,11 @@ Non-local profiles fail-fast at startup if `CORE_JWT_SECRET` is missing
 or under 32 bytes — no silent fallback to dev placeholder.
 
 `local` profile additionally runs:
-- `LocalAdminSeeder` (always) — seeds business-side `admin/admin` user
-  bound to SUPER_ADMIN role + HQ department
+- `LocalAdminSeeder` (always) — seeds business-side `demo-admin/demo-admin`
+  user bound to SUPER_ADMIN role + HQ department
 - `LocalKeycloakAdminSeeder` (only when `mode=oidc`) — seeds Keycloak's
-  `default` realm with an `admin/admin` user, paired with the above so
-  the first SSO login JIT-binds to the SUPER_ADMIN row
+  `demo` realm with a `demo-admin/demo-admin` user, paired with the above
+  so the first SSO login JIT-binds to the SUPER_ADMIN row
 
 See [../docs/getting-started.md](../docs/getting-started.md) for the
 full local / Keycloak setup walkthrough.

@@ -164,7 +164,7 @@ class UserAdminServiceTest {
 
     @Test
     void delete_refusesBuiltInAdmin() {
-        when(userMapper.selectById("u1")).thenReturn(user("u1", "admin"));
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "demo-admin"));
 
         assertThatThrownBy(() -> service.delete("u1"))
                 .isInstanceOf(BusinessException.class)
@@ -181,7 +181,7 @@ class UserAdminServiceTest {
 
     @Test
     void update_builtInAdmin_allowsEmailAndDisplayNameChange() {
-        UserEntity adminUser = user("u1", "admin");
+        UserEntity adminUser = user("u1", "demo-admin");
         adminUser.setEmail("old@example.com");
         adminUser.setDisplayName("Admin");
         when(userMapper.selectById("u1")).thenReturn(adminUser);
@@ -198,7 +198,7 @@ class UserAdminServiceTest {
 
     @Test
     void update_builtInAdmin_refusesDeptChange() {
-        UserEntity adminUser = user("u1", "admin");
+        UserEntity adminUser = user("u1", "demo-admin");
         adminUser.setDeptId("DEPT-HQ");
         when(userMapper.selectById("u1")).thenReturn(adminUser);
 
@@ -213,7 +213,7 @@ class UserAdminServiceTest {
 
     @Test
     void update_builtInAdmin_refusesStatusChange() {
-        UserEntity adminUser = user("u1", "admin");
+        UserEntity adminUser = user("u1", "demo-admin");
         adminUser.setStatus(1);
         when(userMapper.selectById("u1")).thenReturn(adminUser);
 
@@ -234,7 +234,7 @@ class UserAdminServiceTest {
         // 400 unless the UI specifically stripped deptId/status from the
         // payload (which is the kind of fiddly thing future regressions
         // would silently break).
-        UserEntity adminUser = user("u1", "admin");
+        UserEntity adminUser = user("u1", "demo-admin");
         adminUser.setDeptId("DEPT-HQ");
         adminUser.setStatus(1);
         adminUser.setEmail("admin@platform.local");

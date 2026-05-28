@@ -110,17 +110,17 @@ class AuthServiceTest {
         UserEntity u = new UserEntity();
         u.setId("ULID-USER-26");
         u.setTenantId("demo");
-        u.setUsername("admin");
-        u.setEmail("admin@example.com");
-        u.setDisplayName("Admin User");
+        u.setUsername("demo-admin");
+        u.setEmail("demo-admin@example.com");
+        u.setDisplayName("Demo Admin");
         u.setPasswordHash("$2a$12$fakehash");
         u.setStatus(1);
         return u;
     }
 
     private void stubLoginSuccess(UserEntity user) {
-        when(userMapper.findByIdentifier("demo", "admin")).thenReturn(user);
-        when(lockoutService.remainingLockSeconds("demo", "admin")).thenReturn(0L);
+        when(userMapper.findByIdentifier("demo", "demo-admin")).thenReturn(user);
+        when(lockoutService.remainingLockSeconds("demo", "demo-admin")).thenReturn(0L);
         when(encoder.matches("RightPassword", user.getPasswordHash())).thenReturn(true);
     }
 
@@ -132,13 +132,13 @@ class AuthServiceTest {
         when(roleMapper.findRoleIdsByUserId("ULID-USER-26", "demo"))
                 .thenReturn(List.of(BuiltInRoles.SUPER_ADMIN_ID));
 
-        AuthService.LoginResult result = service.login("admin", "RightPassword", req);
+        AuthService.LoginResult result = service.login("demo-admin", "RightPassword", req);
 
         // Login itself succeeded (token issued).
         org.assertj.core.api.Assertions.assertThat(result.tokens()).isNotNull();
         // Self-alert email dispatched to the user's OWN address.
         verify(mailService).sendHtmlAsync(
-                eq("admin@example.com"),
+                eq("demo-admin@example.com"),
                 any(Locale.class),
                 eq("user-break-glass-used.subject"),
                 any(Object[].class),
@@ -157,7 +157,7 @@ class AuthServiceTest {
 
         // Must not throw — operator may be deliberately logging in via
         // break-glass during an SMTP outage too.
-        AuthService.LoginResult result = service.login("admin", "RightPassword", req);
+        AuthService.LoginResult result = service.login("demo-admin", "RightPassword", req);
 
         org.assertj.core.api.Assertions.assertThat(result.tokens()).isNotNull();
         verify(mailService, never()).sendHtmlAsync(any(), any(), any(), any(Object[].class), any(), any());
@@ -173,10 +173,10 @@ class AuthServiceTest {
         stubLoginSuccess(user);
         when(roleMapper.findRoleIdsByUserId(any(), any())).thenReturn(List.of());   // not super-admin
 
-        service.login("admin", "RightPassword", req);
+        service.login("demo-admin", "RightPassword", req);
 
         verify(mailService).sendHtmlAsync(
-                eq("admin@example.com"),
+                eq("demo-admin@example.com"),
                 any(Locale.class),
                 eq("user-break-glass-used.subject"),
                 any(Object[].class),
@@ -193,7 +193,7 @@ class AuthServiceTest {
         UserEntity user = successfulUserRow();
         stubLoginSuccess(user);
 
-        service.login("admin", "RightPassword", req);
+        service.login("demo-admin", "RightPassword", req);
 
         verify(mailService, never()).sendHtmlAsync(any(), any(), any(), any(Object[].class), any(), any());
     }
@@ -204,7 +204,7 @@ class AuthServiceTest {
         UserEntity user = successfulUserRow();
         stubLoginSuccess(user);
 
-        service.login("admin", "RightPassword", req);
+        service.login("demo-admin", "RightPassword", req);
 
         verify(mailService, never()).sendHtmlAsync(any(), any(), any(), any(Object[].class), any(), any());
     }
@@ -223,7 +223,7 @@ class AuthServiceTest {
         // Critical: a mail hiccup must not block login. Operator recovering
         // from an SSO outage doesn't need SMTP also taking down their
         // /auth/login.
-        AuthService.LoginResult result = service.login("admin", "RightPassword", req);
+        AuthService.LoginResult result = service.login("demo-admin", "RightPassword", req);
 
         org.assertj.core.api.Assertions.assertThat(result.tokens()).isNotNull();
     }

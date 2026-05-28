@@ -58,18 +58,18 @@ public class LocalAdminSeeder {
     }
 
     private UserEntity ensureAdminUser() {
-        UserEntity existing = userMapper.findByIdentifier("demo", "admin");
-        String adminHash = encoder.encode("admin");
+        UserEntity existing = userMapper.findByIdentifier("demo", "demo-admin");
+        String adminHash = encoder.encode("demo-admin");
         LocalDateTime now = LocalDateTime.now();
 
         if (existing == null) {
             UserEntity u = new UserEntity();
             u.setId(IdGenerator.ulid());
             u.setTenantId("demo");
-            u.setUsername("admin");
-            u.setEmail("admin@platform.local");
+            u.setUsername("demo-admin");
+            u.setEmail("demo-admin@platform.local");
             u.setUserNo("U00000001");
-            u.setDisplayName("Local Admin");
+            u.setDisplayName("Demo Admin");
             u.setPasswordHash(adminHash);
             u.setStatus(1);
             u.setMark(1);
@@ -83,10 +83,10 @@ public class LocalAdminSeeder {
         }
 
         boolean dirty = false;
-        if (!encoder.matches("admin", existing.getPasswordHash())) {
+        if (!encoder.matches("demo-admin", existing.getPasswordHash())) {
             existing.setPasswordHash(adminHash);
             dirty = true;
-            log.info("LocalAdminSeeder: reset admin password to default");
+            log.info("LocalAdminSeeder: reset demo-admin password to default");
         }
         if (existing.getStatus() == null || existing.getStatus() != 1) {
             existing.setStatus(1);
@@ -97,7 +97,7 @@ public class LocalAdminSeeder {
             dirty = true;
         }
         if (existing.getEmail() == null || existing.getEmail().isBlank()) {
-            existing.setEmail("admin@platform.local");
+            existing.setEmail("demo-admin@platform.local");
             dirty = true;
         }
         if (dirty) {

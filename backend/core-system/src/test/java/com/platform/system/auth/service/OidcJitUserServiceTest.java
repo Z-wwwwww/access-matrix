@@ -131,10 +131,10 @@ class OidcJitUserServiceTest {
         Jwt token = jwt(Map.of(
                 "sub", "kc-uuid-2b",
                 "tid", "demo",
-                "preferred_username", "admin"));
+                "preferred_username", "demo-admin"));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2b", "demo")).thenReturn(null);
-        UserEntity legacy = row("ULID-ADMIN-26", "admin");
-        when(userMapper.findByIdentifier("demo", "admin")).thenReturn(legacy);
+        UserEntity legacy = row("ULID-ADMIN-26", "demo-admin");
+        when(userMapper.findByIdentifier("demo", "demo-admin")).thenReturn(legacy);
         when(roleMapper.findRoleIdsByUserId("ULID-ADMIN-26", "demo"))
                 .thenReturn(java.util.List.of(BuiltInRoles.SUPER_ADMIN_ID));
 

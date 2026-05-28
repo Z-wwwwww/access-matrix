@@ -50,7 +50,7 @@ git clone <your-fork-url> access-matrix && cd access-matrix
 psql -h 127.0.0.1 -U postgres \
   -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
 
-# 3. 后端（local profile，自动建表 + 种 admin/admin）
+# 3. 后端（local profile，自动建表 + 种 demo-admin/demo-admin）
 cd backend
 ./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local
 
@@ -59,7 +59,7 @@ cd frontend
 npm install && npm run dev
 ```
 
-浏览器开 http://localhost:5273/login → `admin` / `admin` → 进入系统。
+浏览器开 http://localhost:5273/login → `demo-admin` / `demo-admin` → 进入系统。
 
 > 默认走传统 password 登录。要启用 SSO（Keycloak），见 [完整启动指南](docs/getting-started.md#启用-sso-keycloak-模式)。
 > **已有 password 项目要切 SSO**？走自动化迁移：[docs/migration-password-to-sso.md](docs/migration-password-to-sso.md) — 改一行 yml + 重启搞定，业务数据零损失。
@@ -133,7 +133,7 @@ npm install && npm run dev
 | Realm | 账号 | 密码 | 角色 / 部门 |
 |---|---|---|---|
 | system | `ops` | `ops` | Platform Admin |
-| demo | `admin` | `admin` | SUPER_ADMIN / HQ |
+| demo | `demo-admin` | `demo-admin` | SUPER_ADMIN / HQ |
 | demo | `tanaka_taro` | `demo123` | 取締役（ALL）/ HQ |
 | demo | `yamada_hanako` | `demo123` | 東京支社長（DEPT_AND_SUB）/ TOKYO |
 | demo | `sato_ken` | `demo123` | 大阪支社課長（DEPT）/ OSAKA |
