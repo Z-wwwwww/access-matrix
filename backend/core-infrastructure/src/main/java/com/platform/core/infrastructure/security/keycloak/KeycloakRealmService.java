@@ -147,6 +147,64 @@ public class KeycloakRealmService {
     }
 
     /**
+     * Re-enable a realm — the symmetric counterpart of {@link #disableRealm}
+     * for the suspend / resume tenant workflow. Sets enabled=true so KC
+     * resumes issuing tokens for users in this realm.
+     *
+     * <p>No-op on a realm that's already enabled (KC's PUT replaces the
+     * full representation; updating to the same state is harmless).
+     */
+    public void enableRealm(String tenantCode) {
+        validateTenantCode(tenantCode);
+        try (Keycloak kc = newAdminClient()) {
+            RealmResource rr = kc.realm(tenantCode);
+            RealmRepresentation rep = rr.toRepresentation();
+            if (rep == null) {
+                throw new KeycloakUserService.KeycloakOperationException(
+                        "Realm '" + tenantCode + "' not found in Keycloak");
+            }
+            rep.setEnabled(true);
+            rr.update(rep);
+            log.info("[kc-realm] enabled realm '{}'", tenantCode);
+        } catch (NotFoundException e) {
+            throw new KeycloakUserService.KeycloakOperationException(
+                    "Realm '" + tenantCode + "' not found in Keycloak", e);
+        } catch (WebApplicationException e) {
+            throw new KeycloakUserService.KeycloakOperationException(
+                    "Keycloak enable-realm failed: HTTP " + e.getResponse().getStatus(), e);
+        }
+    }
+
+    /**
+     * Update the realm's displayName attribute — what the KC admin
+     * console shows above the realm picker. Called by the platform
+     * tenant-edit flow so KC and core_tenant don't drift.
+     *
+     * <p>Realm name itself ({@code tenant_code}) stays immutable: renaming
+     * it would invalidate every JWT's {@code iss} claim and break sessions.
+     */
+    public void updateDisplayName(String tenantCode, String displayName) {
+        validateTenantCode(tenantCode);
+        try (Keycloak kc = newAdminClient()) {
+            RealmResource rr = kc.realm(tenantCode);
+            RealmRepresentation rep = rr.toRepresentation();
+            if (rep == null) {
+                throw new KeycloakUserService.KeycloakOperationException(
+                        "Realm '" + tenantCode + "' not found in Keycloak");
+            }
+            rep.setDisplayName(displayName);
+            rr.update(rep);
+            log.info("[kc-realm] updated displayName for realm '{}'", tenantCode);
+        } catch (NotFoundException e) {
+            throw new KeycloakUserService.KeycloakOperationException(
+                    "Realm '" + tenantCode + "' not found in Keycloak", e);
+        } catch (WebApplicationException e) {
+            throw new KeycloakUserService.KeycloakOperationException(
+                    "Keycloak update-realm failed: HTTP " + e.getResponse().getStatus(), e);
+        }
+    }
+
+    /**
      * {@code true} if a realm with this exact code exists in Keycloak.
      * Used by {@code TenantAdminService.create} to fail-fast before
      * touching the DB.
