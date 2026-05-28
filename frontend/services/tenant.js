@@ -14,5 +14,5 @@ export const createTenantApi         = (body)           => request.post('/platfo
 export const updateTenantApi         = (id, body)       => request.patch(`/platform/tenants/${id}`, body)
 export const suspendTenantApi        = (id)             => request.post(`/platform/tenants/${id}/suspend`)
 export const resumeTenantApi         = (id)             => request.post(`/platform/tenants/${id}/resume`)
-export const deleteTenantApi         = (id)             => request.delete(`/platform/tenants/${id}`)
+export const hardDeleteTenantApi     = (id, confirmCode) => request.delete(`/platform/tenants/${id}`, { data: { confirmCode } })
 export const startSupportSessionApi  = (id, reason)     => request.post(`/platform/tenants/${id}/support-session`, { reason })

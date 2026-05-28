@@ -162,9 +162,9 @@ export default {
         suspended: '停止'
       },
       search: { placeholder: 'コードまたは名前で検索' },
-      softDeleteHint: {
-        title: 'ソフト削除のみ：',
-        body: 'テナントを削除すると Keycloak realm が無効化され、利用者はサインインできなくなりますが、ビジネスデータは保持されます。完全削除は別途オペレーション手順で行います。'
+      recycleBinHint: {
+        title: '削除はゴミ箱方式：',
+        body: 'まず「停止」してください（KC realm が無効化され、サインイン不可になりますがデータは残ります）。本当に削除する場合は停止後の行に出る赤いゴミ箱アイコンから実行 — テナントコード入力での確認後、業務データ・KC realm・レジストリ行すべて物理削除されます。元に戻せません。'
       },
       edit: {
         titleCreate: '新規テナント',
@@ -202,16 +202,40 @@ export default {
         resume: '再開'
       },
       tooltip: {
-        softDelete: 'テナントをソフト削除',
         suspend: 'テナントを一時停止（Keycloak realm 無効化、解除可能）',
         resume: '停止中のテナントを再開',
         edit: 'テナント情報を編集',
         builtInLocked: '組み込みテナント（system / demo）は変更不可'
       },
+      hardDelete: {
+        title: 'テナントを完全削除',
+        tooltip: {
+          confirm: 'テナントを完全削除（業務データ・KC realm・レジストリ行すべて物理削除）'
+        },
+        warning: {
+          title: '元に戻せません',
+          intro: '「{displayName}」（{tenantCode}）を完全削除しようとしています。次のすべてが恒久的に消えます：',
+          dropBusiness: 'このテナントに紐づく全業務テーブル行（ユーザー・ロール・部署・タスク等）',
+          dropRealm: 'Keycloak realm 本体（ユーザー / セッション / クライアント設定すべて）',
+          dropRegistry: '中央レジストリ行（core_tenant）',
+          noUndo: '回復は不可能。バックアップから手動復元のみ。'
+        },
+        label: {
+          typeCode: '確認のため、テナントコード「{tenantCode}」を正確に入力してください'
+        },
+        error: {
+          mismatch: 'テナントコードが一致しません'
+        },
+        button: {
+          confirm: '完全削除する',
+          deleting: '削除中...'
+        },
+        message: {
+          success: 'テナント「{tenantCode}」を完全削除しました',
+          failed: 'テナント完全削除に失敗'
+        }
+      },
       confirm: {
-        deleteTitle: 'テナント削除',
-        deleteMessage: '「{displayName}」（{tenantCode}）をソフト削除しますか？\n\n• Keycloak realm が無効化され、サインインできなくなります\n• ビジネスデータは保持されます\n• 復元には管理コンソールでの手動操作が必要',
-        deleteConfirm: 'ソフト削除する',
         suspendTitle: 'テナント停止',
         suspendMessage: '「{displayName}」（{tenantCode}）を一時停止しますか？\n\n• Keycloak realm が無効化され、サインインできなくなります\n• 「再開」ボタンでいつでも復帰できます',
         suspendConfirm: '停止する',
@@ -256,8 +280,6 @@ export default {
         createSuccess: 'テナントを作成し、招待メールを送信しました',
         createFailed: 'テナント作成に失敗',
         loadFailed: 'テナント一覧取得に失敗',
-        deleteSuccess: 'テナントをソフト削除しました',
-        deleteFailed: 'テナント削除に失敗',
         suspendSuccess: 'テナントを停止しました',
         suspendFailed: 'テナント停止に失敗',
         resumeSuccess: 'テナントを再開しました',
