@@ -56,9 +56,16 @@ public class AuthSchemaBootstrap {
             jdbc.execute("ALTER TABLE core_auth_user ADD COLUMN IF NOT EXISTS user_no VARCHAR(32)");
             jdbc.execute("ALTER TABLE core_auth_user ADD COLUMN IF NOT EXISTS email VARCHAR(255)");
             jdbc.execute("ALTER TABLE core_auth_user ADD COLUMN IF NOT EXISTS display_name VARCHAR(128)");
-            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_auth_user_username ON core_auth_user (username) WHERE mark = 1");
-            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_auth_user_email ON core_auth_user (email) WHERE mark = 1 AND email IS NOT NULL");
-            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_auth_user_user_no ON core_auth_user (user_no) WHERE mark = 1 AND user_no IS NOT NULL");
+            // V20 + V33: uniqueness on (username) / (email) / (user_no) is
+            // (tenant_id, *) only. The V2-era global indexes were dropped on
+            // purpose so two tenants can each have a user_no=U00000001 and
+            // a username=admin. We do NOT recreate global indexes here as a
+            // "safety net" — every startup did exactly that until this fix,
+            // resurrecting V2 state seconds after V33 dropped it, and crashing
+            // SystemAdminSeeder on the very next ops/demo-admin user_no collide.
+            // The per-tenant siblings (uk_core_auth_user_tenant_*) are owned
+            // by Flyway V20 and don't need a bootstrap fallback — schemas
+            // built without Flyway are unsupported anyway.
 
             jdbc.execute("""
                     CREATE TABLE IF NOT EXISTS core_auth_login_log (
