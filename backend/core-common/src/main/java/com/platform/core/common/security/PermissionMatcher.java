@@ -6,32 +6,63 @@ import java.util.Set;
  * Pure-function matcher used by both the AOP permission aspect and any business code
  * that needs to ask "does this user have permission X?".
  *
- * <p>Supported wildcards (kept deliberately minimal):
+ * <h3>Two super-wildcards, two scopes</h3>
+ * <p>The system has two independent authority scopes — platform ops
+ * (cross-tenant management) and business super-admin (within one tenant).
+ * Each gets its own wildcard, and the two do NOT shadow each other:
+ *
  * <ul>
- *   <li>{@code *:*}        — matches every business-tenant permission</li>
- *   <li>{@code resource:*} — matches every action on that resource (including {@code platform:*})</li>
- *   <li>exact match        — e.g. {@code user:delete} matches itself</li>
+ *   <li>{@code *:*} — <b>PLATFORM super</b>. Matches every permission in the
+ *       {@code platform:} namespace ({@code platform:tenant:*} etc.).
+ *       Held by PLATFORM_ADMIN. Does <em>not</em> match business permissions
+ *       like {@code user:read} — a platform admin shouldn't be able to
+ *       impersonate business-tenant users (GDPR / SOC2 privacy boundary).</li>
+ *   <li>{@code tenant:*} — <b>TENANT super</b>. Matches every business
+ *       permission ({@code user:read}, {@code role:create}, ...) but
+ *       <em>not</em> anything in the {@code platform:} namespace. Held by
+ *       SUPER_ADMIN of each business tenant. A compromised business admin
+ *       should not be able to reach {@code POST /platform/tenants} and
+ *       create realms.</li>
  * </ul>
  *
- * <h3>The {@code platform:*} carve-out</h3>
- * <p>{@code *:*} (business-tenant SUPER_ADMIN's wildcard) deliberately does NOT
- * match anything in the {@code platform:} namespace. The two scopes are
- * independent: a business-tenant super-admin can do everything within
- * their tenant, but only a PLATFORM_ADMIN (holding {@code platform:*})
- * can call {@code platform:tenant:*} or other platform-ops endpoints.
- * Without this carve-out a compromised business-tenant admin could
- * reach {@code POST /platform/tenants} and create realms — a real
- * privilege-escalation vector since KC admin operations don't go
- * through the MyBatis-Plus tenant interceptor.
+ * <p>Other wildcards:
+ * <ul>
+ *   <li>{@code resource:*} — matches every action on that resource
+ *       (e.g. {@code user:*} → {@code user:read}, {@code user:create}, ...).
+ *       Still works for {@code platform:*} too as a narrower platform-ops
+ *       delegation if ever needed.</li>
+ *   <li>exact match — e.g. {@code user:delete} matches itself</li>
+ * </ul>
+ *
+ * <h3>Why the symbol assignment</h3>
+ * <p>{@code *:*} <em>looks like</em> the highest-privilege wildcard, so it
+ * goes to the highest-privilege role (PLATFORM_ADMIN). The naming gives
+ * future code reviewers an immediate signal: "this user has *:* — they
+ * own the whole platform." That's the visual convention; the actual
+ * authority is enforced by the symmetric carve-outs below.
+ *
+ * <h3>Why no shadowing</h3>
+ * <p>Neither super-wildcard satisfies the other's namespace. To grant
+ * a single user both authorities (rare — usually a single "super-super-
+ * admin" that the SaaS owner uses), assign BOTH {@code *:*} and
+ * {@code tenant:*} explicitly. The redundancy is the point: an explicit
+ * dual grant is auditable in a way a single magic wildcard is not.
  */
 public final class PermissionMatcher {
 
+    /** PLATFORM super-wildcard. Matches the {@code platform:} namespace only. */
     public static final String SUPER = "*:*";
+
     /**
-     * Reserved namespace for platform-ops permissions. {@code *:*} does not
-     * cover this; you need {@code platform:*} (or an exact code like
-     * {@code platform:tenant:create}) to satisfy a required permission in
-     * this namespace.
+     * TENANT super-wildcard. Matches every business permission outside the
+     * {@code platform:} namespace. Held by business-tenant SUPER_ADMIN.
+     */
+    public static final String TENANT_SUPER = "tenant:*";
+
+    /**
+     * Reserved namespace for platform-ops permissions. {@link #TENANT_SUPER}
+     * does NOT cover this; {@link #SUPER} ONLY covers this (with the
+     * symmetric carve-out for business permissions).
      */
     public static final String PLATFORM_NS = "platform:";
 
@@ -45,9 +76,10 @@ public final class PermissionMatcher {
     public static boolean matches(Set<String> userPerms, String required) {
         if (required == null || required.isBlank()) return false;
         if (userPerms == null || userPerms.isEmpty()) return false;
-        // Business-tenant SUPER does NOT shadow platform-ops permissions.
-        // See class comment for the rationale.
-        if (userPerms.contains(SUPER) && !required.startsWith(PLATFORM_NS)) return true;
+        // Platform super matches only the platform: namespace.
+        if (userPerms.contains(SUPER) && required.startsWith(PLATFORM_NS)) return true;
+        // Tenant super matches everything except the platform: namespace.
+        if (userPerms.contains(TENANT_SUPER) && !required.startsWith(PLATFORM_NS)) return true;
         if (userPerms.contains(required)) return true;
         int colon = required.indexOf(':');
         if (colon > 0) {

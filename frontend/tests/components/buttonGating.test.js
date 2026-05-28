@@ -81,8 +81,10 @@ describe('Role.vue — button permission gating', () => {
     }
   })
 
-  it('super admin (*:*) sees everything', () => {
-    const wrapper = mountPage(ROLE_PAGE_BUTTONS, ['*:*'])
+  it('business super (tenant:*) sees every business action', () => {
+    // tenant:* is the business-tenant SUPER_ADMIN's wildcard after the
+    // *:* / tenant:* split — should satisfy every business-namespace gate.
+    const wrapper = mountPage(ROLE_PAGE_BUTTONS, ['tenant:*'])
     for (const b of ROLE_PAGE_BUTTONS) {
       expect(wrapper.find(`.${b.id}`).exists()).toBe(true)
     }

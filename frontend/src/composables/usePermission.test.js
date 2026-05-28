@@ -43,16 +43,30 @@ describe('usePermission', () => {
     expect(hasAnyRole(['admin', 'viewer'])).toBe(false)
   })
 
-  it('hasPermission honours *:* wildcard', () => {
-    // The whole point of the wildcard-aware composable: a super admin holding
-    // only `*:*` should still see every action button.
+  it('hasPermission honours tenant:* wildcard (business super-admin)', () => {
+    // tenant:* is the business-tenant SUPER_ADMIN's wildcard — should
+    // satisfy every business permission check the UI gates on.
     const store = useAuthStore()
-    store.authorities = ['*:*']
+    store.authorities = ['tenant:*']
     const { hasPermission } = usePermission()
 
     expect(hasPermission('user:read')).toBe(true)
     expect(hasPermission('role:delete')).toBe(true)
     expect(hasPermission('whatever:goes')).toBe(true)
+    // Should NOT cover platform: namespace
+    expect(hasPermission('platform:tenant:read')).toBe(false)
+  })
+
+  it('hasPermission honours *:* wildcard (platform super-admin)', () => {
+    // *:* is the PLATFORM_ADMIN's wildcard — covers platform: namespace only.
+    const store = useAuthStore()
+    store.authorities = ['*:*']
+    const { hasPermission } = usePermission()
+
+    expect(hasPermission('platform:tenant:read')).toBe(true)
+    expect(hasPermission('platform:anything')).toBe(true)
+    // Should NOT cover business namespace
+    expect(hasPermission('user:read')).toBe(false)
   })
 
   it('hasPermission honours resource:* wildcard', () => {
