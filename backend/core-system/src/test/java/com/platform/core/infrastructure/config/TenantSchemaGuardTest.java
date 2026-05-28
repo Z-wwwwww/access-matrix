@@ -72,15 +72,16 @@ class TenantSchemaGuardTest {
                         "core_rbac_role",
                         "core_rbac_permission",
                         "business_widget",
+                        "core_numbering_key",      // per-tenant, JdbcTemplate-only — has column, NOT excluded
                         // Excluded — correctly column-less:
                         "flyway_schema_history",
                         "core_meta",
-                        "core_numbering_management",
-                        "core_numbering_key"),
+                        "core_numbering_management"),
                 List.of(
                         "core_rbac_role",
                         "core_rbac_permission",
-                        "business_widget")
+                        "business_widget",
+                        "core_numbering_key")
         );
         TenantSchemaGuard guard = newGuard(true);
         assertThatCode(guard::verify).doesNotThrowAnyException();
@@ -109,7 +110,7 @@ class TenantSchemaGuardTest {
         // through a recent migration that forgot to remove the entry.
         stubTables(
                 List.of("core_rbac_role", "core_meta", "flyway_schema_history",
-                        "core_numbering_management", "core_numbering_key"),
+                        "core_numbering_management"),
                 List.of("core_rbac_role", "core_meta")  // ← core_meta has tenant_id now
         );
         TenantSchemaGuard guard = newGuard(true);
@@ -123,7 +124,7 @@ class TenantSchemaGuardTest {
     void caseInsensitive() {
         stubTables(
                 List.of("Core_Rbac_Role", "FLYWAY_SCHEMA_HISTORY", "Core_Meta",
-                        "Core_Numbering_Management", "Core_Numbering_Key"),
+                        "Core_Numbering_Management"),
                 List.of("Core_Rbac_Role")
         );
         TenantSchemaGuard guard = newGuard(true);
