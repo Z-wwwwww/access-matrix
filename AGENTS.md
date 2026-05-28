@@ -94,13 +94,22 @@ The backend's local profile automatically runs Flyway migrations + LocalAdminSee
 When the task is "add a new business module / table / endpoint":
 
 ```bash
-# Fastest path — generates 5 Java files + 1 SQL migration, conventions baked in
+# Typical: a fresh module (orders, billing, ...) — generates a self-contained
+# backend/business-<name>/ Maven module with permissions class + migration + 5 Java files,
+# auto-wired into backend/pom.xml and backend/core-bootstrap/pom.xml.
 ./mvnw -pl core-bootstrap exec:java \
     -Dexec.mainClass=com.platform.core.bootstrap.tools.BusinessModuleScaffold \
-    -Dexec.args="<resource>"      # e.g. order, invoice, salesreport
+    -Dexec.args="<resource> --new-module=<module-name>"
+#  ↑ e.g. "order --new-module=orders"   "invoice --new-module=billing"
+
+# Legacy: add a second resource inside the existing business-demo module
+# (useful for tutorials / playgrounds). Auto-injects 4 perm constants into DemoPermissions.
+./mvnw -pl core-bootstrap exec:java \
+    -Dexec.mainClass=com.platform.core.bootstrap.tools.BusinessModuleScaffold \
+    -Dexec.args="<resource>"
 ```
 
-Then edit the placeholder business columns + add 4 permission constants to `backend/business-demo/src/main/java/com/platform/business/demo/security/DemoPermissions.java` (the scaffold prints the exact lines to add). Full conventions live at [backend/AGENTS.md § Business code recipe](backend/AGENTS.md#business-code-recipe--adding-a-new-table--endpoint); the boot guards (`TenantSchemaGuard` + `PermissionConsistencyGuard`) + `ArchitectureTest` enforce them.
+After scaffolding, edit the placeholder columns in the generated `V1000__create_business_<resource>.sql` and entity. In new-module mode the permissions class is already generated; in legacy mode the scaffold prints the exact constants it injected into `DemoPermissions`. Full conventions live at [backend/AGENTS.md § Business code recipe](backend/AGENTS.md#business-code-recipe--adding-a-new-table--endpoint); the boot guards (`TenantSchemaGuard` + `PermissionConsistencyGuard`) + `ArchitectureTest` enforce them.
 
 ## Cross-stack contract alignment points (most common pitfalls)
 

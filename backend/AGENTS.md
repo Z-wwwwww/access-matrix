@@ -179,12 +179,18 @@ This is the canonical checklist when an AI agent or human is asked to "add an Or
 Before writing anything by hand, try:
 
 ```bash
+# A. New module (typical for a real business domain — orders, billing, etc.):
+./mvnw -pl core-bootstrap exec:java \
+    -Dexec.mainClass=com.platform.core.bootstrap.tools.BusinessModuleScaffold \
+    -Dexec.args="<resource> --new-module=<module-name>"
+
+# B. Legacy mode (adds a second resource to the existing business-demo module):
 ./mvnw -pl core-bootstrap exec:java \
     -Dexec.mainClass=com.platform.core.bootstrap.tools.BusinessModuleScaffold \
     -Dexec.args="<resource>"
 ```
 
-This clones `business-demo/task/*` with identifier substitution and writes a Flyway migration at the next free V≥1000 — produces 5 Java files + 1 SQL file, all conventions baked in. Then you only edit business fields + add permission constants. See [`docs/development.md` § Adding a new business module](../docs/development.md#adding-a-new-business-module-end-to-end-checklist) for the full walkthrough.
+Both modes clone `business-demo/task/*` with identifier substitution and write the migration at the next free V≥1000. New-module mode additionally creates `backend/business-<name>/` (its own Maven module with `pom.xml`, a `<Name>Permissions` class with 4 auto-registered constants, and an empty `db/migration/` dir) and wires it into `backend/pom.xml` + `backend/core-bootstrap/pom.xml`. Legacy mode auto-injects 4 perm constants into `business-demo/.../security/DemoPermissions.java`. Either way you only need to edit business fields next. See [`docs/development.md` § Adding a new business module](../docs/development.md#adding-a-new-business-module-end-to-end-checklist) for the full walkthrough.
 
 If you prefer (or need) to do it by hand, the DO / DON'T below is the spec.
 
