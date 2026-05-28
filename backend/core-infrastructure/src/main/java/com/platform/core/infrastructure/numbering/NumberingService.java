@@ -20,18 +20,36 @@ import java.util.List;
  * Allocates human-visible reference numbers (e.g. {@code U00000001}) backed by
  * {@code core_numbering_management} and {@code core_numbering_key}.
  *
- * <p>Optimisations vs the original implementation:
+ * <h3>Tenant scoping</h3>
+ * <p>Both backing tables are per-tenant:
+ * <ul>
+ *   <li>{@code core_numbering_management} (def + counter, PK
+ *       {@code (tenant_id, code_kbn)}) — used by the {@code fixedKey == ""}
+ *       path. Every tenant has its own counter so e.g. {@code U00000001} is
+ *       independently the first user of demo, acme, …</li>
+ *   <li>{@code core_numbering_key} (counter only, PK
+ *       {@code (tenant_id, code_kbn, numbering_key)}) — used by the
+ *       {@code fixedKey != ""} path for finer-grained sub-buckets within
+ *       a tenant (e.g. one counter per branch office).</li>
+ * </ul>
+ *
+ * <p>tenantId must be passed by the caller — never resolved internally.
+ * The {@link #requireTenant} check rejects null/blank at every public method
+ * to keep the per-tenant guarantee from being undermined by a forgetful caller.
+ *
+ * <h3>Optimisations vs the original implementation</h3>
  * <ul>
  *   <li>{@link NumberingDef} (format / digit / recycle / min-max-step) cached in
  *       Caffeine for 10 minutes &mdash; the volatile {@code seq_id} stays in DB
- *       and is mutated atomically per call.</li>
+ *       and is mutated atomically per call. Cache key is
+ *       {@code (tenantId, codeKbn)} so per-tenant overrides Just Work.</li>
  *   <li>Counter increment uses {@code UPDATE ... RETURNING seq_id} in a single
  *       statement (no more {@code SELECT FOR UPDATE} + {@code UPDATE} round-trip).</li>
  *   <li>{@code nextBatch} / {@code collectBatch} allocate {@code count} numbers
  *       in one DB hit, cutting bulk-import latency by roughly N times.</li>
  * </ul>
  *
- * <p>Semantics preserved from before:
+ * <h3>Semantics</h3>
  * <ul>
  *   <li>Each allocation runs in its own transaction ({@code REQUIRES_NEW}).</li>
  *   <li>For {@code count == 1}, exceeding {@code max_value} wraps back to
@@ -44,16 +62,22 @@ import java.util.List;
 @Service
 public class NumberingService {
 
+    /** Source tenant for {@link #seedDefaultsForTenant} — the reference business tenant. */
+    private static final String TEMPLATE_TENANT = "demo";
+
     private final JdbcTemplate jdbc;
-    private final LoadingCache<String, NumberingDef> defCache;
+    private final LoadingCache<DefCacheKey, NumberingDef> defCache;
 
     public NumberingService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
         this.defCache = Caffeine.newBuilder()
                 .maximumSize(500)
                 .expireAfterWrite(Duration.ofMinutes(10))
-                .build(this::loadDef);
+                .build(key -> loadDef(key.tenantId(), key.codeKbn()));
     }
+
+    /** Composite key for the def cache — codeKbn alone is no longer unique. */
+    private record DefCacheKey(String tenantId, String codeKbn) {}
 
     // ---------- public API ----------
 
@@ -78,18 +102,43 @@ public class NumberingService {
     }
 
     /**
-     * Reject null / blank tenantId at the API boundary instead of silently
-     * routing the allocation into a phantom {@code "default"} bucket. The
-     * fallback used to be {@code tenantId == null ? "default" : tenantId},
-     * which dated from before V25 renamed the {@code default} tenant to
-     * {@code demo} — anyone forgetting to pass tenantId would write rows to
-     * a tenant that no longer exists, mixing all callers' counters together.
-     * Fail-fast makes the contract explicit: <em>core_numbering_key is
-     * per-tenant; callers MUST resolve their tenant before calling here.</em>
+     * Clone every numbering definition from the template tenant ({@code demo})
+     * into {@code newTenantId}, resetting each counter to {@code min_value -
+     * step_value} so the new tenant's first allocation returns exactly
+     * {@code min_value}. Called from {@code TenantAdminService.create} right
+     * after the registry row is inserted; idempotent via {@code ON CONFLICT
+     * DO NOTHING} so a retry of a half-failed tenant creation doesn't
+     * double-seed.
      *
-     * <p>The only production caller today ({@code UserAdminService.create})
-     * already defaults to {@code "demo"} before invoking us; this check is
-     * defence against a future caller that forgets.
+     * <p>If the template tenant has zero definitions (unusual — would mean
+     * the platform was installed without seeding the {@code USER} def), this
+     * is a no-op and the new tenant's first {@code next(...)} call will get
+     * a {@code "Numbering definition not found"} error. That failure mode is
+     * preserved deliberately so an empty-defs misconfiguration surfaces loudly
+     * the first time someone tries to allocate.
+     */
+    @Transactional
+    public void seedDefaultsForTenant(String newTenantId) {
+        requireTenant(newTenantId);
+        jdbc.update(
+                "INSERT INTO core_numbering_management " +
+                "    (tenant_id, code_kbn, format_sentence, recycle_division, zero_insert, " +
+                "     seq_id_digit, date_format_sentence, min_value, max_value, step_value, " +
+                "     seq_id, description) " +
+                "SELECT ?, code_kbn, format_sentence, recycle_division, zero_insert, " +
+                "       seq_id_digit, date_format_sentence, min_value, max_value, step_value, " +
+                "       min_value - step_value, description " +
+                "  FROM core_numbering_management " +
+                " WHERE tenant_id = ? " +
+                "ON CONFLICT (tenant_id, code_kbn) DO NOTHING",
+                newTenantId, TEMPLATE_TENANT);
+    }
+
+    /**
+     * Reject null / blank tenantId at the API boundary so we never silently
+     * route an allocation into a phantom tenant bucket. Every public method
+     * funnels through here. The contract is loud: <em>NumberingService is
+     * per-tenant; callers MUST resolve their tenant before invoking.</em>
      */
     private static String requireTenant(String tenantId) {
         if (tenantId == null || tenantId.isBlank()) {
@@ -100,9 +149,9 @@ public class NumberingService {
         return tenantId;
     }
 
-    /** Drop the cached definition for one codeKbn — call after editing a definition row. */
-    public void invalidate(String codeKbn) {
-        defCache.invalidate(codeKbn);
+    /** Drop the cached definition for one (tenantId, codeKbn) — call after editing a definition row. */
+    public void invalidate(String tenantId, String codeKbn) {
+        defCache.invalidate(new DefCacheKey(tenantId, codeKbn));
     }
 
     /** Drop all cached definitions — call after bulk DB updates. */
@@ -116,9 +165,10 @@ public class NumberingService {
         if (count <= 0) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED, "count must be > 0");
         }
-        NumberingDef def = defCache.get(codeKbn);
+        NumberingDef def = defCache.get(new DefCacheKey(tenantId, codeKbn));
         if (def == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "Numbering definition not found: " + codeKbn);
+            throw new BusinessException(ErrorCode.NOT_FOUND,
+                    "Numbering definition not found: " + codeKbn + " (tenant=" + tenantId + ")");
         }
 
         String datePart = computeDatePart(def.recycleDivision(), def.dateFormatSentence());
@@ -129,7 +179,7 @@ public class NumberingService {
         long delta = def.stepValue() * count;
         long lastSeq;
         if (fixedKey == null || fixedKey.isEmpty()) {
-            lastSeq = incrementManagement(codeKbn, delta, def, count);
+            lastSeq = incrementManagement(codeKbn, tenantId, delta, def, count);
         } else {
             ensureKeyRow(codeKbn, expandedKey, tenantId, def);
             lastSeq = incrementKey(codeKbn, expandedKey, tenantId, delta, def, count);
@@ -145,32 +195,35 @@ public class NumberingService {
         return out;
     }
 
-    private long incrementManagement(String codeKbn, long delta, NumberingDef def, int count) {
+    private long incrementManagement(String codeKbn, String tenantId,
+                                     long delta, NumberingDef def, int count) {
         // Atomic conditional update: only commits if (seq_id + delta) would not exceed max_value.
         List<Long> rows = jdbc.query(
                 "UPDATE core_numbering_management " +
                 "   SET seq_id = seq_id + ? " +
-                " WHERE code_kbn = ? AND seq_id + ? <= ? " +
+                " WHERE tenant_id = ? AND code_kbn = ? AND seq_id + ? <= ? " +
                 "RETURNING seq_id",
                 (rs, n) -> rs.getLong(1),
-                delta, codeKbn, delta, def.maxValue());
+                delta, tenantId, codeKbn, delta, def.maxValue());
 
         if (!rows.isEmpty()) return rows.get(0);
 
         if (count == 1) {
             // Preserve legacy wrap-on-overflow: reset to min_value, return min_value.
             List<Long> wrap = jdbc.query(
-                    "UPDATE core_numbering_management SET seq_id = ? WHERE code_kbn = ? RETURNING seq_id",
+                    "UPDATE core_numbering_management SET seq_id = ? " +
+                    "WHERE tenant_id = ? AND code_kbn = ? RETURNING seq_id",
                     (rs, n) -> rs.getLong(1),
-                    def.minValue(), codeKbn);
+                    def.minValue(), tenantId, codeKbn);
             if (wrap.isEmpty()) {
                 throw new BusinessException(ErrorCode.NOT_FOUND,
-                        "Numbering definition not found: " + codeKbn);
+                        "Numbering definition not found: " + codeKbn + " (tenant=" + tenantId + ")");
             }
             return wrap.get(0);
         }
         throw new BusinessException(ErrorCode.BUSINESS_ERROR,
-                "Numbering '" + codeKbn + "' would exceed max_value " + def.maxValue() + " in this batch");
+                "Numbering '" + codeKbn + "' (tenant=" + tenantId
+                        + ") would exceed max_value " + def.maxValue() + " in this batch");
     }
 
     private void ensureKeyRow(String codeKbn, String expandedKey, String tenantId, NumberingDef def) {
@@ -217,12 +270,12 @@ public class NumberingService {
 
     // ---------- cache loader & helpers ----------
 
-    private NumberingDef loadDef(String codeKbn) {
+    private NumberingDef loadDef(String tenantId, String codeKbn) {
         try {
             return jdbc.queryForObject(
                     "SELECT format_sentence, recycle_division, zero_insert, seq_id_digit, " +
                     "       date_format_sentence, min_value, max_value, step_value " +
-                    "  FROM core_numbering_management WHERE code_kbn = ?",
+                    "  FROM core_numbering_management WHERE tenant_id = ? AND code_kbn = ?",
                     (rs, n) -> new NumberingDef(
                             rs.getString("format_sentence"),
                             rs.getInt("recycle_division"),
@@ -232,7 +285,7 @@ public class NumberingService {
                             rs.getLong("min_value"),
                             rs.getLong("max_value"),
                             rs.getLong("step_value")),
-                    codeKbn);
+                    tenantId, codeKbn);
         } catch (EmptyResultDataAccessException e) {
             return null;
         }

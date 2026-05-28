@@ -47,8 +47,7 @@ public class MybatisPlusConfig {
      */
     static final Set<String> TENANT_EXCLUDED_TABLES = Set.of(
             "flyway_schema_history",
-            "core_meta",
-            "core_numbering_management"
+            "core_meta"
     );
 
     /**

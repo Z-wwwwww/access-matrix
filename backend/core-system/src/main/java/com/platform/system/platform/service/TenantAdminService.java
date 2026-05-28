@@ -7,6 +7,7 @@ import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.core.common.result.PageResult;
+import com.platform.core.infrastructure.numbering.NumberingService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakRealmService;
 import com.platform.system.platform.dto.TenantDto;
 import com.platform.system.platform.entity.TenantEntity;
@@ -65,11 +66,14 @@ public class TenantAdminService {
      * controller is gated separately).
      */
     private final ObjectProvider<KeycloakRealmService> realmServiceProvider;
+    private final NumberingService numberingService;
 
     public TenantAdminService(TenantMapper tenantMapper,
-                              ObjectProvider<KeycloakRealmService> realmServiceProvider) {
+                              ObjectProvider<KeycloakRealmService> realmServiceProvider,
+                              NumberingService numberingService) {
         this.tenantMapper = tenantMapper;
         this.realmServiceProvider = realmServiceProvider;
+        this.numberingService = numberingService;
     }
 
     public PageResult<TenantDto.View> list(long page, long size, String keyword) {
@@ -139,6 +143,15 @@ public class TenantAdminService {
         row.setCreateTime(LocalDateTime.now());
         row.setUpdateTime(LocalDateTime.now());
         tenantMapper.insert(row);
+
+        // ── 4. Seed per-tenant numbering definitions ────────────────
+        // Without this, the new tenant's first numberingService.next("USER", ...)
+        // would error with "Numbering definition not found" because V31 made
+        // core_numbering_management per-tenant. Clones from the 'demo' template
+        // with seq_id reset so this tenant starts numbering from min_value.
+        // Inside the same @Transactional so a failure here rolls back the
+        // registry row too — symmetric with the registry-insert failure path.
+        numberingService.seedDefaultsForTenant(req.tenantCode());
 
         log.info("[tenant] created tenant '{}' (id={}, displayName='{}')",
                 req.tenantCode(), row.getId(), req.displayName());
