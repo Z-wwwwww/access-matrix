@@ -455,13 +455,33 @@ public class TenantAdminService {
     }
 
     /**
-     * Soft-delete a tenant: disable the Keycloak realm (users can't sign
-     * in any more) and mark the DB row deleted. Business data
-     * ({@code core_auth_user}, etc. with this tenant_code) stays
-     * untouched so a future "undo" or hard-purge has its substrate.
+     * Permanently delete a tenant — the "empty recycle bin" operation.
+     *
+     * <p>Flow ("recycle bin" UX): operator must first {@link #suspend}
+     * the tenant, then call this from the suspended-tenant view. The
+     * status=0 prerequisite is a deliberate friction point — single-
+     * click "active → gone" was rejected as too dangerous.
+     *
+     * <p>Order (DB first, KC last):
+     * <ol>
+     *   <li>DELETE per-tenant business rows in FK-safe order. Junction
+     *       tables ({@code core_rbac_role_*, core_rbac_user_role}) before
+     *       their parents ({@code core_rbac_role / permission / menu /
+     *       dept}); {@code core_auth_user} after {@code user_role}; the
+     *       rest in any order; {@code core_tenant} registry last.</li>
+     *   <li>Delete the Keycloak realm. Done after DB so a DB failure
+     *       doesn't leave us with a gone realm but live data rows.</li>
+     * </ol>
+     *
+     * <p>Confirmation: {@code confirmCode} must match the row's
+     * {@code tenantCode} exactly. Defence-in-depth — the frontend gates
+     * on the same typed match, but the backend re-validates so an
+     * operator armed with curl can't slip a path-id past.
+     *
+     * <p>Irreversible. No undo.
      */
     @Transactional
-    public void softDelete(String id) {
+    public void hardDelete(String id, String confirmCode) {
         TenantEntity row = tenantMapper.selectById(id);
         if (row == null || !Integer.valueOf(1).equals(row.getMark())) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Tenant not found: " + id);
@@ -470,35 +490,89 @@ public class TenantAdminService {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR,
                     "Built-in tenant '" + row.getTenantCode() + "' cannot be deleted");
         }
+        if (!Integer.valueOf(0).equals(row.getStatus())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                    "Tenant '" + row.getTenantCode() + "' must be suspended before delete "
+                            + "(active tenants can't be hard-deleted in one step)");
+        }
+        if (confirmCode == null || !confirmCode.equals(row.getTenantCode())) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,
+                    "confirmCode must match the tenant code exactly");
+        }
 
-        // KC first so we know the IdP can be reached BEFORE we mark the
-        // row dead. If KC is down we'd rather fail-loud and let the
-        // operator retry once it's back, than mark dead in DB but leave
-        // the realm enabled (a state that lets users keep signing in
-        // even though the registry says the tenant is gone).
+        String tenantCode = row.getTenantCode();
+        log.warn("[tenant] HARD DELETE starting for '{}' (id={}) — irreversible", tenantCode, id);
+
+        // ── 1. Per-tenant business rows ─────────────────────────────
+        // FK-safe ordering. The four junction tables (role_dept,
+        // role_menu, role_permission, user_role) reference role/dept/
+        // menu/permission/user with ON DELETE RESTRICT, so they must
+        // empty first.
+        deleteByTenant("core_rbac_role_dept", tenantCode);
+        deleteByTenant("core_rbac_role_menu", tenantCode);
+        deleteByTenant("core_rbac_role_permission", tenantCode);
+        deleteByTenant("core_rbac_user_role", tenantCode);
+        // Then the four "parents" the junctions referenced.
+        deleteByTenant("core_rbac_role", tenantCode);
+        deleteByTenant("core_rbac_permission", tenantCode);
+        deleteByTenant("core_rbac_menu", tenantCode);
+        deleteByTenant("core_rbac_dept", tenantCode);
+        // Users after user_role.
+        deleteByTenant("core_auth_user", tenantCode);
+        // Standalone per-tenant tables (no FKs to / from each other).
+        deleteByTenant("core_auth_login_log", tenantCode);
+        deleteByTenant("core_oplog", tenantCode);
+        deleteByTenant("core_password_reset_token", tenantCode);
+        deleteByTenant("core_user_invite", tenantCode);
+        deleteByTenant("core_numbering_key", tenantCode);
+        deleteByTenant("core_numbering_management", tenantCode);
+        // Business modules. Add new modules' tables here as they ship,
+        // or migrate to information_schema-driven discovery later.
+        deleteByTenant("demo_task", tenantCode);
+
+        // ── 2. Keycloak realm ───────────────────────────────────────
+        // Done before the registry row so a KC failure leaves the
+        // registry row intact for retry. We've already deleted the
+        // business data — operator can retry the whole hardDelete and
+        // step 1 will be no-ops, KC delete will succeed.
         KeycloakRealmService realmService = realmServiceProvider.getIfAvailable();
         if (realmService != null) {
             try {
-                realmService.disableRealm(row.getTenantCode());
+                realmService.deleteRealm(tenantCode);
             } catch (Exception e) {
-                log.warn("[tenant] disableRealm for '{}' failed: {}",
-                        row.getTenantCode(), e.toString());
+                log.warn("[tenant] deleteRealm for '{}' failed: {}", tenantCode, e.toString());
                 throw new BusinessException(ErrorCode.BUSINESS_ERROR,
-                        "Could not disable realm in Keycloak: " + e.getMessage());
+                        "Could not delete realm in Keycloak: " + e.getMessage());
             }
         }
 
-        // Then the registry row. UpdateWrapper because mark is @TableLogic
-        // — updateById would silently strip mark from the SET clause.
-        tenantMapper.update(null,
-                new UpdateWrapper<TenantEntity>()
-                        .eq("id", id)
-                        .eq("mark", 1)
-                        .set("mark", 0)
-                        .set("update_user", "platform-admin")
-                        .set("update_time", LocalDateTime.now()));
+        // ── 3. Registry row (hard DELETE, not mark=0) ──────────────
+        // Bypass MP soft-delete: use raw SQL so the row physically leaves.
+        // tenantMapper.deleteById would honour @TableLogic and just mark=0.
+        int rows = jdbc.update("DELETE FROM core_tenant WHERE id = ?", id);
+        if (rows != 1) {
+            // Unexpected — the selectById above succeeded but DELETE
+            // affected the wrong number of rows. Log loudly so it surfaces
+            // post-mortem, but don't blow up the operation since the rest
+            // already succeeded.
+            log.warn("[tenant] registry DELETE for id={} affected {} rows (expected 1)", id, rows);
+        }
 
-        log.info("[tenant] soft-deleted tenant '{}' (id={})", row.getTenantCode(), id);
+        log.warn("[tenant] HARD DELETE complete for '{}' (id={})", tenantCode, id);
+    }
+
+    /**
+     * DELETE FROM the given table where tenant_id matches, via JdbcTemplate
+     * (bypasses MP tenant interceptor — we're operating from system tenant
+     * and target a different tenant, so interceptor scoping would no-op).
+     * Logs the row count so the operator can see at a glance how much was
+     * removed from each table.
+     */
+    private void deleteByTenant(String table, String tenantCode) {
+        int rows = jdbc.update("DELETE FROM " + table + " WHERE tenant_id = ?", tenantCode);
+        if (rows > 0) {
+            log.info("[tenant] DELETE {} rows from {} for tenant='{}'", rows, table, tenantCode);
+        }
     }
 
     private TenantDto.View toView(TenantEntity e) {

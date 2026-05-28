@@ -69,6 +69,16 @@ public final class TenantDto {
     ) {}
 
     /**
+     * Request body for {@code DELETE /platform/tenants/{id}}. The
+     * {@code confirmCode} must match the target tenant's
+     * {@code tenant_code} exactly — backend re-validates so a curl-armed
+     * operator can't slip a path-id past the frontend's typed gate.
+     */
+    public record HardDeleteRequest(
+            @NotBlank @Size(max = 64) String confirmCode
+    ) {}
+
+    /**
      * Request body for {@code POST /platform/tenants/{id}/support-session}.
      * A non-blank {@code reason} is mandatory — it's the primary audit
      * justification and lands in {@code core_oplog.request_body} via the

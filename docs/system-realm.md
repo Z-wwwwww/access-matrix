@@ -124,7 +124,7 @@ V26                       → seeds PLATFORM_ADMIN role + platform:* permission
 
 Sign in as `ops` / `ops` and navigate to `/platform/tenants` — the
 tenant management console (see "Managing business tenants" below) lets
-you create / soft-delete business tenants from there.
+you create / suspend / hard-delete business tenants from there.
 
 ## Production setup
 
@@ -160,6 +160,80 @@ Until the tenant-management UI lands:
 
 After the tenant-management PR lands, this becomes a single REST call
 plus an email.
+
+## Managing business tenants
+
+The tenant lifecycle from the `/platform/tenants` console mirrors a
+"recycle bin" model — every destructive step needs an explicit
+predecessor, and the most destructive step needs a typed confirmation:
+
+```
+                    suspend             hard delete
+   ┌──────────┐  ─────────────►  ┌──────────┐  ────────────►  ☒ gone
+   │  active  │                  │ suspended │   (typed conf.)   forever
+   └──────────┘  ◄─────────────  └──────────┘
+                     resume
+```
+
+### Create (POST /platform/tenants)
+
+End-to-end onboarding inside one `@Transactional`:
+1. Create Keycloak realm from the demo template (KC first → no orphan rows)
+2. Insert `core_tenant` registry row
+3. Seed `core_numbering_management` (per-tenant counter)
+4. Seed RBAC: tenant:* permission + SUPER_ADMIN role + role-permission
+   binding + clone of demo's menu tree
+5. Create first admin user (no password) + bind to SUPER_ADMIN
+6. Create matching Keycloak user (no credentials)
+7. Mint an invite token and email the link to `contactEmail`
+
+The invite recipient hits `/invite/<token>`, sets a password, and is
+the new tenant's first SUPER_ADMIN.
+
+### Suspend (POST /platform/tenants/{id}/suspend)
+
+- `status` flips 1 → 0; `mark` stays 1
+- KC realm `enabled` flips to false (active sessions get kicked out
+  on next refresh; new logins refused)
+- Tenant stays visible in the list with a "Suspended" badge
+- Reversible via Resume
+
+### Resume (POST /platform/tenants/{id}/resume)
+
+- `status` flips 0 → 1; KC realm `enabled` back to true
+- Idempotent (already-active resume is a no-op)
+
+### Hard delete (DELETE /platform/tenants/{id})
+
+"Empty recycle bin" — the only destructive operation.
+
+**Prerequisites**:
+- Tenant must currently be suspended (`status=0`). Active tenants are
+  refused — the UI doesn't even show a delete button on active rows.
+- Body must include `confirmCode` matching the tenant's `tenant_code`
+  exactly. The frontend gates on the same typed match; the backend
+  re-validates so a curl-armed caller can't slip a path-id past.
+- Built-in tenants (`system`, `demo`) refused.
+
+**Order (DB-first)**:
+1. `DELETE FROM <every per-tenant table> WHERE tenant_id = ?` in
+   FK-safe order (junction tables → parents → users → auxiliaries).
+   Currently hardcoded; adding a new per-tenant table for a future
+   business module means adding one line to `TenantAdminService.hardDelete`.
+2. `kc.realm(code).remove()` — drops realm + users + sessions + clients.
+3. `DELETE FROM core_tenant WHERE id = ?` (registry row last).
+
+DB-first is deliberate: a DB failure leaves the realm intact and the
+registry row intact for retry. The reverse would leave data unreachable
+but still consuming space, requiring manual realm recreation to recover.
+
+**Irreversible**. No undo. Recovery is "restore from backup", which
+requires DB + KC backups timed before the delete.
+
+### Support sessions
+
+See [§ Support sessions](#support-sessions-platform-ops-impersonation)
+below — short-lived JWT impersonation for ticket triage, with audit.
 
 ## Support sessions (platform-ops impersonation)
 

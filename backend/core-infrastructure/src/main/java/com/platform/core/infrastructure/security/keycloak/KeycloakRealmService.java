@@ -205,6 +205,34 @@ public class KeycloakRealmService {
     }
 
     /**
+     * Physically delete a realm — drops realm config, users, sessions,
+     * clients, audit events. Irreversible. Called by the hard-delete
+     * tenant flow AFTER all per-tenant DB rows have been deleted.
+     *
+     * <p>Ordering note: the orchestrating service runs DB deletes BEFORE
+     * this KC delete. If the DB-side succeeds and this KC call fails,
+     * we end up with an orphan realm in Keycloak — the operator can
+     * delete it manually from the admin console. The reverse (KC delete
+     * succeeds, DB delete fails) would leave business data unreachable
+     * but still consuming space — worse, because the recovery path
+     * involves manually recreating the realm. Hence DB-first.
+     */
+    public void deleteRealm(String tenantCode) {
+        validateTenantCode(tenantCode);
+        try (Keycloak kc = newAdminClient()) {
+            kc.realm(tenantCode).remove();
+            log.info("[kc-realm] deleted realm '{}'", tenantCode);
+        } catch (NotFoundException e) {
+            // Already gone — treat as success so a retry of a half-failed
+            // hard delete completes cleanly rather than tripping here.
+            log.warn("[kc-realm] realm '{}' was already absent during delete", tenantCode);
+        } catch (WebApplicationException e) {
+            throw new KeycloakUserService.KeycloakOperationException(
+                    "Keycloak delete-realm failed: HTTP " + e.getResponse().getStatus(), e);
+        }
+    }
+
+    /**
      * {@code true} if a realm with this exact code exists in Keycloak.
      * Used by {@code TenantAdminService.create} to fail-fast before
      * touching the DB.

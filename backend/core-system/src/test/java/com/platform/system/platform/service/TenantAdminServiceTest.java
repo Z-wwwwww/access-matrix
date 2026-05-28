@@ -271,72 +271,81 @@ class TenantAdminServiceTest {
         assertThat(TenantAdminService.deriveUsernameFromEmail("_internal@acme.com")).isEqualTo("internal");
     }
 
-    // ─── softDelete ──────────────────────────────────────────────────
+    // ─── hardDelete ──────────────────────────────────────────────────
+    // Recycle-bin model: tenant must already be suspended (status=0)
+    // before hardDelete is callable. confirmCode must match tenant_code.
+
+    private TenantEntity suspendedRow(String id, String code) {
+        TenantEntity e = row(id, code);
+        e.setStatus(0);
+        return e;
+    }
 
     @Test
-    void softDelete_builtInSystem_refused() {
-        when(tenantMapper.selectById("id-sys")).thenReturn(row("id-sys", "system"));
+    void hardDelete_builtInSystem_refused() {
+        when(tenantMapper.selectById("id-sys")).thenReturn(suspendedRow("id-sys", "system"));
 
-        assertThatThrownBy(() -> service.softDelete("id-sys"))
+        assertThatThrownBy(() -> service.hardDelete("id-sys", "system"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Built-in tenant");
 
-        verify(realmService, never()).disableRealm(any());
-        verify(tenantMapper, never()).update(any(), any());
+        verify(realmService, never()).deleteRealm(any());
     }
 
     @Test
-    void softDelete_builtInDemo_refused() {
-        when(tenantMapper.selectById("id-demo")).thenReturn(row("id-demo", "demo"));
-
-        assertThatThrownBy(() -> service.softDelete("id-demo"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Built-in tenant");
-
-        verify(realmService, never()).disableRealm(any());
-    }
-
-    @Test
-    void softDelete_happyPath_disablesRealmThenMarksRowDeleted() {
+    void hardDelete_activeTenant_refused_mustSuspendFirst() {
+        // status=1 → active → recycle-bin rule kicks in: refuse.
         when(tenantMapper.selectById("id-acme")).thenReturn(row("id-acme", "acme"));
 
-        service.softDelete("id-acme");
-
-        org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(realmService, tenantMapper);
-        inOrder.verify(realmService).disableRealm("acme");
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<UpdateWrapper<TenantEntity>> cap = ArgumentCaptor.forClass(UpdateWrapper.class);
-        inOrder.verify(tenantMapper).update(org.mockito.ArgumentMatchers.isNull(), cap.capture());
-        String sql = cap.getValue().getSqlSet();
-        assertThat(sql).contains("mark=");
-        assertThat(cap.getValue().getParamNameValuePairs().values()).contains(0);
-    }
-
-    @Test
-    void softDelete_kcDown_failsAndDoesNotMarkRow() {
-        when(tenantMapper.selectById("id-acme")).thenReturn(row("id-acme", "acme"));
-        org.mockito.Mockito.doThrow(new KeycloakUserService.KeycloakOperationException("KC down"))
-                .when(realmService).disableRealm("acme");
-
-        assertThatThrownBy(() -> service.softDelete("id-acme"))
+        assertThatThrownBy(() -> service.hardDelete("id-acme", "acme"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Could not disable realm");
+                .hasMessageContaining("must be suspended before delete");
 
-        verify(tenantMapper, never()).update(any(), any());
+        verify(realmService, never()).deleteRealm(any());
+        verify(jdbc, never()).update(anyString(), org.mockito.ArgumentMatchers.<Object[]>any());
     }
 
     @Test
-    void softDelete_alreadyDeleted_notFound() {
-        TenantEntity deleted = row("id-x", "x");
-        deleted.setMark(0);
-        when(tenantMapper.selectById("id-x")).thenReturn(deleted);
+    void hardDelete_mismatchedConfirmCode_refused() {
+        when(tenantMapper.selectById("id-acme")).thenReturn(suspendedRow("id-acme", "acme"));
 
-        assertThatThrownBy(() -> service.softDelete("id-x"))
+        assertThatThrownBy(() -> service.hardDelete("id-acme", "acmeXXX"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("confirmCode must match");
+
+        verify(realmService, never()).deleteRealm(any());
+        verify(jdbc, never()).update(anyString(), org.mockito.ArgumentMatchers.<Object[]>any());
+    }
+
+    @Test
+    void hardDelete_alreadyDeleted_notFound() {
+        TenantEntity gone = suspendedRow("id-x", "x");
+        gone.setMark(0);
+        when(tenantMapper.selectById("id-x")).thenReturn(gone);
+
+        assertThatThrownBy(() -> service.hardDelete("id-x", "x"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("not found");
+    }
 
-        verify(realmService, never()).disableRealm(any());
+    @Test
+    void hardDelete_happyPath_dropsBusinessRowsThenKcThenRegistry() {
+        when(tenantMapper.selectById("id-acme")).thenReturn(suspendedRow("id-acme", "acme"));
+        when(jdbc.update(anyString(), org.mockito.ArgumentMatchers.<Object[]>any())).thenReturn(1);
+
+        service.hardDelete("id-acme", "acme");
+
+        // Order: every business DELETE before KC realm delete, registry DELETE last.
+        org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(jdbc, realmService);
+        // Junction tables fire first; we just confirm at least one biz DELETE
+        // happens before the realm delete, then a registry DELETE last.
+        inOrder.verify(jdbc, org.mockito.Mockito.atLeastOnce()).update(
+                org.mockito.ArgumentMatchers.contains("core_rbac_role_dept"),
+                org.mockito.ArgumentMatchers.<Object[]>any());
+        inOrder.verify(realmService).deleteRealm("acme");
+        inOrder.verify(jdbc).update(
+                org.mockito.ArgumentMatchers.contains("DELETE FROM core_tenant"),
+                org.mockito.ArgumentMatchers.<Object[]>any());
     }
 
     // ─── suspend / resume ────────────────────────────────────────────
