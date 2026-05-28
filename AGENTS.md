@@ -1,7 +1,5 @@
 # Access Matrix — Cross-Stack Workspace Guide
 
-**English** · [中文](AGENTS.zh-CN.md)
-
 This repo is a monorepo: `backend/` is the Spring Boot 4 backend and `frontend/` is the Vue 3 frontend. The two stacks are tightly coupled, which is why they live together — a single PR can "add an API + add a page" without any version-coordination overhead.
 
 ## Repository layout
@@ -90,6 +88,12 @@ Cross-stack PRs must pass CI on both sides (the path filter triggers the corresp
 2. Then frontend: `cd frontend && npm install && npm run dev`
 
 The backend's local profile automatically runs Flyway migrations + LocalAdminSeeder + DemoSeeder, so no manual SQL is required.
+
+## Adding a new business module (AI quick reference)
+
+When the task is "add a new business module / table / endpoint", the canonical recipe lives at [backend/AGENTS.md § Business code recipe](backend/AGENTS.md#business-code-recipe--adding-a-new-table--endpoint). One-line summary:
+
+> Business tables MUST have `tenant_id` + extend `BaseEntity` + lead unique indexes with `tenant_id`. Controllers MUST use `@RequiresPermission(SomePermissions.X)` with constants from a `*Permissions.java` class. Migration versions for business modules start at **V1000+** (V1-V999 reserved). Reference implementation: `backend/business-demo/`. The boot guards (`TenantSchemaGuard` + `PermissionConsistencyGuard`) + ArchUnit tests will fail-fast on any deviation.
 
 ## Cross-stack contract alignment points (most common pitfalls)
 

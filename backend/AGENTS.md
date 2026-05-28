@@ -1,7 +1,5 @@
 # Access Matrix — Backend AI Development Guide
 
-**English** · [中文](AGENTS.zh-CN.md)
-
 > Companion frontend: `../frontend/` (Vue 3 + Vite + Tailwind v4). This repo is a monorepo; for the root-level cross-stack conventions see [../AGENTS.md](../AGENTS.md).
 > Backend listens on `:9135` by default, context-path `/api`, dev profile forces `Asia/Tokyo` timezone.
 
@@ -171,6 +169,63 @@ core-bootstrap/
 9. **NO `confirm()`-style imperative approval skipping** — risky actions (deleting SUPER_ADMIN / changing tenant / changing password policy) must go through `core_oplog` audit + a secondary confirmation.
 10. **NO unchecked `selectById` after JWT** on multi-tenant-enabled paths — note that the refresh token path uses `findByIdAndTenant` to prevent the MyBatis-Plus tenant interceptor from mis-applying the `X-Tenant-Id` header to the token holder.
 11. **NEVER modify an already-shipped `V*__*.sql`** — adding/changing columns means creating `V{N+1}__*.sql`. `FlywayRepairConfig` tolerates checksum drift, but schema-history readability still relies on append-only.
+
+## Business code recipe — adding a new table / endpoint
+
+This is the canonical checklist when an AI agent or human is asked to "add an Orders module" or similar. Follow these and the existing guards (`TenantSchemaGuard`, `PermissionConsistencyGuard`, ArchUnit) won't fail at startup.
+
+### DO
+
+- **Migration**: place under `backend/business-<module>/src/main/resources/db/migration/V<N>__*.sql` with version **≥ 1000** (V1-V999 reserved for the framework). Every business table MUST include:
+  ```sql
+  id            char(26)     NOT NULL PRIMARY KEY,
+  tenant_id     varchar(64)  NOT NULL,
+  mark          smallint     NOT NULL DEFAULT 1,
+  create_user   varchar(64),
+  update_user   varchar(64),
+  create_time   timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time   timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP
+  ```
+- **Unique indexes lead with `tenant_id`**: `CREATE UNIQUE INDEX uk_xxx_yyy ON xxx (tenant_id, business_key) WHERE mark = 1;` — never a single-column `(business_key)` unique.
+- **Entity extends `BaseEntity`**: never redeclare `id` / `tenantId` / `mark` / audit fields. `@TableName("business_xxx")` + business fields only. `BaseEntity` + `AuditMetaObjectHandler` auto-fill the rest on INSERT.
+- **Mapper extends `BaseMapper<XxxEntity>`** and lives under `..mapper..` package. Custom queries via `@Select` MUST include `tenant_id = #{...}` predicate.
+- **Controller**: `@RestController` + `@RequestMapping("/business-xxx/...")`. Every public HTTP method MUST be annotated with `@RequiresPermission(XxxPermissions.SOME_CODE)`. NEVER use a string literal — always a constant from a `*Permissions.java` class.
+- **Permission codes** register through a constants class: `public static final String XXX_READ = "xxx:read"` + `static { PermissionCode.registerAll(XxxPermissions.class, "xxx"); }`. `PermissionConsistencyGuard` will fail-fast on startup if a `@RequiresPermission` references an unregistered string.
+- **Service does the work**: controller delegates to a `@Service` class. Controllers don't access mappers directly, services don't access controllers.
+
+### DON'T
+
+- ❌ **No `tenant_id` column** on a per-tenant business table. `TenantSchemaGuard` fail-fasts the boot.
+- ❌ **Adding the table to `MybatisPlusConfig.TENANT_EXCLUDED_TABLES`** unless the data is genuinely global (one row-set for the whole installation — like `core_meta`). If you're not sure, it's not global.
+- ❌ **`@InterceptorIgnore` on business operations** — that bypasses the MP tenant filter; reserved for cross-tenant platform-ops endpoints only.
+- ❌ **Literal permission codes in `@RequiresPermission("xxx:yyy")`** — use a constant. The guard rejects literal codes that don't appear in `PermissionRegistry`.
+- ❌ **`@PreAuthorize`** — endpoint auth uses `@RequiresPermission` uniformly.
+- ❌ **Inline permission checks in controllers** (`if (currentUser.isAdmin()) { ... }`). Use the AOP + `RequestContext`.
+- ❌ **`roleIds.contains(BuiltInRoles.SUPER_ADMIN_ID)`** — that constant is demo-specific. Use `BuiltInRoleLookup.superAdminRoleId(tenantId)` for per-tenant resolution.
+- ❌ **Modifying an already-applied `V*__*.sql`** — write a new `V{N+1}` patch migration. See V14 / V30 / V33 for examples.
+
+### Where to put the files
+
+| Concern | Path |
+|---|---|
+| Migration | `backend/business-<module>/src/main/resources/db/migration/V<N>__*.sql` |
+| Entity | `backend/business-<module>/src/main/java/.../entity/XxxEntity.java` |
+| Mapper | `backend/business-<module>/src/main/java/.../mapper/XxxMapper.java` |
+| Service | `backend/business-<module>/src/main/java/.../service/XxxService.java` |
+| Controller | `backend/business-<module>/src/main/java/.../controller/XxxController.java` |
+| Permission constants | `backend/business-<module>/src/main/java/.../security/XxxPermissions.java` |
+
+### Reference implementation
+
+`backend/business-demo/` is the canonical model — `TaskEntity` / `TaskMapper` / `TaskController` / `DemoPermissions` show every convention in action. When in doubt, copy that module's shape.
+
+### What enforces these rules
+
+| Layer | Mechanism | Caught when |
+|---|---|---|
+| Compile | ArchUnit tests in `core-system` | `./mvnw test` |
+| Boot | `TenantSchemaGuard`, `PermissionConsistencyGuard` | `./mvnw spring-boot:run` |
+| Runtime | `TenantLineInnerInterceptor`, `AuditMetaObjectHandler` | first API call |
 
 ## Flyway conventions
 
