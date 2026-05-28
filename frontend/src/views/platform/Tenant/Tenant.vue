@@ -11,13 +11,14 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useAuthStore } from '@/stores/auth'
 import { Plus, Search, RotateCcw, Trash2, Pause, Play, Pencil, LifeBuoy } from 'lucide-vue-next'
 import {
-  listTenantsApi, deleteTenantApi,
+  listTenantsApi,
   suspendTenantApi, resumeTenantApi,
   startSupportSessionApi
 } from '../../../../services/tenant'
 import TenantCreate from './TenantCreate.vue'
 import TenantEdit from './TenantEdit.vue'
 import TenantSupportSession from './TenantSupportSession.vue'
+import TenantHardDelete from './TenantHardDelete.vue'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
@@ -34,6 +35,7 @@ const search = reactive({ keyword: '' })
 const showCreate = ref(false)
 const editTarget = ref(null)            // null = closed; row object = open with that row
 const supportTarget = ref(null)         // null = closed; row object = open support-session dialog
+const hardDeleteTarget = ref(null)      // null = closed; row object = open hard-delete confirmation
 
 const columns = [
   { key: 'tenantCode',    label: () => t('platform.tenant.column.tenantCode'),    width: '180px' },
@@ -81,32 +83,12 @@ function isBuiltIn(row) {
   return row.tenantCode === 'system' || row.tenantCode === 'demo'
 }
 
-async function handleDelete(row) {
-  // Confirmation is deliberately scary — soft delete is reversible at
-  // the DB level (mark=0 → mark=1) but the Keycloak realm disable kicks
-  // everyone out of that tenant, and "reverse the disable" requires
-  // ops to log in to the KC admin console. Worth a beat to ask twice.
-  const ok = await confirm({
-    title: t('platform.tenant.confirm.deleteTitle'),
-    message: t('platform.tenant.confirm.deleteMessage', {
-      tenantCode: row.tenantCode,
-      displayName: row.displayName
-    }),
-    variant: 'destructive',
-    confirmText: t('platform.tenant.confirm.deleteConfirm')
-  })
-  if (!ok) return
-  try {
-    const res = await deleteTenantApi(row.id)
-    if (res.data.code === 0) {
-      toast.success(t('platform.tenant.message.deleteSuccess'))
-      fetchData()
-    } else {
-      toast.error(res.data.msg || t('platform.tenant.message.deleteFailed'))
-    }
-  } catch (e) {
-    toast.error(e.message)
-  }
+function openHardDelete(row) {
+  // Hard delete uses a typed-confirmation modal — too dangerous for the
+  // generic useConfirm dialog. The modal also enforces "row must be
+  // suspended" matching the backend gate; we don't surface the button
+  // for active rows in the first place.
+  hardDeleteTarget.value = row
 }
 
 async function handleSuspend(row) {
@@ -208,12 +190,12 @@ onMounted(() => {
       </div>
     </Card>
 
-    <!-- Soft-delete warning callout — make the semantics visible BEFORE
-         someone clicks the trash icon, not only at the confirmation dialog. -->
+    <!-- Recycle-bin hint: explain the two-step delete model BEFORE
+         someone hunts for a missing trash icon on an active row. -->
     <Card class="p-3 bg-amber-500/5 border-amber-500/30">
       <p class="text-xs text-muted-foreground leading-relaxed">
-        <span class="font-medium text-foreground">{{ t('platform.tenant.softDeleteHint.title') }}</span>
-        {{ t('platform.tenant.softDeleteHint.body') }}
+        <span class="font-medium text-foreground">{{ t('platform.tenant.recycleBinHint.title') }}</span>
+        {{ t('platform.tenant.recycleBinHint.body') }}
       </p>
     </Card>
 
@@ -291,14 +273,17 @@ onMounted(() => {
               <Play class="size-3.5" />
             </button>
 
-            <!-- Soft-delete -->
-            <button v-permission="'platform:tenant:delete'"
+            <!-- Hard delete — recycle-bin model: only suspended rows
+                 expose this button. Active rows must Suspend first.
+                 Modal then requires typing the tenantCode exactly. -->
+            <button v-if="row.status !== 1"
+                    v-permission="'platform:tenant:delete'"
                     class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                     :disabled="isBuiltIn(row)"
                     :title="isBuiltIn(row)
                         ? t('platform.tenant.tooltip.builtInLocked')
-                        : t('platform.tenant.tooltip.softDelete')"
-                    @click="handleDelete(row)">
+                        : t('platform.tenant.hardDelete.tooltip.confirm')"
+                    @click="openHardDelete(row)">
               <Trash2 class="size-3.5" />
             </button>
           </div>
@@ -311,5 +296,8 @@ onMounted(() => {
     <TenantSupportSession :row="supportTarget"
                           @close="supportTarget = null"
                           @start="handleSupportSession" />
+    <TenantHardDelete :row="hardDeleteTarget"
+                      @close="hardDeleteTarget = null"
+                      @deleted="() => { hardDeleteTarget = null; fetchData() }" />
   </div>
 </template>
