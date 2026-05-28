@@ -24,8 +24,13 @@ public class MybatisPlusConfig {
     /**
      * Tables that hold platform-global state (not per-tenant), so the tenant filter must skip them.
      * NOTE: `core_auth_user` / `core_auth_login_log` ARE tenant-scoped — they stay subject to the filter.
+     *
+     * <p>Package-private so {@link TenantSchemaGuard} can cross-check the
+     * exclusion list against the actual DB schema at startup. Anything added
+     * here without {@code tenant_id} on the DB side will be silently shared
+     * across all tenants — Guard fail-fasts on the mismatch.
      */
-    private static final Set<String> TENANT_EXCLUDED_TABLES = Set.of(
+    static final Set<String> TENANT_EXCLUDED_TABLES = Set.of(
             "flyway_schema_history",
             "core_meta",
             "core_numbering_management",
