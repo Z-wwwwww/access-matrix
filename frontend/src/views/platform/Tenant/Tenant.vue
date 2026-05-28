@@ -7,9 +7,13 @@ import Badge from '@/components/ui/Badge.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import { Plus, Search, RotateCcw, Trash2 } from 'lucide-vue-next'
-import { listTenantsApi, deleteTenantApi } from '../../../../services/tenant'
+import { Plus, Search, RotateCcw, Trash2, Pause, Play, Pencil } from 'lucide-vue-next'
+import {
+  listTenantsApi, deleteTenantApi,
+  suspendTenantApi, resumeTenantApi
+} from '../../../../services/tenant'
 import TenantCreate from './TenantCreate.vue'
+import TenantEdit from './TenantEdit.vue'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
@@ -22,6 +26,7 @@ const pageSize = ref(20)
 const search = reactive({ keyword: '' })
 
 const showCreate = ref(false)
+const editTarget = ref(null)   // null = closed; row object = open with that row
 
 const columns = [
   { key: 'tenantCode',    label: () => t('platform.tenant.column.tenantCode'),    width: '180px' },
@@ -29,7 +34,7 @@ const columns = [
   { key: 'contactEmail',  label: () => t('platform.tenant.column.contactEmail'), width: '240px' },
   { key: 'status',        label: () => t('platform.tenant.column.status'),        width: '100px' },
   { key: 'createTime',    label: () => t('platform.tenant.column.createTime'),    width: '180px' },
-  { key: 'actions',       label: () => t('platform.tenant.column.actions'),       width: '120px' }
+  { key: 'actions',       label: () => t('platform.tenant.column.actions'),       width: '160px' }
 ]
 
 async function fetchData() {
@@ -61,6 +66,14 @@ function openCreate() {
   showCreate.value = true
 }
 
+function openEdit(row) {
+  editTarget.value = row
+}
+
+function isBuiltIn(row) {
+  return row.tenantCode === 'system' || row.tenantCode === 'demo'
+}
+
 async function handleDelete(row) {
   // Confirmation is deliberately scary — soft delete is reversible at
   // the DB level (mark=0 → mark=1) but the Keycloak realm disable kicks
@@ -83,6 +96,44 @@ async function handleDelete(row) {
       fetchData()
     } else {
       toast.error(res.data.msg || t('platform.tenant.message.deleteFailed'))
+    }
+  } catch (e) {
+    toast.error(e.message)
+  }
+}
+
+async function handleSuspend(row) {
+  const ok = await confirm({
+    title: t('platform.tenant.confirm.suspendTitle'),
+    message: t('platform.tenant.confirm.suspendMessage', {
+      tenantCode: row.tenantCode,
+      displayName: row.displayName
+    }),
+    confirmText: t('platform.tenant.confirm.suspendConfirm')
+  })
+  if (!ok) return
+  try {
+    const res = await suspendTenantApi(row.id)
+    if (res.data.code === 0) {
+      toast.success(t('platform.tenant.message.suspendSuccess'))
+      fetchData()
+    } else {
+      toast.error(res.data.msg || t('platform.tenant.message.suspendFailed'))
+    }
+  } catch (e) {
+    toast.error(e.message)
+  }
+}
+
+async function handleResume(row) {
+  // Resume is non-destructive — confirm-less is fine.
+  try {
+    const res = await resumeTenantApi(row.id)
+    if (res.data.code === 0) {
+      toast.success(t('platform.tenant.message.resumeSuccess'))
+      fetchData()
+    } else {
+      toast.error(res.data.msg || t('platform.tenant.message.resumeFailed'))
     }
   } catch (e) {
     toast.error(e.message)
@@ -144,8 +195,7 @@ onMounted(() => {
       >
         <template #cell-tenantCode="{ row }">
           <span class="font-mono text-sm">{{ row.tenantCode }}</span>
-          <Badge v-if="row.tenantCode === 'system' || row.tenantCode === 'demo'"
-                 variant="outline" class="ml-2 text-[10px]">
+          <Badge v-if="isBuiltIn(row)" variant="outline" class="ml-2 text-[10px]">
             {{ t('common.status.builtIn') }}
           </Badge>
         </template>
@@ -158,11 +208,45 @@ onMounted(() => {
           </Badge>
         </template>
         <template #cell-actions="{ row }">
-          <div class="inline-flex items-center gap-1">
+          <div class="inline-flex items-center gap-0.5">
+            <!-- Edit (displayName + contactEmail) -->
+            <button v-permission="'platform:tenant:update'"
+                    class="h-7 px-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                    :disabled="isBuiltIn(row)"
+                    :title="isBuiltIn(row)
+                        ? t('platform.tenant.tooltip.builtInLocked')
+                        : t('platform.tenant.tooltip.edit')"
+                    @click="openEdit(row)">
+              <Pencil class="size-3.5" />
+            </button>
+
+            <!-- Suspend / Resume toggle — same column slot, behavior swaps on row.status -->
+            <button v-if="row.status === 1"
+                    v-permission="'platform:tenant:update'"
+                    class="h-7 px-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                    :disabled="isBuiltIn(row)"
+                    :title="isBuiltIn(row)
+                        ? t('platform.tenant.tooltip.builtInLocked')
+                        : t('platform.tenant.tooltip.suspend')"
+                    @click="handleSuspend(row)">
+              <Pause class="size-3.5" />
+            </button>
+            <button v-else
+                    v-permission="'platform:tenant:update'"
+                    class="h-7 px-2 rounded hover:bg-emerald-500/10 text-emerald-600 text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                    :disabled="isBuiltIn(row)"
+                    :title="isBuiltIn(row)
+                        ? t('platform.tenant.tooltip.builtInLocked')
+                        : t('platform.tenant.tooltip.resume')"
+                    @click="handleResume(row)">
+              <Play class="size-3.5" />
+            </button>
+
+            <!-- Soft-delete -->
             <button v-permission="'platform:tenant:delete'"
                     class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                    :disabled="row.tenantCode === 'system' || row.tenantCode === 'demo'"
-                    :title="(row.tenantCode === 'system' || row.tenantCode === 'demo')
+                    :disabled="isBuiltIn(row)"
+                    :title="isBuiltIn(row)
                         ? t('platform.tenant.tooltip.builtInLocked')
                         : t('platform.tenant.tooltip.softDelete')"
                     @click="handleDelete(row)">
@@ -174,5 +258,6 @@ onMounted(() => {
     </Card>
 
     <TenantCreate v-model:open="showCreate" @saved="fetchData" />
+    <TenantEdit :row="editTarget" @close="editTarget = null" @saved="() => { editTarget = null; fetchData() }" />
   </div>
 </template>

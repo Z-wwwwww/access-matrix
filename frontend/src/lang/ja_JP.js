@@ -166,47 +166,71 @@ export default {
         title: 'ソフト削除のみ：',
         body: 'テナントを削除すると Keycloak realm が無効化され、利用者はサインインできなくなりますが、ビジネスデータは保持されます。完全削除は別途オペレーション手順で行います。'
       },
-      tooltip: {
-        softDelete: 'テナントをソフト削除',
-        builtInLocked: '組み込みテナント（system / demo）は削除不可'
-      },
-      confirm: {
-        deleteTitle: 'テナント削除',
-        deleteMessage: '「{displayName}」（{tenantCode}）をソフト削除しますか？\n\n• Keycloak realm が disabled になり、ユーザーはサインインできなくなります\n• 業務データはそのまま残ります\n• 再有効化は KC 管理コンソールから手動で行う必要があります',
-        deleteConfirm: 'ソフト削除を実行'
-      },
-      button: {
-        new: '新規テナント'
-      },
-      message: {
-        loadFailed: 'テナント一覧の取得に失敗',
-        createSuccess: 'テナントを作成しました',
-        createFailed: 'テナント作成に失敗',
-        deleteSuccess: 'テナントをソフト削除しました',
-        deleteFailed: 'テナント削除に失敗'
-      },
       edit: {
         titleCreate: '新規テナント',
+        titleEdit: 'テナント編集',
         intro: 'Keycloak realm + 中央レジストリ行を 1 操作で作成します。テナントコードは作成後の変更不可です。',
+        editIntro: 'テナントコードは変更不可です。表示名・連絡先メールのみ更新できます。',
         label: {
           tenantCode: 'テナントコード',
           displayName: '表示名',
-          contactEmail: '連絡先メール'
+          contactEmail: '連絡先メール',
+          adminUsername: '管理者ユーザー名'
         },
         placeholder: {
           tenantCode: 'acme',
           displayName: 'Acme 株式会社',
-          contactEmail: 'admin@acme.example'
+          contactEmail: 'admin@acme.example',
+          adminUsername: 'admin'
         },
         hint: {
           tenantCode: '小文字英数字・ハイフン（RFC1035 ラベル）。Keycloak realm 名・サブドメインに使われます。',
-          contactEmail: '最初の管理者を招待する宛先（任意）'
+          contactEmail: '最初の管理者を招待する宛先（任意）',
+          adminUsername: '未入力時は連絡先メールのローカル部から自動生成。後から変更可'
         },
         error: {
           invalidCode: 'テナントコードは小文字英数字・ハイフン（RFC1035 ラベル）で入力してください',
-          missingDisplayName: '表示名を入力してください'
+          missingDisplayName: '表示名を入力してください',
+          invalidAdminUsername: '管理者ユーザー名は英小文字始まり、英数字・ハイフン・アンダースコアのみ'
         },
         saving: '送信中...'
+      },
+      button: {
+        new: '新規テナント',
+        edit: '編集',
+        suspend: '停止',
+        resume: '再開'
+      },
+      tooltip: {
+        softDelete: 'テナントをソフト削除',
+        suspend: 'テナントを一時停止（Keycloak realm 無効化、解除可能）',
+        resume: '停止中のテナントを再開',
+        edit: 'テナント情報を編集',
+        builtInLocked: '組み込みテナント（system / demo）は変更不可'
+      },
+      confirm: {
+        deleteTitle: 'テナント削除',
+        deleteMessage: '「{displayName}」（{tenantCode}）をソフト削除しますか？\n\n• Keycloak realm が無効化され、サインインできなくなります\n• ビジネスデータは保持されます\n• 復元には管理コンソールでの手動操作が必要',
+        deleteConfirm: 'ソフト削除する',
+        suspendTitle: 'テナント停止',
+        suspendMessage: '「{displayName}」（{tenantCode}）を一時停止しますか？\n\n• Keycloak realm が無効化され、サインインできなくなります\n• 「再開」ボタンでいつでも復帰できます',
+        suspendConfirm: '停止する',
+        resumeTitle: 'テナント再開',
+        resumeMessage: '「{displayName}」（{tenantCode}）を再開しますか？\n\nKeycloak realm が再度有効化され、サインインを受け付けます。',
+        resumeConfirm: '再開する'
+      },
+      message: {
+        createSuccess: 'テナントを作成し、招待メールを送信しました',
+        createFailed: 'テナント作成に失敗',
+        loadFailed: 'テナント一覧取得に失敗',
+        deleteSuccess: 'テナントをソフト削除しました',
+        deleteFailed: 'テナント削除に失敗',
+        suspendSuccess: 'テナントを停止しました',
+        suspendFailed: 'テナント停止に失敗',
+        resumeSuccess: 'テナントを再開しました',
+        resumeFailed: 'テナント再開に失敗',
+        updateSuccess: 'テナント情報を更新しました',
+        updateFailed: 'テナント情報の更新に失敗'
       }
     }
   },
