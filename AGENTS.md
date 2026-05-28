@@ -91,9 +91,16 @@ The backend's local profile automatically runs Flyway migrations + LocalAdminSee
 
 ## Adding a new business module (AI quick reference)
 
-When the task is "add a new business module / table / endpoint", the canonical recipe lives at [backend/AGENTS.md § Business code recipe](backend/AGENTS.md#business-code-recipe--adding-a-new-table--endpoint). One-line summary:
+When the task is "add a new business module / table / endpoint":
 
-> Business tables MUST have `tenant_id` + extend `BaseEntity` + lead unique indexes with `tenant_id`. Controllers MUST use `@RequiresPermission(SomePermissions.X)` with constants from a `*Permissions.java` class. Migration versions for business modules start at **V1000+** (V1-V999 reserved). Reference implementation: `backend/business-demo/`. The boot guards (`TenantSchemaGuard` + `PermissionConsistencyGuard`) + ArchUnit tests will fail-fast on any deviation.
+```bash
+# Fastest path — generates 5 Java files + 1 SQL migration, conventions baked in
+./mvnw -pl core-bootstrap exec:java \
+    -Dexec.mainClass=com.platform.core.bootstrap.tools.BusinessModuleScaffold \
+    -Dexec.args="<resource>"      # e.g. order, invoice, salesreport
+```
+
+Then edit the placeholder business columns + add 4 permission constants to `backend/business-demo/src/main/java/com/platform/business/demo/security/DemoPermissions.java` (the scaffold prints the exact lines to add). Full conventions live at [backend/AGENTS.md § Business code recipe](backend/AGENTS.md#business-code-recipe--adding-a-new-table--endpoint); the boot guards (`TenantSchemaGuard` + `PermissionConsistencyGuard`) + `ArchitectureTest` enforce them.
 
 ## Cross-stack contract alignment points (most common pitfalls)
 

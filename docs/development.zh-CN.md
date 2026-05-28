@@ -257,7 +257,27 @@ CREATE INDEX IF NOT EXISTS idx_core_dict_tenant ON core_dict (tenant_id) WHERE m
 
 ## 加一个新业务模块（端到端 checklist）
 
-"加订单模块 / 库存模块 / 计费模块" 的标准配方。完全跟 `TenantSchemaGuard` / `PermissionConsistencyGuard` / `core-system` 里 ArchUnit 测试的约定一致。参考实现：[`backend/business-demo/`](../backend/business-demo/)。
+"加订单模块 / 库存模块 / 计费模块" 的标准配方。完全跟 `TenantSchemaGuard` / `PermissionConsistencyGuard` / `core-system` 里 ArchitectureTest 的约定一致。参考实现：[`backend/business-demo/`](../backend/business-demo/)。
+
+### 0. 推荐：用 scaffold 工具自动生成
+
+最快路径 —— 一条命令生成下面 6 个文件，conventions 全部内置：
+
+```bash
+./mvnw -pl core-bootstrap exec:java \
+    -Dexec.mainClass=com.platform.core.bootstrap.tools.BusinessModuleScaffold \
+    -Dexec.args="<resource>"
+```
+
+`<resource>` 必须匹配 `[a-z][a-z0-9]*`（如 `order`、`invoice`、`salesreport`）。工具会：
+
+- 克隆 `business-demo/task/*` 并替换标识符（`Task` → `Invoice`、`task` → `invoice`、`demo_task` → `business_invoice`）
+- 自动选下一个空闲 Flyway 版本号 ≥ 1000（从 `core-bootstrap/.../db/migration/` 扫出来）
+- 生成迁移：含 `tenant_id` + 审计列 + tenant 打头的唯一索引
+- 打印 next-steps（你还得手动加权限码常量 —— 见下面第 5 步）
+- 不覆盖已有目录 —— 想重新生成先把目录删掉
+
+然后跳到第 5 步（加权限码）继续。下面的步骤是不用 scaffold 时的手动路径。
 
 ### 1. 选版本号 + 写迁移
 

@@ -172,7 +172,21 @@ core-bootstrap/
 
 ## Business code recipe — adding a new table / endpoint
 
-This is the canonical checklist when an AI agent or human is asked to "add an Orders module" or similar. Follow these and the existing guards (`TenantSchemaGuard`, `PermissionConsistencyGuard`, ArchUnit) won't fail at startup.
+This is the canonical checklist when an AI agent or human is asked to "add an Orders module" or similar. Follow these and the existing guards (`TenantSchemaGuard`, `PermissionConsistencyGuard`, ArchitectureTest) won't fail at startup.
+
+### Fastest path: use the scaffold tool
+
+Before writing anything by hand, try:
+
+```bash
+./mvnw -pl core-bootstrap exec:java \
+    -Dexec.mainClass=com.platform.core.bootstrap.tools.BusinessModuleScaffold \
+    -Dexec.args="<resource>"
+```
+
+This clones `business-demo/task/*` with identifier substitution and writes a Flyway migration at the next free V≥1000 — produces 5 Java files + 1 SQL file, all conventions baked in. Then you only edit business fields + add permission constants. See [`docs/development.md` § Adding a new business module](../docs/development.md#adding-a-new-business-module-end-to-end-checklist) for the full walkthrough.
+
+If you prefer (or need) to do it by hand, the DO / DON'T below is the spec.
 
 ### DO
 

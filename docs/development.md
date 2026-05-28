@@ -257,7 +257,27 @@ Seeing `Successfully applied migration V23` in the startup log means you're good
 
 ## Adding a new business module (end-to-end checklist)
 
-The single canonical recipe for "add an orders / inventory / billing module". Follows every convention enforced by `TenantSchemaGuard`, `PermissionConsistencyGuard`, and the ArchUnit tests in `core-system`. Use [`backend/business-demo/`](../backend/business-demo/) as the reference shape.
+The single canonical recipe for "add an orders / inventory / billing module". Follows every convention enforced by `TenantSchemaGuard`, `PermissionConsistencyGuard`, and the ArchitectureTest in `core-system`. Use [`backend/business-demo/`](../backend/business-demo/) as the reference shape.
+
+### 0. Recommended: run the scaffold tool
+
+The fastest way — generates all 6 files below with the conventions baked in:
+
+```bash
+./mvnw -pl core-bootstrap exec:java \
+    -Dexec.mainClass=com.platform.core.bootstrap.tools.BusinessModuleScaffold \
+    -Dexec.args="<resource>"
+```
+
+`<resource>` must match `[a-z][a-z0-9]*` (e.g. `order`, `invoice`, `salesreport`). The tool:
+
+- Clones `business-demo/task/*` with identifier substitution (`Task` → `Invoice`, `task` → `invoice`, `demo_task` → `business_invoice`).
+- Picks the next free Flyway version ≥ 1000 (auto-detected from `core-bootstrap/.../db/migration/`).
+- Writes the migration with the correct `tenant_id` + audit columns + tenant-prefixed unique index.
+- Prints next-steps (you still need to add permission constants — see step 5 below).
+- Refuses to overwrite — delete the resource directory first to regenerate.
+
+Then jump to step 5 ("permission constants") and onward. The remaining steps describe the manual path if you'd rather not use the scaffold.
 
 ### 1. Pick a version range and create the migration
 
