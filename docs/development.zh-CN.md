@@ -261,7 +261,27 @@ CREATE INDEX IF NOT EXISTS idx_core_dict_tenant ON core_dict (tenant_id) WHERE m
 
 ### 0. 推荐：用 scaffold 工具自动生成
 
-最快路径 —— 一条命令生成下面 6 个文件，conventions 全部内置：
+最快路径 —— 一条命令生成下面 6 个文件，conventions 全部内置。两种模式：
+
+**A. 新建模块**（生产用法 —— 订单、计费等独立业务域）：
+
+```bash
+./mvnw -pl core-bootstrap exec:java \
+    -Dexec.mainClass=com.platform.core.bootstrap.tools.BusinessModuleScaffold \
+    -Dexec.args="<resource> --new-module=<module-name>"
+```
+
+例：`--Dexec.args="order --new-module=orders"` 会创建 `backend/business-orders/`，包含：
+
+- 模块 `pom.xml`
+- `security/OrdersPermissions.java`（4 个权限常量自动注册）
+- `order/{controller,dto,entity,mapper,service}/Order*.java`
+- `db/migration/V1000__create_business_order.sql`
+- 自动把模块写入 `backend/pom.xml`（`<modules>` + `<dependencyManagement>`）和 `backend/core-bootstrap/pom.xml`（`<dependency>`）
+
+新模块完全自包含 —— 权限自动注册，迁移通过 Flyway 的 classpath 扫描自动接入。
+
+**B. 旧模式**（在现有 `business-demo` 模块里加第二个资源 —— 适合教学 / playground）：
 
 ```bash
 ./mvnw -pl core-bootstrap exec:java \
@@ -269,15 +289,18 @@ CREATE INDEX IF NOT EXISTS idx_core_dict_tenant ON core_dict (tenant_id) WHERE m
     -Dexec.args="<resource>"
 ```
 
-`<resource>` 必须匹配 `[a-z][a-z0-9]*`（如 `order`、`invoice`、`salesreport`）。工具会：
+旧模式下工具还会自动把 4 个权限常量（`<RESOURCE>_READ/CREATE/UPDATE/DELETE`）注入到 `business-demo/.../security/DemoPermissions.java`。
 
-- 克隆 `business-demo/task/*` 并替换标识符（`Task` → `Invoice`、`task` → `invoice`、`demo_task` → `business_invoice`）
-- 自动选下一个空闲 Flyway 版本号 ≥ 1000（从 `core-bootstrap/.../db/migration/` 扫出来）
+两种模式都会：
+
+- `<resource>` 必须匹配 `[a-z][a-z0-9]*`（如 `order`、`invoice`、`salesreport`）
+- `<module-name>`（new-module 模式）必须匹配 `[a-z][a-z0-9-]*`
+- 克隆 `business-demo/task/*` 模板并替换标识符（`Task` → `Order`、`task` → `order`、`demo_task` → `business_order`）
+- 自动选下一个空闲 Flyway 版本号 ≥ 1000 —— `--new-module` 模式同时扫 core-bootstrap 现有迁移目录 + 新模块自己的目录（后者刚创建是空的，所以第一条是 `V1000`）
 - 生成迁移：含 `tenant_id` + 审计列 + tenant 打头的唯一索引
-- 打印 next-steps（你还得手动加权限码常量 —— 见下面第 5 步）
 - 不覆盖已有目录 —— 想重新生成先把目录删掉
 
-然后跳到第 5 步（加权限码）继续。下面的步骤是不用 scaffold 时的手动路径。
+然后跳到第 5 步（加权限码）继续（new-module 模式下可以跳过第 5 步 —— 权限类已经生成了）。下面的步骤是不用 scaffold 时的手动路径。
 
 ### 1. 选版本号 + 写迁移
 

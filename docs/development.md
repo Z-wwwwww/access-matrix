@@ -261,7 +261,27 @@ The single canonical recipe for "add an orders / inventory / billing module". Fo
 
 ### 0. Recommended: run the scaffold tool
 
-The fastest way — generates all 6 files below with the conventions baked in:
+The fastest way — generates all 6 files below with the conventions baked in. Two modes:
+
+**A. New module** (the typical case for a real business domain — orders, billing, etc.):
+
+```bash
+./mvnw -pl core-bootstrap exec:java \
+    -Dexec.mainClass=com.platform.core.bootstrap.tools.BusinessModuleScaffold \
+    -Dexec.args="<resource> --new-module=<module-name>"
+```
+
+Example: `--Dexec.args="order --new-module=orders"` creates `backend/business-orders/` containing:
+
+- Module `pom.xml`
+- `security/OrdersPermissions.java` with 4 constants auto-registered
+- `order/{controller,dto,entity,mapper,service}/Order*.java`
+- `db/migration/V1000__create_business_order.sql`
+- Wires the module into `backend/pom.xml` (`<modules>` + `<dependencyManagement>`) and `backend/core-bootstrap/pom.xml` (`<dependency>`)
+
+The new module is fully self-contained — its permissions are auto-registered, its migration is picked up via the classpath Flyway scan.
+
+**B. Legacy mode** (adds a second resource to the existing `business-demo` module — useful for tutorials / playgrounds):
 
 ```bash
 ./mvnw -pl core-bootstrap exec:java \
@@ -269,15 +289,18 @@ The fastest way — generates all 6 files below with the conventions baked in:
     -Dexec.args="<resource>"
 ```
 
-`<resource>` must match `[a-z][a-z0-9]*` (e.g. `order`, `invoice`, `salesreport`). The tool:
+In legacy mode the tool also injects 4 perm constants (`<RESOURCE>_READ/CREATE/UPDATE/DELETE`) into `business-demo/.../security/DemoPermissions.java` automatically.
 
-- Clones `business-demo/task/*` with identifier substitution (`Task` → `Invoice`, `task` → `invoice`, `demo_task` → `business_invoice`).
-- Picks the next free Flyway version ≥ 1000 (auto-detected from `core-bootstrap/.../db/migration/`).
-- Writes the migration with the correct `tenant_id` + audit columns + tenant-prefixed unique index.
-- Prints next-steps (you still need to add permission constants — see step 5 below).
+In both modes:
+
+- `<resource>` must match `[a-z][a-z0-9]*` (e.g. `order`, `invoice`, `salesreport`).
+- `<module-name>` (new-module mode) must match `[a-z][a-z0-9-]*`.
+- Clones the `business-demo/task/*` template with identifier substitution (`Task` → `Order`, `task` → `order`, `demo_task` → `business_order`).
+- Picks the next free Flyway version ≥ 1000 — for `--new-module` this scans both the existing core-bootstrap migration dir and the new module's own (which starts empty, so the first migration is `V1000`).
+- Writes the migration with `tenant_id` + audit columns + tenant-prefixed unique index.
 - Refuses to overwrite — delete the resource directory first to regenerate.
 
-Then jump to step 5 ("permission constants") and onward. The remaining steps describe the manual path if you'd rather not use the scaffold.
+Then jump to step 5 ("permission constants") and onward (skip step 5 if you used new-module mode — the permissions class was generated). The remaining steps describe the manual path if you'd rather not use the scaffold.
 
 ### 1. Pick a version range and create the migration
 
