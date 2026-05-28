@@ -354,7 +354,7 @@ public class UserAdminService {
         }
     }
 
-    private static final String BUILTIN_ADMIN_USERNAME = "admin";
+    private static final String BUILTIN_ADMIN_USERNAME = "demo-admin";
 
     /**
      * Refuse an operation if {@code userId} is the only active holder of the

@@ -55,16 +55,16 @@ public class LocalKeycloakAdminSeeder {
     private static final Logger log = LoggerFactory.getLogger(LocalKeycloakAdminSeeder.class);
 
     private static final String TENANT_REALM   = "demo";
-    private static final String ADMIN_USERNAME = "admin";
-    private static final String ADMIN_EMAIL    = "admin@platform.local";
-    private static final String ADMIN_DISPLAY  = "Local Admin";
+    private static final String ADMIN_USERNAME = "demo-admin";
+    private static final String ADMIN_EMAIL    = "demo-admin@platform.local";
+    private static final String ADMIN_DISPLAY  = "Demo Admin";
     /**
      * Dev-default password — intentionally aligned with LocalAdminSeeder's
-     * local password ("admin") so the same credential works whether the
+     * local password ("demo-admin") so the same credential works whether the
      * backend is in {@code mode=password} or {@code mode=oidc}. Rotate this
      * in any environment a person other than you can reach.
      */
-    private static final String ADMIN_PASSWORD = "admin";
+    private static final String ADMIN_PASSWORD = "demo-admin";
 
     private final KeycloakUserService keycloakUserService;
 

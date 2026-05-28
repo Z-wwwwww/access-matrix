@@ -103,7 +103,7 @@ LocalAdminSeeder: ensured admin user (id=...) is bound to SUPER_ADMIN role
 | 阶段 | 动作 |
 |---|---|
 | Flyway 迁移 | 跑 V1-V29 所有 SQL；建出 `core_*` 全部表 + 2 行 `core_tenant`（`system` / `demo`）+ 2 个内置角色（SUPER_ADMIN / Platform Admin）+ 5 个 demo 数据范围角色 |
-| `LocalAdminSeeder` | 在 demo 租户种 `admin/admin`，绑 SUPER_ADMIN + HQ 部门 |
+| `LocalAdminSeeder` | 在 demo 租户种 `demo-admin/demo-admin`，绑 SUPER_ADMIN + HQ 部门 |
 | `SystemAdminSeeder` | 在 system 租户种 `ops/ops`，绑 PLATFORM_ADMIN |
 | `DemoSeeder` | 种 5 个数据范围演示用户（密码统一 `demo123`）+ 15 条演示 task |
 | `*KeycloakAdminSeeder` | OIDC 模式下，把上面两个管理账号同步到 Keycloak 对应 realm |
@@ -120,7 +120,7 @@ npm install     # 首次
 npm run dev
 ```
 
-浏览器开 http://localhost:5273/login → 输 `admin` / `admin` → 进入系统。
+浏览器开 http://localhost:5273/login → 输 `demo-admin` / `demo-admin` → 进入系统。
 
 ---
 
@@ -189,9 +189,9 @@ app:
 
 ### 5.4 第一次 SSO 登录
 
-后端启动时 `LocalKeycloakAdminSeeder` 会自动在 Keycloak 的 `demo` realm 里建 `admin` 用户（密码 `admin`，permanent），`SystemKeycloakAdminSeeder` 在 `system` realm 里建 `ops` 用户（密码 `ops`）。
+后端启动时 `LocalKeycloakAdminSeeder` 会自动在 Keycloak 的 `demo` realm 里建 `demo-admin` 用户（密码 `demo-admin`，permanent），`SystemKeycloakAdminSeeder` 在 `system` realm 里建 `ops` 用户（密码 `ops`）。
 
-浏览器 http://localhost:5273/login → 点 **"Sign in with SSO"** → 跳到 Keycloak 登录页 → 输 `admin` / `admin` → 跳回前端，登录成功。
+浏览器 http://localhost:5273/login → 点 **"Sign in with SSO"** → 跳到 Keycloak 登录页 → 输 `demo-admin` / `demo-admin` → 跳回前端，登录成功。
 
 **幕后发生的事**：
 1. Keycloak 签发 JWT，`sub` = Keycloak UUID，`tid` = `demo`
