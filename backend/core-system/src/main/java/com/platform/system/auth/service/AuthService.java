@@ -4,11 +4,11 @@ import com.platform.system.auth.dto.TokenResponse;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
 import com.platform.system.rbac.mapper.RoleMapper;
+import com.platform.system.rbac.service.BuiltInRoleLookup;
 import com.platform.system.rbac.service.PermissionQueryService;
 import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
-import com.platform.core.common.security.BuiltInRoles;
 import com.platform.core.common.security.PermissionMatcher;
 import com.platform.core.infrastructure.config.properties.AppMailProperties;
 import com.platform.core.infrastructure.mail.MailService;
@@ -52,6 +52,7 @@ public class AuthService {
     private final LoginAuditService auditService;
     private final PermissionQueryService permissionQueryService;
     private final RoleMapper roleMapper;
+    private final BuiltInRoleLookup roleLookup;
     private final ForceLogoutService forceLogoutService;
     private final MailService mailService;
     private final AppMailProperties mailProps;
@@ -71,6 +72,7 @@ public class AuthService {
                        LoginAuditService auditService,
                        PermissionQueryService permissionQueryService,
                        RoleMapper roleMapper,
+                       BuiltInRoleLookup roleLookup,
                        ForceLogoutService forceLogoutService,
                        MailService mailService,
                        AppMailProperties mailProps) {
@@ -82,6 +84,7 @@ public class AuthService {
         this.auditService = auditService;
         this.permissionQueryService = permissionQueryService;
         this.roleMapper = roleMapper;
+        this.roleLookup = roleLookup;
         this.forceLogoutService = forceLogoutService;
         this.mailService = mailService;
         this.mailProps = mailProps;
@@ -162,8 +165,10 @@ public class AuthService {
             // so they can rotate.
             boolean isSuperAdmin;
             try {
-                isSuperAdmin = roleMapper.findRoleIdsByUserId(user.getId(), user.getTenantId())
-                        .contains(BuiltInRoles.SUPER_ADMIN_ID);
+                String superId = roleLookup.superAdminRoleId(user.getTenantId());
+                isSuperAdmin = superId != null
+                        && roleMapper.findRoleIdsByUserId(user.getId(), user.getTenantId())
+                                .contains(superId);
             } catch (Exception e) {
                 log.warn("[break-glass] role lookup failed for {} ({}), assuming non-super-admin",
                         user.getId(), e.toString());

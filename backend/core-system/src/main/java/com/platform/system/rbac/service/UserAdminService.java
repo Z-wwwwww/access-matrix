@@ -8,7 +8,6 @@ import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.core.common.result.PageResult;
-import com.platform.core.common.security.BuiltInRoles;
 import com.platform.core.infrastructure.config.properties.AppMailProperties;
 import com.platform.core.infrastructure.mail.MailService;
 import com.platform.core.infrastructure.numbering.NumberingService;
@@ -19,9 +18,7 @@ import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
 import com.platform.system.auth.service.InviteTokenService;
 import com.platform.system.rbac.dto.UserDto;
-import com.platform.system.rbac.entity.RoleEntity;
 import com.platform.system.rbac.entity.UserRoleEntity;
-import com.platform.system.rbac.mapper.RoleMapper;
 import com.platform.system.rbac.mapper.UserRoleMapper;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -41,7 +38,7 @@ public class UserAdminService {
 
     private final UserMapper userMapper;
     private final UserRoleMapper userRoleMapper;
-    private final RoleMapper roleMapper;
+    private final BuiltInRoleLookup roleLookup;
     private final PasswordEncoder encoder;
     private final PasswordPolicyService passwordPolicy;
     private final PermissionCacheService cacheService;
@@ -57,7 +54,7 @@ public class UserAdminService {
 
     public UserAdminService(UserMapper userMapper,
                             UserRoleMapper userRoleMapper,
-                            RoleMapper roleMapper,
+                            BuiltInRoleLookup roleLookup,
                             PasswordEncoder encoder,
                             PasswordPolicyService passwordPolicy,
                             PermissionCacheService cacheService,
@@ -69,7 +66,7 @@ public class UserAdminService {
                             AppMailProperties mailProps) {
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
-        this.roleMapper = roleMapper;
+        this.roleLookup = roleLookup;
         this.encoder = encoder;
         this.passwordPolicy = passwordPolicy;
         this.cacheService = cacheService;
@@ -291,9 +288,10 @@ public class UserAdminService {
         // If the new set strips SUPER_ADMIN from a user who currently holds it,
         // and they are the sole super admin left, refuse — same invariant the
         // delete/disable paths enforce.
-        String superRoleId = findSuperAdminRoleId();
+        String tid = RequestContext.tenantIdOrDefault();
+        String superRoleId = roleLookup.superAdminRoleId(tid);
         if (superRoleId != null
-                && userRoleMapper.existsActiveLink(userId, superRoleId, RequestContext.tenantIdOrDefault()) != null
+                && userRoleMapper.existsActiveLink(userId, superRoleId, tid) != null
                 && (roleIds == null || !roleIds.contains(superRoleId))) {
             assertNotLastSuperAdmin(userId, "strip SUPER_ADMIN from");
         }
@@ -358,31 +356,20 @@ public class UserAdminService {
 
     /**
      * Refuse an operation if {@code userId} is the only active holder of the
-     * {@code SUPER_ADMIN} role. Without this guard a single careless delete /
-     * disable / role-strip leaves the platform with zero usable super admins
-     * and a tedious DB-fix recovery path.
+     * {@code SUPER_ADMIN} role <em>in the caller's tenant</em>. Without this
+     * guard a single careless delete / disable / role-strip leaves the
+     * tenant with zero usable super admins and a tedious DB-fix recovery.
      */
     private void assertNotLastSuperAdmin(String userId, String op) {
-        String superRoleId = findSuperAdminRoleId();
-        if (superRoleId == null) return; // role row missing entirely → nothing to guard
         String tid = RequestContext.tenantIdOrDefault();
+        String superRoleId = roleLookup.superAdminRoleId(tid);
+        if (superRoleId == null) return; // tenant has no built-in super admin row → nothing to guard
         if (userRoleMapper.existsActiveLink(userId, superRoleId, tid) == null) return; // not a super admin
         Long total = userRoleMapper.countActiveHoldersByRoleId(superRoleId, tid);
         if (total != null && total <= 1L) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR,
                     "Cannot " + op + " the last active SUPER_ADMIN user");
         }
-    }
-
-    /**
-     * Returns the SUPER_ADMIN role id iff the seeded row is still live. Looking up by the
-     * seeded ULID (see {@link BuiltInRoles}) instead of by code/name string means renaming
-     * the role's display name does not break the "last super admin" protection.
-     */
-    private String findSuperAdminRoleId() {
-        RoleEntity r = roleMapper.selectById(BuiltInRoles.SUPER_ADMIN_ID);
-        if (r == null || !Integer.valueOf(1).equals(r.getMark())) return null;
-        return r.getId();
     }
 
     private UserEntity require(String id) {

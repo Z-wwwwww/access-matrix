@@ -6,7 +6,7 @@ import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
-import com.platform.core.common.security.BuiltInRoles;
+import com.platform.system.rbac.service.BuiltInRoleLookup;
 import com.platform.core.common.security.RequiresPermission;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
 import com.platform.system.auth.entity.UserEntity;
@@ -80,15 +80,18 @@ public class BreakGlassController {
 
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
+    private final BuiltInRoleLookup roleLookup;
     private final PasswordEncoder encoder;
     private final PasswordPolicyService passwordPolicy;
 
     public BreakGlassController(UserMapper userMapper,
                                 RoleMapper roleMapper,
+                                BuiltInRoleLookup roleLookup,
                                 PasswordEncoder encoder,
                                 PasswordPolicyService passwordPolicy) {
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
+        this.roleLookup = roleLookup;
         this.encoder = encoder;
         this.passwordPolicy = passwordPolicy;
     }
@@ -160,8 +163,9 @@ public class BreakGlassController {
         String tenantId = RequestContext.tenantIdOrDefault();
         boolean isSuperAdmin;
         try {
-            isSuperAdmin = roleMapper.findRoleIdsByUserId(userId, tenantId)
-                    .contains(BuiltInRoles.SUPER_ADMIN_ID);
+            String superId = roleLookup.superAdminRoleId(tenantId);
+            isSuperAdmin = superId != null
+                    && roleMapper.findRoleIdsByUserId(userId, tenantId).contains(superId);
         } catch (Exception e) {
             // Conservative: a transient role-lookup failure is treated as
             // "not super-admin" rather than "yes admin" — break-glass is
