@@ -95,7 +95,8 @@ cd backend
   context-path   : /api
   security.mode  : permit-all   (or oidc, depending on application-local.yml)
 ============================================================
-LocalAdminSeeder: ensured admin user (id=...) is bound to SUPER_ADMIN role
+LocalAdminSeeder: ensured demo-admin user (id=...) is bound to SUPER_ADMIN role
+SystemAdminSeeder: linked ops user to PLATFORM_ADMIN role
 ```
 
 **首次启动会做的事**（`local` profile）：
@@ -289,9 +290,9 @@ npm run test:e2e      # playwright（需要前后端都在跑）
 
 **原因**：Keycloak client 的 Valid Redirect URIs 不含前端的 callback 路径。
 
-**修**：进 Keycloak admin → `default` realm → Clients → `access-matrix-backend` → Valid Redirect URIs，加 `http://localhost:5273/*`。
+**修**：进 Keycloak admin → `demo` realm → Clients → `access-matrix-backend` → Valid Redirect URIs，加 `http://localhost:5273/*`。
 
-仓库里 `default-realm.json` 已经包含了这个，**只在你改过 redirect URI 或自建 realm 时**才会遇到。
+仓库里 `demo-realm.json` 已经包含了这个，**只在你改过 redirect URI 或自建 realm 时**才会遇到。
 
 ### 8.3 邮件发送报 `500 Error: bad syntax`
 
