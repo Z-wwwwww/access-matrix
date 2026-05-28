@@ -1,22 +1,28 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import { Plus, Search, RotateCcw, Trash2, Pause, Play, Pencil } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
+import { Plus, Search, RotateCcw, Trash2, Pause, Play, Pencil, LifeBuoy } from 'lucide-vue-next'
 import {
   listTenantsApi, deleteTenantApi,
-  suspendTenantApi, resumeTenantApi
+  suspendTenantApi, resumeTenantApi,
+  startSupportSessionApi
 } from '../../../../services/tenant'
 import TenantCreate from './TenantCreate.vue'
 import TenantEdit from './TenantEdit.vue'
+import TenantSupportSession from './TenantSupportSession.vue'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
+const router = useRouter()
+const auth = useAuthStore()
 
 const loading = ref(false)
 const list = ref([])
@@ -26,7 +32,8 @@ const pageSize = ref(20)
 const search = reactive({ keyword: '' })
 
 const showCreate = ref(false)
-const editTarget = ref(null)   // null = closed; row object = open with that row
+const editTarget = ref(null)            // null = closed; row object = open with that row
+const supportTarget = ref(null)         // null = closed; row object = open support-session dialog
 
 const columns = [
   { key: 'tenantCode',    label: () => t('platform.tenant.column.tenantCode'),    width: '180px' },
@@ -140,6 +147,35 @@ async function handleResume(row) {
   }
 }
 
+function openSupportSession(row) {
+  supportTarget.value = row
+}
+
+async function handleSupportSession({ row, reason }) {
+  try {
+    const res = await startSupportSessionApi(row.id, reason)
+    if (res.data.code === 0) {
+      const data = res.data.data
+      auth.enterSupportSession(data.token, {
+        sessionId:   data.sessionId,
+        tenantCode:  data.tenantCode,
+        displayName: data.displayName,
+        expiresAt:   data.expiresAt
+      })
+      supportTarget.value = null
+      toast.success(t('platform.tenant.support.message.started', {
+        tenantCode: data.tenantCode
+      }))
+      // Hard reload so menu / sidebar / /me all re-render under the new identity.
+      router.push('/').then(() => window.location.reload())
+    } else {
+      toast.error(res.data.msg || t('platform.tenant.support.message.startFailed'))
+    }
+  } catch (e) {
+    toast.error(e.message || t('platform.tenant.support.message.startFailed'))
+  }
+}
+
 onMounted(() => {
   fetchData()
 })
@@ -220,6 +256,19 @@ onMounted(() => {
               <Pencil class="size-3.5" />
             </button>
 
+            <!-- Support session — only for active, non-built-in tenants -->
+            <button v-permission="'platform:tenant:impersonate'"
+                    class="h-7 px-2 rounded hover:bg-amber-500/10 text-amber-600 text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                    :disabled="isBuiltIn(row) || row.status !== 1"
+                    :title="isBuiltIn(row)
+                        ? t('platform.tenant.tooltip.builtInLocked')
+                        : (row.status !== 1
+                            ? t('platform.tenant.support.tooltip.disabledSuspended')
+                            : t('platform.tenant.support.tooltip.start'))"
+                    @click="openSupportSession(row)">
+              <LifeBuoy class="size-3.5" />
+            </button>
+
             <!-- Suspend / Resume toggle — same column slot, behavior swaps on row.status -->
             <button v-if="row.status === 1"
                     v-permission="'platform:tenant:update'"
@@ -259,5 +308,8 @@ onMounted(() => {
 
     <TenantCreate v-model:open="showCreate" @saved="fetchData" />
     <TenantEdit :row="editTarget" @close="editTarget = null" @saved="() => { editTarget = null; fetchData() }" />
+    <TenantSupportSession :row="supportTarget"
+                          @close="supportTarget = null"
+                          @start="handleSupportSession" />
   </div>
 </template>

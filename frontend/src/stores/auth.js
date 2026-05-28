@@ -19,9 +19,20 @@ import { ref, computed } from 'vue'
 import { loginApi, refreshApi, logoutApi, getMeApi } from '../../services/auth'
 import { decodeJwt } from '@/utils/jwt-decode'
 import { keycloakLogoutUrl, oidcConfig, isSsoReachable } from '@/utils/oidc'
+import { clearTenantCache } from '@/utils/tenant'
 
 const ACCESS_KEY = 'access_token'
 const ID_TOKEN_KEY = 'id_token'
+
+// Platform-ops "support session" — these slots hold the ORIGINAL ops
+// token + tenant_id while a support session is active. On terminate we
+// swap back. Kept here (not in a separate store) so the existing axios
+// Bearer plumbing keeps working unchanged — it just reads access_token.
+const SUPPORT_ORIG_ACCESS_KEY = 'support_orig_access_token'
+const SUPPORT_ORIG_ID_KEY = 'support_orig_id_token'
+const SUPPORT_ORIG_TENANT_KEY = 'support_orig_tenant_id'
+const SUPPORT_SESSION_KEY = 'support_session_info'   // { sessionId, tenantCode, displayName, expiresAt }
+const TENANT_LS_KEY = 'tenant_id'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(localStorage.getItem(ACCESS_KEY) || '')
@@ -148,6 +159,84 @@ export const useAuthStore = defineStore('auth', () => {
     return res.data.data
   }
 
+  // ─── Platform-ops support sessions ────────────────────────────────
+  // Reactivity hook for the banner — bumped whenever enter/terminate
+  // mutates localStorage. localStorage isn't natively reactive in Vue,
+  // so we make this an explicit signal the banner / nav components watch.
+  const supportSessionBump = ref(0)
+
+  /** True iff we're currently impersonating a tenant. */
+  const isSupportSession = computed(() => {
+    supportSessionBump.value   // dep for reactivity
+    return !!localStorage.getItem(SUPPORT_ORIG_ACCESS_KEY)
+  })
+
+  /** Metadata for the active support session ({sessionId, tenantCode, displayName, expiresAt}) or null. */
+  const supportSessionInfo = computed(() => {
+    supportSessionBump.value
+    const raw = localStorage.getItem(SUPPORT_SESSION_KEY)
+    return raw ? JSON.parse(raw) : null
+  })
+
+  /**
+   * Enter a support session. Stashes the current ops token + tenant_id
+   * under the SUPPORT_ORIG_* keys, then overwrites them with the
+   * support-session values. Existing axios Bearer plumbing keeps reading
+   * access_token unchanged, so every subsequent API call automatically
+   * hits the target tenant. Caller is responsible for navigating to a
+   * fresh route (typically "/") so the UI re-renders with the new
+   * tenant's menus + me.
+   */
+  function enterSupportSession(supportToken, info) {
+    if (localStorage.getItem(SUPPORT_ORIG_ACCESS_KEY)) {
+      throw new Error('already in a support session — terminate the current one first')
+    }
+    // Stash originals.
+    const origAccess = localStorage.getItem(ACCESS_KEY) || ''
+    const origId     = localStorage.getItem(ID_TOKEN_KEY) || ''
+    const origTenant = localStorage.getItem(TENANT_LS_KEY) || ''
+    localStorage.setItem(SUPPORT_ORIG_ACCESS_KEY, origAccess)
+    localStorage.setItem(SUPPORT_ORIG_ID_KEY, origId)
+    localStorage.setItem(SUPPORT_ORIG_TENANT_KEY, origTenant)
+    localStorage.setItem(SUPPORT_SESSION_KEY, JSON.stringify(info))
+
+    // Switch live state.
+    setAccessToken(supportToken)
+    // id_token stays as ops's — the support session is HS256, no id_token.
+    // (Keeping ops's id_token means logout still has it for the eventual
+    // KC end_session call after we terminate back to ops.)
+    localStorage.setItem(TENANT_LS_KEY, info.tenantCode)
+    clearTenantCache()         // utils/tenant.js memoises; force re-resolve
+    userInfo.value = null      // force /me refetch under new identity
+    supportSessionBump.value++
+  }
+
+  /**
+   * Terminate the active support session: restore the stashed ops token +
+   * tenant_id, clear the support-* keys. Caller should navigate to a
+   * sensible landing page (typically /platform/tenants) afterwards.
+   */
+  function terminateSupportSession() {
+    const origAccess = localStorage.getItem(SUPPORT_ORIG_ACCESS_KEY)
+    if (origAccess == null) return false   // not in a support session
+    const origId     = localStorage.getItem(SUPPORT_ORIG_ID_KEY) || ''
+    const origTenant = localStorage.getItem(SUPPORT_ORIG_TENANT_KEY) || ''
+
+    setAccessToken(origAccess)
+    setIdToken(origId)
+    if (origTenant) localStorage.setItem(TENANT_LS_KEY, origTenant)
+    else            localStorage.removeItem(TENANT_LS_KEY)
+    clearTenantCache()
+    userInfo.value = null
+
+    localStorage.removeItem(SUPPORT_ORIG_ACCESS_KEY)
+    localStorage.removeItem(SUPPORT_ORIG_ID_KEY)
+    localStorage.removeItem(SUPPORT_ORIG_TENANT_KEY)
+    localStorage.removeItem(SUPPORT_SESSION_KEY)
+    supportSessionBump.value++
+    return true
+  }
+
   return {
     accessToken,
     idToken,
@@ -166,6 +255,11 @@ export const useAuthStore = defineStore('auth', () => {
     refresh,
     logout,
     wasLastLogoutLocalOnly,
-    fetchUserInfo
+    fetchUserInfo,
+    // support sessions
+    isSupportSession,
+    supportSessionInfo,
+    enterSupportSession,
+    terminateSupportSession
   }
 })

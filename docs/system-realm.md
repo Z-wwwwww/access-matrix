@@ -161,12 +161,111 @@ Until the tenant-management UI lands:
 After the tenant-management PR lands, this becomes a single REST call
 plus an email.
 
+## Support sessions (platform-ops impersonation)
+
+When a tenant raises a support ticket — "my report shows wrong numbers"
+— the platform ops team needs to act inside that tenant briefly. Without
+a tool, they either ssh into the DB (no UI, no audit) or borrow a
+customer admin's credentials (no accountability). The "support session"
+feature is the official path.
+
+### What it does
+
+`POST /platform/tenants/{id}/support-session` (gated by
+`platform:tenant:impersonate`, body `{ reason }`) mints a 30-minute
+HS256 JWT with:
+
+- `sub` = the target tenant's oldest active SUPER_ADMIN user id
+- `tid` = the target tenant code
+- `scope` = `tenant:*` (full SUPER_ADMIN authority within the tenant)
+- `preferred_username` = `"[support] <ops>"` — visible audit prefix
+- `act` claim — RFC 8693-style actor record:
+  ```json
+  {
+    "sub":        "<ops user id in system tenant>",
+    "tid":        "system",
+    "username":   "<ops username>",
+    "session_id": "<uuid>",
+    "reason":     "<text from the request body>",
+    "mode":       "FULL"
+  }
+  ```
+
+The frontend stashes the ops token + tenant_id under separate localStorage
+keys before overwriting with the support-session values, so on terminate
+the original session restores cleanly. A persistent red banner at the
+top of every page shows the active session, countdown, and a Terminate
+button.
+
+### Audit trail — two layers
+
+1. **Username prefix**. The downstream oplog aspect reads
+   `RequestContext.username()` (populated from JWT
+   `preferred_username`), so every write made during the session lands
+   in `core_oplog` as `[support] ops`. A routine "what did ops do in
+   acme today?" query surfaces these immediately, no JWT decoding needed.
+
+2. **Platform-side oplog row at session start**. The
+   `@OpLog(action="tenant.impersonate.start")` annotation on the
+   controller writes a separate row in the system tenant's audit log
+   with `target_id = <acme registry id>` and `request_body` = the
+   reason. So "I started a support session for OS-1234 at HH:MM" is
+   captured before the actual support work even begins.
+
+3. **(Optional, future)** Anyone wanting the full forensic trail can
+   decode the JWT and read the `act` claim — the structured record is
+   there even though no current code projects it into a separate column.
+
+### Why we use the target's SUPER_ADMIN as the JWT subject
+
+The alternative is a per-tenant shadow `__support__` user (cleaner
+audit, since the tenant's own SUPER_ADMIN actions wouldn't be confused
+with the platform-ops support work). But that adds DDL + a confusing
+extra row in `core_auth_user`. For v1 we use the existing SUPER_ADMIN —
+the `[support]` prefix + `act` claim carry the disambiguation. The
+shadow-user refactor is a follow-up if the audit ambiguity becomes a
+problem in practice.
+
+### Known limitations (v1)
+
+- **FULL-mode only** — the minted token has `tenant:*`, including writes.
+  A READ_ONLY mode (scope reduced to `*:read`) is tracked as a follow-up;
+  today the audit trail is the sole protection against bad writes.
+- **No server-side revoke list**. Terminating in the UI just discards
+  the token client-side. The token remains valid on the backend until
+  its `exp` (30 min). Adding the `session_id` to `ForceLogoutService`'s
+  Redis kickout set would close this — small follow-up.
+- **Built-in tenants refused**. `system` and `demo` cannot be the target
+  of a support session — no operational reason, and the blast radius if
+  it ever went wrong is high. Hard-coded refusal.
+- **No FE auto-refresh**. 30 minutes is meant to cover one triage cycle;
+  there is no extend/renew endpoint. If a session genuinely needs more,
+  terminate + restart (which generates a fresh `session_id` and a new
+  oplog row, preserving accountability).
+
+### Operator runbook
+
+```
+1. ops logs into ?tenant=system, navigates to /platform/tenants
+2. Find the tenant row → click the LifeBuoy (lifesaver) icon
+3. Enter a non-trivial reason (≥5 chars; "test" gets rejected client-side)
+4. Click "Start support session" → page reloads under the new identity
+5. Red banner at top shows: "Acting as <displayName> (<code>) — MM:SS"
+6. Do the work. Every write lands in core_oplog as "[support] ops".
+7. Click Terminate in the banner OR wait for the 30-min auto-expire.
+8. Page reloads back to /platform/tenants under the ops identity.
+```
+
 ## See also
 
 - `infra/keycloak/realms/system-realm.json` — realm template
 - `backend/.../bootstrap/startup/SystemAdminSeeder.java` — DB seed
 - `backend/.../bootstrap/startup/SystemKeycloakAdminSeeder.java` — KC sync
 - `backend/.../core-common/security/BuiltInRoles.java` — `PLATFORM_ADMIN_ID`
-- `backend/.../core-system/security/SystemPermissions.java` — `platform:*` codes
+- `backend/.../core-system/security/PlatformPermissions.java` — `platform:*` codes
 - `backend/.../core-infrastructure/config/MybatisPlusConfig.java` — the bypass
+- `backend/.../core-system/platform/service/TenantImpersonationService.java` — support-session mint
+- `backend/.../core-infrastructure/security/JwtIssuer.java` — `issueSupportSession`
+- `frontend/src/stores/auth.js` — `enterSupportSession` / `terminateSupportSession`
+- `frontend/src/components/layout/SupportSessionBanner.vue` — red banner
 - `backend/core-bootstrap/.../db/migration/V26__system_platform_admin.sql` — role / permission seed
