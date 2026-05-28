@@ -22,19 +22,45 @@ import java.util.Set;
 public class MybatisPlusConfig {
 
     /**
-     * Tables that hold platform-global state (not per-tenant), so the tenant filter must skip them.
-     * NOTE: `core_auth_user` / `core_auth_login_log` ARE tenant-scoped — they stay subject to the filter.
+     * Tables the MyBatis tenant-line interceptor must skip when injecting
+     * {@code WHERE tenant_id = ?}.
+     *
+     * <p>Two categories live here:
+     * <ul>
+     *   <li><b>Platform-global tables</b> — one row-set for the whole
+     *       installation, not per-tenant. {@code flyway_schema_history},
+     *       {@code core_meta}, {@code core_numbering_management}. These
+     *       have NO {@code tenant_id} column on the DB side, and they would
+     *       crash on every SELECT if the interceptor tried to filter them.</li>
+     *   <li><b>JdbcTemplate-only per-tenant tables</b> — they DO have
+     *       {@code tenant_id} on the DB side, but their access path doesn't
+     *       go through MyBatis at all, so the interceptor would never see
+     *       their queries anyway. Listed here as <em>belt-and-suspenders</em>:
+     *       if a future dev wires up a MyBatis mapper against the table,
+     *       this entry prevents auto-injection (since the JdbcTemplate code
+     *       already scopes by tenant manually and a double-filter would
+     *       silently no-op). {@code core_numbering_key} is the example —
+     *       see {@link com.platform.core.infrastructure.numbering.NumberingService}
+     *       where every SQL explicitly binds {@code tenant_id}. {@link TenantSchemaGuard}
+     *       will WARN about this entry; that warning is the audit trail
+     *       reminding future devs "this isn't a bug, the table is manually
+     *       scoped — don't drop it from EXCLUDED without removing the
+     *       JdbcTemplate access path too".</li>
+     * </ul>
+     *
+     * <p>NOTE: {@code core_auth_user} / {@code core_auth_login_log} are
+     * tenant-scoped and accessed via MyBatis — they stay subject to the filter.
      *
      * <p>Package-private so {@link TenantSchemaGuard} can cross-check the
-     * exclusion list against the actual DB schema at startup. Anything added
-     * here without {@code tenant_id} on the DB side will be silently shared
-     * across all tenants — Guard fail-fasts on the mismatch.
+     * exclusion list against the actual DB schema at startup. A table missing
+     * its {@code tenant_id} column AND missing from this list will fail-fast
+     * at boot (the dangerous silent-leak case).
      */
     static final Set<String> TENANT_EXCLUDED_TABLES = Set.of(
-            "flyway_schema_history",
-            "core_meta",
-            "core_numbering_management",
-            "core_numbering_key"
+            "flyway_schema_history",       // global — no tenant_id column
+            "core_meta",                   // global — no tenant_id column
+            "core_numbering_management",   // global — no tenant_id column
+            "core_numbering_key"           // per-tenant, JdbcTemplate-only — manually scoped
     );
 
     /**
