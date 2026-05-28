@@ -147,8 +147,9 @@ Once a realm is configured the way you want it to ship to other developers:
 4. Commit it. On next start, the `--import-realm` flag in the launcher
    will rehydrate the realm from this JSON on any contributor's machine.
 
-> The current `realms/` directory only has a `.gitkeep`; once we agree on
-> the dev realm shape we'll commit the first export there.
+> `realms/` 已经committed `demo-realm.json`（业务示例租户）和
+> `system-realm.json`（平台运营租户）。新增租户请用 `new-tenant.ps1`
+> 克隆 `demo-realm.json` 并改名，避免手编 JSON。
 
 ## Custom theme (access-matrix branding)
 
