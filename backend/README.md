@@ -1,5 +1,7 @@
 # backend — Access Matrix Foundation
 
+**English** · [中文](README.zh-CN.md)
+
 Multi-module Spring Boot 4 / JDK 25 platform foundation: authentication,
 RBAC, data-scope, multi-tenancy, audit. Naming is business-neutral
 (`core-*`, `com.platform.core.*`, `CORE_*`) so the foundation can host

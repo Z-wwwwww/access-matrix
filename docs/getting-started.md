@@ -1,90 +1,92 @@
 # Getting Started
 
-从零开始本地跑起整个项目。覆盖两种登录场景：
+**English** · [中文](getting-started.zh-CN.md)
 
-- **最小场景**：用项目自家的 password 登录（5 分钟，无第三方依赖）
-- **完整场景**：接入 Keycloak SSO + 邮件 + 邀请流程（生产环境同款）
+Get the whole project running locally from scratch. Two sign-in scenarios are covered:
+
+- **Minimal setup** — sign in with the project's built-in password flow (5 minutes, no third-party services)
+- **Full setup** — Keycloak SSO + email + invite flow (the same shape used in production)
 
 ---
 
-## 1. 前置依赖
+## 1. Prerequisites
 
-| 软件 | 版本 | 说明 |
+| Tool | Version | Notes |
 |---|---|---|
-| **JDK** | 25 | 项目用 Java 25（virtual threads、scoped values）。Maven Wrapper 不会自动下 JDK。 |
-| **Node.js** | 20+ | 前端 Vite 6 要求。`nvm` 管理推荐。 |
-| **PostgreSQL** | 15+ | 主库 + Keycloak 数据 schema 共用 |
-| **Redis** | 7+ | 权限缓存、刷新 token、强制下线集合 |
-| **Maven** | 3.9+ | 项目自带 `mvnw` wrapper，可不装本地 Maven |
+| **JDK** | 25 | The project uses Java 25 (virtual threads, scoped values). The Maven Wrapper does not auto-download a JDK. |
+| **Node.js** | 20+ | Required by the Vite 6 frontend. `nvm` is recommended. |
+| **PostgreSQL** | 15+ | Shared by both the main DB and the Keycloak schema. |
+| **Redis** | 7+ | Permission cache, refresh tokens, force-logout set. |
+| **Maven** | 3.9+ | The `mvnw` wrapper ships with the project, so a local Maven install is optional. |
 
-**可选**：
+**Optional**:
 
-| 软件 | 用途 |
+| Tool | Purpose |
 |---|---|
-| **Keycloak 26+** | SSO 模式必需（[下载 ZIP](https://www.keycloak.org/downloads)） |
-| **Docker Desktop** | 跑 Testcontainers IT；不装的话相关 IT 自动跳过 |
-| **psql CLI** | 数据库手动操作；项目内已有 `db/migration/V*.sql` 自动执行 |
+| **Keycloak 26+** | Required for SSO mode ([download the ZIP](https://www.keycloak.org/downloads)). |
+| **Docker Desktop** | Needed to run Testcontainers-based ITs; without it those ITs auto-skip. |
+| **psql CLI** | Handy for manual DB work; the project's own `db/migration/V*.sql` runs automatically. |
 
 ---
 
-## 2. 数据库初始化
+## 2. Database setup
 
-### 2.1 创建主库
+### 2.1 Create the main database
 
 ```bash
 psql -h 127.0.0.1 -U postgres \
   -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
 ```
 
-> 名字 `new_inntouch_core` 是项目历史遗留命名。如要改，同时改 `application-local.yml` 的 `spring.datasource.url`。
+> The name `new_inntouch_core` is a historical project name. If you rename it, also update `spring.datasource.url` in `application-local.yml`.
 
-### 2.2 （可选）创建 Keycloak 用 schema
+### 2.2 (Optional) Create the Keycloak schema
 
-只在准备启用 SSO 时需要：
+Only needed if you plan to enable SSO:
 
 ```bash
 psql -h 127.0.0.1 -U postgres -d new_inntouch_core \
   -c "CREATE SCHEMA IF NOT EXISTS keycloak;"
 ```
 
-Keycloak 用这个 schema 存自己的内部表，跟应用业务表（`public` schema）物理隔离。
+Keycloak stores its internal tables in this schema, physically separated from the application's business tables (`public` schema).
 
-### 2.3 Flyway 自动建表
+### 2.3 Flyway creates the tables automatically
 
-**不需要手动建任何业务表**。后端首次启动时 Flyway 会按 V1 → V29 顺序自动跑 `backend/core-bootstrap/src/main/resources/db/migration/*.sql`：
+**You do not need to create any business tables by hand.** On first backend startup, Flyway runs `backend/core-bootstrap/src/main/resources/db/migration/*.sql` in order from V1 through V29:
 
-| 迁移 | 内容 |
+| Migration | Contents |
 |---|---|
-| V1-V4 | 元表、用户表、登录日志、采番系统 |
-| V5-V9 | RBAC 主表（role / permission / menu / dept / user_role / role_permission / role_menu / role_dept） |
-| V10-V19 | demo 数据、菜单图标、多语言菜单、清理 |
-| V20 | `(tenant_id, username)` 唯一索引（V20 多租户化） |
-| V21 | `core_auth_user.keycloak_id` 链接列（SSO） |
-| V22 | `core_user_invite` 邀请 token 表 |
-| V24 | 密码 reset token + `password_hash` 可空（SSO→password 迁移用） |
-| V25 | 把内置租户 `default` 重命名为 `demo` |
-| V26 | 新增 `system` 租户 + `PLATFORM_ADMIN` 内置角色 + MP 拦截器跨租户 bypass |
-| V27 | 中央租户注册表 `core_tenant`；初始写入 `system` / `demo` 两行 |
-| V28 | 平台运营菜单（`/platform/tenants`）绑定 `PLATFORM_ADMIN` |
-| V29 | super-wildcard 改名：`*:*` → 平台超管，`tenant:*` → 业务超管（互不覆盖） |
+| V1-V4 | Metadata tables, user table, login log, numbering system |
+| V5-V9 | RBAC core tables (role / permission / menu / dept / user_role / role_permission / role_menu / role_dept) |
+| V10-V19 | Demo data, menu icons, multi-language menus, cleanup |
+| V20 | `(tenant_id, username)` unique index (multi-tenant cutover at V20) |
+| V21 | `core_auth_user.keycloak_id` link column (SSO) |
+| V22 | `core_user_invite` invitation-token table |
+| V24 | Password reset token + nullable `password_hash` (for the SSO-to-password migration path) |
+| V25 | Rename the built-in tenant `default` to `demo` |
+| V26 | Add `system` tenant + built-in `PLATFORM_ADMIN` role + MP-interceptor cross-tenant bypass |
+| V27 | Central tenant registry `core_tenant`; seeded with `system` and `demo` rows |
+| V28 | Platform-ops menu (`/platform/tenants`) bound to `PLATFORM_ADMIN` |
+| V29 | Super-wildcard rename: `*:*` → platform super-admin, `tenant:*` → business super-admin (non-overlapping) |
 
 ---
 
-## 3. 启动后端（local profile）
+## 3. Start the backend (local profile)
 
 ```bash
 cd backend
 ./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-Windows PowerShell：
+Windows PowerShell:
 
 ```powershell
 cd backend
 .\mvnw.cmd -pl core-bootstrap -am spring-boot:run "-Dspring-boot.run.profiles=local"
 ```
 
-**期望输出末尾**：
+**Expected tail of the output**:
 
 ```
 ============================================================
@@ -99,54 +101,54 @@ LocalAdminSeeder: ensured demo-admin user (id=...) is bound to SUPER_ADMIN role
 SystemAdminSeeder: linked ops user to PLATFORM_ADMIN role
 ```
 
-**首次启动会做的事**（`local` profile）：
+**What the first startup does** (`local` profile):
 
-| 阶段 | 动作 |
+| Stage | Action |
 |---|---|
-| Flyway 迁移 | 跑 V1-V29 所有 SQL；建出 `core_*` 全部表 + 2 行 `core_tenant`（`system` / `demo`）+ 2 个内置角色（SUPER_ADMIN / Platform Admin）+ 5 个 demo 数据范围角色 |
-| `LocalAdminSeeder` | 在 demo 租户种 `demo-admin/demo-admin`，绑 SUPER_ADMIN + HQ 部门 |
-| `SystemAdminSeeder` | 在 system 租户种 `ops/ops`，绑 PLATFORM_ADMIN |
-| `DemoSeeder` | 种 5 个数据范围演示用户（密码统一 `demo123`）+ 15 条演示 task |
-| `*KeycloakAdminSeeder` | OIDC 模式下，把上面两个管理账号同步到 Keycloak 对应 realm |
+| Flyway migrations | Runs V1-V29; creates every `core_*` table, two `core_tenant` rows (`system` / `demo`), two built-in roles (SUPER_ADMIN / Platform Admin), and five demo data-scope roles. |
+| `LocalAdminSeeder` | In the demo tenant, seeds `demo-admin/demo-admin`, bound to SUPER_ADMIN + the HQ department. |
+| `SystemAdminSeeder` | In the system tenant, seeds `ops/ops`, bound to PLATFORM_ADMIN. |
+| `DemoSeeder` | Seeds five data-scope demo users (all with password `demo123`) plus 15 demo tasks. |
+| `*KeycloakAdminSeeder` | In OIDC mode, syncs both admin accounts into the matching Keycloak realm. |
 
-完整初始角色 / 用户矩阵见 [README · 初始化与演示数据](../README.md#-初始化与演示数据)。所有种子都是 `@Profile("local")` —— **prod / dev 部署只跑迁移，不种任何用户**。
+The full initial role / user matrix is in [README · Seed data](../README.md#-初始化与演示数据). Every seeder is `@Profile("local")` — **prod and dev deployments run only the migrations and seed no users**.
 
 ---
 
-## 4. 启动前端
+## 4. Start the frontend
 
 ```bash
 cd frontend
-npm install     # 首次
+npm install     # first time only
 npm run dev
 ```
 
-浏览器开 http://localhost:5273/login → 输 `demo-admin` / `demo-admin` → 进入系统。
+Open http://localhost:5273/login in the browser, sign in with `demo-admin` / `demo-admin`, and you're in.
 
 ---
 
-## 5. 启用 SSO (Keycloak 模式)
+## 5. Enable SSO (Keycloak mode)
 
-可选但强烈推荐 —— 生产环境基本都用 SSO。
+Optional but strongly recommended — production deployments almost always use SSO.
 
-### 5.1 下载 Keycloak
+### 5.1 Download Keycloak
 
-到 https://www.keycloak.org/downloads 拿 **Server 版** ZIP（约 200MB），解压到任意目录：
+Grab the **Server** ZIP (~200MB) from https://www.keycloak.org/downloads and extract it anywhere:
 
 ```
-C:\SERVER\keycloak-26.6.2\    (Windows 默认路径，对应启动脚本)
+C:\SERVER\keycloak-26.6.2\    (Windows default path, matches the startup script)
 ~/tools/keycloak-26.6.2/      (mac/linux)
 ```
 
-不需要 Docker。Keycloak 是个 Quarkus Java 应用，直接跑就行。
+Docker is not required. Keycloak is a Quarkus Java application; just run it directly.
 
-如果路径不同，设环境变量：
+If you extracted to a different path, set an env var:
 
 ```powershell
 setx KEYCLOAK_HOME "D:\my-path\keycloak-26.6.2"
 ```
 
-### 5.2 启动 Keycloak
+### 5.2 Start Keycloak
 
 ```powershell
 infra\keycloak\start-keycloak.bat
@@ -156,21 +158,21 @@ infra\keycloak\start-keycloak.bat
 infra/keycloak/start-keycloak.sh
 ```
 
-启动脚本会做几件事：
-- 用 `keycloak` schema 连本机 Postgres（跟应用共用 DB 实例，schema 隔离）
-- HTTP 端口 8180（避免跟 Spring Boot 默认 8080 冲突）
-- `--import-realm` 自动加载 `infra/keycloak/realms/*.json`：`demo-realm.json`（业务示例）和 `system-realm.json`（平台运营），都含 `access-matrix-backend` client + `tid` claim mapper
-- 30 秒内启动完成
+The startup script does a few things:
+- Connects to the local Postgres using the `keycloak` schema (same DB instance as the app, schema-isolated).
+- Binds HTTP to port 8180 (avoids clashing with Spring Boot's default 8080).
+- `--import-realm` auto-loads `infra/keycloak/realms/*.json`: `demo-realm.json` (business demo) and `system-realm.json` (platform ops), both containing the `access-matrix-backend` client and the `tid` claim mapper.
+- Comes up within 30 seconds.
 
-**首次启动会跑 Liquibase 迁移**（Keycloak 自己的，~30s），后续启动 < 10s。
+**The first start runs Keycloak's own Liquibase migrations** (~30s); subsequent starts take under 10s.
 
-控制台：http://localhost:8180/admin （`admin` / `admin`）
+Admin console: http://localhost:8180/admin (`admin` / `admin`).
 
-详细 Keycloak 配置见 [infra/keycloak/README.md](../infra/keycloak/README.md)。
+For details on Keycloak configuration see [infra/keycloak/README.md](../infra/keycloak/README.md).
 
-### 5.3 切到 OIDC 模式
+### 5.3 Switch to OIDC mode
 
-编辑 `backend/core-bootstrap/src/main/resources/application-local.yml`：
+Edit `backend/core-bootstrap/src/main/resources/application-local.yml`:
 
 ```diff
 app:
@@ -179,47 +181,47 @@ app:
 +   mode: oidc
 ```
 
-编辑 `frontend/.env.development`：
+Edit `frontend/.env.development`:
 
 ```diff
 - VITE_OIDC_ENABLED=false
 + VITE_OIDC_ENABLED=true
 ```
 
-**重启**后端 + 前端（前端 `.env` 改动需要重启 vite dev server，不会热刷）。
+**Restart** both backend and frontend (a `.env` change requires restarting the Vite dev server — it does not hot-reload).
 
-### 5.4 第一次 SSO 登录
+### 5.4 First SSO sign-in
 
-后端启动时 `LocalKeycloakAdminSeeder` 会自动在 Keycloak 的 `demo` realm 里建 `demo-admin` 用户（密码 `demo-admin`，permanent），`SystemKeycloakAdminSeeder` 在 `system` realm 里建 `ops` 用户（密码 `ops`）。
+On backend startup, `LocalKeycloakAdminSeeder` automatically creates a `demo-admin` user (password `demo-admin`, permanent) in Keycloak's `demo` realm, and `SystemKeycloakAdminSeeder` creates an `ops` user (password `ops`) in the `system` realm.
 
-浏览器 http://localhost:5273/login → 点 **"Sign in with SSO"** → 跳到 Keycloak 登录页 → 输 `demo-admin` / `demo-admin` → 跳回前端，登录成功。
+Open http://localhost:5273/login, click **"Sign in with SSO"**, you get bounced to Keycloak's login page, enter `demo-admin` / `demo-admin`, and you get redirected back to the frontend — signed in.
 
-**幕后发生的事**：
-1. Keycloak 签发 JWT，`sub` = Keycloak UUID，`tid` = `demo`
-2. 后端验签通过
-3. `OidcJitUserService` 首次见到这个 UUID → 走 bind path → 把 `keycloak_id` 写到 `LocalAdminSeeder` 种的那行 `core_auth_user`
-4. `RequestContext.userId` 是业务 ULID，立刻就是超管
+**What happens behind the scenes**:
+1. Keycloak issues a JWT with `sub` = the Keycloak UUID and `tid` = `demo`.
+2. The backend verifies the signature.
+3. `OidcJitUserService` sees this UUID for the first time, takes the bind path, and writes `keycloak_id` onto the existing `core_auth_user` row seeded by `LocalAdminSeeder`.
+4. `RequestContext.userId` becomes the business ULID, and the user is immediately super-admin.
 
-后续登录直接走 fast path（按 keycloak_id 命中业务行）。平台运营走同一个流程，但前端用 `?tenant=system` 进入 system realm，登 `ops/ops` → 拿到 PLATFORM_ADMIN 权限 → 看到 `/platform/tenants` 菜单。
+Subsequent logins take the fast path (look up the business row by `keycloak_id`). The platform-ops flow is the same shape, but the frontend enters the `system` realm via `?tenant=system`, signs in as `ops/ops`, picks up PLATFORM_ADMIN, and unlocks the `/platform/tenants` menu.
 
 ---
 
-## 6. 启用邮件（可选）
+## 6. Enable email (optional)
 
-开启后台用户管理的 **invite** 模式（自动给新用户发邀请邮件）。
+Unlocks the user-management **invite** mode (an invitation email is sent automatically to new users).
 
-### 6.1 准备 SMTP 凭据
+### 6.1 Get SMTP credentials
 
-项目默认配置走腾讯企业邮（`smtp.exmail.qq.com:465 SSL`）。其他 SMTP 服务（Gmail / AWS SES / 公司 SMTP）也可用，改 `CORE_MAIL_HOST` / `CORE_MAIL_PORT` 即可。
+The default configuration targets Tencent Business Mail (`smtp.exmail.qq.com:465 SSL`). Any other SMTP service (Gmail / AWS SES / your company SMTP) works too — just change `CORE_MAIL_HOST` / `CORE_MAIL_PORT`.
 
-腾讯企业邮**必须用客户端专用密码**（不是登录密码）：
-1. 登 https://exmail.qq.com
-2. 右上角设置 → 安全 → 客户端专用密码 → 新增
-3. 拿到 16 位密码（只展示一次）
+Tencent Business Mail **requires a client-specific password** (not your login password):
+1. Sign in at https://exmail.qq.com.
+2. Settings (top right) → Security → Client-specific password → Add.
+3. Copy the 16-character password (shown only once).
 
-### 6.2 配置
+### 6.2 Configure
 
-环境变量方式（推荐）：
+Environment variables (recommended):
 
 ```powershell
 $env:CORE_MAIL_USERNAME = "your-name@your-company.com"
@@ -228,7 +230,7 @@ $env:CORE_MAIL_ENABLED = "true"
 $env:CORE_MAIL_FROM = "your-name@your-company.com"
 ```
 
-或者写进 `application-local.yml`（**不要提交 password**）：
+Or drop them into `application-local.yml` (**never commit the password**):
 
 ```yaml
 spring:
@@ -241,90 +243,90 @@ app:
     from: your-name@your-company.com
 ```
 
-### 6.3 验证
+### 6.3 Verify
 
-重启后端，看启动 log 应该有：
+Restart the backend; the startup log should contain:
 
 ```
 MailHealthIndicator: Status UP
 ```
 
-不出现 `AuthenticationFailedException: 500 Error: bad syntax` 之类的。
+without anything like `AuthenticationFailedException: 500 Error: bad syntax`.
 
-详细使用见 [User Guide](user-guide.md#用户管理invite--direct-模式)。
+For day-to-day usage see the [User Guide](user-guide.md#2-user-management-invite--direct-modes).
 
 ---
 
-## 7. 跑测试
+## 7. Run the tests
 
-### 7.1 后端单测（不需要 Docker）
+### 7.1 Backend unit tests (no Docker required)
 
 ```bash
 cd backend
 ./mvnw test
 ```
 
-期望：**49 个 core-system + 15 个 core-common = 64 unit tests pass**。
+Expected: **49 core-system + 15 core-common = 64 unit tests pass**.
 
-Testcontainers IT（`OidcJitProvisioningIT`、`MultiTenantSchemaIT`）需要 Docker；没装时自动 skip。
+The Testcontainers ITs (`OidcJitProvisioningIT`, `MultiTenantSchemaIT`) need Docker; they auto-skip when Docker is unavailable.
 
-### 7.2 前端单测
+### 7.2 Frontend tests
 
 ```bash
 cd frontend
-npm run test          # vitest 跑 44 个测试
-npm run test:e2e      # playwright（需要前后端都在跑）
+npm run test          # vitest runs 44 tests
+npm run test:e2e      # playwright (both backend and frontend must be running)
 ```
 
 ---
 
-## 8. 常见问题排错
+## 8. Troubleshooting
 
-### 8.1 后端启动报 `Driver org.postgresql.Driver claims to not accept jdbcUrl, ${CORE_DB_URL}`
+### 8.1 Backend fails to start with `Driver org.postgresql.Driver claims to not accept jdbcUrl, ${CORE_DB_URL}`
 
-**原因**：`SPRING_PROFILES_ACTIVE` 没设，走了 fail-closed 的 prod 默认，但 prod 要求外部环境变量。
+**Cause**: `SPRING_PROFILES_ACTIVE` is unset, so the fail-closed prod default kicks in — and prod requires external env vars.
 
-**修**：启动时加 `-Dspring-boot.run.profiles=local`，或者设环境变量 `$env:SPRING_PROFILES_ACTIVE = "local"`。
+**Fix**: add `-Dspring-boot.run.profiles=local` to the startup command, or set `$env:SPRING_PROFILES_ACTIVE = "local"`.
 
-### 8.2 SSO 登录页报 `Invalid parameter: redirect_uri`
+### 8.2 SSO sign-in page says `Invalid parameter: redirect_uri`
 
-**原因**：Keycloak client 的 Valid Redirect URIs 不含前端的 callback 路径。
+**Cause**: the Keycloak client's Valid Redirect URIs do not include the frontend's callback path.
 
-**修**：进 Keycloak admin → `demo` realm → Clients → `access-matrix-backend` → Valid Redirect URIs，加 `http://localhost:5273/*`。
+**Fix**: in the Keycloak admin console → `demo` realm → Clients → `access-matrix-backend` → Valid Redirect URIs, add `http://localhost:5273/*`.
 
-仓库里 `demo-realm.json` 已经包含了这个，**只在你改过 redirect URI 或自建 realm 时**才会遇到。
+The bundled `demo-realm.json` already includes this, so **you only hit this if you changed the redirect URI or rolled your own realm**.
 
-### 8.3 邮件发送报 `500 Error: bad syntax`
+### 8.3 Email sending fails with `500 Error: bad syntax`
 
-**原因**：腾讯企业邮拒绝用登录密码做 SMTP 认证。
+**Cause**: Tencent Business Mail refuses to use your login password for SMTP auth.
 
-**修**：到 ExMail 控制台生成"客户端专用密码"（16 位），替换 `CORE_MAIL_PASSWORD`。
+**Fix**: generate a "client-specific password" (16 chars) in the ExMail console and use it as `CORE_MAIL_PASSWORD`.
 
-### 8.4 SSO 登录后跳回 /login，URL 带 `?sso_error=1`
+### 8.4 After SSO sign-in you get bounced back to /login with `?sso_error=1`
 
-**原因**：`SsoCallback.vue` 拿到 code 后跟 Keycloak 换 token 失败。
+**Cause**: `SsoCallback.vue` exchanged the authorization code for a token with Keycloak and the exchange failed.
 
-**排查**：打开 DevTools → Network → 找 `/protocol/openid-connect/token` 这次 POST：
-- HTTP 400 `invalid_grant` → state 或 code_verifier 不匹配（一般是浏览器多 tab 同时操作）
-- HTTP 401 → client 配置错误，确认 `VITE_OIDC_CLIENT_ID` 跟 Keycloak 里的 Client ID 一致
-- 网络错 → Keycloak 没跑，检查 8180 端口
+**How to diagnose**: open DevTools → Network and find that POST to `/protocol/openid-connect/token`:
+- HTTP 400 `invalid_grant` → state or code_verifier mismatch (typically caused by juggling multiple browser tabs at once).
+- HTTP 401 → client misconfiguration; confirm that `VITE_OIDC_CLIENT_ID` matches the Client ID in Keycloak.
+- Network error → Keycloak isn't running; check port 8180.
 
-### 8.5 后端启动报 `log4j-slf4j2-impl cannot be present with log4j-to-slf4j`
+### 8.5 Backend fails to start with `log4j-slf4j2-impl cannot be present with log4j-to-slf4j`
 
-**原因**：跑测试时引入了 `spring-boot-starter-logging` 的传递依赖。
+**Cause**: a test bringing in `spring-boot-starter-logging` as a transitive dependency.
 
-**修**：3 个 pom 已经加了 exclusion（core-common / core-system / core-bootstrap），不会再遇到。如果你新加了 spring-boot-starter-test 到别的模块，照着做 exclusion 即可。详见 `core-common/pom.xml` 里 `spring-boot-starter-test` 那块。
+**Fix**: the three relevant POMs already declare the exclusion (core-common / core-system / core-bootstrap), so you should not hit this. If you add `spring-boot-starter-test` to a new module, copy the same exclusion. See the `spring-boot-starter-test` block in `core-common/pom.xml`.
 
-### 8.6 前端登录页没有 "Sign in with SSO" 按钮
+### 8.6 The frontend login page does not show a "Sign in with SSO" button
 
-**原因**：`VITE_OIDC_ENABLED=false` 或没设。
+**Cause**: `VITE_OIDC_ENABLED=false` (or unset).
 
-**修**：编辑 `frontend/.env.development`，设 `VITE_OIDC_ENABLED=true`，**重启 vite dev server**（`.env*` 改动 vite 不热刷新）。
+**Fix**: edit `frontend/.env.development`, set `VITE_OIDC_ENABLED=true`, then **restart the Vite dev server** (Vite does not hot-reload `.env*` changes).
 
 ---
 
-## 9. 下一步
+## 9. Next steps
 
-- 📖 [**User Guide**](user-guide.md) — 学会怎么管理用户 / 角色 / 权限 / 数据范围 / 多租户
-- 🛠 [**Development**](development.md) — 怎么加新菜单 / 权限 / 数据库迁移
-- 🚀 [**Deployment**](deployment.md) — 怎么部到生产
+- [**User Guide**](user-guide.md) — managing users / roles / permissions / data scopes / tenants
+- [**Development**](development.md) — adding new menus / permissions / database migrations
+- [**Deployment**](deployment.md) — getting it into production

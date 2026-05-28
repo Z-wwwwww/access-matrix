@@ -1,117 +1,119 @@
-# Access Matrix — 前端 AI 开发规约
+# Access Matrix — Frontend AI Development Guide
 
-> 配套后端: `../backend/`（Spring Boot 4 + Spring Security 6 + JWT + 多租户 RBAC），监听 `:9135`。本仓是 monorepo，根级跨栈规约见 [../AGENTS.md](../AGENTS.md)。
-> Vite 通过 `/proxy_url` 代理到后端，开发端口默认 `5273`。
+**English** · [中文](AGENTS.zh-CN.md)
+
+> Companion backend: `../backend/` (Spring Boot 4 + Spring Security 6 + JWT + multi-tenant RBAC), listens on `:9135`. This repo is a monorepo; for the root-level cross-stack conventions see [../AGENTS.md](../AGENTS.md).
+> Vite proxies to the backend via `/proxy_url`; the dev port defaults to `5273`.
 
 ## Project Overview
-本项目是 **Access Matrix**（RBAC/権限矩阵）的管理前端：用户・ロール・権限・メニュー・部署・操作ログ 等系统功能 + 后续可挂接的业务模块（如 PMS）。视图、组件、服务采用 **AI 驱动开发流程**（Spec + Skill + 自然语言）。
+This project is the admin frontend for **Access Matrix** (RBAC / permission matrix): system features such as users, roles, permissions, menus, departments, and op log, plus business modules (e.g. PMS) that can be plugged in later. Views, components, and services follow an **AI-driven development workflow** (Spec + Skill + natural language).
 
 ## Tech Stack (MANDATORY)
 - Vue 3.5+ (Composition API, `<script setup>`)
-- **JavaScript ONLY**（TypeScript 禁止）
+- **JavaScript ONLY** (TypeScript forbidden)
 - Vite 6
-- Tailwind CSS v4（`@import "tailwindcss"`、`@theme` token）
-- Radix Vue（headless 基底）
+- Tailwind CSS v4 (`@import "tailwindcss"`, `@theme` tokens)
+- Radix Vue (headless primitives)
 - class-variance-authority (CVA), clsx, tailwind-merge
 - ECharts 6 + vue-echarts
-- lucide-vue-next（图标）
+- lucide-vue-next (icons)
 - Vue Router 4
 - Pinia
-- Axios（services/request.js 全局拦截器）
-- **vue-i18n v9** (Composition API mode, `legacy: false`) — 支持 ja_JP / en / zh_CN / zh_TW / ko_KR；默认 ja_JP
+- Axios (global interceptors in services/request.js)
+- **vue-i18n v9** (Composition API mode, `legacy: false`) — supports ja_JP / en / zh_CN / zh_TW / ko_KR; default ja_JP
 
 ## Hard Rules
-1. **NO TypeScript** — 全栈 JS
-2. **NO inline styles** — 仅 Tailwind class
-3. **NO API calls in components** — HTTP 全部走 `services/`
-4. **NO pages in components/** — 页面放 `src/views/`
-5. **NO duplicate components** — 创建前先查 `docs/component-register.md`
-6. **NO hand-written `<table>`** — 数据表全部用 `@/components/shared/DataTable`（含 tree 用法见 §"Tree table"）
-7. **NO native form 元素**（在 views 里）—— `<input>`/`<select>`/`<textarea>`/`<input type=date>`/`<input type=checkbox>`/`<input type=radio>` 一律换成 `@/components/ui/` 下对应的 `Input` / `Select` / `Textarea` / `DatePicker` / `Checkbox` / `RadioGroup`（或 `Radio`）
-8. **NO `window.confirm()` / `alert()`** — 用 `useConfirm()` + 全局挂载的 `<ConfirmDialog />`
-9. 命名：组件 PascalCase；服务/composable camelCase
-10. 所有 props 必须有 `default`
-11. 字典数据来自 `src/dict/storage.js`（静态打包），通过 `useDict(code)` / `useDicts([code,...])` 取
-12. **NO hardcoded business strings**（新代码）—— 用户可见的 label/title/placeholder/button/toast 必须 `t()`，翻译落到 `src/lang/{locale}.js` 或 `src/lang/{module}/{locale}.js`
-13. **详情页模板** (`*Edit.vue` / `*Detail.vue`)：外层 `<Card>` → header (`flex justify-between p-4 border-b`) → `<Tabs v-model="activeTab" :items="tabItems">`（不要 `container-class`/`sticky`）→ 可选 footer。参考 `RoleEdit.vue` / `UserEdit.vue`
+1. **NO TypeScript** — JS across the stack
+2. **NO inline styles** — Tailwind classes only
+3. **NO API calls in components** — all HTTP goes through `services/`
+4. **NO pages in components/** — pages live under `src/views/`
+5. **NO duplicate components** — check `docs/component-register.md` before creating one
+6. **NO hand-written `<table>`** — all data tables use `@/components/shared/DataTable` (tree usage in the "Tree table" section)
+7. **NO native form elements** (in views) — `<input>` / `<select>` / `<textarea>` / `<input type=date>` / `<input type=checkbox>` / `<input type=radio>` must be swapped for the corresponding `Input` / `Select` / `Textarea` / `DatePicker` / `Checkbox` / `RadioGroup` (or `Radio`) under `@/components/ui/`
+8. **NO `window.confirm()` / `alert()`** — use `useConfirm()` plus the globally mounted `<ConfirmDialog />`
+9. Naming: components PascalCase; services / composables camelCase
+10. All props must have a `default`
+11. Dictionary data lives in `src/dict/storage.js` (statically bundled); access it via `useDict(code)` / `useDicts([code,...])`
+12. **NO hardcoded business strings** (in new code) — user-visible labels / titles / placeholders / buttons / toasts must use `t()`, with translations placed in `src/lang/{locale}.js` or `src/lang/{module}/{locale}.js`
+13. **Detail page template** (`*Edit.vue` / `*Detail.vue`): outer `<Card>` → header (`flex justify-between p-4 border-b`) → `<Tabs v-model="activeTab" :items="tabItems">` (no `container-class` / `sticky`) → optional footer. See `RoleEdit.vue` / `UserEdit.vue`.
 
-## 系统文件 vs 业务文件 — 放哪
+## System files vs business files — where do they go
 
-**核心原则**：access-matrix 是平台型项目，**系统模块**（账号/权限/审计）跟**业务模块**（PMS/CRM/...）必须分目录、分服务。后端模块边界也是同样的（`core-system` vs `business-{name}`）。
+**Core principle**: access-matrix is a platform-type project. **System modules** (accounts / permissions / audit) and **business modules** (PMS / CRM / ...) must live in separate directories and services. The backend module boundary is the same (`core-system` vs `business-{name}`).
 
-### Views（页面）
+### Views (pages)
 
-| 类型 | 目录 | 例子 |
-|------|------|------|
-| 系统管理 | `src/views/system/{Feature}/` | `system/User/User.vue`、`system/Role/RoleEdit.vue`、`system/Menu/Menu.vue`、`system/Dept/Dept.vue`、`system/Permission/Permission.vue`、`system/OpLog/OpLog.vue` |
-| 业务模块 | `src/views/{businessModule}/{Feature}/` | `{module}/{Feature}/{Feature}.vue`、`{module}/{Feature}/{Feature}Edit.vue` —— `{module}` 由各业务自取（如 `pms` / `crm`），按需新建 |
-| 登录/公共 | `src/views/login/`、`src/views/404.vue`、`_iframe.vue`、`_redirect.vue` | 同左 |
+| Type | Directory | Examples |
+|------|-----------|----------|
+| System admin | `src/views/system/{Feature}/` | `system/User/User.vue`, `system/Role/RoleEdit.vue`, `system/Menu/Menu.vue`, `system/Dept/Dept.vue`, `system/Permission/Permission.vue`, `system/OpLog/OpLog.vue` |
+| Business module | `src/views/{businessModule}/{Feature}/` | `{module}/{Feature}/{Feature}.vue`, `{module}/{Feature}/{Feature}Edit.vue` — `{module}` is chosen by each business (e.g. `pms` / `crm`) and created on demand |
+| Login / common | `src/views/login/`, `src/views/404.vue`, `_iframe.vue`, `_redirect.vue` | same |
 
-> 基盘**不预建命名占位目录**。需要哪个业务模块就新建对应的 `src/views/{module}/`；多业务可以并存，规则只约束**层级和命名风格**（kebab/camel 业务名 + PascalCase Feature）。
+> The foundation **does not pre-create placeholder directories**. Create `src/views/{module}/` when you need a particular business module; multiple businesses can coexist. The rules only constrain **hierarchy and naming style** (kebab/camel business name + PascalCase Feature).
 
-### Services（API 封装）
+### Services (API wrappers)
 
-**所有 `.js` 平铺在 `services/` 一级，不开子目录。** 通过文件名前缀区分归属。
+**All `.js` files sit flat under `services/`; no subdirectories.** File-name prefixes indicate ownership.
 
-| 类型 | 文件命名 | 例 |
-|------|---------|----|
-| 底层 | `request.js` | Axios 实例（拦截器 / token 头 / 错误统一处理）—— 任何业务文件不要绕开它直接 `import axios` |
-| 系统域 | 无前缀，简单名词 | `auth.js`、`user.js`、`role.js`、`permission.js`、`menu.js`、`dept.js`、`oplog.js`、`scope.js`、`dict.js` |
-| 通用下拉/辅助 | 无前缀 | `adminCommon.js`（占位） |
-| 业务域 | **以业务模块名为前缀** + camelCase 拼具体资源 | `pmsReservation.js`、`pmsPayment.js`、`pmsListingProperty.js`、`crmCustomer.js` |
+| Type | Filename | Examples |
+|------|----------|----------|
+| Foundation | `request.js` | The Axios instance (interceptors / token header / unified error handling) — no business file should bypass it and `import axios` directly |
+| System domain | No prefix, simple noun | `auth.js`, `user.js`, `role.js`, `permission.js`, `menu.js`, `dept.js`, `oplog.js`, `scope.js`, `dict.js` |
+| Common dropdown / helper | No prefix | `adminCommon.js` (placeholder) |
+| Business domain | **Prefixed by business module** + camelCase resource | `pmsReservation.js`, `pmsPayment.js`, `pmsListingProperty.js`, `crmCustomer.js` |
 
-规则：
-- 一个业务 service 文件超过 ~15 个时再考虑开 `services/{module}/` 子目录，**默认不开**
-- 不要把业务接口塞进系统域文件
-- 不要在组件里 `import axios`；HTTP 一律走 services 层
+Rules:
+- Only consider opening a `services/{module}/` subdirectory when a single business has more than ~15 service files; **flat by default**
+- Do not stuff business endpoints into system-domain files
+- Do not `import axios` inside components; HTTP goes through the services layer
 
-### 组件分层（不允许跨层引用反向依赖）
+### Component layering (no reverse cross-layer references)
 
-| 层 | 目录 | 谁能用 |
-|----|------|--------|
-| 基础 UI | `src/components/ui/` (Card / Input / Select / Drawer / Dialog / Checkbox / DataTable 用到的内部部件等) | 谁都能用，自己不依赖其他层 |
-| 通用业务 | `src/components/shared/` (DataTable / UserPicker / DictPicker / ConfirmDialog / IconPicker / LucideIcon / LoadingOverlay / FileDownloadLink / ExportFileButton / DateRangeSelector / SwitchField / AreaCascader / SingleImgManualUploader / ToastContainer) | 用 ui/；不能反向被 ui 依赖 |
-| Layout | `src/components/layout/` (AppLayout / AppHeader / AppSidebar / AppTabBar / EmptyLayout / ChangePasswordDialog) | 用 ui + shared |
-| 页面 | `src/views/` | 用 ui + shared + layout + composables + services |
+| Layer | Directory | Who can use it |
+|-------|-----------|----------------|
+| Foundation UI | `src/components/ui/` (Card / Input / Select / Drawer / Dialog / Checkbox / internal parts used by DataTable, etc.) | Anyone; itself depends on no other layer |
+| Shared business | `src/components/shared/` (DataTable / UserPicker / DictPicker / ConfirmDialog / IconPicker / LucideIcon / LoadingOverlay / FileDownloadLink / ExportFileButton / DateRangeSelector / SwitchField / AreaCascader / SingleImgManualUploader / ToastContainer) | Uses ui/; must not be depended on by ui/ in reverse |
+| Layout | `src/components/layout/` (AppLayout / AppHeader / AppSidebar / AppTabBar / EmptyLayout / ChangePasswordDialog) | Uses ui + shared |
+| Pages | `src/views/` | Uses ui + shared + layout + composables + services |
 
-### 其他
+### Others
 
-- `src/composables/` —— 跨页可复用的逻辑（useDict / useConfirm / useTheme / useToast / usePopupFollowTrigger 等）
-- `src/lib/` —— 纯函数工具（cn / cva / date / download / validators）
-- `src/stores/` —— Pinia store
-- `src/dict/` —— 静态字典数据
-- `src/lang/` —— vue-i18n 翻译
-- `src/router/` —— **仅静态路由**（登录/公共/兜底），业务路由由后端菜单驱动动态注入
-- `src/styles/` —— 全局 CSS / Tailwind tokens (`main.css`)
-- `ai/specs/` —— AI Skills 生成的 spec 文件，类型分子目录 (`components/`, `pages/`, `services/`, `stores/`, `composables/`)
+- `src/composables/` — logic reusable across pages (useDict / useConfirm / useTheme / useToast / usePopupFollowTrigger, etc.)
+- `src/lib/` — pure-function utilities (cn / cva / date / download / validators)
+- `src/stores/` — Pinia stores
+- `src/dict/` — static dictionary data
+- `src/lang/` — vue-i18n translations
+- `src/router/` — **static routes only** (login / common / fallback); business routes are injected dynamically from the backend menu
+- `src/styles/` — global CSS / Tailwind tokens (`main.css`)
+- `ai/specs/` — spec files generated by AI Skills, organized by type (`components/`, `pages/`, `services/`, `stores/`, `composables/`)
 
-## 路由（后端菜单驱动）
+## Routing (backend-menu-driven)
 
-- 静态路由：`src/router/index.js` 仅注册免登录页面（`/login`、`/404`、`/forget` 等）
-- 动态路由：路由守卫 `beforeEach` 内调 **`GET /api/menu/me`** 拿当前用户菜单 → `menuToRoutes()` 转换 → `router.addRoute()` 动态注入
-- 业务页面只需在 `src/views/{module}/{Feature}/{Feature}.vue` 放好组件，**路径和层级由后端 `core_rbac_menu` 表控制**
-- 后端 `component` 字段是相对路径（如 `/system/User/User`），前端目录大小写**不敏感**
+- Static routes: `src/router/index.js` only registers login-free pages (`/login`, `/404`, `/forget`, etc.)
+- Dynamic routes: inside the `beforeEach` route guard, call **`GET /api/menu/me`** to fetch the current user's menu → `menuToRoutes()` to convert → `router.addRoute()` to inject dynamically
+- A business page only needs to drop a component at `src/views/{module}/{Feature}/{Feature}.vue`; **the path and hierarchy are controlled by the backend `core_rbac_menu` table**
+- The backend `component` field is a relative path (e.g. `/system/User/User`); frontend directory casing is **not case-sensitive**
 
-## Backend API Conventions（access-matrix 后端）
+## Backend API Conventions (access-matrix backend)
 
-| 项 | 实际 |
-|----|------|
-| Base URL | `http://127.0.0.1:9135/api`（dev），前端 Vite 通过 `/proxy_url` 代理 |
-| 认证头 | **`Authorization: Bearer <jwt>`** —— 有 `Bearer ` 前缀，跟旧 PMS 后端不同 |
-| 多租户 | 请求带 `X-Tenant-Id` header；JWT 已签发时后端从 `tid` claim 读 |
-| Refresh token | HttpOnly Cookie `core_refresh`，axios `withCredentials: true` 自动携带 |
-| 分页参数 | **`page` + `size`**（不是 `limit`/`pageSize`）。后端 `PaginationInnerInterceptor` maxLimit = 500 |
-| 响应包装 | `{ code: 0, msg: "", data: ... }`，分页时 `data = { records, total, page, limit }` |
-| 列表/详情/CRUD | RESTful：`GET /admin/{module}/list`、`GET /admin/{module}/{id}`、`POST /admin/{module}`、`PUT /admin/{module}/{id}`、`DELETE /admin/{module}/{id}` |
-| Me-endpoints | `GET /api/menu/me` 当前用户菜单树；`GET /api/permission/me` 当前用户权限码 Set |
-| 字典 | **静态**（build-time bundle from `src/dict/storage.js`）—— `useDict(code)` 直接取，**不走 HTTP** |
-| 用户权限码 | JWT scope claim：`*:*`（超管）或 `__compact__`（其它，触发后端缓存查询）—— 前端不应解析 scope，统一用 `/permission/me` |
-| 强制下线 | 后端 ForceLogoutFilter 全局检查；axios 401 拦截 → 清 token 跳登录 |
-| 日期格式 | 后端要求 `yyyy-MM-dd HH:mm:ssZZ`（如 `2026-04-02 00:00:00+0900`）；强制 Asia/Tokyo；统一走 `@/lib/date` 的 `toBackendDate(val)` 转换 |
+| Item | Reality |
+|------|---------|
+| Base URL | `http://127.0.0.1:9135/api` (dev); the frontend Vite proxies via `/proxy_url` |
+| Auth header | **`Authorization: Bearer <jwt>`** — with the `Bearer ` prefix, unlike the legacy PMS backend |
+| Multi-tenant | Requests carry an `X-Tenant-Id` header; once a JWT is issued, the backend reads from the `tid` claim |
+| Refresh token | HttpOnly cookie `core_refresh`; axios `withCredentials: true` carries it automatically |
+| Pagination params | **`page` + `size`** (not `limit` / `pageSize`). Backend `PaginationInnerInterceptor` maxLimit = 500 |
+| Response wrapper | `{ code: 0, msg: "", data: ... }`; for pagination `data = { records, total, page, limit }` |
+| List / detail / CRUD | RESTful: `GET /admin/{module}/list`, `GET /admin/{module}/{id}`, `POST /admin/{module}`, `PUT /admin/{module}/{id}`, `DELETE /admin/{module}/{id}` |
+| Me-endpoints | `GET /api/menu/me` for the current user's menu tree; `GET /api/permission/me` for the current user's permission-code Set |
+| Dictionaries | **Static** (build-time bundle from `src/dict/storage.js`) — read directly via `useDict(code)`, **no HTTP** |
+| User permission codes | JWT scope claim: `*:*` (super admin) or `__compact__` (others, triggers backend cache lookup) — the frontend should not parse `scope`; use `/permission/me` uniformly |
+| Force logout | The backend `ForceLogoutFilter` checks globally; the axios 401 interceptor clears tokens and redirects to login |
+| Date format | The backend expects `yyyy-MM-dd HH:mm:ssZZ` (e.g. `2026-04-02 00:00:00+0900`); forced Asia/Tokyo; uniformly convert via `toBackendDate(val)` from `@/lib/date` |
 
-## Tree table（Dept / Menu 模板）
+## Tree table (Dept / Menu template)
 
-DataTable **没有原生 tree 模式**（它的 `expandable` 是行展开详情面板，不是 indent-children）。Tree 用法：
+DataTable **has no native tree mode** (its `expandable` is row-expansion detail panel, not indent-children). Tree usage:
 
 ```vue
 <script setup>
@@ -137,33 +139,33 @@ function toggle(id) { ... }
 </template>
 ```
 
-参考 `views/system/Dept/Dept.vue` 和 `views/system/Menu/Menu.vue`。
+See `views/system/Dept/Dept.vue` and `views/system/Menu/Menu.vue`.
 
 ## Internationalization (i18n)
 
-- 库：vue-i18n v9 (`legacy: false`)；入口 `src/lang/index.js`，main.js 中 `app.use(i18n)`
-- 语言：ja_JP / en / zh_CN / zh_TW / ko_KR；默认 ja_JP；持久化到 `localStorage['i18n-lang']`
-- 文件结构：
-  - `src/lang/{locale}.js` —— 主语言文件，按模块 import 子文件
-  - `src/lang/{module}/{locale}.js` —— 模块翻译
-- key 命名：点分隔、小写模块名 + camelCase 字段，例：`user.company`、`reservation.checkInDate`、`common.button.search`
-- 新代码：用 `t()` + 翻译键；不要硬编码业务文案
-- **历史例外**：`views/system/*` 下的 6 个管理页 (User / UserEdit / Role / RoleEdit / Permission / Menu / Dept / OpLog) 是从老模板搬来 + 手工改造的，仍带硬编码日文，**不要为了 i18n 主动改它们**，等触发到具体页面修改时再迁
+- Library: vue-i18n v9 (`legacy: false`); entry `src/lang/index.js`, registered in main.js via `app.use(i18n)`
+- Languages: ja_JP / en / zh_CN / zh_TW / ko_KR; default ja_JP; persisted to `localStorage['i18n-lang']`
+- File layout:
+  - `src/lang/{locale}.js` — main language file; imports module sub-files
+  - `src/lang/{module}/{locale}.js` — module translations
+- Key naming: dot-separated, lowercase module name + camelCase fields, e.g. `user.company`, `reservation.checkInDate`, `common.button.search`
+- New code: use `t()` + translation keys; do not hardcode business copy
+- **Historical exception**: the six admin pages under `views/system/*` (User / UserEdit / Role / RoleEdit / Permission / Menu / Dept / OpLog) were ported from an old template and hand-tweaked, and still contain hardcoded Japanese. **Do not actively rewrite them for i18n's sake** — migrate them only when you happen to be modifying those specific pages.
 
-## AI Skills（Slash Commands）
+## AI Skills (Slash Commands)
 
-通过 `pnpm ai:*` 调用，底层 `Claude Code` 执行，脚本 `scripts/ai-cli.mjs`：
+Invoked via `pnpm ai:*`; under the hood `Claude Code` runs them through `scripts/ai-cli.mjs`:
 
 | Skill | Command | Purpose |
 |-------|---------|---------|
-| create-component | `/create-component` | 用 Spec/自然语言创建组件 |
-| create-page | `/create-page` | 创建页面 + 路由 |
-| update-page | `/update-page` | 修改已有页面 |
-| generate | `/generate` | 生成 service / composable / store / utils |
-| inspect | `/inspect` | 审计重复/违规 |
-| analyze | `/analyze` | 解析现有代码 → spec |
+| create-component | `/create-component` | Create a component from a Spec / natural language |
+| create-page | `/create-page` | Create a page + route |
+| update-page | `/update-page` | Modify an existing page |
+| generate | `/generate` | Generate service / composable / store / utils |
+| inspect | `/inspect` | Audit duplicates / violations |
+| analyze | `/analyze` | Parse existing code → spec |
 
-Spec 块示例（任何 skill 都能直接吃）：
+Spec block example (any skill takes it directly):
 
 ```yaml
 component:
@@ -178,44 +180,44 @@ component:
       md: "w-10 h-10 text-sm"
 ```
 
-也可纯自然语言："创建一个用户头像组件，支持 sm/md/lg 三个尺寸"。
+Plain natural language also works: "create a user avatar component supporting sm/md/lg sizes".
 
-## Registries（创建前必查）
+## Registries (always check before creating)
 
-- 组件注册：`docs/component-register.md`
-- 服务注册：`docs/service-register.md`
+- Component registry: `docs/component-register.md`
+- Service registry: `docs/service-register.md`
 
-每个生成的 component / service 都要登记，避免重复造轮子。
+Every generated component / service must be registered to avoid reinventing the wheel.
 
 ---
 
 ## Behavioral Guidelines
 
 ### 1. Think Before Coding
-- 先表态假设，不确定就问
-- 多解时把选项摊开，别静悄悄选
-- 有更简方案就提出
-- 不懂的点直接停下、命名困惑、问
+- State your assumptions first; ask when unsure
+- When there are multiple solutions, lay out the options instead of silently picking one
+- If a simpler approach exists, raise it
+- If something is unclear or naming is confusing, stop and ask
 
 ### 2. Simplicity First
-- 最少代码解决问题
-- 不为单次用法做抽象
-- 不加未要求的"灵活性"
-- 不为不可能的场景写错误处理
-- 写到 200 行能写成 50 行 → 重写
+- Solve the problem with the least code
+- Do not abstract for single-use cases
+- Do not add unrequested "flexibility"
+- Do not write error handling for impossible scenarios
+- If 200 lines could have been 50 → rewrite
 
 ### 3. Surgical Changes
-- 只动该动的
-- 不顺手"改进"附近代码
-- 不重构没坏的东西
-- 跟现有风格保持一致
-- 自己的改动产生的孤儿代码自己清；既有的死代码不主动删
+- Touch only what needs to change
+- Do not casually "improve" nearby code
+- Do not refactor what isn't broken
+- Stay consistent with the existing style
+- Clean up orphan code you produced; do not proactively delete pre-existing dead code
 
 ### 4. Goal-Driven Execution
-- "加校验" → "为非法输入写测试，跑通"
-- "修 bug" → "写一个能复现的测试，再修"
-- 多步任务给出可验证步骤计划
+- "Add validation" → "write a test for the invalid input, make it pass"
+- "Fix the bug" → "write a reproducing test, then fix"
+- For multi-step tasks, give a verifiable step plan
 
 ---
 
-**这些规约生效的信号**：diff 里多余改动减少、过度复杂导致的重写减少、提问发生在动手前而不是错误后。
+**Signs these conventions are taking hold**: fewer incidental changes in diffs, fewer rewrites caused by over-complication, and questions raised before action rather than after errors.

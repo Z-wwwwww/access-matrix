@@ -1,28 +1,30 @@
 # frontend — Access Matrix Web
 
-Access Matrix 管理后台 + 业务示例前端。**Vue 3.5 + Vite 6 + Tailwind v4 + Radix Vue**，JavaScript only。
+**English** · [中文](README.zh-CN.md)
 
-配套后端: [../backend/](../backend/)（Spring Boot 4 + JWT + 多租户）。Vite 通过 `/proxy_url` 代理到后端 `:9135/api`，开发端口默认 `:5273`。
+The Access Matrix admin console plus business demo frontend. **Vue 3.5 + Vite 6 + Tailwind v4 + Radix Vue**, JavaScript only.
 
-## 启动
+Companion backend: [../backend/](../backend/) (Spring Boot 4 + JWT + multi-tenant). Vite proxies to the backend at `:9135/api` via `/proxy_url`; the dev port defaults to `:5273`.
+
+## Getting started
 
 ```bash
 npm install
-npm run dev          # 开发模式
-npm run build        # 生产构建
+npm run dev          # development mode
+npm run build        # production build
 npm run lint         # ESLint
 ```
 
-## 开发规约
+## Development conventions
 
-所有约定见 [AGENTS.md](AGENTS.md)：
+All conventions live in [AGENTS.md](AGENTS.md):
 
-- 组件分层（`ui/` / `shared/` / `layout/` / `views/`）
-- 业务前缀的 services 命名（`pmsXxx.js` / `demoXxx.js`）
-- 必用共享组件：`DataTable` / `Drawer` / `Input` / `Select` / `Checkbox` / `DatePicker` / `UserPicker` / `DictPicker` / `ConfirmDialog`
-- 禁手写 `<table>` / `<input type=date>` / `window.confirm()` / 内联 style
+- Component layering (`ui/` / `shared/` / `layout/` / `views/`)
+- Business-prefixed service naming (`pmsXxx.js` / `demoXxx.js`)
+- Mandatory shared components: `DataTable` / `Drawer` / `Input` / `Select` / `Checkbox` / `DatePicker` / `UserPicker` / `DictPicker` / `ConfirmDialog`
+- No hand-written `<table>` / `<input type=date>` / `window.confirm()` / inline `style`
 
-## AI Skill 入口
+## AI Skill entry points
 
 ```bash
 npm run ai:create-page UserList
@@ -32,20 +34,20 @@ npm run ai:inspect compliance
 npm run ai:analyze src/views/system/User/User.vue
 ```
 
-底层走 `scripts/ai-cli.mjs` 调 Claude Code。
+Under the hood, `scripts/ai-cli.mjs` calls Claude Code.
 
-## 主要目录
+## Main directories
 
 ```
-services/         API 封装（平铺、前缀区分）
+services/         API wrappers (flat, prefix-distinguished)
 src/components/
-  ├── ui/         基础 UI
-  ├── shared/     通用业务组件
-  └── layout/     AppLayout 等
+  ├── ui/         foundation UI
+  ├── shared/     shared business components
+  └── layout/     AppLayout etc.
 src/views/
-  ├── system/     系统管理（User/Role/Permission/Menu/Dept/OpLog/Profile）
-  └── demo/       业务示例（Task —— 数据范围演示）
+  ├── system/     system admin (User/Role/Permission/Menu/Dept/OpLog/Profile)
+  └── demo/      business demo (Task — data-scope showcase)
 src/composables/  useDict / useConfirm / useTheme ...
-src/dict/storage.js   静态字典
-src/lang/         vue-i18n 翻译
+src/dict/storage.js   static dictionaries
+src/lang/         vue-i18n translations
 ```

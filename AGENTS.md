@@ -1,60 +1,62 @@
-# Access Matrix — 跨栈 Workspace 规约
+# Access Matrix — Cross-Stack Workspace Guide
 
-本仓是 monorepo：`backend/` 是 Spring Boot 4 后端、`frontend/` 是 Vue 3 前端。两栈强耦合，因此放在同一仓库管理 —— 单次 PR 完成"加 API + 加页面"，无版本协调成本。
+**English** · [中文](AGENTS.zh-CN.md)
 
-## 仓库布局
+This repo is a monorepo: `backend/` is the Spring Boot 4 backend and `frontend/` is the Vue 3 frontend. The two stacks are tightly coupled, which is why they live together — a single PR can "add an API + add a page" without any version-coordination overhead.
+
+## Repository layout
 
 ```
 access-matrix/
-├── .editorconfig                       两栈共用的缩进/编码/换行约定
-├── .gitignore                          仅跨栈条目（IDE / OS）
-├── README.md                           工程门面
-├── AGENTS.md                           本文件
+├── .editorconfig                       indentation/encoding/EOL conventions shared by both stacks
+├── .gitignore                          cross-stack entries only (IDE / OS)
+├── README.md                           project front page
+├── AGENTS.md                           this file
 ├── .github/
 │   ├── workflows/
-│   │   ├── backend.yml                  paths: 'backend/**' 触发
-│   │   └── frontend.yml                 paths: 'frontend/**' 触发
-│   └── pull_request_template.md         PR 模板：必填影响范围
-├── docs/                                跨栈协作文档（数据范围演示等）
+│   │   ├── backend.yml                  triggers on paths: 'backend/**'
+│   │   └── frontend.yml                 triggers on paths: 'frontend/**'
+│   └── pull_request_template.md         PR template: impact scope is required
+├── docs/                                cross-stack collaboration docs (data-scope demo, etc.)
 ├── backend/                             ← Spring Boot 4 + Java 25 + Maven Wrapper
-│   ├── AGENTS.md                        后端开发规约
-│   ├── .gitignore                       Maven target / *.class / .mvn/timing 等
+│   ├── AGENTS.md                        backend dev guide
+│   ├── .gitignore                       Maven target / *.class / .mvn/timing etc.
 │   ├── pom.xml
 │   ├── mvnw / mvnw.cmd / .mvn/
-│   └── (5 个 Maven module ...)
+│   └── (5 Maven modules ...)
 └── frontend/                            ← Vue 3 + Vite 6 + Tailwind v4
-    ├── AGENTS.md                        前端开发规约
-    ├── .gitignore                       node_modules / dist / .vite 等
+    ├── AGENTS.md                        frontend dev guide
+    ├── .gitignore                       node_modules / dist / .vite etc.
     ├── package.json
     └── src/ services/ public/ ...
 ```
 
-各栈的开发规则（命名、文件分层、API 约定、违反硬规则）在 `backend/AGENTS.md` 和 `frontend/AGENTS.md` —— 进任何一栈写代码前**先读那个栈的 AGENTS.md**。本文件只覆盖 **跨栈** 约定。
+The development rules for each stack (naming, file layering, API conventions, hard-rule violations) live in `backend/AGENTS.md` and `frontend/AGENTS.md` — **read that stack's AGENTS.md before writing code there**. This file covers **cross-stack** conventions only.
 
-## Commit 约定（Conventional Commits）
+## Commit conventions (Conventional Commits)
 
-格式：`<type>(<scope>): <subject>`
+Format: `<type>(<scope>): <subject>`
 
-| type | 用途 |
-|------|------|
-| `feat` | 新功能 |
-| `fix` | bug 修复 |
-| `refactor` | 不改外部行为的重写 |
-| `chore` | 杂务（构建、依赖更新、目录调整） |
-| `docs` | 仅文档 |
-| `test` | 测试代码 |
-| `ci` | GitHub Actions / 流水线 |
-| `perf` | 性能优化 |
-| `style` | 格式化（不影响逻辑） |
+| type | Use |
+|------|-----|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `refactor` | Rewrite without changing external behavior |
+| `chore` | Chores (build, dependency updates, directory shuffles) |
+| `docs` | Docs only |
+| `test` | Test code |
+| `ci` | GitHub Actions / pipelines |
+| `perf` | Performance optimization |
+| `style` | Formatting (no logic change) |
 
-`scope` 取值：
+Allowed `scope` values:
 
-- `backend` — 改 `backend/**`
-- `frontend` — 改 `frontend/**`
-- `repo` — 改根级 meta（README / AGENTS / workflows / .gitignore 等）
-- `docs` — 改根级 `/docs/`
+- `backend` — changes under `backend/**`
+- `frontend` — changes under `frontend/**`
+- `repo` — changes to root meta (README / AGENTS / workflows / .gitignore, etc.)
+- `docs` — changes under root `/docs/`
 
-示例：
+Examples:
 
 ```
 feat(backend): add demo_task table and DataScopeHelper walkthrough
@@ -64,15 +66,15 @@ docs(repo): add data-scope-demo.md
 ci(repo): split backend/frontend workflows with path filters
 ```
 
-跨栈一次性提交允许，scope 用 `backend,frontend` 逗号分隔：
+One-shot cross-stack commits are allowed; use comma-separated scope `backend,frontend`:
 
 ```
 feat(backend,frontend): /demo/task CRUD end-to-end
 ```
 
-## PR 约定
+## PR conventions
 
-PR 标题跟 commit 一样格式。PR 描述用 `.github/pull_request_template.md` 的模板，**必勾**"影响范围"：
+PR titles follow the commit format. PR descriptions use the `.github/pull_request_template.md` template, **with the "impact scope" checkbox required**:
 
 ```
 - [ ] backend
@@ -80,44 +82,44 @@ PR 标题跟 commit 一样格式。PR 描述用 `.github/pull_request_template.m
 - [ ] repo (workflows / docs / config)
 ```
 
-跨栈 PR 必须两栈都过 CI（path filter 会按目录变化触发对应 workflow）。
+Cross-stack PRs must pass CI on both sides (the path filter triggers the corresponding workflow based on which directory changed).
 
-## 启动顺序
+## Startup order
 
-1. 先后端：`cd backend && ./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local`
-2. 再前端：`cd frontend && npm install && npm run dev`
+1. Backend first: `cd backend && ./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local`
+2. Then frontend: `cd frontend && npm install && npm run dev`
 
-后端 local profile 会自动跑 Flyway 迁移 + LocalAdminSeeder + DemoSeeder，无需手工 SQL。
+The backend's local profile automatically runs Flyway migrations + LocalAdminSeeder + DemoSeeder, so no manual SQL is required.
 
-## 跨栈契约对齐点（最常踩坑的几个）
+## Cross-stack contract alignment points (most common pitfalls)
 
-| 维度 | 来源 |
-|------|------|
-| 认证头 | 后端读 `Authorization: Bearer <jwt>`；前端 axios 拦截器自动加 |
-| Refresh cookie | 后端下发 HttpOnly `core_refresh`；前端 axios `withCredentials: true` |
-| 多租户 header | `X-Tenant-Id`（pre-auth fallback）/ JWT `tid` claim（auth 后） |
-| 分页参数 | **`page` + `size`**（不是 `pageSize`/`limit`） |
-| 响应格式 | `{ code: 0, msg: "", data: {...} }`；分页时 `data = { records, total, page, limit }` |
-| 时间格式 | 后端要求 `yyyy-MM-dd HH:mm:ssZZ`，前端走 `frontend/src/lib/date.js` 的 `toBackendDate` 统一转换 |
-| 时区 | 强制 `Asia/Tokyo` |
-| 静态路由 vs 动态路由 | 前端只静态注册公开页；业务路由由后端 `/api/menu/me` 驱动 `addRoute()` |
+| Dimension | Source |
+|-----------|--------|
+| Auth header | Backend reads `Authorization: Bearer <jwt>`; the frontend axios interceptor adds it automatically |
+| Refresh cookie | Backend issues HttpOnly `core_refresh`; the frontend axios uses `withCredentials: true` |
+| Multi-tenant header | `X-Tenant-Id` (pre-auth fallback) / JWT `tid` claim (after auth) |
+| Pagination params | **`page` + `size`** (not `pageSize` / `limit`) |
+| Response shape | `{ code: 0, msg: "", data: {...} }`; for pagination `data = { records, total, page, limit }` |
+| Date format | Backend expects `yyyy-MM-dd HH:mm:ssZZ`; the frontend converts uniformly via `toBackendDate` in `frontend/src/lib/date.js` |
+| Timezone | Forced `Asia/Tokyo` |
+| Static vs dynamic routes | The frontend registers public pages statically only; business routes are driven by the backend `/api/menu/me` via `addRoute()` |
 
-## 行为指南（两栈通用）
+## Behavioral guidelines (both stacks)
 
 ### 1. Think Before Coding
-- 先表态假设，不确定就问
-- 多解时把选项摊开，别静悄悄选
+- State your assumptions first; ask when unsure
+- When there are multiple solutions, lay out the options instead of silently picking one
 
 ### 2. Simplicity First
-- 最少代码解决问题
-- 不为单次用法做抽象
-- 不加未要求的"灵活性"
+- Solve the problem with the least code
+- Do not abstract for single-use cases
+- Do not add unrequested "flexibility"
 
 ### 3. Surgical Changes
-- 只动该动的
-- 不顺手"改进"附近代码
-- 跟现有风格保持一致
+- Touch only what needs to change
+- Do not casually "improve" nearby code
+- Stay consistent with the existing style
 
 ### 4. Goal-Driven Execution
-- 把任务转成可验证目标
-- 多步任务给出可验证步骤计划
+- Turn the task into a verifiable goal
+- For multi-step tasks, give a verifiable step plan

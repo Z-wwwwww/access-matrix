@@ -1,5 +1,7 @@
 # Break-glass credentials
 
+**English** · [中文](break-glass.zh-CN.md)
+
 Operational guide for the "break-glass password" mechanism — the
 emergency credential that lets a super-admin log in when Keycloak (SSO)
 is unavailable.

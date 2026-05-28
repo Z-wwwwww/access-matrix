@@ -1,5 +1,7 @@
 # The `system` realm — platform operations
 
+**English** · [中文](system-realm.zh-CN.md)
+
 This document describes the `system` realm: a hidden Keycloak realm
 reserved for the SaaS operator's own staff, used to manage business
 tenants and run cross-tenant administration.

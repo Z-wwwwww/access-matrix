@@ -1,5 +1,7 @@
 # Keycloak — local SSO/IdP for access-matrix
 
+**English** · [中文](README.zh-CN.md)
+
 We use **Keycloak 26+** as the OIDC identity provider during development.
 It runs as a standalone Java process (no Docker required) and talks to the
 same Postgres instance the application uses, isolated by schema.

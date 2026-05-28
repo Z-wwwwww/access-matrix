@@ -1,6 +1,6 @@
-# Data Scope Walkthrough — `business-demo`
+# 数据范围演练 —— `business-demo`
 
-**English** · [中文](data-scope-demo.zh-CN.md)
+[English](data-scope-demo.md) · **中文**
 
 `business-demo` 模块演示 access-matrix 的 5 种 **数据范围**（`role.data_scope`）实际效果：同一张表、同一条 SQL，不同身份登录看到的行数不同。
 
