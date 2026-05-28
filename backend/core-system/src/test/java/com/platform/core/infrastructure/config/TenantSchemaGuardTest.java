@@ -72,16 +72,18 @@ class TenantSchemaGuardTest {
                         "core_rbac_role",
                         "core_rbac_permission",
                         "business_widget",
-                        "core_numbering_key",      // per-tenant, JdbcTemplate-only — has column, NOT excluded
+                        // Per-tenant + JdbcTemplate-only — has column, NOT excluded:
+                        "core_numbering_key",
+                        "core_numbering_management",
                         // Excluded — correctly column-less:
                         "flyway_schema_history",
-                        "core_meta",
-                        "core_numbering_management"),
+                        "core_meta"),
                 List.of(
                         "core_rbac_role",
                         "core_rbac_permission",
                         "business_widget",
-                        "core_numbering_key")
+                        "core_numbering_key",
+                        "core_numbering_management")
         );
         TenantSchemaGuard guard = newGuard(true);
         assertThatCode(guard::verify).doesNotThrowAnyException();
@@ -91,8 +93,7 @@ class TenantSchemaGuardTest {
     @DisplayName("table missing tenant_id and not excluded — fail-fast with offender named")
     void missingColumnIsFatal() {
         stubTables(
-                List.of("core_rbac_role", "business_oops", "flyway_schema_history",
-                        "core_meta", "core_numbering_management", "core_numbering_key"),
+                List.of("core_rbac_role", "business_oops", "flyway_schema_history", "core_meta"),
                 // business_oops is NOT in this list → has no tenant_id column
                 List.of("core_rbac_role")
         );
@@ -109,8 +110,7 @@ class TenantSchemaGuardTest {
         // core_meta is in EXCLUDED but we pretend it grew a tenant_id column
         // through a recent migration that forgot to remove the entry.
         stubTables(
-                List.of("core_rbac_role", "core_meta", "flyway_schema_history",
-                        "core_numbering_management"),
+                List.of("core_rbac_role", "core_meta", "flyway_schema_history"),
                 List.of("core_rbac_role", "core_meta")  // ← core_meta has tenant_id now
         );
         TenantSchemaGuard guard = newGuard(true);
@@ -123,8 +123,7 @@ class TenantSchemaGuardTest {
     @DisplayName("table names are matched case-insensitively")
     void caseInsensitive() {
         stubTables(
-                List.of("Core_Rbac_Role", "FLYWAY_SCHEMA_HISTORY", "Core_Meta",
-                        "Core_Numbering_Management"),
+                List.of("Core_Rbac_Role", "FLYWAY_SCHEMA_HISTORY", "Core_Meta"),
                 List.of("Core_Rbac_Role")
         );
         TenantSchemaGuard guard = newGuard(true);

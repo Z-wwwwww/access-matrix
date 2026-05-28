@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.platform.core.common.error.BusinessException;
+import com.platform.core.infrastructure.numbering.NumberingService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakRealmService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.platform.dto.TenantDto;
@@ -52,6 +53,7 @@ class TenantAdminServiceTest {
 
     @Mock TenantMapper tenantMapper;
     @Mock KeycloakRealmService realmService;
+    @Mock NumberingService numberingService;
     private ObjectProvider<KeycloakRealmService> realmServiceProvider;
     private TenantAdminService service;
 
@@ -61,7 +63,7 @@ class TenantAdminServiceTest {
         // ObjectProvider with the mock as its single available bean.
         realmServiceProvider = (ObjectProvider<KeycloakRealmService>) mock(ObjectProvider.class);
         when(realmServiceProvider.getIfAvailable()).thenReturn(realmService);
-        service = new TenantAdminService(tenantMapper, realmServiceProvider);
+        service = new TenantAdminService(tenantMapper, realmServiceProvider, numberingService);
     }
 
     private TenantEntity row(String id, String code) {
@@ -140,13 +142,17 @@ class TenantAdminServiceTest {
 
         assertThat(newId).hasSize(26);   // ULID
 
-        // Verify ordering: KC create BEFORE DB insert. Critical for the
-        // "no orphan row on KC failure" guarantee — if the order were
-        // reversed and KC threw, we'd be stuck with a registry row
-        // pointing at a non-existent realm.
-        org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(realmService, tenantMapper);
+        // Verify ordering: KC create BEFORE DB insert, then numbering seed
+        // after. Critical for the "no orphan row on KC failure" guarantee —
+        // if the order were reversed and KC threw, we'd be stuck with a
+        // registry row pointing at a non-existent realm. Seeding numbering
+        // last is fine because it's in the same @Transactional so a failure
+        // rolls back both the row and (eventually) the realm orphan.
+        org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(
+                realmService, tenantMapper, numberingService);
         inOrder.verify(realmService).createRealmFromTemplate("acme", "Acme Corp.");
         inOrder.verify(tenantMapper).insert(any(TenantEntity.class));
+        inOrder.verify(numberingService).seedDefaultsForTenant("acme");
 
         ArgumentCaptor<TenantEntity> cap = ArgumentCaptor.forClass(TenantEntity.class);
         verify(tenantMapper).insert(cap.capture());
