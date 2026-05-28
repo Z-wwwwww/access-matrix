@@ -6,6 +6,7 @@ import com.platform.core.common.result.PageResult;
 import com.platform.core.common.security.RequiresPermission;
 import com.platform.system.platform.dto.TenantDto;
 import com.platform.system.platform.service.TenantAdminService;
+import com.platform.system.platform.service.TenantImpersonationService;
 import com.platform.system.security.PlatformPermissions;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -36,9 +37,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlatformTenantController {
 
     private final TenantAdminService tenantService;
+    private final TenantImpersonationService impersonationService;
 
-    public PlatformTenantController(TenantAdminService tenantService) {
+    public PlatformTenantController(TenantAdminService tenantService,
+                                    TenantImpersonationService impersonationService) {
         this.tenantService = tenantService;
+        this.impersonationService = impersonationService;
     }
 
     @GetMapping
@@ -98,6 +102,32 @@ public class PlatformTenantController {
     public JsonResult<Void> resume(@PathVariable String id) {
         tenantService.resume(id);
         return JsonResult.ok();
+    }
+
+    /**
+     * Mint a 30-minute "support session" token that lets the platform-ops
+     * caller act with the target tenant's SUPER_ADMIN authority. Reason is
+     * mandatory and lands in {@code core_oplog.request_body} via the @OpLog
+     * aspect — primary audit justification. The minted token carries an
+     * RFC 8693 {@code act} claim with the original ops identity, plus a
+     * {@code "[support] <ops>"} username prefix so every downstream oplog
+     * row shouts "this was a support session" without having to decode
+     * the JWT.
+     *
+     * <p>FULL-mode for v1 — the token has the tenant's tenant:* wildcard.
+     * READ_ONLY is tracked as a follow-up; today the audit trail is the
+     * sole protection against an ops user making bad writes during support.
+     *
+     * <p>Built-in tenants (system, demo) refused: no operational reason to
+     * impersonate them, and accidents would be unusually costly there.
+     */
+    @PostMapping("/{id}/support-session")
+    @RequiresPermission(PlatformPermissions.TENANT_IMPERSONATE)
+    @OpLog(module = "platform", action = "tenant.impersonate.start", targetType = "tenant")
+    public JsonResult<TenantDto.SupportSessionResponse> startSupportSession(
+            @PathVariable String id,
+            @Valid @RequestBody TenantDto.SupportSessionRequest body) {
+        return JsonResult.ok(impersonationService.startSession(id, body.reason()));
     }
 
     /**

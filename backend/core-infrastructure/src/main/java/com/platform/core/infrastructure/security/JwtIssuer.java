@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Component
@@ -62,6 +63,51 @@ public class JwtIssuer {
         JwsHeader header = JwsHeader.with(() -> "HS256").build();
         String token = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
         return new TokenIssue(token, tokenId, now, exp, ACCESS_TTL.toSeconds());
+    }
+
+    /**
+     * Sign a support-session access token — used by the platform-ops
+     * "impersonate tenant" flow so an ops user can act with a target
+     * tenant's SUPER_ADMIN authority while leaving an audit trail.
+     *
+     * <p>Differs from {@link #issue} in three ways:
+     * <ul>
+     *   <li>{@code username} should already carry a visible prefix
+     *       (typically {@code "[support] <ops>"}) so every downstream
+     *       audit log row reads as a support action at a glance.</li>
+     *   <li>Adds an RFC 8693–style {@code act} claim recording the
+     *       original ops actor (sub, tid, username, session_id, reason)
+     *       — the forensic trail beyond the prefixed username.</li>
+     *   <li>TTL is caller-provided (typically 30 min vs the regular
+     *       15 min) so a single support session covers a normal triage
+     *       cycle without renewal logic.</li>
+     * </ul>
+     */
+    public TokenIssue issueSupportSession(String targetUserId, String targetTenantId,
+                                          String prefixedUsername,
+                                          String scopeClaim, List<String> roleIds,
+                                          Map<String, Object> actClaim,
+                                          Duration ttl) {
+        Instant now = Instant.now();
+        Instant exp = now.plus(ttl == null ? ACCESS_TTL : ttl);
+        String tokenId = UUID.randomUUID().toString();
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .id(tokenId)
+                .issuer(ISSUER)
+                .subject(targetUserId)
+                .issuedAt(now)
+                .expiresAt(exp)
+                .claim(props.jwt().usernameClaim(), prefixedUsername)
+                .claim(props.jwt().tenantClaim(), targetTenantId)
+                .claim(props.jwt().authoritiesClaim(), scopeClaim == null ? "" : scopeClaim)
+                .claim(CLAIM_ROLE_IDS, roleIds == null ? "" : String.join(",", roleIds))
+                .claim("act", actClaim == null ? Map.of() : actClaim)
+                .build();
+
+        JwsHeader header = JwsHeader.with(() -> "HS256").build();
+        String token = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+        return new TokenIssue(token, tokenId, now, exp, (exp.getEpochSecond() - now.getEpochSecond()));
     }
 
     public record TokenIssue(String token, String tokenId, Instant issuedAt, Instant expiresAt, long expiresInSec) {}
