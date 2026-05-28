@@ -59,22 +59,45 @@ public class NumberingService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String next(String codeKbn, String tenantId) {
-        return doAllocate(codeKbn, "", tenantId, 1).get(0);
+        return doAllocate(codeKbn, "", requireTenant(tenantId), 1).get(0);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String collect(String codeKbn, String fixedKey, String tenantId) {
-        return doAllocate(codeKbn, fixedKey, tenantId, 1).get(0);
+        return doAllocate(codeKbn, fixedKey, requireTenant(tenantId), 1).get(0);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public List<String> nextBatch(String codeKbn, String tenantId, int count) {
-        return doAllocate(codeKbn, "", tenantId, count);
+        return doAllocate(codeKbn, "", requireTenant(tenantId), count);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public List<String> collectBatch(String codeKbn, String fixedKey, String tenantId, int count) {
-        return doAllocate(codeKbn, fixedKey, tenantId, count);
+        return doAllocate(codeKbn, fixedKey, requireTenant(tenantId), count);
+    }
+
+    /**
+     * Reject null / blank tenantId at the API boundary instead of silently
+     * routing the allocation into a phantom {@code "default"} bucket. The
+     * fallback used to be {@code tenantId == null ? "default" : tenantId},
+     * which dated from before V25 renamed the {@code default} tenant to
+     * {@code demo} — anyone forgetting to pass tenantId would write rows to
+     * a tenant that no longer exists, mixing all callers' counters together.
+     * Fail-fast makes the contract explicit: <em>core_numbering_key is
+     * per-tenant; callers MUST resolve their tenant before calling here.</em>
+     *
+     * <p>The only production caller today ({@code UserAdminService.create})
+     * already defaults to {@code "demo"} before invoking us; this check is
+     * defence against a future caller that forgets.
+     */
+    private static String requireTenant(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,
+                    "NumberingService requires a non-null tenantId — callers must resolve "
+                            + "RequestContext.tenantIdOrDefault() before invoking");
+        }
+        return tenantId;
     }
 
     /** Drop the cached definition for one codeKbn — call after editing a definition row. */
@@ -151,11 +174,12 @@ public class NumberingService {
     }
 
     private void ensureKeyRow(String codeKbn, String expandedKey, String tenantId, NumberingDef def) {
+        // tenantId already validated non-null by requireTenant() at the public API boundary.
         jdbc.update(
                 "INSERT INTO core_numbering_key (tenant_id, code_kbn, numbering_key, seq_id) " +
                 "VALUES (?, ?, ?, ?) " +
                 "ON CONFLICT (tenant_id, code_kbn, numbering_key) DO NOTHING",
-                tenantId == null ? "default" : tenantId,
+                tenantId,
                 codeKbn,
                 expandedKey,
                 def.minValue() - def.stepValue());
@@ -163,7 +187,6 @@ public class NumberingService {
 
     private long incrementKey(String codeKbn, String expandedKey, String tenantId,
                               long delta, NumberingDef def, int count) {
-        String tid = tenantId == null ? "default" : tenantId;
         List<Long> rows = jdbc.query(
                 "UPDATE core_numbering_key " +
                 "   SET seq_id = seq_id + ? " +
@@ -171,7 +194,7 @@ public class NumberingService {
                 "   AND seq_id + ? <= ? " +
                 "RETURNING seq_id",
                 (rs, n) -> rs.getLong(1),
-                delta, tid, codeKbn, expandedKey, delta, def.maxValue());
+                delta, tenantId, codeKbn, expandedKey, delta, def.maxValue());
 
         if (!rows.isEmpty()) return rows.get(0);
 
@@ -180,7 +203,7 @@ public class NumberingService {
                     "UPDATE core_numbering_key SET seq_id = ? " +
                     "WHERE tenant_id = ? AND code_kbn = ? AND numbering_key = ? RETURNING seq_id",
                     (rs, n) -> rs.getLong(1),
-                    def.minValue(), tid, codeKbn, expandedKey);
+                    def.minValue(), tenantId, codeKbn, expandedKey);
             if (wrap.isEmpty()) {
                 throw new BusinessException(ErrorCode.NOT_FOUND,
                         "Numbering key row not found: " + codeKbn + "/" + expandedKey);
