@@ -67,4 +67,29 @@ public final class TenantDto {
             @NotBlank @Size(max = 128) String displayName,
             @Email @Size(max = 255) String contactEmail
     ) {}
+
+    /**
+     * Request body for {@code POST /platform/tenants/{id}/support-session}.
+     * A non-blank {@code reason} is mandatory — it's the primary audit
+     * justification and lands in {@code core_oplog.request_body} via the
+     * {@code @OpLog} aspect.
+     */
+    public record SupportSessionRequest(
+            @NotBlank @Size(max = 255) String reason
+    ) {}
+
+    /**
+     * Response shape from starting a support session. The frontend stashes
+     * {@code token} as its active Bearer (saving the prior ops token for
+     * restoration on terminate) and renders the countdown / banner from
+     * {@code expiresAt} / {@code expiresInSec}.
+     */
+    public record SupportSessionResponse(
+            String token,
+            String sessionId,
+            String tenantCode,
+            String displayName,
+            String expiresAt,
+            long expiresInSec
+    ) {}
 }

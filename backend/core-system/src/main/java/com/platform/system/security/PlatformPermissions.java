@@ -35,10 +35,11 @@ import org.springframework.stereotype.Component;
 @Component
 public final class PlatformPermissions {
 
-    public static final String TENANT_READ   = "platform:tenant:read";
-    public static final String TENANT_CREATE = "platform:tenant:create";
-    public static final String TENANT_UPDATE = "platform:tenant:update";
-    public static final String TENANT_DELETE = "platform:tenant:delete";
+    public static final String TENANT_READ        = "platform:tenant:read";
+    public static final String TENANT_CREATE      = "platform:tenant:create";
+    public static final String TENANT_UPDATE      = "platform:tenant:update";
+    public static final String TENANT_DELETE      = "platform:tenant:delete";
+    public static final String TENANT_IMPERSONATE = "platform:tenant:impersonate";
 
     static {
         PermissionCode.registerAll(PlatformPermissions.class, "platform");
