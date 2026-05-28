@@ -48,7 +48,14 @@ public final class PermissionRegistry {
     }
 
     static void put(String code, String module) {
-        int colon = code.indexOf(':');
+        // namespace 入りの code（例: platform:tenant:read）に対応するため
+        // 最後の : で resource / action を分割する。
+        //   user:read              → resource=user, action=read
+        //   platform:tenant:read   → resource=platform:tenant, action=read
+        // PermissionMatcher は最初の : で resource を切って resource:* を
+        // 探すので、wildcard ルックアップとはセマンティクスが意図的に異なる
+        // （wildcard は最上位プレフィックスで覆える設計）。
+        int colon = code.lastIndexOf(':');
         String resource = code.substring(0, colon);
         String action = code.substring(colon + 1);
         CODES.put(code, new Entry(code, resource, action, module));

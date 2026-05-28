@@ -6,7 +6,7 @@ import com.platform.core.common.result.PageResult;
 import com.platform.core.common.security.RequiresPermission;
 import com.platform.system.platform.dto.TenantDto;
 import com.platform.system.platform.service.TenantAdminService;
-import com.platform.system.security.SystemPermissions;
+import com.platform.system.security.PlatformPermissions;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,7 +41,7 @@ public class PlatformTenantController {
     }
 
     @GetMapping
-    @RequiresPermission(SystemPermissions.PLATFORM_TENANT_READ)
+    @RequiresPermission(PlatformPermissions.TENANT_READ)
     public JsonResult<PageResult<TenantDto.View>> list(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "20") long size,
@@ -50,13 +50,13 @@ public class PlatformTenantController {
     }
 
     @GetMapping("/{id}")
-    @RequiresPermission(SystemPermissions.PLATFORM_TENANT_READ)
+    @RequiresPermission(PlatformPermissions.TENANT_READ)
     public JsonResult<TenantDto.View> get(@PathVariable String id) {
         return JsonResult.ok(tenantService.get(id));
     }
 
     @PostMapping
-    @RequiresPermission(SystemPermissions.PLATFORM_TENANT_CREATE)
+    @RequiresPermission(PlatformPermissions.TENANT_CREATE)
     @OpLog(module = "platform", action = "tenant.create", targetType = "tenant")
     public JsonResult<String> create(@Valid @RequestBody TenantDto.CreateRequest body) {
         return JsonResult.ok(tenantService.create(body));
@@ -69,7 +69,7 @@ public class PlatformTenantController {
      * re-enable step (ops-only — not exposed via this API on purpose).
      */
     @DeleteMapping("/{id}")
-    @RequiresPermission(SystemPermissions.PLATFORM_TENANT_DELETE)
+    @RequiresPermission(PlatformPermissions.TENANT_DELETE)
     @OpLog(module = "platform", action = "tenant.softDelete", targetType = "tenant")
     public JsonResult<Void> softDelete(@PathVariable String id) {
         tenantService.softDelete(id);

@@ -59,13 +59,11 @@ public final class SystemPermissions {
     public static final String AUTH_UNLOCK         = "auth:unlock";
     public static final String AUTH_RESET_PASSWORD = "auth:reset-password";
 
-    // ---- platform (system-tenant only — held by PLATFORM_ADMIN role) ----
-    // These are deliberately NOT covered by the business-tenant '*:*'
-    // wildcard. A SUPER_ADMIN of 'acme' cannot reach platform:tenant:read;
-    // a PLATFORM_ADMIN can. The two scopes don't shadow each other.
-    public static final String PLATFORM_TENANT_READ   = "platform:tenant:read";
-    public static final String PLATFORM_TENANT_CREATE = "platform:tenant:create";
-    public static final String PLATFORM_TENANT_DELETE = "platform:tenant:delete";
+    // platform: namespace は {@link PlatformPermissions} に分離。
+    // module="platform" として登録する必要があるため別クラスに切り出している。
+    // 同じクラス内に置くと registerAll の module 引数が一つしか取れず
+    // V28 で seed した module='platform' を Guard が module='system' に
+    // 上書きしてしまう（UI のモジュール別グルーピングが壊れる）。
 
     static {
         PermissionCode.registerAll(SystemPermissions.class, "system");
