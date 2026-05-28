@@ -35,8 +35,17 @@ import java.util.regex.Pattern;
  */
 public final class PermissionCode {
 
-    /** 強制 code フォーマット：小文字 resource : 小文字 action（- と数字も可、ただし先頭は英字）。 */
-    private static final Pattern FORMAT = Pattern.compile("[a-z][a-z0-9-]*:[a-z][a-z0-9-]*");
+    /**
+     * 強制 code フォーマット：2 つ以上の小文字セグメントを {@code :} で連結。
+     * <ul>
+     *   <li>{@code user:read} — 業務権限の標準形（resource:action）</li>
+     *   <li>{@code platform:tenant:read} — namespace を入れた 3 セグメント形
+     *       （resource 部に {@code :} を含む。{@link PermissionRegistry#put} は
+     *       最後の {@code :} で resource / action を分割する）</li>
+     * </ul>
+     * 各セグメントは英字始まり、英数字 + ハイフン可。
+     */
+    private static final Pattern FORMAT = Pattern.compile("[a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*)+");
 
     private PermissionCode() {}
 
