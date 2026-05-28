@@ -88,19 +88,59 @@ npm install && npm run dev
 
 ---
 
-## 🎬 演示数据
+## 🎬 初始化与演示数据
 
-`local` profile 自动种 5 个 demo 用户，演示 5 种数据范围效果：
+`git clone` 后第一次启动（Flyway 迁移 V1-V29 + `--profile=local` 种子 + Keycloak `--import-realm`）拿到的全景：
 
-| 用户 | 角色 | 数据范围 | 看到的 task |
+### Keycloak Realms（`infra/keycloak/realms/*.json` 自动导入）
+
+| Realm | 用途 | 备注 |
+|---|---|---|
+| `master` | Keycloak 自带 | admin/admin |
+| `system` | 平台运营 realm | `tid=system` 的 JWT 触发 MyBatis-Plus 拦截器跨租户 bypass |
+| `demo` | 业务示例 realm | 普通业务租户的样板 |
+
+> 新增业务租户走 `infra/keycloak/new-tenant.ps1 -Name <name>`（克隆 `demo-realm.json` 并改 `tid` claim mapper）。
+
+### 业务租户 `core_tenant`
+
+| Tenant ID | Display | 备注 |
+|---|---|---|
+| `system` | Platform Operations | 跟 system realm 一一对应 |
+| `demo` | Demo Tenant | 跟 demo realm 一一对应 |
+
+### 内置角色（is_built_in = 1，UI 上锁，不可编辑/删除）
+
+| 角色 | Tenant | 通配权限 | 持有者 |
 |---|---|---|---|
-| `tanaka_taro` | 取締役 | ALL | 全部 4 个部门 |
-| `yamada_hanako` | 東京支社長 | DEPT_AND_SUB | 東京 + 子部门京都 |
-| `sato_ken` | 大阪支社課長 | DEPT | 仅大阪 |
-| `suzuki_misaki` | 一般社員 | SELF | 仅自己创建的 |
-| `takahashi_shinichi` | 京都連絡担当 | CUSTOM | role_dept 显式绑定的京都 |
+| **SUPER_ADMIN** | demo | `tenant:*`（命中除 `platform:` 外的一切） | 每个业务租户的超管 |
+| **Platform Admin** | system | `*:*`（仅命中 `platform:` 命名空间） | SaaS 运营人员 |
 
-密码统一 `demo123`。详见 [data-scope demo](docs/data-scope-demo.md)。
+> 两个 super-wildcard **对称豁免、互不覆盖** —— 业务超管不能调 `/platform/*`，平台管理员不能假冒业务用户。详见 [`docs/system-realm.md`](docs/system-realm.md) 和 `PermissionMatcher.java`。
+
+### Demo 角色（is_built_in = 0，演示数据范围 5 种 scope，可删可改）
+
+| 角色 | 数据范围 | 演示效果 |
+|---|---|---|
+| デモ：全範囲 | ALL | 全部 4 个部门 |
+| デモ：自部署＋下位 | DEPT_AND_SUB | 東京 + 子部门京都 |
+| デモ：自部署のみ | DEPT | 仅大阪 |
+| デモ：本人のみ | SELF | 仅自己创建的 |
+| デモ：カスタム部署 | CUSTOM | role_dept 显式绑定的京都 |
+
+### 种子用户（仅 `@Profile("local")` 创建；prod / dev 部署完全空表）
+
+| Realm | 账号 | 密码 | 角色 / 部门 |
+|---|---|---|---|
+| system | `ops` | `ops` | Platform Admin |
+| demo | `admin` | `admin` | SUPER_ADMIN / HQ |
+| demo | `tanaka_taro` | `demo123` | 取締役（ALL）/ HQ |
+| demo | `yamada_hanako` | `demo123` | 東京支社長（DEPT_AND_SUB）/ TOKYO |
+| demo | `sato_ken` | `demo123` | 大阪支社課長（DEPT）/ OSAKA |
+| demo | `suzuki_misaki` | `demo123` | 一般社員（SELF）/ TOKYO |
+| demo | `takahashi_shinichi` | `demo123` | 京都連絡担当（CUSTOM→京都）/ HQ |
+
+种子代码：`LocalAdminSeeder` / `SystemAdminSeeder` / `DemoSeeder` + 两个 `*KeycloakAdminSeeder`，全部 `@Profile("local")`。详细数据范围对照见 [data-scope demo](docs/data-scope-demo.md)。
 
 ---
 
