@@ -23,50 +23,63 @@ class PermissionMatcherTest {
         }
 
         @Test
-        @DisplayName("*:* grants every business-tenant permission")
-        void superWildcard() {
+        @DisplayName("*:* is PLATFORM super — matches platform: namespace only")
+        void platformSuperWildcard() {
+            // *:* is the PLATFORM_ADMIN's wildcard. It matches every
+            // platform:* perm but explicitly does NOT match business
+            // perms — privacy boundary (a platform admin shouldn't be
+            // able to impersonate business users).
             Set<String> perms = Set.of("*:*");
-            assertThat(PermissionMatcher.matches(perms, "user:read")).isTrue();
-            assertThat(PermissionMatcher.matches(perms, "role:delete")).isTrue();
-            assertThat(PermissionMatcher.matches(perms, "system:anything")).isTrue();
-            // NB: "platform:*" is the exception — see platformCarveOut below.
+            assertThat(PermissionMatcher.matches(perms, "platform:tenant:read")).isTrue();
+            assertThat(PermissionMatcher.matches(perms, "platform:tenant:create")).isTrue();
+            assertThat(PermissionMatcher.matches(perms, "platform:anything")).isTrue();
+            assertThat(PermissionMatcher.matches(perms, "user:read")).isFalse();
+            assertThat(PermissionMatcher.matches(perms, "role:delete")).isFalse();
+            assertThat(PermissionMatcher.matches(perms, "system:anything")).isFalse();
         }
 
         @Test
-        @DisplayName("*:* deliberately does NOT match platform:* — privilege carve-out")
-        void platformCarveOut() {
-            // Business-tenant SUPER_ADMIN holds *:*. They should NOT thereby
-            // satisfy platform-ops permissions — PLATFORM_ADMIN is a
-            // distinct scope, and *:*'s blanket grant must stop at the
-            // platform: namespace boundary. Without this carve-out a
-            // compromised SUPER_ADMIN could reach POST /platform/tenants
-            // and create realms.
-            Set<String> businessSuper = Set.of("*:*");
-            assertThat(PermissionMatcher.matches(businessSuper, "platform:tenant:read"))
-                    .as("*:* must not satisfy platform:tenant:read")
-                    .isFalse();
-            assertThat(PermissionMatcher.matches(businessSuper, "platform:tenant:create"))
-                    .isFalse();
-            assertThat(PermissionMatcher.matches(businessSuper, "platform:tenant:delete"))
-                    .isFalse();
-            assertThat(PermissionMatcher.matches(businessSuper, "platform:anything"))
-                    .isFalse();
+        @DisplayName("tenant:* is TENANT super — matches everything outside platform:")
+        void tenantSuperWildcard() {
+            // tenant:* is the business-tenant SUPER_ADMIN's wildcard.
+            // Matches every business permission, but the platform:
+            // namespace is carved out — a compromised business admin
+            // cannot reach POST /platform/tenants.
+            Set<String> perms = Set.of("tenant:*");
+            assertThat(PermissionMatcher.matches(perms, "user:read")).isTrue();
+            assertThat(PermissionMatcher.matches(perms, "role:delete")).isTrue();
+            assertThat(PermissionMatcher.matches(perms, "auth:reset-password")).isTrue();
+            assertThat(PermissionMatcher.matches(perms, "anything:goes")).isTrue();
+            assertThat(PermissionMatcher.matches(perms, "platform:tenant:read")).isFalse();
+            assertThat(PermissionMatcher.matches(perms, "platform:tenant:create")).isFalse();
+            assertThat(PermissionMatcher.matches(perms, "platform:anything")).isFalse();
+        }
 
-            // platform:* DOES satisfy platform:tenant:* (via the
-            // resource:* branch).
-            Set<String> platformAdmin = Set.of("platform:*");
-            assertThat(PermissionMatcher.matches(platformAdmin, "platform:tenant:read")).isTrue();
-            assertThat(PermissionMatcher.matches(platformAdmin, "platform:tenant:create")).isTrue();
-            assertThat(PermissionMatcher.matches(platformAdmin, "platform:anything")).isTrue();
-            // And platform:* must NOT shadow business-tenant perms either
-            // — symmetry. A PLATFORM_ADMIN cannot impersonate a SUPER_ADMIN.
-            assertThat(PermissionMatcher.matches(platformAdmin, "user:read")).isFalse();
-            assertThat(PermissionMatcher.matches(platformAdmin, "role:delete")).isFalse();
+        @Test
+        @DisplayName("the two supers don't shadow each other")
+        void supersAreDisjoint() {
+            // Critical invariant: holding one super wildcard never grants
+            // the other namespace's perms. To get both authorities a user
+            // would need both wildcards explicitly assigned.
+            Set<String> platformOnly = Set.of("*:*");
+            Set<String> tenantOnly = Set.of("tenant:*");
+            Set<String> bothSupers = Set.of("*:*", "tenant:*");
 
-            // Exact platform code also works (no wildcard at all).
-            Set<String> readOnly = Set.of("platform:tenant:read");
-            assertThat(PermissionMatcher.matches(readOnly, "platform:tenant:read")).isTrue();
-            assertThat(PermissionMatcher.matches(readOnly, "platform:tenant:create")).isFalse();
+            // platform-only: no business perms
+            assertThat(PermissionMatcher.matches(platformOnly, "user:read")).isFalse();
+            // tenant-only: no platform perms
+            assertThat(PermissionMatcher.matches(tenantOnly, "platform:tenant:read")).isFalse();
+            // both: god mode
+            assertThat(PermissionMatcher.matches(bothSupers, "user:read")).isTrue();
+            assertThat(PermissionMatcher.matches(bothSupers, "platform:tenant:read")).isTrue();
+        }
+
+        @Test
+        @DisplayName("constants pin the wildcard literals")
+        void constants() {
+            assertThat(PermissionMatcher.SUPER).isEqualTo("*:*");
+            assertThat(PermissionMatcher.TENANT_SUPER).isEqualTo("tenant:*");
+            assertThat(PermissionMatcher.PLATFORM_NS).isEqualTo("platform:");
         }
 
         @Test
@@ -89,19 +102,17 @@ class PermissionMatcherTest {
         }
 
         @Test
-        @DisplayName("malformed required (no colon) — never matches via wildcard")
+        @DisplayName("malformed required (no colon) — only tenant:* rescues it")
         void noColonRequired() {
-            // Defensive: required permission strings should always be resource:action.
-            // If a caller passes a malformed value, we don't fall back to "match by prefix".
-            assertThat(PermissionMatcher.matches(Set.of("*:*"), "userread")).isTrue();  // *:* covers all
+            // Defensive: required permission strings should always be
+            // resource:action. A bare "userread" is malformed; only the
+            // catch-all wildcard tenant:* satisfies it (since it doesn't
+            // start with "platform:"). *:* is platform-scoped now and does
+            // NOT cover a colon-less value.
+            assertThat(PermissionMatcher.matches(Set.of("tenant:*"), "userread")).isTrue();
+            assertThat(PermissionMatcher.matches(Set.of("*:*"), "userread")).isFalse();
             assertThat(PermissionMatcher.matches(Set.of("user:*"), "userread")).isFalse();
             assertThat(PermissionMatcher.matches(Set.of("user:read"), "userread")).isFalse();
-        }
-
-        @Test
-        @DisplayName("SUPER constant equals literal *:*")
-        void superConstant() {
-            assertThat(PermissionMatcher.SUPER).isEqualTo("*:*");
         }
     }
 
@@ -124,8 +135,15 @@ class PermissionMatcherTest {
         }
 
         @Test
-        void superAdminMatchesAnyRequest() {
-            assertThat(PermissionMatcher.matchesAny(Set.of("*:*"), "user:read", "role:delete")).isTrue();
+        void tenantSuperMatchesAnyBusinessRequest() {
+            assertThat(PermissionMatcher.matchesAny(Set.of("tenant:*"), "user:read", "role:delete")).isTrue();
+            assertThat(PermissionMatcher.matchesAny(Set.of("tenant:*"), "platform:tenant:read")).isFalse();
+        }
+
+        @Test
+        void platformSuperMatchesAnyPlatformRequest() {
+            assertThat(PermissionMatcher.matchesAny(Set.of("*:*"), "platform:tenant:read", "platform:tenant:create")).isTrue();
+            assertThat(PermissionMatcher.matchesAny(Set.of("*:*"), "user:read")).isFalse();
         }
     }
 }

@@ -17,27 +17,30 @@ export function arrayHasAny(source, targets) {
 
 /**
  * Match a single permission code against a list of granted codes.
- * Mirrors the backend's PermissionMatcher wildcard semantics:
- *   - "*:*"          → grants every BUSINESS-TENANT permission (super admin
- *                       within one tenant; does NOT cover "platform:*")
- *   - "resource:*"   → grants every action on that resource (includes
- *                       "platform:*" for PLATFORM_ADMIN)
+ * Mirrors the backend's PermissionMatcher wildcard semantics — keep the
+ * two implementations in lockstep or buttons end up gated differently
+ * from API calls.
+ *
+ *   - "*:*"          → PLATFORM super. Matches every "platform:*" permission;
+ *                       does NOT cover business permissions like "user:read".
+ *                       Held by PLATFORM_ADMIN.
+ *   - "tenant:*"     → TENANT super. Matches every permission OUTSIDE the
+ *                       "platform:" namespace. Held by business-tenant
+ *                       SUPER_ADMIN.
+ *   - "resource:*"   → grants every action on that resource (e.g. "user:*")
  *   - exact "r:a"    → grants only that pair
  *
- * The `platform:*` carve-out keeps a business-tenant super-admin from
- * accidentally reaching platform-ops controllers; see backend
- * PermissionMatcher.java for the full rationale.
- *
  * Without wildcard support the front-end would hide every v-permission
- * button for super-admins who hold only `["*:*"]`.
+ * button for super-admins who hold only the super wildcards.
  */
 const PLATFORM_NS = 'platform:'
 
 export function matchPermission(perms, want) {
   if (!Array.isArray(perms) || perms.length === 0 || !want) return false
-  // SUPER does NOT shadow platform-namespaced perms. Mirrors the
-  // backend matcher's same-named carve-out.
-  if (perms.includes('*:*') && !want.startsWith(PLATFORM_NS)) return true
+  // Platform super matches only the platform: namespace.
+  if (perms.includes('*:*') && want.startsWith(PLATFORM_NS)) return true
+  // Tenant super matches everything except the platform: namespace.
+  if (perms.includes('tenant:*') && !want.startsWith(PLATFORM_NS)) return true
   if (perms.includes(want)) return true
   const colon = want.indexOf(':')
   if (colon < 0) return false

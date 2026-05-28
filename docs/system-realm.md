@@ -58,19 +58,37 @@ mirrors `demo`. Strict bits live exclusively on session/lockout.
 | `platform:*` wildcard permission | `core_rbac_permission` under tenant `system` | Seeded by V26 |
 | Default ops user (dev only) | `ops` / `ops` | Seeded by `SystemAdminSeeder` + `SystemKeycloakAdminSeeder` under `@Profile("local")` |
 
-## Permission model — `platform:*` vs `*:*`
+## Permission model — `*:*` vs `tenant:*`
 
-The two wildcards do NOT shadow each other:
+The system has two super-wildcards, one per scope, and they do NOT
+shadow each other:
 
 | Wildcard | Who holds it | What it grants | What it does NOT grant |
 |---|---|---|---|
-| `*:*` | SUPER_ADMIN of a business tenant | Everything within that tenant | `platform:*` perms (can't manage tenants) |
-| `platform:*` | PLATFORM_ADMIN of `system` | Tenant management, cross-tenant ops | Business-tenant data access — they can't impersonate `acme`'s SUPER_ADMIN |
+| `*:*` | PLATFORM_ADMIN (in `system` realm) | The full `platform:` namespace — tenant management, cross-tenant ops | Business-tenant data — they can't impersonate `acme`'s SUPER_ADMIN |
+| `tenant:*` | SUPER_ADMIN of a business tenant (e.g. `demo`, `acme`) | Everything within that tenant — `user:*`, `role:*`, `auth:*`, `dept:*`, etc. | The `platform:*` namespace — they can't reach `POST /platform/tenants` |
+
+The symbol assignment maps the "looks most powerful" wildcard (`*:*`)
+to the "most powerful in scope" role (PLATFORM_ADMIN); the business
+super-admin gets `tenant:*`, which reads as "I'm the boss within this
+tenant" — the scope is right there in the name.
 
 This split is deliberate: a SaaS company's operations staff manage the
 billing / signup / suspension of tenants, but they should NOT be able
-to read a customer's business records. The two perm namespaces enforce
-that boundary in code, not just by trust.
+to read a customer's business records. The two scopes enforce that
+boundary in code (PermissionMatcher rejects shadow attempts both ways),
+not just by trust.
+
+### Implications
+
+- Granting "godmode" requires BOTH wildcards explicitly (rare, but
+  auditable when needed). No single wildcard covers everything.
+- `platform:*` still works as a narrower delegation (resource wildcard)
+  if you want a junior platform-ops role with all platform perms but
+  no `*:*` reserved-for-PLATFORM_ADMIN signal.
+- `tenant:*` matching naturally extends to any future business
+  permission added in any module — no need to update the wildcard
+  registration as the perm catalogue grows.
 
 ## The MyBatis-Plus bypass
 

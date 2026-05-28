@@ -50,14 +50,16 @@ describe('v-permission directive', () => {
     expect(wrapper.find('.guarded').exists()).toBe(false)
   })
 
-  it('super admin (*:*) keeps every guarded button', () => {
-    // The exact bug we fixed: previously a user with only `*:*` had every
-    // v-permission button removed because the matcher only did exact compare.
+  it('business super (tenant:*) keeps every business-guarded button', () => {
+    // The exact bug we fixed: previously a user with the super wildcard had
+    // every v-permission button removed because the matcher only did exact compare.
+    // After the *:* / tenant:* split, tenant:* is the business super wildcard
+    // and should satisfy every business permission gate.
     const wrapper = mountGuard({
       directive: vPermission,
       name: 'permission',
       bindingExpr: "'user:read'",
-      patchStore: (s) => { s.authorities = ['*:*'] }
+      patchStore: (s) => { s.authorities = ['tenant:*'] }
     })
     expect(wrapper.find('.guarded').exists()).toBe(true)
   })

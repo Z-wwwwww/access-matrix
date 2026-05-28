@@ -18,10 +18,27 @@ describe('matchPermission — wildcard semantics', () => {
     expect(matchPermission(['user:read'], 'role:read')).toBe(false)
   })
 
-  it('*:* grants every permission', () => {
-    expect(matchPermission(['*:*'], 'user:read')).toBe(true)
-    expect(matchPermission(['*:*'], 'role:delete')).toBe(true)
-    expect(matchPermission(['*:*'], 'whatever:goes-here')).toBe(true)
+  it('*:* is PLATFORM super — matches platform: namespace only', () => {
+    // *:* is the PLATFORM_ADMIN's wildcard. It DOES match every platform:* perm.
+    expect(matchPermission(['*:*'], 'platform:tenant:read')).toBe(true)
+    expect(matchPermission(['*:*'], 'platform:tenant:create')).toBe(true)
+    expect(matchPermission(['*:*'], 'platform:anything')).toBe(true)
+    // It does NOT match business permissions — a platform admin should not
+    // be able to impersonate a business user (GDPR / SOC2 boundary).
+    expect(matchPermission(['*:*'], 'user:read')).toBe(false)
+    expect(matchPermission(['*:*'], 'role:delete')).toBe(false)
+    expect(matchPermission(['*:*'], 'whatever:goes-here')).toBe(false)
+  })
+
+  it('tenant:* is TENANT super — matches every non-platform permission', () => {
+    // tenant:* is the business-tenant SUPER_ADMIN's wildcard. Matches every
+    // business permission but NOT the platform: namespace — a compromised
+    // business admin should not be able to reach POST /platform/tenants.
+    expect(matchPermission(['tenant:*'], 'user:read')).toBe(true)
+    expect(matchPermission(['tenant:*'], 'role:delete')).toBe(true)
+    expect(matchPermission(['tenant:*'], 'whatever:goes-here')).toBe(true)
+    expect(matchPermission(['tenant:*'], 'platform:tenant:read')).toBe(false)
+    expect(matchPermission(['tenant:*'], 'platform:tenant:create')).toBe(false)
   })
 
   it('resource:* grants every action on that resource only', () => {
@@ -47,10 +64,13 @@ describe('matchPermission — wildcard semantics', () => {
   })
 
   it('malformed required permission (no colon) cannot leak through resource:*', () => {
-    // We do NOT want "user:*" to accidentally match a malformed "userread"
-    // string just because it starts with "user". Only *:* should cover anything.
+    // Defensive: required permission strings should always be resource:action.
+    // No wildcard should rescue a malformed value, EXCEPT tenant:* — which
+    // matches anything not in the platform: namespace, including a no-colon
+    // string like "userread".
     expect(matchPermission(['user:*'], 'userread')).toBe(false)
-    expect(matchPermission(['*:*'], 'userread')).toBe(true)
+    expect(matchPermission(['*:*'], 'userread')).toBe(false)      // not platform:
+    expect(matchPermission(['tenant:*'], 'userread')).toBe(true)  // non-platform
   })
 })
 
@@ -67,14 +87,21 @@ describe('hasAllPermissions / hasAnyPermission', () => {
     expect(hasAnyPermission(userPerms, ['user:read', 'menu:read'])).toBe(false)
   })
 
-  it('super admin (*:*) matches every request', () => {
-    expect(hasAllPermissions(['*:*'], ['user:read', 'role:delete', 'menu:write'])).toBe(true)
-    expect(hasAnyPermission(['*:*'], ['definitely:not-real'])).toBe(true)
+  it('business super (tenant:*) matches every non-platform request', () => {
+    expect(hasAllPermissions(['tenant:*'], ['user:read', 'role:delete', 'menu:write'])).toBe(true)
+    expect(hasAnyPermission(['tenant:*'], ['definitely:not-real'])).toBe(true)
+    // But still bounded — platform: stays out of reach
+    expect(hasAnyPermission(['tenant:*'], ['platform:tenant:read'])).toBe(false)
+  })
+
+  it('platform super (*:*) matches every platform request', () => {
+    expect(hasAllPermissions(['*:*'], ['platform:tenant:read', 'platform:tenant:create'])).toBe(true)
+    expect(hasAnyPermission(['*:*'], ['user:read'])).toBe(false)
   })
 
   it('non-array wants returns false', () => {
-    expect(hasAllPermissions(['*:*'], null)).toBe(false)
-    expect(hasAnyPermission(['*:*'], 'user:read')).toBe(false)
+    expect(hasAllPermissions(['tenant:*'], null)).toBe(false)
+    expect(hasAnyPermission(['tenant:*'], 'user:read')).toBe(false)
   })
 })
 
