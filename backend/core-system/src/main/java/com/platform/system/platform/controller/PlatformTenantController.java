@@ -10,6 +10,7 @@ import com.platform.system.security.PlatformPermissions;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -60,6 +61,43 @@ public class PlatformTenantController {
     @OpLog(module = "platform", action = "tenant.create", targetType = "tenant")
     public JsonResult<String> create(@Valid @RequestBody TenantDto.CreateRequest body) {
         return JsonResult.ok(tenantService.create(body));
+    }
+
+    /**
+     * Patch the registry row's mutable fields (displayName, contactEmail).
+     * Also propagates the displayName change to the Keycloak realm so the
+     * KC admin console and our platform console stay in sync.
+     * tenant_code is immutable — see {@link TenantDto.UpdateRequest}.
+     */
+    @PatchMapping("/{id}")
+    @RequiresPermission(PlatformPermissions.TENANT_UPDATE)
+    @OpLog(module = "platform", action = "tenant.update", targetType = "tenant")
+    public JsonResult<Void> update(@PathVariable String id,
+                                   @Valid @RequestBody TenantDto.UpdateRequest body) {
+        tenantService.update(id, body);
+        return JsonResult.ok();
+    }
+
+    /**
+     * Suspend the tenant: status=0, Keycloak realm disabled. Reversible
+     * via {@link #resume}. The registry row stays mark=1 so the tenant
+     * remains visible in the list with a "suspended" badge.
+     */
+    @PostMapping("/{id}/suspend")
+    @RequiresPermission(PlatformPermissions.TENANT_UPDATE)
+    @OpLog(module = "platform", action = "tenant.suspend", targetType = "tenant")
+    public JsonResult<Void> suspend(@PathVariable String id) {
+        tenantService.suspend(id);
+        return JsonResult.ok();
+    }
+
+    /** Resume a previously suspended tenant: status=1, KC realm re-enabled. */
+    @PostMapping("/{id}/resume")
+    @RequiresPermission(PlatformPermissions.TENANT_UPDATE)
+    @OpLog(module = "platform", action = "tenant.resume", targetType = "tenant")
+    public JsonResult<Void> resume(@PathVariable String id) {
+        tenantService.resume(id);
+        return JsonResult.ok();
     }
 
     /**

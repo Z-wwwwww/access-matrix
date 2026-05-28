@@ -31,6 +31,15 @@ public final class TenantDto {
      * Create body. The {@code tenantCode} is what becomes both the
      * Keycloak realm name and the tenant_id on every business row;
      * once chosen it's effectively immutable (rename is not supported).
+     *
+     * <p>{@code adminUsername} is the username of the auto-provisioned
+     * SUPER_ADMIN user. When blank, the server derives it from
+     * {@code contactEmail}'s local-part (lowercased and sanitised to
+     * {@code [a-z0-9_-]}); if that derivation yields an empty or
+     * already-taken username, the server falls back to {@code "admin"}.
+     * Operators wanting a specific username can override here. Whatever
+     * username lands, the user is created with {@code password_hash=NULL}
+     * and receives an invite mail at {@code contactEmail}.
      */
     public record CreateRequest(
             @NotBlank
@@ -40,6 +49,22 @@ public final class TenantDto {
 
             @NotBlank @Size(max = 128) String displayName,
 
+            @Email @Size(max = 255) String contactEmail,
+
+            @Size(max = 64)
+            @Pattern(regexp = "^[a-z0-9][a-z0-9_-]{0,63}$|^$",
+                    message = "adminUsername must be lowercase alphanumeric / dash / underscore")
+            String adminUsername
+    ) {}
+
+    /**
+     * Patch body for the registry row. tenant_code stays immutable
+     * (renaming it would require coordinated changes across Keycloak realm,
+     * every business row's tenant_id, and external clients) — anything else
+     * about the tenant is fair game from the platform-ops console.
+     */
+    public record UpdateRequest(
+            @NotBlank @Size(max = 128) String displayName,
             @Email @Size(max = 255) String contactEmail
     ) {}
 }
