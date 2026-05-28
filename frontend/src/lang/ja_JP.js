@@ -219,6 +219,39 @@ export default {
         resumeMessage: '「{displayName}」（{tenantCode}）を再開しますか？\n\nKeycloak realm が再度有効化され、サインインを受け付けます。',
         resumeConfirm: '再開する'
       },
+      support: {
+        tooltip: {
+          start: 'サポートセッションを開始（このテナントの SUPER_ADMIN 権限で 30 分間操作）',
+          disabledSuspended: '停止中のテナントはサポートセッションを開始できません'
+        },
+        dialog: {
+          title: 'サポートセッション開始',
+          warning: {
+            title: '高権限操作の確認',
+            body: '{displayName}（{tenantCode}）の SUPER_ADMIN として 30 分間操作します。\nこのセッション中の全ての操作は監査ログに「[support] <あなたのユーザー名>」として記録されます。'
+          },
+          reasonLabel: '理由（必須）',
+          reasonPlaceholder: '例: OS-1234 ユーザー報告の再現確認',
+          reasonHint: '監査ログ（core_oplog.request_body）に保存されます。具体的に書いてください。',
+          ttlNote: 'セッションは 30 分後に自動失効します（延長不可）',
+          auditNote: '全ての操作が監査ログに残ります',
+          writeNote: '読み取り専用モードは未実装（書き込みも可能）— 慎重に',
+          starting: '開始中...',
+          confirm: 'サポートセッションを開始'
+        },
+        banner: {
+          acting: 'サポートセッション中: {displayName}（{tenantCode}）',
+          note: '全ての操作は監査ログに記録されます'
+        },
+        button: {
+          terminate: 'セッション終了'
+        },
+        message: {
+          started: 'サポートセッションを開始しました（{tenantCode}）',
+          startFailed: 'サポートセッション開始に失敗',
+          terminated: 'サポートセッションを終了しました'
+        }
+      },
       message: {
         createSuccess: 'テナントを作成し、招待メールを送信しました',
         createFailed: 'テナント作成に失敗',

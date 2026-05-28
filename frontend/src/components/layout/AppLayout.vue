@@ -6,6 +6,7 @@ import { useTabsStore } from '@/stores/tabs'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
 import AppTabBar from './AppTabBar.vue'
+import SupportSessionBanner from './SupportSessionBanner.vue'
 import ToastContainer from '@/components/shared/ToastContainer.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 
@@ -61,6 +62,11 @@ const hideFooter = computed(() => route.meta?.hideFooter === true)
 
 <template>
   <div class="min-h-screen flex flex-col bg-background">
+    <!-- Platform-ops support session banner — only renders when the auth
+         store's support-mode flag is on. Sits above the header so it's the
+         first thing the operator sees on every page. -->
+    <SupportSessionBanner />
+
     <!-- Header -->
     <AppHeader :collapsed="collapsed" @toggle-sidebar="toggleSidebar" />
 
