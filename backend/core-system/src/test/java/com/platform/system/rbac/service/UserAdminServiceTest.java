@@ -15,9 +15,7 @@ import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
 import com.platform.system.auth.service.InviteTokenService;
 import com.platform.system.rbac.dto.UserDto;
-import com.platform.system.rbac.entity.RoleEntity;
 import com.platform.system.rbac.entity.UserRoleEntity;
-import com.platform.system.rbac.mapper.RoleMapper;
 import com.platform.system.rbac.mapper.UserRoleMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,7 +58,7 @@ class UserAdminServiceTest {
 
     @Mock UserMapper userMapper;
     @Mock UserRoleMapper userRoleMapper;
-    @Mock RoleMapper roleMapper;
+    @Mock com.platform.system.rbac.service.BuiltInRoleLookup roleLookup;
     @Mock PasswordEncoder encoder;
     @Mock PasswordPolicyService passwordPolicy;
     @Mock PermissionCacheService cacheService;
@@ -80,6 +78,14 @@ class UserAdminServiceTest {
     @BeforeEach
     void seedTenant() {
         RequestContext.set("acme", "tester", "tester", Locale.JAPAN, "trace-1");
+        // Tests run as tenant=acme; pre-refactor stubs used the constant
+        // SUPER_ADMIN_ID directly. After the lookup refactor, the service
+        // resolves the tenant's super-admin role id via BuiltInRoleLookup —
+        // mirror that resolution here so the existsActiveLink / count
+        // queries keyed on SUPER_ADMIN_ID still match.
+        org.mockito.Mockito.lenient()
+                .when(roleLookup.superAdminRoleId("acme"))
+                .thenReturn(BuiltInRoles.SUPER_ADMIN_ID);
     }
 
     @AfterEach
@@ -94,15 +100,6 @@ class UserAdminServiceTest {
         u.setMark(1);
         u.setStatus(1);
         return u;
-    }
-
-    private RoleEntity superAdminRole() {
-        RoleEntity r = new RoleEntity();
-        r.setId(BuiltInRoles.SUPER_ADMIN_ID);
-        r.setName("Super Administrator");
-        r.setIsBuiltIn(1);
-        r.setMark(1);
-        return r;
     }
 
     @Test
@@ -144,7 +141,6 @@ class UserAdminServiceTest {
     void delete_softDeletesViaUpdateWrapper_andKicksOut() {
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
         // not super admin
-        when(roleMapper.selectById(BuiltInRoles.SUPER_ADMIN_ID)).thenReturn(superAdminRole());
         when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
 
         service.delete("u1");
@@ -251,7 +247,6 @@ class UserAdminServiceTest {
     @Test
     void delete_refusesLastSuperAdmin() {
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
-        when(roleMapper.selectById(BuiltInRoles.SUPER_ADMIN_ID)).thenReturn(superAdminRole());
         when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1);
         when(userRoleMapper.countActiveHoldersByRoleId(BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1L);
 
@@ -267,7 +262,6 @@ class UserAdminServiceTest {
     @Test
     void delete_allowsSuperAdminWhenNotLast() {
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
-        when(roleMapper.selectById(BuiltInRoles.SUPER_ADMIN_ID)).thenReturn(superAdminRole());
         when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1);
         when(userRoleMapper.countActiveHoldersByRoleId(BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(3L);
 
@@ -280,7 +274,6 @@ class UserAdminServiceTest {
     @Test
     void changeStatus_disablingTriggersKickOut() {
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
-        when(roleMapper.selectById(BuiltInRoles.SUPER_ADMIN_ID)).thenReturn(superAdminRole());
         when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
 
         service.changeStatus("u1", 0);
@@ -305,7 +298,6 @@ class UserAdminServiceTest {
         // The role-strip path must trip the same last-admin guard as delete / disable —
         // otherwise an admin could silently leave the platform with no super admins.
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
-        when(roleMapper.selectById(BuiltInRoles.SUPER_ADMIN_ID)).thenReturn(superAdminRole());
         when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1);
         when(userRoleMapper.countActiveHoldersByRoleId(BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1L);
 
@@ -319,7 +311,6 @@ class UserAdminServiceTest {
     @Test
     void assignRoles_allowsKeepingSuperRole() {
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
-        when(roleMapper.selectById(BuiltInRoles.SUPER_ADMIN_ID)).thenReturn(superAdminRole());
         when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1);
         // Keeping the super role in the new set — guard should be skipped, no countActiveHoldersByRoleId call.
 

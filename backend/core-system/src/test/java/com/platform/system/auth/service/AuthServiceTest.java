@@ -71,6 +71,7 @@ class AuthServiceTest {
     @Mock LoginAuditService auditService;
     @Mock PermissionQueryService permissionQueryService;
     @Mock RoleMapper roleMapper;
+    @Mock com.platform.system.rbac.service.BuiltInRoleLookup roleLookup;
     @Mock ForceLogoutService forceLogoutService;
     @Mock MailService mailService;
     @Mock AppMailProperties mailProps;
@@ -99,6 +100,10 @@ class AuthServiceTest {
         when(refreshStore.issue(any(), any())).thenReturn("test-refresh-token");
         when(permissionQueryService.loadUserPermissions(any())).thenReturn(Set.of());
         when(roleMapper.findRoleIdsByUserId(any(), any())).thenReturn(List.of());
+        // Match the demo tenant the test fixture uses. Super-admin tests
+        // additionally stub findRoleIdsByUserId to RETURN SUPER_ADMIN_ID so
+        // the .contains() check inside AuthService.notifyOnboarding passes.
+        when(roleLookup.superAdminRoleId("demo")).thenReturn(BuiltInRoles.SUPER_ADMIN_ID);
     }
 
     @AfterEach

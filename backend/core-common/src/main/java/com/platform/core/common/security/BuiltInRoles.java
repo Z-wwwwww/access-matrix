@@ -13,7 +13,24 @@ public final class BuiltInRoles {
 
     private BuiltInRoles() {}
 
-    /** SUPER_ADMIN role — seeded by V5 / AuthSchemaBootstrap. Tenant-scoped (one per business tenant). */
+    /**
+     * SUPER_ADMIN role for the <b>demo</b> tenant. Seeded by V5 with this
+     * fixed ULID. Every other business tenant gets a fresh random ULID
+     * when {@code RbacSeederService.seedDefaultsForTenant} runs at tenant
+     * creation — so this constant is correct <em>only for the demo tenant</em>.
+     *
+     * <p>Use {@code BuiltInRoleLookup.superAdminRoleId(tenantId)} for any
+     * "is user X a super admin in tenant Y" question. This constant is
+     * reserved for:
+     * <ul>
+     *   <li>{@code LocalAdminSeeder} bootstrap (demo-specific by design)</li>
+     *   <li>Tests using demo as their fixture tenant</li>
+     * </ul>
+     *
+     * <p>Direct {@code roleIds.contains(SUPER_ADMIN_ID)} checks in production
+     * code are a bug — they silently evaluate false for every non-demo
+     * tenant and disable whichever guard they were protecting.
+     */
     public static final String SUPER_ADMIN_ID = "00000000000000000000ROLE01";
 
     /**

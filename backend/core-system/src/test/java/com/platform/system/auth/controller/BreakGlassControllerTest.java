@@ -45,6 +45,7 @@ class BreakGlassControllerTest {
 
     @Mock UserMapper userMapper;
     @Mock RoleMapper roleMapper;
+    @Mock com.platform.system.rbac.service.BuiltInRoleLookup roleLookup;
     @Mock PasswordEncoder encoder;
     @Mock PasswordPolicyService passwordPolicy;
     @InjectMocks BreakGlassController controller;
@@ -52,6 +53,9 @@ class BreakGlassControllerTest {
     @BeforeEach
     void setRequestContext() {
         RequestContext.set("demo", "ULID-CALLER", "alice", Locale.JAPAN, "test-trace");
+        // requireSuperAdmin now resolves the demo super-admin role id via lookup;
+        // mirror the pre-refactor "demo's SUPER_ADMIN_ID is the canonical answer".
+        when(roleLookup.superAdminRoleId("demo")).thenReturn(BuiltInRoles.SUPER_ADMIN_ID);
     }
 
     @AfterEach

@@ -44,6 +44,7 @@ class OidcJitUserServiceTest {
 
     @Mock UserMapper userMapper;
     @Mock RoleMapper roleMapper;
+    @Mock com.platform.system.rbac.service.BuiltInRoleLookup roleLookup;
     @InjectMocks OidcJitUserService service;
 
     @BeforeEach
@@ -52,6 +53,12 @@ class OidcJitUserServiceTest {
         // by hand to match application.yml's default mapper config.
         ReflectionTestUtils.setField(service, "tenantClaim", "tid");
         ReflectionTestUtils.setField(service, "usernameClaim", "preferred_username");
+        // The bind path's super-admin check now goes through the lookup.
+        // Tests that drive the demo realm need this stubbed to mirror the
+        // pre-refactor behaviour (demo's SUPER_ADMIN_ID is the known answer).
+        org.mockito.Mockito.lenient()
+                .when(roleLookup.superAdminRoleId("demo"))
+                .thenReturn(BuiltInRoles.SUPER_ADMIN_ID);
     }
 
     private Jwt jwt(Map<String, Object> claims) {

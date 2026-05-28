@@ -2,7 +2,7 @@ package com.platform.system.auth.service;
 
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.platform.core.common.id.IdGenerator;
-import com.platform.core.common.security.BuiltInRoles;
+import com.platform.system.rbac.service.BuiltInRoleLookup;
 import com.platform.core.infrastructure.security.OidcUserResolver;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
@@ -47,6 +47,7 @@ public class OidcJitUserService implements OidcUserResolver {
 
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
+    private final BuiltInRoleLookup roleLookup;
 
     /**
      * Defaults match {@link com.platform.core.infrastructure.config.properties.AppSecurityProperties.Jwt}
@@ -81,9 +82,11 @@ public class OidcJitUserService implements OidcUserResolver {
     @Value("${app.security.oidc.issuer-base-uri:}")
     private String expectedIssuerBase;
 
-    public OidcJitUserService(UserMapper userMapper, RoleMapper roleMapper) {
+    public OidcJitUserService(UserMapper userMapper, RoleMapper roleMapper,
+                              BuiltInRoleLookup roleLookup) {
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
+        this.roleLookup = roleLookup;
     }
 
     @Override
@@ -205,14 +208,16 @@ public class OidcJitUserService implements OidcUserResolver {
     }
 
     /**
-     * Does this user hold the {@link BuiltInRoles#SUPER_ADMIN_ID} role
-     * in the given tenant? Single role-id lookup; the role-bindings table
-     * is small per user so the query is cheap.
+     * Does this user hold the SUPER_ADMIN role in the given tenant?
+     * Resolves the tenant's SUPER_ADMIN role id via {@link BuiltInRoleLookup}
+     * (cached, tenant-scoped) and checks the user's role bindings. The
+     * role-bindings table is small per user so the bindings query is cheap.
      */
     private boolean isSuperAdmin(String userId, String tenantId) {
         try {
-            return roleMapper.findRoleIdsByUserId(userId, tenantId)
-                    .contains(BuiltInRoles.SUPER_ADMIN_ID);
+            String superId = roleLookup.superAdminRoleId(tenantId);
+            if (superId == null) return false;
+            return roleMapper.findRoleIdsByUserId(userId, tenantId).contains(superId);
         } catch (Exception e) {
             // If the role lookup itself fails, err on the side of caution
             // and treat the user as super-admin — keeping their break-glass
