@@ -131,16 +131,25 @@ public class PlatformTenantController {
     }
 
     /**
-     * Soft delete. Sets the registry row's {@code mark=0} and disables
-     * the Keycloak realm (users can't sign in any more) but leaves the
-     * tenant's business data intact. Reversible by a hard-coded
-     * re-enable step (ops-only — not exposed via this API on purpose).
+     * Permanent hard delete — the "empty recycle bin" operation.
+     *
+     * <p>UX contract: tenant must already be in suspended state
+     * (status=0). Operator first {@link #suspend}s, then deletes from
+     * the suspended view. Single-click "active → gone" is intentionally
+     * impossible.
+     *
+     * <p>Body carries {@code confirmCode} which must match the tenant's
+     * {@code tenantCode} exactly — defence-in-depth typed confirmation.
+     * The frontend gates on the same string match.
+     *
+     * <p>Drops business data + KC realm + registry row. Irreversible.
      */
     @DeleteMapping("/{id}")
     @RequiresPermission(PlatformPermissions.TENANT_DELETE)
-    @OpLog(module = "platform", action = "tenant.softDelete", targetType = "tenant")
-    public JsonResult<Void> softDelete(@PathVariable String id) {
-        tenantService.softDelete(id);
+    @OpLog(module = "platform", action = "tenant.hardDelete", targetType = "tenant")
+    public JsonResult<Void> hardDelete(@PathVariable String id,
+                                       @Valid @RequestBody TenantDto.HardDeleteRequest body) {
+        tenantService.hardDelete(id, body.confirmCode());
         return JsonResult.ok();
     }
 }
