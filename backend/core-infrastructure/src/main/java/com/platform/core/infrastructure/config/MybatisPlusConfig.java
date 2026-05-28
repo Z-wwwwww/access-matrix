@@ -23,44 +23,32 @@ public class MybatisPlusConfig {
 
     /**
      * Tables the MyBatis tenant-line interceptor must skip when injecting
-     * {@code WHERE tenant_id = ?}.
+     * {@code WHERE tenant_id = ?}. All entries here are <b>platform-global</b>:
+     * one row-set for the whole installation, NO {@code tenant_id} column on
+     * the DB side. The interceptor would crash on every SELECT against them
+     * if it tried to filter.
      *
-     * <p>Two categories live here:
-     * <ul>
-     *   <li><b>Platform-global tables</b> — one row-set for the whole
-     *       installation, not per-tenant. {@code flyway_schema_history},
-     *       {@code core_meta}, {@code core_numbering_management}. These
-     *       have NO {@code tenant_id} column on the DB side, and they would
-     *       crash on every SELECT if the interceptor tried to filter them.</li>
-     *   <li><b>JdbcTemplate-only per-tenant tables</b> — they DO have
-     *       {@code tenant_id} on the DB side, but their access path doesn't
-     *       go through MyBatis at all, so the interceptor would never see
-     *       their queries anyway. Listed here as <em>belt-and-suspenders</em>:
-     *       if a future dev wires up a MyBatis mapper against the table,
-     *       this entry prevents auto-injection (since the JdbcTemplate code
-     *       already scopes by tenant manually and a double-filter would
-     *       silently no-op). {@code core_numbering_key} is the example —
-     *       see {@link com.platform.core.infrastructure.numbering.NumberingService}
-     *       where every SQL explicitly binds {@code tenant_id}. {@link TenantSchemaGuard}
-     *       will WARN about this entry; that warning is the audit trail
-     *       reminding future devs "this isn't a bug, the table is manually
-     *       scoped — don't drop it from EXCLUDED without removing the
-     *       JdbcTemplate access path too".</li>
-     * </ul>
+     * <p>Per-tenant tables — even those accessed only via JdbcTemplate (like
+     * {@code core_numbering_key}, scoped manually by
+     * {@link com.platform.core.infrastructure.numbering.NumberingService}) —
+     * stay <em>out</em> of this list. The interceptor doesn't see JdbcTemplate
+     * queries anyway, so the exclusion has no effect on today's code; but
+     * leaving them out means a future MyBatis mapper against the same table
+     * gets auto-injection for free, which is the safer default than relying
+     * on every new mapper author to remember the manual filter.
      *
-     * <p>NOTE: {@code core_auth_user} / {@code core_auth_login_log} are
-     * tenant-scoped and accessed via MyBatis — they stay subject to the filter.
+     * <p>{@code core_auth_user} / {@code core_auth_login_log} are tenant-scoped
+     * via MyBatis — subject to the filter, not listed here.
      *
-     * <p>Package-private so {@link TenantSchemaGuard} can cross-check the
-     * exclusion list against the actual DB schema at startup. A table missing
-     * its {@code tenant_id} column AND missing from this list will fail-fast
-     * at boot (the dangerous silent-leak case).
+     * <p>Package-private so {@link TenantSchemaGuard} can cross-check this
+     * set against the actual DB schema at startup. Any business table that
+     * lacks its {@code tenant_id} column AND is missing from this list will
+     * fail-fast at boot (the dangerous silent-leak case).
      */
     static final Set<String> TENANT_EXCLUDED_TABLES = Set.of(
-            "flyway_schema_history",       // global — no tenant_id column
-            "core_meta",                   // global — no tenant_id column
-            "core_numbering_management",   // global — no tenant_id column
-            "core_numbering_key"           // per-tenant, JdbcTemplate-only — manually scoped
+            "flyway_schema_history",
+            "core_meta",
+            "core_numbering_management"
     );
 
     /**
