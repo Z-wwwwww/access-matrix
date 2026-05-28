@@ -51,7 +51,7 @@ Keycloak 用这个 schema 存自己的内部表，跟应用业务表（`public` 
 
 ### 2.3 Flyway 自动建表
 
-**不需要手动建任何业务表**。后端首次启动时 Flyway 会按 V1 → V22 顺序自动跑 `backend/core-bootstrap/src/main/resources/db/migration/*.sql`：
+**不需要手动建任何业务表**。后端首次启动时 Flyway 会按 V1 → V29 顺序自动跑 `backend/core-bootstrap/src/main/resources/db/migration/*.sql`：
 
 | 迁移 | 内容 |
 |---|---|
@@ -61,6 +61,12 @@ Keycloak 用这个 schema 存自己的内部表，跟应用业务表（`public` 
 | V20 | `(tenant_id, username)` 唯一索引（V20 多租户化） |
 | V21 | `core_auth_user.keycloak_id` 链接列（SSO） |
 | V22 | `core_user_invite` 邀请 token 表 |
+| V24 | 密码 reset token + `password_hash` 可空（SSO→password 迁移用） |
+| V25 | 把内置租户 `default` 重命名为 `demo` |
+| V26 | 新增 `system` 租户 + `PLATFORM_ADMIN` 内置角色 + MP 拦截器跨租户 bypass |
+| V27 | 中央租户注册表 `core_tenant`；初始写入 `system` / `demo` 两行 |
+| V28 | 平台运营菜单（`/platform/tenants`）绑定 `PLATFORM_ADMIN` |
+| V29 | super-wildcard 改名：`*:*` → 平台超管，`tenant:*` → 业务超管（互不覆盖） |
 
 ---
 
@@ -92,10 +98,17 @@ cd backend
 LocalAdminSeeder: ensured admin user (id=...) is bound to SUPER_ADMIN role
 ```
 
-**首次启动会做的事**：
-- 跑 V1-V22 所有迁移
-- 种 1 个 `admin/admin` 业务用户 + SUPER_ADMIN 角色绑定 + 本社部门绑定
-- 种 5 个 demo 用户（密码 `demo123`）+ 15 条演示 task
+**首次启动会做的事**（`local` profile）：
+
+| 阶段 | 动作 |
+|---|---|
+| Flyway 迁移 | 跑 V1-V29 所有 SQL；建出 `core_*` 全部表 + 2 行 `core_tenant`（`system` / `demo`）+ 2 个内置角色（SUPER_ADMIN / Platform Admin）+ 5 个 demo 数据范围角色 |
+| `LocalAdminSeeder` | 在 demo 租户种 `admin/admin`，绑 SUPER_ADMIN + HQ 部门 |
+| `SystemAdminSeeder` | 在 system 租户种 `ops/ops`，绑 PLATFORM_ADMIN |
+| `DemoSeeder` | 种 5 个数据范围演示用户（密码统一 `demo123`）+ 15 条演示 task |
+| `*KeycloakAdminSeeder` | OIDC 模式下，把上面两个管理账号同步到 Keycloak 对应 realm |
+
+完整初始角色 / 用户矩阵见 [README · 初始化与演示数据](../README.md#-初始化与演示数据)。所有种子都是 `@Profile("local")` —— **prod / dev 部署只跑迁移，不种任何用户**。
 
 ---
 
@@ -145,7 +158,7 @@ infra/keycloak/start-keycloak.sh
 启动脚本会做几件事：
 - 用 `keycloak` schema 连本机 Postgres（跟应用共用 DB 实例，schema 隔离）
 - HTTP 端口 8180（避免跟 Spring Boot 默认 8080 冲突）
-- `--import-realm` 自动加载 `infra/keycloak/realms/default-realm.json`（含 `access-matrix-backend` client + `tid` claim mapper）
+- `--import-realm` 自动加载 `infra/keycloak/realms/*.json`：`demo-realm.json`（业务示例）和 `system-realm.json`（平台运营），都含 `access-matrix-backend` client + `tid` claim mapper
 - 30 秒内启动完成
 
 **首次启动会跑 Liquibase 迁移**（Keycloak 自己的，~30s），后续启动 < 10s。
@@ -176,17 +189,17 @@ app:
 
 ### 5.4 第一次 SSO 登录
 
-后端启动时 `LocalKeycloakAdminSeeder` 会自动在 Keycloak 的 `default` realm 里建一个 `admin` 用户（密码 `admin`，permanent）。
+后端启动时 `LocalKeycloakAdminSeeder` 会自动在 Keycloak 的 `demo` realm 里建 `admin` 用户（密码 `admin`，permanent），`SystemKeycloakAdminSeeder` 在 `system` realm 里建 `ops` 用户（密码 `ops`）。
 
 浏览器 http://localhost:5273/login → 点 **"Sign in with SSO"** → 跳到 Keycloak 登录页 → 输 `admin` / `admin` → 跳回前端，登录成功。
 
 **幕后发生的事**：
-1. Keycloak 签发 JWT，`sub` = Keycloak UUID，`tid` = `default`
+1. Keycloak 签发 JWT，`sub` = Keycloak UUID，`tid` = `demo`
 2. 后端验签通过
 3. `OidcJitUserService` 首次见到这个 UUID → 走 bind path → 把 `keycloak_id` 写到 `LocalAdminSeeder` 种的那行 `core_auth_user`
 4. `RequestContext.userId` 是业务 ULID，立刻就是超管
 
-后续登录直接走 fast path（按 keycloak_id 命中业务行）。
+后续登录直接走 fast path（按 keycloak_id 命中业务行）。平台运营走同一个流程，但前端用 `?tenant=system` 进入 system realm，登 `ops/ops` → 拿到 PLATFORM_ADMIN 权限 → 看到 `/platform/tenants` 菜单。
 
 ---
 
