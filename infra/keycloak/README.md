@@ -349,3 +349,82 @@ KC_HOSTNAME_ADMIN=https://kc-admin.internal:8443  # admin face, internal DNS onl
 > only stops a confused user from typing `master` into the tenant switcher and
 > hitting a "client not found" dead-end. Real protection is the proxy rules
 > above plus realm-scoped credentials. Don't conflate the two.
+
+### Backend → Keycloak admin credential (dev shortcut → prod service account)
+
+When ops creates a tenant, the backend calls the Keycloak Admin REST API to
+create the realm + first admin user. That requires the backend to authenticate
+to Keycloak as an admin. The credential is configured under `app.keycloak.admin`
+(`application.yml`), overridable per environment via `CORE_KEYCLOAK_ADMIN_*`.
+
+**Dev default (do NOT ship to prod):**
+
+```yaml
+app:
+  keycloak:
+    admin:
+      realm:     master      # CORE_KEYCLOAK_ADMIN_REALM
+      client-id: admin-cli   # CORE_KEYCLOAK_ADMIN_CLIENT_ID
+      username:  admin       # CORE_KEYCLOAK_ADMIN_USERNAME
+      password:  admin       # CORE_KEYCLOAK_ADMIN_PASSWORD
+```
+
+This is the **Resource Owner Password Credentials** grant (ROPC): the backend
+replays a *human* admin's username + password. Three problems for prod:
+
+1. **ROPC is deprecated** (OAuth 2.1) and brittle — change the admin password
+   and provisioning silently breaks (exactly the "invalid_grant 400" failure
+   mode you hit if `admin`'s password drifts from the config).
+2. **`master` admin is omnipotent** — it can do anything to every realm. Worst
+   blast radius in the whole IdP if the credential leaks.
+3. A human credential should never be a service credential.
+
+**Prod: dedicated service-account client (`client_credentials`).** The code
+already supports this — `KeycloakRealmService.newAdminClient()` switches to the
+`client_credentials` grant automatically when a client secret is present
+(`AppKeycloakProperties.Admin.isServiceAccount()` ⇔ `client-secret` non-blank).
+So switching is **config only, no code change**:
+
+1. **Create a confidential client in the `master` realm**, e.g.
+   `access-matrix-provisioner`:
+   - *Client authentication* = **ON** (confidential)
+   - *Service accounts roles* = **ON** (enables the `client_credentials` grant)
+   - *Standard flow* / *Direct access grants* = **OFF** (machine-to-machine only)
+   - Copy the generated **client secret**.
+
+2. **Grant least-privilege service-account roles.** On the client's
+   *Service account roles* tab, assign the `master` realm role **`create-realm`**.
+   - Why this is enough: when a holder of `create-realm` creates a realm,
+     Keycloak automatically grants that principal the per-realm management
+     roles (`<realm>-realm` client roles: `manage-users`, `manage-realm`, …) on
+     the realm it just created. So the same service account can then create the
+     tenant's admin user and later disable/delete that realm — without ever
+     holding the all-powerful `master` `admin` role.
+   - **Caveat:** this only covers realms the service account *creates itself*.
+     Realms provisioned out-of-band (e.g. `demo`/`system` imported at startup,
+     or created by a different admin) won't carry its management roles, so
+     suspend/delete/update against *those* from the platform console would 403.
+     If the backend must manage pre-existing realms too, additionally assign the
+     relevant `<realm>-realm` roles (or, pragmatically but less tight, the
+     `master` `admin` role).
+
+3. **Point the backend at the service account** (env vars, secret from a vault —
+   never commit it):
+
+   ```bash
+   CORE_KEYCLOAK_SERVER_URL=https://auth.yourcompany.com
+   CORE_KEYCLOAK_ADMIN_REALM=master
+   CORE_KEYCLOAK_ADMIN_CLIENT_ID=access-matrix-provisioner
+   CORE_KEYCLOAK_ADMIN_CLIENT_SECRET=<from-vault>     # presence flips to client_credentials
+   # leave CORE_KEYCLOAK_ADMIN_USERNAME / _PASSWORD unset — they're ignored
+   ```
+
+   Setting `client-secret` is the switch: `newAdminClient()` then uses
+   `grantType=client_credentials` + the secret, and never touches
+   username/password.
+
+4. **Operational hygiene:** store the secret in a secrets manager (Vault / AWS
+   Secrets Manager / sealed secret), rotate it on a schedule, and scope network
+   access so only the backend can reach the token endpoint. For the strongest
+   posture, replace the shared secret with mTLS or signed-JWT client
+   authentication (`private_key_jwt`) instead of `client_secret`.
