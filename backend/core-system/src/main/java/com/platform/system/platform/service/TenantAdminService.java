@@ -23,9 +23,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -115,15 +113,17 @@ public class TenantAdminService {
     private final AppMailProperties mailProps;
     private final JdbcTemplate jdbc;
     /**
-     * Programmatic transaction wrapper for the pure-DB half of {@link #create}.
-     * We use this instead of method-level {@code @Transactional} there because
-     * create() makes external Keycloak calls that MUST NOT sit inside the DB
-     * transaction (they can't be rolled back) — so only the DB block runs under
-     * a transaction, and the external side effects are bracketed by explicit
-     * compensation. The other mutators stay on {@code @Transactional} since
-     * they wrap a single KC call + a single DB write with no atomicity gap.
+     * Self-reference (through the Spring proxy) used to invoke the
+     * {@code @Transactional} {@link #persistNewTenant} from the NON-transactional
+     * {@link #create}. A plain {@code this.persistNewTenant(...)} self-call would
+     * bypass the proxy and the {@code @Transactional} advice — so the whole DB
+     * unit (registry row + numbering/RBAC seed + user + invite) would NOT share
+     * one transaction, and the numbering seed wouldn't be visible to the
+     * immediately-following allocation. Routing through the proxy keeps it a
+     * single declarative transaction, while create() itself stays outside any
+     * transaction so its Keycloak calls aren't trapped in one.
      */
-    private final TransactionTemplate txTemplate;
+    private final ObjectProvider<TenantAdminService> self;
 
     public TenantAdminService(TenantMapper tenantMapper,
                               ObjectProvider<KeycloakRealmService> realmServiceProvider,
@@ -134,7 +134,7 @@ public class TenantAdminService {
                               ObjectProvider<MailService> mailProvider,
                               AppMailProperties mailProps,
                               JdbcTemplate jdbc,
-                              PlatformTransactionManager txManager) {
+                              ObjectProvider<TenantAdminService> self) {
         this.tenantMapper = tenantMapper;
         this.realmServiceProvider = realmServiceProvider;
         this.userServiceProvider = userServiceProvider;
@@ -144,7 +144,7 @@ public class TenantAdminService {
         this.mailProvider = mailProvider;
         this.mailProps = mailProps;
         this.jdbc = jdbc;
-        this.txTemplate = new TransactionTemplate(txManager);
+        this.self = self;
     }
 
     public PageResult<TenantDto.View> list(long page, long size, String keyword) {
@@ -236,10 +236,12 @@ public class TenantAdminService {
 
             // ── 4. All DB writes, atomically ─────────────────────────
             // Pure DB, no external calls inside (the invite email is
-            // fire-and-forget and swallows its own errors). Commits or
-            // rolls back as a unit.
-            return txTemplate.execute(status ->
-                    persistNewTenant(req, adminUsername, adminEmail, adminDisplayName, kcIdFinal));
+            // fire-and-forget and swallows its own errors). Invoked through
+            // the proxy (self) so @Transactional applies — one transaction for
+            // the whole unit, so the numbering/RBAC seed is visible to the
+            // allocation that immediately follows it.
+            return self.getObject().persistNewTenant(
+                    req, adminUsername, adminEmail, adminDisplayName, kcIdFinal);
         } catch (RuntimeException e) {
             // ── Compensation ─────────────────────────────────────────
             // KC user creation or the DB transaction failed after the
@@ -273,8 +275,9 @@ public class TenantAdminService {
      *             when Keycloak user provisioning is unavailable)
      * @return the new tenant registry row id (ULID)
      */
-    private String persistNewTenant(TenantDto.CreateRequest req, String adminUsername,
-                                    String adminEmail, String adminDisplayName, String kcId) {
+    @Transactional
+    public String persistNewTenant(TenantDto.CreateRequest req, String adminUsername,
+                                   String adminEmail, String adminDisplayName, String kcId) {
         // ── Registry row ────────────────────────────────────────────
         TenantEntity row = new TenantEntity();
         row.setId(IdGenerator.ulid());

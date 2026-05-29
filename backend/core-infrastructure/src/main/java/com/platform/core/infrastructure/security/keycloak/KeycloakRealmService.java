@@ -1,10 +1,7 @@
 package com.platform.core.infrastructure.security.keycloak;
 
-import com.platform.core.infrastructure.config.properties.AppKeycloakProperties;
 import jakarta.ws.rs.WebApplicationException;
-import org.keycloak.OAuth2Constants;
 import org.keycloak.admin.client.Keycloak;
-import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.slf4j.Logger;
@@ -17,7 +14,11 @@ import tools.jackson.databind.json.JsonMapper;
 import jakarta.ws.rs.NotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Thin facade over Keycloak's Admin REST realm-level operations: create,
@@ -68,11 +69,11 @@ public class KeycloakRealmService {
      */
     private static final String TEMPLATE_PATH = "keycloak/demo-realm.json";
 
-    private final AppKeycloakProperties.Admin cfg;
+    private final KeycloakAdminClientFactory adminClients;
     private final JsonMapper jsonMapper;
 
-    public KeycloakRealmService(AppKeycloakProperties props, JsonMapper jsonMapper) {
-        this.cfg = props.admin();
+    public KeycloakRealmService(KeycloakAdminClientFactory adminClients, JsonMapper jsonMapper) {
+        this.adminClients = adminClients;
         this.jsonMapper = jsonMapper;
     }
 
@@ -288,7 +289,30 @@ public class KeycloakRealmService {
                         "\"displayName\": " + quote(displayName))
                 .replaceFirst("\"claim\\.value\"\\s*:\\s*\"demo\"",
                         "\"claim.value\": " + quote(tenantCode));
-        return out;
+        // Give the clone its own entity ids. The template is the demo realm's
+        // EXPORT, so it carries demo's realm id + every nested role/client/
+        // mapper id. Those are globally-unique primary keys in Keycloak — left
+        // as-is, kc.realms().create() collides with the existing demo realm and
+        // returns 409 ("already exists"). Remap every UUID consistently (same
+        // source id → same fresh id everywhere it appears) so internal
+        // references stay intact while no longer clashing with demo.
+        return regenerateUuids(out);
+    }
+
+    private static final Pattern UUID_RE = Pattern.compile(
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+
+    /** Consistently replace every UUID in the JSON with a freshly-generated one. */
+    private static String regenerateUuids(String json) {
+        Map<String, String> remap = new HashMap<>();
+        Matcher m = UUID_RE.matcher(json);
+        StringBuilder sb = new StringBuilder();
+        while (m.find()) {
+            String fresh = remap.computeIfAbsent(m.group(), k -> UUID.randomUUID().toString());
+            m.appendReplacement(sb, Matcher.quoteReplacement(fresh));
+        }
+        m.appendTail(sb);
+        return sb.toString();
     }
 
     private static String quote(String s) {
@@ -327,19 +351,8 @@ public class KeycloakRealmService {
         }
     }
 
+    /** Runtime admin client — single path (provisioner, client_credentials). */
     private Keycloak newAdminClient() {
-        KeycloakBuilder b = KeycloakBuilder.builder()
-                .serverUrl(cfg.serverUrl())
-                .realm(cfg.realm())
-                .clientId(cfg.clientId());
-        if (cfg.isServiceAccount()) {
-            b.grantType(OAuth2Constants.CLIENT_CREDENTIALS)
-             .clientSecret(cfg.clientSecret());
-        } else {
-            b.grantType(OAuth2Constants.PASSWORD)
-             .username(cfg.username())
-             .password(cfg.password());
-        }
-        return b.build();
+        return adminClients.runtimeClient();
     }
 }

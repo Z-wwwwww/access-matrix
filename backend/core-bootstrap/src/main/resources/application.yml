@@ -175,18 +175,29 @@ app:
       secure: true
       same-site: Strict
   keycloak:
-    # Server-side Keycloak Admin REST connection used by KeycloakUserService
-    # to provision / disable / delete users from the backend. Realm = tenant id.
+    # RUNTIME identity for ALL backend → Keycloak Admin REST calls: a dedicated
+    # service-account client using the client_credentials grant. ONE path, dev
+    # and prod identical — no username/password at runtime. The client itself is
+    # auto-provisioned at startup by KeycloakProvisionerSeeder (see `bootstrap`
+    # below), so no manual Keycloak console setup is ever required.
     admin:
       server-url:    ${CORE_KEYCLOAK_SERVER_URL:http://localhost:8180}
       realm:         ${CORE_KEYCLOAK_ADMIN_REALM:master}
-      # Default to admin-cli + admin/admin so a fresh local Keycloak just
-      # works. In prod we use a dedicated service-account client per realm
-      # with only `realm-management/manage-users` granted.
-      client-id:     ${CORE_KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
-      client-secret: ${CORE_KEYCLOAK_ADMIN_CLIENT_SECRET:}
-      username:      ${CORE_KEYCLOAK_ADMIN_USERNAME:admin}
-      password:      ${CORE_KEYCLOAK_ADMIN_PASSWORD:admin}
+      client-id:     ${CORE_KEYCLOAK_PROVISIONER_CLIENT_ID:access-matrix-provisioner}
+      # Dev default is a fixed throwaway secret so a fresh checkout just works.
+      # In prod set CORE_KEYCLOAK_PROVISIONER_SECRET to a strong value from vault.
+      client-secret: ${CORE_KEYCLOAK_PROVISIONER_SECRET:dev-provisioner-secret-change-in-prod}
+    # ONE-TIME bootstrap of the provisioner client above. Uses a throwaway admin
+    # credential (dev: Keycloak's own admin/admin) to create the client and grant
+    # it create-realm + manage-users on the pre-existing managed realms. In prod:
+    # supply a one-time root credential, boot once, then set enabled=false and
+    # drop the credential (the provisioner client persists). See infra/keycloak/README.md.
+    bootstrap:
+      enabled:        ${CORE_KEYCLOAK_BOOTSTRAP_ENABLED:true}
+      client-id:      ${CORE_KEYCLOAK_BOOTSTRAP_CLIENT_ID:admin-cli}
+      username:       ${CORE_KEYCLOAK_BOOTSTRAP_USERNAME:admin}
+      password:       ${CORE_KEYCLOAK_BOOTSTRAP_PASSWORD:abcd@1234}
+      managed-realms: ${CORE_KEYCLOAK_BOOTSTRAP_MANAGED_REALMS:demo,system}
   # Outgoing mail — used by MailService for invite + onboarding notices.
   mail:
     enabled:    ${CORE_MAIL_ENABLED:false}

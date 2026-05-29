@@ -116,8 +116,20 @@ public class NumberingService {
      * a {@code "Numbering definition not found"} error. That failure mode is
      * preserved deliberately so an empty-defs misconfiguration surfaces loudly
      * the first time someone tries to allocate.
+     *
+     * <p><b>{@code REQUIRES_NEW} is required, not incidental.</b> The allocators
+     * ({@link #next} et al.) run in their OWN {@code REQUIRES_NEW} transaction,
+     * so they can only see COMMITTED definitions. If this seed merely joined the
+     * caller's (still-open) tenant-creation transaction, the very next
+     * {@code next("USER", newTenant)} in that same flow would run in a separate
+     * tx and NOT see the just-inserted-but-uncommitted def → "Numbering
+     * definition not found". Committing the seed in its own tx makes it visible
+     * to the allocator. Trade-off: if the outer tenant-creation rolls back, the
+     * seeded defs persist as harmless orphan config rows (re-used via {@code ON
+     * CONFLICT DO NOTHING} on the next attempt) — the same "numbering state
+     * lives outside the business tx" philosophy as the allocators themselves.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void seedDefaultsForTenant(String newTenantId) {
         requireTenant(newTenantId);
         jdbc.update(
@@ -132,6 +144,14 @@ public class NumberingService {
                 " WHERE tenant_id = ? " +
                 "ON CONFLICT (tenant_id, code_kbn) DO NOTHING",
                 newTenantId, TEMPLATE_TENANT);
+        // Drop any cached definition for this tenant. The def cache is process-
+        // wide and NOT transaction-aware: an earlier tenant-create that seeded
+        // these defs, cached them, then rolled back (e.g. a later KC step
+        // failed) leaves a stale def entry pointing at a now-absent row. A
+        // retry would then cache-hit the def but find no row to increment and
+        // throw "Numbering definition not found". Invalidating here forces the
+        // next allocation to re-read from the DB inside the current transaction.
+        defCache.invalidateAll();
     }
 
     /**
