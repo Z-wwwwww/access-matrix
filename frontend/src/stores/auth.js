@@ -208,6 +208,11 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem(TENANT_LS_KEY, info.tenantCode)
     clearTenantCache()         // utils/tenant.js memoises; force re-resolve
     userInfo.value = null      // force /me refetch under new identity
+    // Drop the ops identity's open tabs. They reference ops-only routes
+    // (e.g. /platform/tenants) that don't exist under the support menu, so
+    // leaving them in sessionStorage would resurrect dead 404 tabs after the
+    // reload. The tab bar rebuilds from the support landing route instead.
+    sessionStorage.removeItem('access_matrix_tabs')
     supportSessionBump.value++
   }
 
@@ -233,6 +238,10 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(SUPPORT_ORIG_ID_KEY)
     localStorage.removeItem(SUPPORT_ORIG_TENANT_KEY)
     localStorage.removeItem(SUPPORT_SESSION_KEY)
+    // Drop the support identity's open tabs for the same reason as on entry:
+    // tenant pages opened during the session would otherwise linger as 404
+    // tabs once we're back on the ops menu. Rebuilt from the ops landing route.
+    sessionStorage.removeItem('access_matrix_tabs')
     supportSessionBump.value++
     return true
   }
