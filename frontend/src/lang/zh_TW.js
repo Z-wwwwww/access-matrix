@@ -267,6 +267,26 @@ export default {
           terminated: '已結束支援工作階段'
         }
       },
+      resendInvite: {
+        tooltip: {
+          resend: '重新寄送管理員入職邀請（信件未收到或地址錯誤）'
+        },
+        dialog: {
+          title: '重新寄送管理員邀請',
+          body: '為「{displayName}」（{tenantCode}）的管理員重新寄送入職邀請。',
+          emailLabel: '寄送至',
+          emailPlaceholder: 'admin@example.com',
+          emailHint: '已預填目前聯絡信箱。改成正確地址即可更正（同時更新使用者、Keycloak 與租戶聯絡信箱）；不改則僅重新寄送。',
+          tokenNote: '將產生新的邀請連結，先前的連結隨即失效。',
+          activatedNote: '僅在管理員尚未啟用時有效。',
+          sending: '寄送中…',
+          confirm: '重新寄送邀請'
+        },
+        message: {
+          success: '邀請已重新寄送',
+          failed: '重新寄送邀請失敗'
+        }
+      },
       message: {
         createSuccess: '租戶已建立，邀請信已寄出',
         createFailed: '租戶建立失敗',

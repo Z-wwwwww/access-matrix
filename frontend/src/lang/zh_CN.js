@@ -267,6 +267,26 @@ export default {
           terminated: '已结束支持会话'
         }
       },
+      resendInvite: {
+        tooltip: {
+          resend: '重新发送管理员入驻邀请（邮件没收到或地址写错）'
+        },
+        dialog: {
+          title: '重新发送管理员邀请',
+          body: '为「{displayName}」（{tenantCode}）的管理员重新发送入驻邀请。',
+          emailLabel: '发送至',
+          emailPlaceholder: 'admin@example.com',
+          emailHint: '已预填当前联系邮箱。改成正确地址即可纠正（同时更新用户、Keycloak 和租户联系邮箱）；不改则仅重新发送。',
+          tokenNote: '将生成新的邀请链接，之前的链接随即失效。',
+          activatedNote: '仅在管理员尚未激活时有效。',
+          sending: '发送中…',
+          confirm: '重新发送邀请'
+        },
+        message: {
+          success: '邀请已重新发送',
+          failed: '重新发送邀请失败'
+        }
+      },
       message: {
         createSuccess: '租户已创建，邀请邮件已发送',
         createFailed: '租户创建失败',

@@ -290,6 +290,72 @@ class TenantAdminServiceTest {
                 any(Object[].class), any(), any());
     }
 
+    // ─── resendAdminInvite ────────────────────────────────────────────
+
+    /** Stub a tenant with one pending invite + its admin user. */
+    private void stubPendingInvite(String code, String userId, String kcId,
+                                   String username, String displayName, String email) {
+        when(tenantMapper.selectById("id-" + code)).thenReturn(row("id-" + code, code));
+        java.util.Map<String, Object> invite = new java.util.HashMap<>();
+        invite.put("user_id", userId);
+        invite.put("keycloak_id", kcId);
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("core_user_invite"),
+                org.mockito.ArgumentMatchers.<Object[]>any())).thenReturn(List.of(invite));
+        java.util.Map<String, Object> user = new java.util.HashMap<>();
+        user.put("username", username);
+        user.put("display_name", displayName);
+        user.put("email", email);
+        when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("core_auth_user"),
+                org.mockito.ArgumentMatchers.<Object[]>any())).thenReturn(user);
+    }
+
+    @Test
+    void resendInvite_noCorrection_resendsToCurrentEmail() {
+        stubPendingInvite("acme", "u-admin", "kc-admin", "admin", "Acme Admin", "admin@acme.example");
+
+        service.resendAdminInvite("id-acme", null);
+
+        // Re-minted + mailed to the CURRENT address; no email correction anywhere.
+        verify(inviteTokenService).mint(eq("acme"), eq("u-admin"), eq("kc-admin"));
+        verify(mailService).sendHtmlAsync(eq("admin@acme.example"), any(),
+                eq("user-invite.subject"), any(Object[].class), eq("user-invite"), any());
+        verify(kcUserService, never()).updateEmail(anyString(), anyString(), anyString());
+        // Old invites invalidated.
+        verify(jdbc).update(org.mockito.ArgumentMatchers.contains("core_user_invite SET used_at"),
+                any(Object[].class));
+    }
+
+    @Test
+    void resendInvite_withCorrectedEmail_fixesEverywhereThenResends() {
+        stubPendingInvite("acme", "u-admin", "kc-admin", "admin", "Acme Admin", "old@wrong.example");
+
+        service.resendAdminInvite("id-acme", "right@acme.example");
+
+        // Email corrected in the user row, the tenant contact, and Keycloak...
+        verify(jdbc).update(org.mockito.ArgumentMatchers.contains("UPDATE core_auth_user SET email"),
+                any(Object[].class));
+        verify(jdbc).update(org.mockito.ArgumentMatchers.contains("UPDATE core_tenant SET contact_email"),
+                any(Object[].class));
+        verify(kcUserService).updateEmail("acme", "kc-admin", "right@acme.example");
+        // ...then re-sent to the NEW address.
+        verify(inviteTokenService).mint(eq("acme"), eq("u-admin"), eq("kc-admin"));
+        verify(mailService).sendHtmlAsync(eq("right@acme.example"), any(),
+                eq("user-invite.subject"), any(Object[].class), eq("user-invite"), any());
+    }
+
+    @Test
+    void resendInvite_noPendingInvite_rejected() {
+        when(tenantMapper.selectById("id-acme")).thenReturn(row("id-acme", "acme"));
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("core_user_invite"),
+                org.mockito.ArgumentMatchers.<Object[]>any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.resendAdminInvite("id-acme", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("No pending invite");
+
+        verify(inviteTokenService, never()).mint(anyString(), anyString(), anyString());
+    }
+
     // ─── deriveUsernameFromEmail unit tests ───────────────────────────
 
     @Test
