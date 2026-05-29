@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -48,11 +49,11 @@ class KeycloakProvisionerSeederTest {
     @Test
     void bootstrapEnabled_opensBootstrapClientNotRuntime() {
         // factory.bootstrapClient() returns null here → seed() will NPE inside
-        // and fall into its fail-soft catch; we only assert it ATTEMPTED the
-        // bootstrap connection (didn't skip) and never used the runtime client.
+        // and fail fast. We assert it ATTEMPTED the bootstrap connection
+        // (didn't skip) and never used the runtime client.
         KeycloakProvisionerSeeder seeder = new KeycloakProvisionerSeeder(props(true), factory);
 
-        seeder.seed();
+        assertThrows(IllegalStateException.class, seeder::seed);
 
         verify(factory).bootstrapClient();
         verify(factory, never()).runtimeClient();

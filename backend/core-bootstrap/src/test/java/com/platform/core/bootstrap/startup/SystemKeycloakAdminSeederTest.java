@@ -7,6 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -19,7 +20,7 @@ import static org.mockito.Mockito.when;
  *
  *   1. when 'ops' exists in the 'system' realm → no-op
  *   2. when 'ops' is missing → createUser + setPassword(temporary=false)
- *   3. Keycloak unavailable → swallow, don't crash startup
+ *   3. Keycloak unavailable → fail startup loudly
  *
  * The realm name 'system' is hardcoded in the seeder; if anything ever
  * needs to make it configurable, update both the seeder and this test.
@@ -57,11 +58,11 @@ class SystemKeycloakAdminSeederTest {
     }
 
     @Test
-    void keycloakUnreachable_doesNotCrashStartup() {
+    void keycloakUnreachable_failsStartup() {
         when(keycloakUserService.userExists(anyString(), anyString()))
                 .thenThrow(new RuntimeException("connection refused"));
 
-        seeder.seed();
+        assertThrows(IllegalStateException.class, seeder::seed);
 
         verify(keycloakUserService, never()).createUser(anyString(), anyString(), anyString(), anyString(), anyString());
     }

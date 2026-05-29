@@ -142,11 +142,13 @@ public class DemoSeeder {
     private void ensureUserRole(String userId, String roleId) {
         Long existing = userRoleMapper.selectCount(
                 new QueryWrapper<UserRoleEntity>()
+                        .eq("tenant_id", "demo")
                         .eq("user_id", userId)
                         .eq("role_id", roleId)
                         .eq("mark", 1));
         if (existing != null && existing > 0) return;
         UserRoleEntity link = new UserRoleEntity();
+        link.setTenantId("demo");
         link.setUserId(userId);
         link.setRoleId(roleId);
         userRoleMapper.insert(link);

@@ -69,12 +69,10 @@ public class SystemKeycloakAdminSeeder {
             log.info("SystemKeycloakAdminSeeder: provisioned '{}' (kcId={}) in realm '{}'",
                     OPS_USERNAME, kcId, SYSTEM_REALM);
         } catch (Exception e) {
-            // Same fail-soft posture as LocalKeycloakAdminSeeder — startup
-            // shouldn't crash just because Keycloak isn't reachable yet.
-            log.warn("SystemKeycloakAdminSeeder: could not ensure '{}' in Keycloak ({}). "
-                            + "Start Keycloak then restart the app, OR create the user manually "
-                            + "in the 'system' realm.",
-                    OPS_USERNAME, e.toString());
+            String msg = "SystemKeycloakAdminSeeder failed to ensure '%s' in realm '%s'. "
+                    + "Start Keycloak, verify the provisioner client is bootstrapped, then restart.";
+            log.error(msg.formatted(OPS_USERNAME, SYSTEM_REALM), e);
+            throw new IllegalStateException(msg.formatted(OPS_USERNAME, SYSTEM_REALM), e);
         }
     }
 }

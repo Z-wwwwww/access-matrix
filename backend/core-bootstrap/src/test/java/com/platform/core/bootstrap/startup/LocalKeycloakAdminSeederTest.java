@@ -7,6 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -22,8 +23,8 @@ import static org.mockito.Mockito.when;
  *   2. when 'admin' is missing, the seeder calls createUser + setPassword
  *      with temporary=false so the dev default doesn't trip a password-
  *      change required-action on every fresh setup.
- *   3. Keycloak Admin REST failures are SWALLOWED — startup must not crash
- *      just because the IdP isn't reachable yet.
+ *   3. Keycloak Admin REST failures are fail-fast — local OIDC startup must
+ *      not pretend the SSO account was created when it was not.
  */
 @ExtendWith(MockitoExtension.class)
 class LocalKeycloakAdminSeederTest {
@@ -59,13 +60,12 @@ class LocalKeycloakAdminSeederTest {
     }
 
     @Test
-    void keycloakUnreachable_doesNotCrashStartup() {
-        // Simulate Keycloak down — startup hook must swallow + log, not throw.
+    void keycloakUnreachable_failsStartup() {
+        // Simulate Keycloak down — startup hook must fail loudly.
         when(keycloakUserService.userExists(anyString(), anyString()))
                 .thenThrow(new RuntimeException("connection refused"));
 
-        // Should not throw.
-        seeder.seed();
+        assertThrows(IllegalStateException.class, seeder::seed);
 
         verify(keycloakUserService, never()).createUser(anyString(), anyString(), anyString(), anyString(), anyString());
     }
