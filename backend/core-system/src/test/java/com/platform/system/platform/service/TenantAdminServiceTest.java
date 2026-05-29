@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.List;
 
@@ -67,6 +68,7 @@ class TenantAdminServiceTest {
     @Mock MailService mailService;
     @Mock AppMailProperties mailProps;
     @Mock JdbcTemplate jdbc;
+    @Mock PlatformTransactionManager txManager;
 
     private ObjectProvider<KeycloakRealmService> realmServiceProvider;
     private ObjectProvider<KeycloakUserService> userServiceProvider;
@@ -95,7 +97,7 @@ class TenantAdminServiceTest {
 
         service = new TenantAdminService(tenantMapper, realmServiceProvider, userServiceProvider,
                 numberingService, rbacSeederService, inviteTokenService,
-                mailProvider, mailProps, jdbc);
+                mailProvider, mailProps, jdbc, txManager);
     }
 
     private TenantEntity row(String id, String code) {
@@ -191,24 +193,67 @@ class TenantAdminServiceTest {
         String newId = service.create(req);
         assertThat(newId).hasSize(26);   // ULID
 
-        // Critical ordering: every step from the top of create() must run
-        // before the next so a failure mid-flow doesn't leave the tenant
-        // half-provisioned. KC realm goes first (avoids orphan rows); the
-        // rest are tied together by @Transactional so a failure rolls back
-        // the DB writes (the realm orphan recovery is documented separately).
+        // Ordering after the saga refactor: both EXTERNAL Keycloak mutations
+        // (realm, then admin user) run FIRST and outside the DB transaction,
+        // so they can be compensated by realm-delete if the DB work fails.
+        // The DB writes then run as one atomic block. So KC createUser now
+        // precedes tenantMapper.insert (it used to be interleaved mid-DB).
         org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(
-                realmService, tenantMapper, numberingService, rbacSeederService,
-                kcUserService, inviteTokenService, mailService);
+                realmService, kcUserService, tenantMapper, numberingService,
+                rbacSeederService, inviteTokenService, mailService);
         inOrder.verify(realmService).createRealmFromTemplate("acme", "Acme Corp.");
+        inOrder.verify(kcUserService).createUser(eq("acme"), eq("admin"),
+                eq("admin@acme.example"), anyString(), eq(null));
         inOrder.verify(tenantMapper).insert(any(TenantEntity.class));
         inOrder.verify(numberingService).seedDefaultsForTenant("acme");
         inOrder.verify(rbacSeederService).seedDefaultsForTenant("acme");
-        inOrder.verify(kcUserService).createUser(eq("acme"), eq("admin"),
-                eq("admin@acme.example"), anyString(), eq(null));
         inOrder.verify(inviteTokenService).mint(eq("acme"), anyString(), eq("kc-uuid-new"));
         inOrder.verify(mailService).sendHtmlAsync(eq("admin@acme.example"),
                 any(), eq("user-invite.subject"), any(Object[].class),
                 eq("user-invite"), any());
+        // Happy path must NOT compensate.
+        verify(realmService, never()).deleteRealm(any());
+    }
+
+    // ─── create: compensation on failure ───────────────────────────────
+
+    @Test
+    void create_dbWriteFails_compensatesByDeletingRealm() {
+        when(tenantMapper.findActiveByCode("acme")).thenReturn(null);
+        when(realmService.realmExists("acme")).thenReturn(false);
+        // A DB-side step throws AFTER the realm + KC user were created.
+        when(rbacSeederService.seedDefaultsForTenant("acme"))
+                .thenThrow(new RuntimeException("rbac seed blew up"));
+        TenantDto.CreateRequest req = new TenantDto.CreateRequest(
+                "acme", "Acme", "admin@acme.example", null);
+
+        assertThatThrownBy(() -> service.create(req))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("rbac seed blew up");
+
+        // Realm was created, DB failed → compensate by deleting the realm so
+        // no orphan blocks a retry. (Realm delete cascades the KC user too.)
+        verify(realmService).createRealmFromTemplate("acme", "Acme");
+        verify(realmService).deleteRealm("acme");
+    }
+
+    @Test
+    void create_kcUserCreateFails_compensatesByDeletingRealm() {
+        when(tenantMapper.findActiveByCode("acme")).thenReturn(null);
+        when(realmService.realmExists("acme")).thenReturn(false);
+        // The realm is created, but provisioning its admin user fails.
+        when(kcUserService.createUser(anyString(), anyString(), anyString(), anyString(), eq(null)))
+                .thenThrow(new KeycloakUserService.KeycloakOperationException("kc user create failed"));
+        TenantDto.CreateRequest req = new TenantDto.CreateRequest(
+                "acme", "Acme", "admin@acme.example", null);
+
+        assertThatThrownBy(() -> service.create(req))
+                .isInstanceOf(RuntimeException.class);
+
+        verify(realmService).createRealmFromTemplate("acme", "Acme");
+        verify(realmService).deleteRealm("acme");
+        // DB transaction never got a chance to insert anything.
+        verify(tenantMapper, never()).insert(any(TenantEntity.class));
     }
 
     @Test
