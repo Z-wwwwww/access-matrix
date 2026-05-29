@@ -46,9 +46,24 @@
         <caffeine.version>3.2.0</caffeine.version>
         <lombok.version>1.18.44</lombok.version>
         <testcontainers.version>1.21.3</testcontainers.version>
-        <!-- Keycloak admin-client version is decoupled from the server (26.6.2 used here)
-             but the broad-compat 26.x line is fine — REST API is stable within the major. -->
-        <keycloak-admin-client.version>26.0.4</keycloak-admin-client.version>
+        <!-- Keep as NEW as the published admin-client line allows, to stay
+             schema-compatible with the Keycloak server (infra/keycloak, 26.6.2).
+             KeycloakRealmService parses a realm-template JSON exported from the
+             server into RealmRepresentation with STRICT (fail-on-unknown)
+             parsing, so the client's DTO must know every field the server
+             emits — e.g. 26.6 emits `maxSecondaryAuthFailures`, which 26.0.4
+             lacked and which aborted tenant creation.
+
+             Note: Keycloak STOPPED publishing the standalone
+             keycloak-admin-client / keycloak-client-common-synced artifacts
+             after 26.0.9 — there is no 26.1+/26.6.2 on Maven Central. But the
+             26.0.9 *synced* RealmRepresentation tracks the latest schema and
+             already carries maxSecondaryAuthFailures/bruteForceStrategy/
+             maxTemporaryLockouts, so 26.0.9 is the practical "match" for a
+             26.6.x server. If a future server adds a field 26.0.9 doesn't
+             model, strict parsing will fail loudly here — that's the signal,
+             not a regression. -->
+        <keycloak-admin-client.version>26.0.9</keycloak-admin-client.version>
     </properties>
 
     <dependencyManagement>
