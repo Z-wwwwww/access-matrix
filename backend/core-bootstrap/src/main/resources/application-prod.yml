@@ -9,8 +9,9 @@
 #                       CORE_CORS_ALLOWED_ORIGINS
 #   [2] Email (for invites / reset / onboarding): CORE_MAIL_ENABLED,
 #                       CORE_MAIL_HOST/USERNAME/PASSWORD/FROM, CORE_APP_BASE_URL
-#   [2] SSO (only if APP_SECURITY_MODE=oidc): CORE_OIDC_ISSUER_BASE_URI +
-#                       CORE_KEYCLOAK_* — see infra/keycloak/README.md
+#   [2] SSO (only if APP_SECURITY_MODE=oidc): CORE_OIDC_ISSUER_BASE_URI,
+#                       CORE_KEYCLOAK_PROVISIONER_SECRET (runtime identity) +
+#                       one-time CORE_KEYCLOAK_BOOTSTRAP_* — see infra/keycloak/README.md
 # Everything else has a sane default in application.yml; override only with a
 # reason. Vars with NO default below ( ${VAR} ) fail fast at startup if unset.
 # =============================================================================

@@ -3,9 +3,7 @@ package com.platform.core.infrastructure.security.keycloak;
 import com.platform.core.infrastructure.config.properties.AppKeycloakProperties;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
-import org.keycloak.OAuth2Constants;
 import org.keycloak.admin.client.Keycloak;
-import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -38,10 +36,10 @@ public class KeycloakUserService {
 
     private static final Logger log = LoggerFactory.getLogger(KeycloakUserService.class);
 
-    private final AppKeycloakProperties.Admin cfg;
+    private final KeycloakAdminClientFactory adminClients;
 
-    public KeycloakUserService(AppKeycloakProperties props) {
-        this.cfg = props.admin();
+    public KeycloakUserService(KeycloakAdminClientFactory adminClients) {
+        this.adminClients = adminClients;
     }
 
     /**
@@ -197,20 +195,9 @@ public class KeycloakUserService {
         }
     }
 
+    /** Runtime admin client — single path (provisioner, client_credentials). */
     private Keycloak newAdminClient() {
-        KeycloakBuilder b = KeycloakBuilder.builder()
-                .serverUrl(cfg.serverUrl())
-                .realm(cfg.realm())
-                .clientId(cfg.clientId());
-        if (cfg.isServiceAccount()) {
-            b.grantType(OAuth2Constants.CLIENT_CREDENTIALS)
-             .clientSecret(cfg.clientSecret());
-        } else {
-            b.grantType(OAuth2Constants.PASSWORD)
-             .username(cfg.username())
-             .password(cfg.password());
-        }
-        return b.build();
+        return adminClients.runtimeClient();
     }
 
     /** Unchecked wrapper for Keycloak Admin REST failures. */

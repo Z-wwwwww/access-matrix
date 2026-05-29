@@ -350,81 +350,78 @@ KC_HOSTNAME_ADMIN=https://kc-admin.internal:8443  # admin face, internal DNS onl
 > hitting a "client not found" dead-end. Real protection is the proxy rules
 > above plus realm-scoped credentials. Don't conflate the two.
 
-### Backend → Keycloak admin credential (dev shortcut → prod service account)
+### Backend → Keycloak admin credential (auto-bootstrapped service account)
 
 When ops creates a tenant, the backend calls the Keycloak Admin REST API to
-create the realm + first admin user. That requires the backend to authenticate
-to Keycloak as an admin. The credential is configured under `app.keycloak.admin`
-(`application.yml`), overridable per environment via `CORE_KEYCLOAK_ADMIN_*`.
+create the realm + first admin user. The backend authenticates for **all** such
+calls as a dedicated **service-account client** (`access-matrix-provisioner`)
+using the `client_credentials` grant — **one path, dev and prod identical, no
+username/password at runtime**. See `KeycloakAdminClientFactory.runtimeClient()`.
 
-**Dev default (do NOT ship to prod):**
+**That provisioner client is auto-created at startup** by
+`KeycloakProvisionerSeeder` — you never click around the Keycloak console. On
+boot (when `app.keycloak.bootstrap.enabled=true`) it uses a one-time bootstrap
+admin credential to:
 
-```yaml
-app:
-  keycloak:
-    admin:
-      realm:     master      # CORE_KEYCLOAK_ADMIN_REALM
-      client-id: admin-cli   # CORE_KEYCLOAK_ADMIN_CLIENT_ID
-      username:  admin       # CORE_KEYCLOAK_ADMIN_USERNAME
-      password:  admin       # CORE_KEYCLOAK_ADMIN_PASSWORD
+1. create the `access-matrix-provisioner` client (confidential, service accounts
+   on) and sync its secret to `CORE_KEYCLOAK_PROVISIONER_SECRET`;
+2. grant its service account the `master` realm role **`create-realm`**;
+3. grant **`manage-users`/`view-users`** on each pre-existing managed realm
+   (`demo`, `system`) — those were imported, not created by the provisioner, so
+   Keycloak's create-realm auto-grant doesn't cover them.
+
+Realms the provisioner later creates itself (acme, …) are auto-granted
+management by Keycloak, so they need no extra setup.
+
+**Why a service-account client (not the `master` admin user):** the runtime
+credential is a machine secret with **least privilege** (`create-realm` + manage
+on known realms — not the omnipotent `master` `admin`), it isn't subject to
+human-account lifecycle hazards (password policy/expiry/"update password"/MFA —
+the "invalid_grant 400" you hit when the admin password drifts), it's
+rotatable, and a leak is bounded + revocable (delete/rotate one client) rather
+than a full IdP-root compromise.
+
+#### Operator runbook (prod)
+
+First deploy — set in the backend env (see `backend/.env.example`):
+
+```bash
+APP_SECURITY_MODE=oidc
+CORE_OIDC_ISSUER_BASE_URI=https://auth.yourcompany.com
+CORE_KEYCLOAK_SERVER_URL=https://auth.yourcompany.com
+
+CORE_KEYCLOAK_PROVISIONER_SECRET=<strong secret from vault>   # the runtime identity
+
+# one-time bootstrap (reuses your existing KC root admin):
+CORE_KEYCLOAK_BOOTSTRAP_ENABLED=true
+CORE_KEYCLOAK_BOOTSTRAP_USERNAME=<KC root admin>
+CORE_KEYCLOAK_BOOTSTRAP_PASSWORD=<KC root password>
+CORE_KEYCLOAK_BOOTSTRAP_MANAGED_REALMS=demo,system
 ```
 
-This is the **Resource Owner Password Credentials** grant (ROPC): the backend
-replays a *human* admin's username + password. Three problems for prod:
+Boot once → watch for `[kc-provisioner] provisioner ready …`. Then **harden**:
 
-1. **ROPC is deprecated** (OAuth 2.1) and brittle — change the admin password
-   and provisioning silently breaks (exactly the "invalid_grant 400" failure
-   mode you hit if `admin`'s password drifts from the config).
-2. **`master` admin is omnipotent** — it can do anything to every realm. Worst
-   blast radius in the whole IdP if the credential leaks.
-3. A human credential should never be a service credential.
+```bash
+# the provisioner client now persists in Keycloak — drop the one-time root cred
+unset CORE_KEYCLOAK_BOOTSTRAP_USERNAME CORE_KEYCLOAK_BOOTSTRAP_PASSWORD
+CORE_KEYCLOAK_BOOTSTRAP_ENABLED=false
+```
 
-**Prod: dedicated service-account client (`client_credentials`).** The code
-already supports this — `KeycloakRealmService.newAdminClient()` switches to the
-`client_credentials` grant automatically when a client secret is present
-(`AppKeycloakProperties.Admin.isServiceAccount()` ⇔ `client-secret` non-blank).
-So switching is **config only, no code change**:
+Steady state: the only Keycloak secret the backend holds is
+`CORE_KEYCLOAK_PROVISIONER_SECRET`.
 
-1. **Create a confidential client in the `master` realm**, e.g.
-   `access-matrix-provisioner`:
-   - *Client authentication* = **ON** (confidential)
-   - *Service accounts roles* = **ON** (enables the `client_credentials` grant)
-   - *Standard flow* / *Direct access grants* = **OFF** (machine-to-machine only)
-   - Copy the generated **client secret**.
+**Rotation:** routine rotation = rotate the secret. Update
+`CORE_KEYCLOAK_PROVISIONER_SECRET`, re-enable bootstrap for one boot (it re-syncs
+the client's secret to the new value), then disable again — or rotate it in the
+KC console and update the env. The client object, its service account, and all
+role grants are unaffected by a secret change.
 
-2. **Grant least-privilege service-account roles.** On the client's
-   *Service account roles* tab, assign the `master` realm role **`create-realm`**.
-   - Why this is enough: when a holder of `create-realm` creates a realm,
-     Keycloak automatically grants that principal the per-realm management
-     roles (`<realm>-realm` client roles: `manage-users`, `manage-realm`, …) on
-     the realm it just created. So the same service account can then create the
-     tenant's admin user and later disable/delete that realm — without ever
-     holding the all-powerful `master` `admin` role.
-   - **Caveat:** this only covers realms the service account *creates itself*.
-     Realms provisioned out-of-band (e.g. `demo`/`system` imported at startup,
-     or created by a different admin) won't carry its management roles, so
-     suspend/delete/update against *those* from the platform console would 403.
-     If the backend must manage pre-existing realms too, additionally assign the
-     relevant `<realm>-realm` roles (or, pragmatically but less tight, the
-     `master` `admin` role).
+**Caveat (DR / migration only):** if the provisioner *client* is deleted or you
+stand up a fresh Keycloak, the recreated client is a new identity and won't hold
+Keycloak's auto-granted management on previously-created tenant realms — re-run
+bootstrap and re-grant those realms. This does not happen on normal secret
+rotation.
 
-3. **Point the backend at the service account** (env vars, secret from a vault —
-   never commit it):
-
-   ```bash
-   CORE_KEYCLOAK_SERVER_URL=https://auth.yourcompany.com
-   CORE_KEYCLOAK_ADMIN_REALM=master
-   CORE_KEYCLOAK_ADMIN_CLIENT_ID=access-matrix-provisioner
-   CORE_KEYCLOAK_ADMIN_CLIENT_SECRET=<from-vault>     # presence flips to client_credentials
-   # leave CORE_KEYCLOAK_ADMIN_USERNAME / _PASSWORD unset — they're ignored
-   ```
-
-   Setting `client-secret` is the switch: `newAdminClient()` then uses
-   `grantType=client_credentials` + the secret, and never touches
-   username/password.
-
-4. **Operational hygiene:** store the secret in a secrets manager (Vault / AWS
-   Secrets Manager / sealed secret), rotate it on a schedule, and scope network
-   access so only the backend can reach the token endpoint. For the strongest
-   posture, replace the shared secret with mTLS or signed-JWT client
-   authentication (`private_key_jwt`) instead of `client_secret`.
+**Hygiene:** keep the provisioner secret in a secrets manager (Vault / AWS
+Secrets Manager / sealed secret). For the strongest posture, replace the shared
+secret with mTLS or signed-JWT client auth (`private_key_jwt`).

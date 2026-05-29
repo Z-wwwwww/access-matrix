@@ -24,7 +24,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.List;
 
@@ -68,11 +67,11 @@ class TenantAdminServiceTest {
     @Mock MailService mailService;
     @Mock AppMailProperties mailProps;
     @Mock JdbcTemplate jdbc;
-    @Mock PlatformTransactionManager txManager;
 
     private ObjectProvider<KeycloakRealmService> realmServiceProvider;
     private ObjectProvider<KeycloakUserService> userServiceProvider;
     private ObjectProvider<MailService> mailProvider;
+    private ObjectProvider<TenantAdminService> selfProvider;
     private TenantAdminService service;
 
     @BeforeEach
@@ -81,6 +80,7 @@ class TenantAdminServiceTest {
         realmServiceProvider = (ObjectProvider<KeycloakRealmService>) mock(ObjectProvider.class);
         userServiceProvider = (ObjectProvider<KeycloakUserService>) mock(ObjectProvider.class);
         mailProvider = (ObjectProvider<MailService>) mock(ObjectProvider.class);
+        selfProvider = (ObjectProvider<TenantAdminService>) mock(ObjectProvider.class);
         when(realmServiceProvider.getIfAvailable()).thenReturn(realmService);
         when(userServiceProvider.getIfAvailable()).thenReturn(kcUserService);
         when(mailProvider.getIfAvailable()).thenReturn(mailService);
@@ -97,7 +97,10 @@ class TenantAdminServiceTest {
 
         service = new TenantAdminService(tenantMapper, realmServiceProvider, userServiceProvider,
                 numberingService, rbacSeederService, inviteTokenService,
-                mailProvider, mailProps, jdbc, txManager);
+                mailProvider, mailProps, jdbc, selfProvider);
+        // In-process self-proxy: persistNewTenant runs directly on the same
+        // instance (no real transaction in a unit test — interactions still verify).
+        when(selfProvider.getObject()).thenReturn(service);
     }
 
     private TenantEntity row(String id, String code) {
