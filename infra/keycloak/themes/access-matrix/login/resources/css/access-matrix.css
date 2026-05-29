@@ -394,7 +394,15 @@ body::after {
    between the heading and the first form group. Injecting on the header
    too would double-render it. */
 #kc-form-wrapper::before {
-  content: "Continue to your Access-matrix workspace. Use the credentials issued by your administrator.";
+  /* Force a line break at the sentence boundary (\A) so neither the
+     English nor CJK variants break mid-word. `text-wrap: balance` was
+     tempting but it equalizes line lengths without honoring sentence
+     boundaries — for CJK that produces splits like "工 / 作区". `pretty`
+     was the alternative considered; explicit \A wins because each
+     locale knows where its rhythm breaks. The CJK locale rules below
+     override this content with their own \A. */
+  content: "Continue to your Access-matrix workspace.\A Use the credentials issued by your administrator.";
+  white-space: pre-line;
   display: block;
   margin: 0 0 22px;
   font-family: var(--am-sans);
@@ -412,10 +420,10 @@ body::after {
 html[lang="zh-CN"] #kc-form-wrapper::before,
 html[lang="zh-cn"] #kc-form-wrapper::before,
 html[lang="zh"] #kc-form-wrapper::before {
-  content: "请登录您的 Access-matrix 工作区。使用管理员分配的凭据。";
+  content: "请登录您的 Access-matrix 工作区。\A 使用管理员分配的凭据。";
 }
 html[lang="ja"] #kc-form-wrapper::before {
-  content: "Access-matrix ワークスペースにサインインしてください。管理者から発行された認証情報をご使用ください。";
+  content: "Access-matrix ワークスペースにサインインしてください。\A 管理者から発行された認証情報をご使用ください。";
 }
 
 /* Hide stock subtitle paragraph (e.g. "Sign in to your account") */
@@ -458,9 +466,12 @@ label,
 
 /* "Forgot Password?" link — stock template emits it as
    `.pf-v5-c-form__helper-text > a` *below* the password input. Float it
-   up to the label row, right side, so it visually pairs with PASSWORD. */
-.pf-c-form__helper-text,
-.pf-v5-c-form__helper-text {
+   up to the label row, right side, so it visually pairs with PASSWORD.
+   Scoped to helper blocks that contain ONLY an <a> (the forgot-password
+   link); error helpers carry a `.pf-m-error` descendant and are styled
+   separately below. */
+.pf-c-form__helper-text:not(:has(.pf-m-error)):not(.am-error-relocated),
+.pf-v5-c-form__helper-text:not(:has(.pf-m-error)):not(.am-error-relocated) {
   position: absolute !important;
   top: 0 !important;
   right: 0 !important;
@@ -468,6 +479,93 @@ label,
   padding: 0 !important;
   height: 16px !important;
   line-height: 16px !important;
+}
+
+/* Top-of-form credentials error — login.js relocates this node from
+   its default home inside the username form-group to be the FIRST
+   child of `#kc-form-login`, so the message lands above the username
+   row. GitHub / Slack / Notion convention: a server-side credentials
+   failure is a form-level error, not a per-field error, so it reads
+   as a banner at the top of the form, before the user re-engages
+   with the inputs.
+
+   Vertical-margin math: #kc-form-login is `display: grid` with
+   `gap: 24px`. As the FIRST grid item, this row has no grid-gap
+   above it — the space above comes from `#kc-form-wrapper::before`,
+   whose `margin-bottom: 22px` sits between the sub-copy and us.
+   Below us is the username form-group (margin-top: 0), separated by
+   one grid-gap.
+     Desired gap above this row: 14px ⇒ mt = 14 − 22 = −8px
+     Desired gap below this row: 14px ⇒ mb = 14 − 24 = −10px */
+/* Outer wrapper — flex-center the pill in the form column. The
+   negative margins compensate for the sub-copy margin-bottom above
+   us and the grid-gap below us (math is documented above) so the
+   visible breathing room lands at ~14px on both sides. */
+.am-error-relocated {
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  left: auto !important;
+  height: auto !important;
+  line-height: 1.4 !important;
+  margin: -8px 0 -10px !important;
+  padding: 0 !important;
+  font-family: var(--am-sans);
+  letter-spacing: -0.005em;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.am-error-relocated .pf-v5-c-helper-text,
+.am-error-relocated .pf-c-helper-text {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+}
+
+/* The pill — soft red-tinted surface, hairline border, leading icon.
+   Matches the industry-standard credentials-error pattern (Stripe /
+   Linear / Vercel auth flows) while keeping the editorial restraint
+   of the rest of this page: rounded-sm corners (same as inputs), no
+   drop shadow, color tokens already in the danger family. */
+.am-error-relocated .pf-v5-c-helper-text__item,
+.am-error-relocated .pf-c-helper-text__item {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px;
+  padding: 8px 14px 8px 12px;
+  background-color: var(--am-danger-bg);
+  border: 0.8px solid var(--am-danger-bd);
+  border-radius: var(--am-radius-sm);
+  font-family: var(--am-sans);
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--am-danger-fg) !important;
+}
+
+/* Leading icon — single inline-SVG background, no extra DOM. The
+   filled exclamation circle is drawn in --am-danger-fg with the
+   inner exclamation in --am-danger-bg so it reads as cut-out and
+   harmonizes with the pill it sits in. Hardcoded hex (#CB1D1D /
+   #FDECEC) corresponds to the HSL tokens at the top of this file —
+   keep them in sync if --am-danger-fg / --am-danger-bg ever change. */
+.am-error-relocated .pf-v5-c-helper-text__item::before,
+.am-error-relocated .pf-c-helper-text__item::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: inline-block;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23CB1D1D'/><rect x='7.25' y='3.75' width='1.5' height='5.25' rx='0.75' fill='%23FDECEC'/><circle cx='8' cy='11.5' r='0.95' fill='%23FDECEC'/></svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.am-error-relocated .pf-v5-c-helper-text__item-text,
+.am-error-relocated .pf-c-helper-text__item-text {
+  color: inherit !important;
 }
 
 .pf-c-form__helper-text a,
@@ -609,6 +707,65 @@ input[type="tel"]:focus,
   box-shadow: none !important;
   height: 100% !important;
   flex: 1 1 auto !important;
+}
+
+/* ============================================================
+   FIELD VALIDATION ICON — vertically center the PF v5 status
+   icon (the red exclamation circle) over the input's right edge.
+
+   Keycloak 26's keycloak.v2 emits (NO `__group-control` wrapper —
+   the form-control span is a direct child of __group):
+     <div class="pf-v5-c-form__group">
+       <div class="pf-v5-c-form__group-label">…</div>
+       <span class="pf-v5-c-form-control pf-m-error">
+         <input>
+         <span class="pf-v5-c-form-control__utilities">
+           <span class="pf-v5-c-form-control__icon pf-m-status">
+             <i class="fas fa-exclamation-circle"></i>
+           </span>
+         </span>
+       </span>
+     </div>
+
+   PF v5's `.pf-v5-c-form-control` is `display: inline-grid` with
+   `align-items: start`, so on a 46px input the 24px utilities cell
+   sits at the top — visible icon center ~11px above the input
+   centerline. Make the error-state wrapper a positioning context
+   and absolute-position the utilities span at vertical 50%, then
+   nudge in from the right edge so it stops kissing the border.
+
+   Scoped to `.pf-m-error` so:
+     - the locale picker (different parent, different intent) stays
+       untouched (it already has its own `display: none` for utilities)
+     - a non-error field that happens to render a utilities slot
+       (e.g. password field with the eye-button input-group) isn't
+       affected — those use the input-group wrapper instead and the
+       icon is structurally absent.
+   ============================================================ */
+.pf-v5-c-form-control.pf-m-error,
+.pf-c-form-control.pf-m-error {
+  position: relative !important;
+}
+.pf-v5-c-form-control.pf-m-error .pf-v5-c-form-control__utilities,
+.pf-c-form-control.pf-m-error .pf-c-form-control__utilities {
+  position: absolute !important;
+  top: 50% !important;
+  right: 14px !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+  z-index: 1;
+}
+/* Reserve space inside the input so the validation icon doesn't
+   overlap typed characters when the field is in error state. */
+.pf-v5-c-form-control.pf-m-error input,
+.pf-c-form-control.pf-m-error input {
+  padding-right: 40px !important;
 }
 
 /* Hide every browser-native password-field decoration so it doesn't
@@ -865,6 +1022,85 @@ input[name="login"]::after {
 #kc-login:hover::after,
 input[name="login"]:hover::after {
   transform: translateX(2px);
+}
+
+/* ============================================================
+   SUBMIT LOADING STATE — spinner + "Signing in…" while the auth
+   request is in flight. login.js swaps the button contents and
+   adds `.am-loading` on the form submit event; the page navigates
+   on the response either way, so this state is visible for the
+   duration of the round-trip.
+   ============================================================ */
+#kc-login.am-loading,
+input[name="login"].am-loading {
+  cursor: progress;
+  /* The button itself stays full-color so the page doesn't read as
+     "broken" mid-submit; only the trailing arrow goes (replaced by
+     the spinner the JS injected at the start of the label). */
+}
+/* Suppress the trailing arrow ::after — the inline spinner the JS
+   injects acts as the new affordance. */
+#kc-login.am-loading::after,
+input[name="login"].am-loading::after {
+  display: none !important;
+}
+
+.am-spinner {
+  /* 14px circular spinner — same size as the locale chevron and the
+     error-pill icon, so it visually matches the design's icon scale.
+     Border + transparent top edge yields a CSS-only ring; the
+     `am-spin` keyframe (already defined further down) rotates it. */
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.8px solid currentColor;
+  border-top-color: transparent;
+  animation: am-spin 0.7s linear infinite;
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 8px;
+  /* Inherit text color so the ring tracks the button color (white on
+     navy, navy on cream in dark mode). */
+}
+@media (prefers-reduced-motion: reduce) {
+  .am-spinner { animation: none; border-top-color: currentColor; opacity: 0.5; }
+}
+
+/* ============================================================
+   CAPS LOCK HINT — surfaces the modifier state when the password
+   field is focused. Tucked under the password input, soft warning
+   palette, pill shape so it doesn't compete with the form's primary
+   inputs. login.js builds and toggles this node.
+   ============================================================ */
+.am-capslock-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 4px 10px 4px 8px;
+  font-family: var(--am-sans);
+  font-size: 12px;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  color: var(--am-warn-fg);
+  background-color: var(--am-warn-bg);
+  border: 0.8px solid var(--am-warn-bd);
+  border-radius: 999px;
+  width: fit-content;
+  /* Use !important to beat .pf-v5-c-form__group's `position: relative`
+     descendant rules that might otherwise re-anchor us. We sit in
+     the normal flow under the password input-group. */
+}
+.am-capslock-hint[hidden] {
+  /* The bare `hidden` attribute is overridden by the existing
+     `display: flex` on .pf-v5-c-form__group descendants in some
+     browsers — re-state explicitly. */
+  display: none !important;
+}
+.am-capslock-hint__icon {
+  flex-shrink: 0;
+  display: inline-block;
 }
 
 /* ============================================================
@@ -1488,9 +1724,35 @@ a.kc-forgot,
   padding: 4px 6px 4px 10px;
   gap: 6px;
   cursor: default;
+  /* Allow the inline message to wrap onto a second line below the
+     input row — input + go-button stay flush on top, msg slot drops
+     to a full-width line beneath via flex-basis:100%. */
+  flex-wrap: wrap;
 }
 .am-realm-menu__row--input:hover {
   background: transparent !important;
+}
+/* Inline status / error message under the realm-switch input. Empty
+   collapses to zero height so the row stays compact until a check or
+   error populates it. */
+.am-realm-menu__input-msg {
+  flex-basis: 100%;
+  min-height: 0;
+  margin-top: 2px;
+  padding-left: 0;
+  font-size: 11px;
+  letter-spacing: -0.005em;
+  color: var(--am-muted);
+  line-height: 1.3;
+}
+.am-realm-menu__input-msg:empty {
+  display: none;
+}
+.am-realm-menu__input-msg--info {
+  color: var(--am-muted);
+}
+.am-realm-menu__input-msg--err {
+  color: var(--am-danger-fg);
 }
 .am-realm-menu__input {
   flex: 1;

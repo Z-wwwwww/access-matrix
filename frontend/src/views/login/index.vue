@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useMenuStore } from '@/stores/menu'
 import { useTabsStore } from '@/stores/tabs'
 import { User, Lock, Building, KeyRound, ShieldAlert, RefreshCw } from 'lucide-vue-next'
-import { beginLogin as beginSsoLogin, oidcConfig, stashReturnTo, keycloakForgotPasswordUrl, isSsoReachable } from '@/utils/oidc'
+import { beginLogin as beginSsoLogin, oidcConfig, stashReturnTo, keycloakForgotPasswordUrl, isSsoReachable, diagnoseSsoFailure, TENANT_RECOVERED_SS_KEY } from '@/utils/oidc'
 
 const ssoConfig = oidcConfig()
 const ssoEnabled = ssoConfig.enabled
@@ -45,6 +45,35 @@ const autoRedirecting = ref(false)
 // where the user has no path back to the SPA.
 const ssoUnreachable = ref(false)
 const ssoRetrying = ref(false)
+// Stale-tenant recovery breadcrumb: if the previous load detected that
+// the stored tenant's realm was gone and silently switched us back to the
+// default, surface a one-shot notice so the user understands why they're
+// no longer in the tenant they expected. Read+cleared on mount.
+const tenantRecoveredFrom = ref('')
+
+/**
+ * Probe SSO reachability with auto-recovery for the "stored tenant points
+ * at a deleted realm" case. Returns:
+ *   - true  → SSO is reachable for the current tenant, caller may proceed
+ *   - false → SSO is unreachable AND no recovery happened, caller should
+ *             show the unreachable banner
+ * Returns nothing (and navigates away) if recovery fired — the page is
+ * about to reload, so callers should not continue after this resolves
+ * with anything other than `true`.
+ */
+async function probeWithRecovery() {
+  const ok = await isSsoReachable()
+  if (ok) return true
+  const verdict = await diagnoseSsoFailure()
+  if (verdict === 'recovered') {
+    // Reload onto the same /login route so currentTenant() re-resolves
+    // (now without the stale localStorage value) and the mount-time
+    // flow reruns against the recovered default tenant.
+    window.location.replace(window.location.pathname + window.location.search + window.location.hash)
+    return false
+  }
+  return false
+}
 
 function onHotZoneClick() {
   if (!ssoEnabled || passwordUnlocked.value) return  // nothing to unlock
@@ -139,9 +168,11 @@ async function handleSsoLogin() {
   // Probe BEFORE handing control off to window.location.assign. If the
   // probe fails we keep the user in-app and surface the friendly banner;
   // the redirect would otherwise dead-end on the browser's native error
-  // page with no way back.
+  // page with no way back. probeWithRecovery also auto-clears a stored
+  // tenant whose realm has been deleted (caller never sees the unreachable
+  // state in that case — page reloads onto the recovered default tenant).
   ssoRetrying.value = true
-  const reachable = await isSsoReachable()
+  const reachable = await probeWithRecovery()
   ssoRetrying.value = false
   if (!reachable) {
     ssoUnreachable.value = true
@@ -181,7 +212,7 @@ async function handleForgotPassword() {
   errorMsg.value = ''
   ssoErrorFromQuery.value = ''
   ssoRetrying.value = true
-  const reachable = await isSsoReachable()
+  const reachable = await probeWithRecovery()
   ssoRetrying.value = false
   if (!reachable) {
     ssoUnreachable.value = true
@@ -217,6 +248,17 @@ function shouldAutoRedirectToSso() {
 }
 
 onMounted(() => {
+  // Stale-tenant recovery breadcrumb — set by diagnoseSsoFailure() on
+  // the previous load when it cleared a dead tenant. Read once and clear
+  // so a manual refresh doesn't keep showing the notice forever.
+  try {
+    const recovered = sessionStorage.getItem(TENANT_RECOVERED_SS_KEY)
+    if (recovered) {
+      tenantRecoveredFrom.value = recovered
+      sessionStorage.removeItem(TENANT_RECOVERED_SS_KEY)
+    }
+  } catch { /* sessionStorage blocked — skip */ }
+
   if (authStore.isAuthenticated) {
     router.replace('/')
     return
@@ -259,7 +301,7 @@ onMounted(() => {
     // break-glass CTA instead of the browser's "refused to connect"
     // page — that page has no way back, so a confused operator would
     // have to hit Back, lose tab state, and rediscover the hot-zone.
-    isSsoReachable().then((reachable) => {
+    probeWithRecovery().then((reachable) => {
       if (!reachable) {
         autoRedirecting.value = false
         ssoUnreachable.value = true
@@ -308,6 +350,13 @@ onBeforeUnmount(() => {
       <!-- Error message -->
       <div v-if="errorMsg || ssoErrorFromQuery" class="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm border border-destructive/20">
         {{ errorMsg || ssoErrorFromQuery }}
+      </div>
+
+      <!-- One-shot stale-tenant recovery notice. Shown after the user's
+           stored tenant was found to point at a deleted/non-existent
+           realm and we silently switched them back to the default. -->
+      <div v-if="tenantRecoveredFrom" class="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-foreground">
+        {{ t('login.tenantRecovered', { stale: tenantRecoveredFrom }) }}
       </div>
 
       <!-- ─── SSO MODE ────────────────────────────────────────────────────── -->

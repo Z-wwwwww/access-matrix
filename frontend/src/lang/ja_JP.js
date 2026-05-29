@@ -136,6 +136,7 @@ export default {
       retry: 'SSO を再試行',
       retrying: '確認中...'
     },
+    tenantRecovered: 'テナント「{stale}」は利用できなくなりました。デフォルトテナントに戻しました。',
     passwordBreakGlass: 'パスワードログインモード（緊急用）',
     backToSso: 'SSO に戻す',
     passwordModeHotzone: 'パスワードログインを解除するには 2 秒以内に 5 回クリック',

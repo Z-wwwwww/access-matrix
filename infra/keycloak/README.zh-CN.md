@@ -189,6 +189,63 @@ SPA 在运行时通过 `frontend/src/utils/tenant.js` 决定 "我现在正在登
 | 管理 UI 进入 "Update profile" 死循环 | 忘记将开发用户邮箱标记为已验证 —— 在 Users → Details 中切换。 |
 | 8180 端口已被占用 | 启动前设置 `KC_HTTP_PORT=8280`（或类似）。 |
 
-## 生产环境定型（本文不展开）
+## 生产环境定型
 
-生产环境我们将以生产模式（`kc.sh start`）运行 Keycloak，置于 TLS 终结反向代理之后，启用 `hostname-strict=true`、`proxy-headers=xforwarded`，并使用独立的专用 DB 用户 —— 而非应用本身的 `postgres` 超级用户。
+生产环境我们以生产模式（`kc.sh start`）运行 Keycloak，置于 TLS 终结反向代理之后，启用 `hostname-strict=true`、`proxy-headers=xforwarded`，并使用独立的专用 DB 用户 —— 而非应用本身的 `postgres` 超级用户。
+
+### 网络分流 —— 认证面 vs 管理面
+
+这是生产加固里**最重要的一项决策**，所以单列一节。Keycloak 的端点分两类，暴露要求**完全相反**：
+
+| 类别 | 路径前缀 | 谁访问 | 公网可达性 |
+| --- | --- | --- | --- |
+| **认证面** | `/realms/<realm>/*`、`/resources/*` | 终端用户**浏览器**（登录、token、账号台、**租户切换**） | **必须公开** |
+| **管理面** | `/admin/*`（admin console SPA **和** Admin REST API） | 仅运维 | **仅内网** |
+
+认证面**必须**公开：OIDC 授权码流程会把用户浏览器重定向到 `/realms/<tenant>/protocol/openid-connect/auth`。租户切换（登录主题里 realm 药丸的切换器）走的是同一套机制 —— 跳到 SPA，再由 SPA 打 `/realms/<新租户>/...`。所以**自由切换 realm 就要求 `/realms/*` 公网代理出去**。这是设计使然且安全，因为认证面只暴露用户本就该访问的登录/token 端点。
+
+管理面**不需要**公开。KC 管理控制台是挂在 `/admin/<realm>/console/` 下的 SPA，它真正的读写操作全靠调用 `/admin/realms/*` 下的 **Admin REST API**。在反代上拒掉 `/admin/*`，**即使 admin 密码完全正确**，控制台从公网也用不了 —— 它依赖的 API 够不着。**这就是为什么主防线是网络隔离，而非密码保密**。密码保密是第二层（纵深防御），不是唯一一道。
+
+> **两个面为什么能干净拆分：** 它们路径前缀不同（`/realms/` vs `/admin/`），反代用简单的 location 规则就能放行一个、拒绝另一个 —— 完全不影响登录和租户切换。
+
+### 推荐的反向代理规则
+
+```nginx
+# ── 认证面：公开 ────────────────────────────────────────────────
+# 业务用户在这里登录、切换租户。
+location /realms/    { proxy_pass http://keycloak_upstream; }
+location /resources/ { proxy_pass http://keycloak_upstream; }
+
+# ── 单独拒掉 master realm（理由见下）─────────────────────────────
+# 必须排在通用 /realms/ 规则之前，或用更精确的正则匹配。
+# 没有任何合法业务流程会以 master 为目标。
+location ~ ^/realms/master(/|$) { deny all; return 404; }
+
+# ── 管理面：仅内网 ──────────────────────────────────────────────
+# admin console SPA + Admin REST API。运维通过 VPN / bastion /
+# 内网访问，绝不走公网监听器。
+location /admin/     { deny all; return 404; }
+```
+
+运维从内网（VPN、bastion 或仅内网的监听器）访问管理控制台。Keycloak 26 还支持专门的管理面 hostname，让控制台自身的链接永远不指向公网地址：
+
+```bash
+KC_HOSTNAME=https://auth.yourcompany.com          # 公开的认证面
+KC_HOSTNAME_ADMIN=https://kc-admin.internal:8443  # 管理面，仅内网 DNS 解析
+```
+
+### 建议：在公网边缘单独拒掉 `master` realm
+
+**做什么：** 在拒掉 `/admin/*` 之外，于公网监听器上**显式拒掉 `/realms/master/*`**（上面那条正则规则）。
+
+**为什么值得为它单列一条规则：**
+
+1. **`master` 没有任何业务用途。** 没有租户映射到它，没有应用 client 认证到它。"realm 名 == 租户 id"的约定意味着每个*真实*租户是 `demo`、`system`、`acme`…… —— 永远不会是 `master`。所以公网拒掉它在功能上零成本。
+
+2. **`master` 是跨 realm 的超级 realm。** 它的管理员能管理*所有*其它 realm，它持有 bootstrap 的 `admin` 超管，是整个 IdP 里价值最高的目标。把它的登录页挡在公网之外，等于把它整个从攻击面上移除（没有撞库、没有暴力破解、不暴露它的登录流 / MFA 配置）。
+
+3. **路径一致性让人容易遗漏。** `master` 走的是和业务 realm **完全相同**的 `/realms/<name>/*` 结构 —— 在 URL 层它毫无特殊。正是这种一致性，导致一条放行全部的 `/realms/*` 规则会**悄悄连 `master` 一起暴露**。显式的 deny 规则把意图写明、可审计，而不是依赖每个人都记得"`/realms/*` 里其实藏着管理超级 realm"。
+
+4. **纵深防御，而非唯一防御。** 即使漏了这条规则，`master` 仍受两道保护：(a) realm 隔离的凭据 —— 业务用户在 `master` 里没有账号；(b) `/admin/*` 拦截 —— 让一张 `master` token 无处可用。这条规则是廉价、显式的最外层，意味着别处某一处配错不会就此暴露超级 realm。
+
+> 登录主题 `login.js` 里的前端 `BLOCKED_REALMS` 黑名单（`master`、`admin`、`www`…）是**UX 防呆，不是安全控制** —— 它只阻止迷糊的用户在租户切换框里输 `master` 然后撞上"client not found"死页面。真正的保护是上面的反代规则加上 realm 隔离的凭据。别把两者混为一谈。

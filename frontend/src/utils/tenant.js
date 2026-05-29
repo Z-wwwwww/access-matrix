@@ -36,7 +36,19 @@
 
 const TENANT_LS_KEY = 'tenant_id'
 const TENANT_QS_KEY = 'tenant'
-const DEFAULT_TENANT = 'demo'
+export const DEFAULT_TENANT = 'demo'
+
+/**
+ * Platform-ops realm — guaranteed to exist in every deployment (it hosts
+ * the `ops` super-user and platform tenant management). Used as the
+ * tenant-independent reachability probe target: if `system` doesn't
+ * answer, KC itself is down; if it does, the user's stored tenant is
+ * the thing that's broken (most commonly because the realm was deleted).
+ * Kept separate from DEFAULT_TENANT (which is the fallback user-facing
+ * tenant — demo) so we don't conflate "is KC alive" with "what tenant
+ * should the user land in".
+ */
+export const SYSTEM_REALM = 'system'
 
 /**
  * Subdomain labels that are infrastructure / reserved hosts, NOT tenants.
@@ -79,6 +91,17 @@ export function setTenantOverride(name) {
 
 /** Drop the memoized value. Test-only — production never needs this. */
 export function clearTenantCache() {
+  cached = null
+}
+
+/**
+ * Drop the persisted tenant override AND the in-memory cache. Used by the
+ * SSO recovery path when a stored tenant points at a realm that no longer
+ * exists — clearing here makes the very next currentTenant() call fall
+ * through to the default, so the user can recover without DevTools.
+ */
+export function clearStoredTenant() {
+  try { localStorage.removeItem(TENANT_LS_KEY) } catch { /* no-op */ }
   cached = null
 }
 

@@ -21,6 +21,10 @@ export KC_DB_PASSWORD="${KC_DB_PASSWORD:-abcd@1234}"
 
 export KC_HTTP_PORT=8180
 export KC_HOSTNAME_STRICT=false
+# Bind to the IPv6 wildcard — see start-keycloak.bat for the long version.
+# tl;dr: Quarkus disables IPV6_V6ONLY so `::` listens dual-stack, which keeps
+# Chrome (IPv6-first) happy alongside curl/Edge (IPv4 fallback).
+export KC_HTTP_HOST="::"
 
 # Dev-only admin bootstrap. NEVER use these credentials anywhere reachable.
 export KEYCLOAK_ADMIN=admin
@@ -38,6 +42,21 @@ if [[ -d "$THEMES_SRC" ]]; then
         rsync -a --update "$THEMES_SRC/" "$KEYCLOAK_HOME/themes/"
     else
         cp -RuT "$THEMES_SRC" "$KEYCLOAK_HOME/themes"
+    fi
+fi
+
+# Sync realm exports into $KEYCLOAK_HOME/data/import — that's the only
+# place --import-realm looks. Keeps realm definitions reviewable in-repo
+# while letting a fresh clone boot the right realms on first launch
+# without anyone touching the KC admin console.
+REALMS_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/realms"
+if [[ -d "$REALMS_SRC" ]] && compgen -G "$REALMS_SRC/*.json" > /dev/null; then
+    mkdir -p "$KEYCLOAK_HOME/data/import"
+    echo "Syncing realm imports from $REALMS_SRC to $KEYCLOAK_HOME/data/import ..."
+    if command -v rsync > /dev/null; then
+        rsync -a --update "$REALMS_SRC/"*.json "$KEYCLOAK_HOME/data/import/"
+    else
+        cp -u "$REALMS_SRC/"*.json "$KEYCLOAK_HOME/data/import/"
     fi
 fi
 
