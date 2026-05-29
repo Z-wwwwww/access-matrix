@@ -246,9 +246,106 @@ lock everyone out.
 | Admin UI shows "Update profile" loop | Forgot to mark the dev user's email as verified — toggle it in Users → Details. |
 | 8180 already in use | Set `KC_HTTP_PORT=8280` (or similar) before running. |
 
-## Production posture (out of scope here)
+## Production posture
 
-For prod we will run Keycloak in production mode (`kc.sh start`) behind a
+For prod we run Keycloak in production mode (`kc.sh start`) behind a
 TLS-terminating reverse proxy, with `hostname-strict=true`,
 `proxy-headers=xforwarded`, and its own dedicated DB user — not the
 application's `postgres` superuser.
+
+### Network segmentation — the auth face vs. the admin face
+
+This is the single most important production hardening decision, so it gets
+its own section. Keycloak serves two categories of endpoint with **opposite**
+exposure requirements:
+
+| Category | Path prefix | Who uses it | Public reachability |
+| --- | --- | --- | --- |
+| **Auth face** | `/realms/<realm>/*`, `/resources/*` | End-user **browsers** (login, token, account, **tenant switching**) | **Must be public** |
+| **Admin face** | `/admin/*` (admin console SPA **and** the Admin REST API) | Operators only | **Internal-only** |
+
+The auth face *has* to be public: OIDC Authorization-Code flow redirects the
+user's browser to `/realms/<tenant>/protocol/openid-connect/auth`. Tenant
+switching (the realm-pill switcher in the login theme) is the same mechanism —
+it navigates to the SPA which then hits `/realms/<new-tenant>/...`. So free
+realm switching **requires** `/realms/*` to be proxied publicly. That is by
+design and safe, because the auth face only exposes login/token endpoints that
+users are supposed to reach.
+
+The admin face does **not** need to be public. The KC admin console is a SPA
+under `/admin/<realm>/console/` that does all its real work by calling the
+**Admin REST API** under `/admin/realms/*`. Block `/admin/*` at the proxy and
+the console is unusable from the internet **even with a correct admin
+password** — the API it depends on is unreachable. This is why network
+isolation, not password secrecy, is the *primary* control. Password secrecy is
+the second layer (defense in depth), not the only line.
+
+> **Why the two faces can be split cleanly:** they live under different path
+> prefixes (`/realms/` vs `/admin/`), so a reverse proxy can allow one and deny
+> the other with simple location rules — without affecting login or tenant
+> switching.
+
+### Recommended reverse-proxy rules
+
+```nginx
+# ── Auth face: public ──────────────────────────────────────────────
+# Business users log in and switch tenants through these.
+location /realms/    { proxy_pass http://keycloak_upstream; }
+location /resources/ { proxy_pass http://keycloak_upstream; }
+
+# ── Block the master realm specifically (see reasoning below) ───────
+# Must come BEFORE the generic /realms/ rule, or place it as a more
+# specific regex match. No legitimate business flow targets master.
+location ~ ^/realms/master(/|$) { deny all; return 404; }
+
+# ── Admin face: internal-only ───────────────────────────────────────
+# Admin console SPA + Admin REST API. Operators reach these via VPN /
+# bastion / internal network, never the public listener.
+location /admin/     { deny all; return 404; }
+```
+
+Operators access the admin console from inside the network (VPN, bastion, or
+an internal-only listener). Keycloak 26 also supports a dedicated admin
+hostname so the console's own links never point at the public URL:
+
+```bash
+KC_HOSTNAME=https://auth.yourcompany.com          # public auth face
+KC_HOSTNAME_ADMIN=https://kc-admin.internal:8443  # admin face, internal DNS only
+```
+
+### Recommendation: block the `master` realm at the public edge
+
+**What:** in addition to denying `/admin/*`, explicitly deny
+`/realms/master/*` on the public listener (the regex rule above).
+
+**Why this is worth a dedicated rule:**
+
+1. **`master` has no business purpose.** No tenant maps to it; no application
+   client authenticates against it. The realm-name == tenant-id convention
+   means every *real* tenant is `demo`, `system`, `acme`, … — never `master`.
+   So blocking it publicly costs nothing functionally.
+
+2. **`master` is the cross-realm super-realm.** Its admins can manage *every*
+   other realm. It holds the bootstrap `admin` super-user. It is the highest-
+   value target in the whole IdP. Keeping its login page off the public
+   internet removes it from the attack surface entirely (no credential
+   stuffing, no brute force, no exposure of its login flow / MFA config).
+
+3. **Path uniformity makes it easy to forget.** `master` is reached through the
+   exact same `/realms/<name>/*` structure as business realms — it is *not*
+   special at the URL layer. That uniformity is precisely why an allow-all
+   `/realms/*` rule silently exposes `master` too. The explicit deny rule makes
+   the intent visible and auditable instead of relying on everyone remembering
+   that `/realms/*` quietly includes the admin super-realm.
+
+4. **Defense in depth, not the only defense.** Even if this rule is missing,
+   `master` stays protected by (a) realm-scoped credentials — business users
+   have no `master` account — and (b) the `/admin/*` block, which makes a
+   `master` token useless. This rule is the cheap, explicit outer layer that
+   means a single misconfiguration elsewhere doesn't expose the super-realm.
+
+> The frontend `BLOCKED_REALMS` denylist in the login theme's `login.js`
+> (`master`, `admin`, `www`, …) is a **UX guard, not a security control** — it
+> only stops a confused user from typing `master` into the tenant switcher and
+> hitting a "client not found" dead-end. Real protection is the proxy rules
+> above plus realm-scoped credentials. Don't conflate the two.

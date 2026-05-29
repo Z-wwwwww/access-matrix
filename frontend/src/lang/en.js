@@ -129,6 +129,7 @@ export default {
       retry: 'Retry SSO',
       retrying: 'Checking...'
     },
+    tenantRecovered: "Tenant '{stale}' is no longer available — switched back to the default tenant.",
     passwordBreakGlass: 'Password login mode (break-glass)',
     backToSso: 'Back to SSO',
     passwordModeHotzone: 'Click 5 times within 2 seconds to unlock password login',

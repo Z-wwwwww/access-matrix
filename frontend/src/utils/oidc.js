@@ -10,7 +10,7 @@
  */
 
 import { newCodeVerifier, deriveCodeChallenge, newState } from './pkce'
-import { currentTenant } from './tenant'
+import { currentTenant, DEFAULT_TENANT, SYSTEM_REALM, clearStoredTenant } from './tenant'
 
 const SS_VERIFIER = 'oidc_pkce_verifier'
 const SS_STATE    = 'oidc_state'
@@ -141,12 +141,29 @@ export function keycloakForgotPasswordUrl() {
 const SSO_PROBE_TIMEOUT_MS = 3000
 
 export async function isSsoReachable() {
-  const cfg = oidcConfig()
-  if (!cfg.enabled || !cfg.issuer) return false
+  return isSsoReachableForTenant(currentTenant())
+}
+
+/**
+ * Same probe as {@link isSsoReachable} but for an EXPLICIT tenant rather
+ * than the one currentTenant() resolved to. Used by {@link diagnoseSsoFailure}
+ * to test the fallback tenant independent of whatever the user has stored,
+ * so we can disambiguate "the stored tenant's realm got deleted" from
+ * "Keycloak is genuinely down".
+ */
+export async function isSsoReachableForTenant(tenant) {
+  const env = import.meta.env
+  if (env.VITE_OIDC_ENABLED !== 'true') return false
+  let issuer = env.VITE_OIDC_ISSUER
+  if (!issuer) {
+    const base = (env.VITE_OIDC_ISSUER_BASE || '').replace(/\/$/, '')
+    if (base) issuer = `${base}/realms/${tenant}`
+  }
+  if (!issuer) return false
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), SSO_PROBE_TIMEOUT_MS)
-    const res = await fetch(`${cfg.issuer}/.well-known/openid-configuration`, {
+    const res = await fetch(`${issuer}/.well-known/openid-configuration`, {
       method: 'GET',
       mode: 'cors',
       cache: 'no-store',
@@ -162,6 +179,56 @@ export async function isSsoReachable() {
     // same browser-level error page.
     return false
   }
+}
+
+/**
+ * Breadcrumb key — sessionStorage flag that survives the recovery reload.
+ * Holds the stale tenant name so /login can show a "switched to default"
+ * notice. Cleared on read.
+ */
+export const TENANT_RECOVERED_SS_KEY = 'tenant_recovered_from'
+
+/**
+ * Called when {@link isSsoReachable} returns false. Decides what really
+ * went wrong and, when possible, recovers without user intervention:
+ *
+ *   - 'recovered' — the user had a stored tenant (e.g. `default`) whose
+ *     realm has been deleted; the default tenant still answers. Cleared
+ *     the stale value and stashed the old name; caller should hard-reload
+ *     so currentTenant() re-resolves to DEFAULT_TENANT.
+ *   - 'kc-down'   — even DEFAULT_TENANT can't be reached; KC is genuinely
+ *     unreachable. Caller should show the standard unreachable banner.
+ *   - 'no-recover'— current tenant IS the default (nothing to fall back
+ *     to) or there's no stored override to clear. Same UX as 'kc-down'.
+ *
+ * Loop-safe: once a recovery has fired this tab session, repeats are
+ * suppressed (a real KC outage shouldn't masquerade as another stale-
+ * tenant case after the first reload).
+ */
+export async function diagnoseSsoFailure() {
+  // Already recovered once this tab? Take the 'kc-down' verdict and stop —
+  // otherwise a real KC outage during the post-recovery probe could trigger
+  // another spurious recovery attempt.
+  try {
+    if (sessionStorage.getItem(TENANT_RECOVERED_SS_KEY) !== null) return 'kc-down'
+  } catch { /* no-op */ }
+  const stored = (() => {
+    try { return localStorage.getItem('tenant_id') } catch { return null }
+  })()
+  const cur = currentTenant()
+  if (!stored || stored === DEFAULT_TENANT || cur === DEFAULT_TENANT) return 'no-recover'
+  // The stored tenant failed. Probe the platform-ops realm (SYSTEM_REALM)
+  // to disambiguate "KC down" from "stored tenant gone" — system is the
+  // tenant-independent canary. If it answers, KC is up and the stored
+  // value is what's broken; clear it and breadcrumb. We probe system
+  // rather than DEFAULT_TENANT (=demo) because demo is a business tenant
+  // that can legitimately be disabled in some deployments, whereas
+  // system always exists.
+  const probeOk = await isSsoReachableForTenant(SYSTEM_REALM)
+  if (!probeOk) return 'kc-down'
+  clearStoredTenant()
+  try { sessionStorage.setItem(TENANT_RECOVERED_SS_KEY, stored) } catch { /* no-op */ }
+  return 'recovered'
 }
 
 /** Where the user wanted to land — preserved through the IdP round-trip. */

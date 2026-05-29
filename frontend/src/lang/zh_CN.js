@@ -129,6 +129,7 @@ export default {
       retry: '重试 SSO',
       retrying: '检测中...'
     },
+    tenantRecovered: '租户 "{stale}" 已不存在，已自动切换回默认租户。',
     passwordBreakGlass: '密码登录模式（应急）',
     backToSso: '返回 SSO',
     passwordModeHotzone: '2 秒内连击 5 次可解锁密码登录',
