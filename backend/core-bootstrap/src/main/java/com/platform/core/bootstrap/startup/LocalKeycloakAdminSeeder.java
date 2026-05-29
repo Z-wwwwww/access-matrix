@@ -45,7 +45,9 @@ import org.springframework.stereotype.Component;
  *
  * <p>Idempotent: only creates the user when missing. Never resets the
  * password on subsequent boots, so a dev rotating the local admin
- * password isn't undone by the next restart.
+ * password isn't undone by the next restart. If Keycloak provisioning fails
+ * under local OIDC mode, startup fails loudly so the missing SSO account is
+ * not mistaken for a successful boot.
  */
 @Component
 @Profile("local")
@@ -99,13 +101,10 @@ public class LocalKeycloakAdminSeeder {
             log.info("LocalKeycloakAdminSeeder: provisioned '{}' (kcId={}) in realm '{}'",
                     ADMIN_USERNAME, kcId, TENANT_REALM);
         } catch (Exception e) {
-            // Don't crash startup — the app is still useful (other flows /
-            // health endpoints work) and a dev can recover by either:
-            //   (a) starting Keycloak and restarting the app, OR
-            //   (b) manually creating 'admin' in the Keycloak admin console.
-            log.warn("LocalKeycloakAdminSeeder: could not ensure '{}' in Keycloak ({}). "
-                    + "Start Keycloak then restart the app, OR create the user manually.",
-                    ADMIN_USERNAME, e.toString());
+            String msg = "LocalKeycloakAdminSeeder failed to ensure '%s' in realm '%s'. "
+                    + "Start Keycloak, verify the provisioner client is bootstrapped, then restart.";
+            log.error(msg.formatted(ADMIN_USERNAME, TENANT_REALM), e);
+            throw new IllegalStateException(msg.formatted(ADMIN_USERNAME, TENANT_REALM), e);
         }
     }
 }

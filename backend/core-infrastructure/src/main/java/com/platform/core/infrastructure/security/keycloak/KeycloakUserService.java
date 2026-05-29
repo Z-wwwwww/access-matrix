@@ -96,7 +96,8 @@ public class KeycloakUserService {
             if (status == Response.Status.CONFLICT.getStatusCode()) {
                 throw new KeycloakOperationException("Keycloak user already exists: " + username);
             }
-            throw new KeycloakOperationException("Keycloak create-user failed: HTTP " + status);
+            throw new KeycloakOperationException("Keycloak create-user failed: realm=%s username=%s %s"
+                    .formatted(realm, username, responseDetail(r)));
         }
     }
 
@@ -114,7 +115,8 @@ public class KeycloakUserService {
             ur.resetPassword(c);
             log.info("[kc] set password (temporary={}) for user {} in realm {}", temporary, keycloakUserId, realm);
         } catch (WebApplicationException e) {
-            throw new KeycloakOperationException("Keycloak set-password failed: HTTP " + e.getResponse().getStatus(), e);
+            throw new KeycloakOperationException("Keycloak set-password failed: realm=%s userId=%s %s"
+                    .formatted(realm, keycloakUserId, responseDetail(e.getResponse())), e);
         }
     }
 
@@ -141,7 +143,8 @@ public class KeycloakUserService {
                     actions, keycloakUserId, realm);
         } catch (WebApplicationException e) {
             throw new KeycloakOperationException(
-                    "Keycloak executeActionsEmail failed: HTTP " + e.getResponse().getStatus(), e);
+                    "Keycloak executeActionsEmail failed: realm=%s userId=%s actions=%s %s"
+                            .formatted(realm, keycloakUserId, actions, responseDetail(e.getResponse())), e);
         }
     }
 
@@ -173,7 +176,8 @@ public class KeycloakUserService {
             ur.update(u);
             log.info("[kc] updated email for user {} in realm {}", keycloakUserId, realm);
         } catch (WebApplicationException e) {
-            throw new KeycloakOperationException("Keycloak update-email failed: HTTP " + e.getResponse().getStatus(), e);
+            throw new KeycloakOperationException("Keycloak update-email failed: realm=%s userId=%s %s"
+                    .formatted(realm, keycloakUserId, responseDetail(e.getResponse())), e);
         }
     }
 
@@ -185,7 +189,8 @@ public class KeycloakUserService {
             ur.update(u);
             log.info("[kc] disabled user {} in realm {}", keycloakUserId, realm);
         } catch (WebApplicationException e) {
-            throw new KeycloakOperationException("Keycloak disable-user failed: HTTP " + e.getResponse().getStatus(), e);
+            throw new KeycloakOperationException("Keycloak disable-user failed: realm=%s userId=%s %s"
+                    .formatted(realm, keycloakUserId, responseDetail(e.getResponse())), e);
         }
     }
 
@@ -198,6 +203,9 @@ public class KeycloakUserService {
         try (Keycloak kc = newAdminClient()) {
             List<UserRepresentation> hits = kc.realm(realm).users().searchByUsername(username, true);
             return hits != null && !hits.isEmpty();
+        } catch (WebApplicationException e) {
+            throw new KeycloakOperationException("Keycloak user lookup failed: realm=%s username=%s %s"
+                    .formatted(realm, username, responseDetail(e.getResponse())), e);
         }
     }
 
@@ -207,7 +215,8 @@ public class KeycloakUserService {
             int s = r.getStatus();
             if (s != Response.Status.NO_CONTENT.getStatusCode()
                     && s != Response.Status.NOT_FOUND.getStatusCode()) {
-                throw new KeycloakOperationException("Keycloak delete-user failed: HTTP " + s);
+                throw new KeycloakOperationException("Keycloak delete-user failed: realm=%s userId=%s %s"
+                        .formatted(realm, keycloakUserId, responseDetail(r)));
             }
             log.info("[kc] deleted user {} in realm {} (HTTP {})", keycloakUserId, realm, s);
         }
@@ -216,6 +225,21 @@ public class KeycloakUserService {
     /** Runtime admin client — single path (provisioner, client_credentials). */
     private Keycloak newAdminClient() {
         return adminClients.runtimeClient();
+    }
+
+    private String responseDetail(Response response) {
+        if (response == null) return "HTTP <no response>";
+        String body = "";
+        try {
+            if (response.hasEntity()) {
+                body = response.readEntity(String.class);
+            }
+        } catch (Exception ignored) {
+            body = "<unreadable response body>";
+        }
+        return body == null || body.isBlank()
+                ? "HTTP " + response.getStatus()
+                : "HTTP " + response.getStatus() + " body=" + body;
     }
 
     /** Unchecked wrapper for Keycloak Admin REST failures. */

@@ -120,6 +120,7 @@ public class LocalAdminSeeder {
         }
         Long existing = userRoleMapper.selectCount(
                 new QueryWrapper<UserRoleEntity>()
+                        .eq("tenant_id", admin.getTenantId())
                         .eq("user_id", admin.getId())
                         .eq("role_id", superAdmin.getId())
                         .eq("mark", 1));
@@ -127,6 +128,7 @@ public class LocalAdminSeeder {
             return;
         }
         UserRoleEntity link = new UserRoleEntity();
+        link.setTenantId(admin.getTenantId());
         link.setUserId(admin.getId());
         link.setRoleId(superAdmin.getId());
         userRoleMapper.insert(link);

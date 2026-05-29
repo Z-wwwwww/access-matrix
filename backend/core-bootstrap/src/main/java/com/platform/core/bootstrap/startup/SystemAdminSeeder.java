@@ -152,6 +152,7 @@ public class SystemAdminSeeder {
         }
         Long existing = userRoleMapper.selectCount(
                 new QueryWrapper<UserRoleEntity>()
+                        .eq("tenant_id", ops.getTenantId())
                         .eq("user_id", ops.getId())
                         .eq("role_id", platformAdmin.getId())
                         .eq("mark", 1));
@@ -159,6 +160,7 @@ public class SystemAdminSeeder {
             return;
         }
         UserRoleEntity link = new UserRoleEntity();
+        link.setTenantId(ops.getTenantId());
         link.setUserId(ops.getId());
         link.setRoleId(platformAdmin.getId());
         userRoleMapper.insert(link);

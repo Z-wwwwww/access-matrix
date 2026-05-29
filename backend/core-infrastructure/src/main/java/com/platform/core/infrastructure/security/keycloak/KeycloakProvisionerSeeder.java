@@ -46,10 +46,11 @@ import java.util.List;
  * (+5 / +15) which use the runtime (provisioner) client and therefore need it
  * to exist and hold manage-users on demo/system first.
  *
- * <p>Idempotent and fail-soft: re-running only syncs; if Keycloak is
- * unreachable or the bootstrap credential is wrong, it logs and leaves startup
- * intact (tenant provisioning simply won't work until it succeeds on a later
- * boot). Disable entirely with {@code app.keycloak.bootstrap.enabled=false}.
+ * <p>Idempotent and fail-fast: re-running only syncs; if Keycloak is
+ * unreachable or the bootstrap credential is wrong, startup fails loudly
+ * instead of pretending tenant provisioning will work. Disable entirely with
+ * {@code app.keycloak.bootstrap.enabled=false} after the provisioner client has
+ * been created and granted.
  */
 @Component
 @ConditionalOnProperty(name = "app.security.mode", havingValue = "oidc")
@@ -113,12 +114,11 @@ public class KeycloakProvisionerSeeder {
             log.info("[kc-provisioner] provisioner ready (client='{}', granted create-realm + manage-users on {})",
                     provClientId, boot.managedRealms());
         } catch (Exception e) {
-            // Fail-soft: don't crash startup. Tenant provisioning will fail
-            // until this succeeds, but the rest of the app is usable.
-            log.warn("[kc-provisioner] could not ensure provisioner client '{}' ({}). "
-                            + "Check Keycloak is up and the bootstrap admin credential "
-                            + "(app.keycloak.bootstrap.*) is valid, then restart.",
-                    provClientId, e.toString());
+            String msg = "Keycloak provisioner bootstrap failed for client '%s'. "
+                    + "Check Keycloak is running and app.keycloak.bootstrap.* matches the Keycloak root admin "
+                    + "(local default: admin/admin), then restart.";
+            log.error(msg.formatted(provClientId), e);
+            throw new IllegalStateException(msg.formatted(provClientId), e);
         }
     }
 
@@ -152,7 +152,7 @@ public class KeycloakProvisionerSeeder {
         c.setSecret(secret);
         try (Response r = master.clients().create(c)) {
             if (r.getStatus() != Response.Status.CREATED.getStatusCode()) {
-                throw new IllegalStateException("create provisioner client failed: HTTP " + r.getStatus());
+                throw new IllegalStateException("create provisioner client failed: " + responseDetail(r));
             }
         }
         String uuid = master.clients().findByClientId(clientId).get(0).getId();
@@ -187,5 +187,20 @@ public class KeycloakProvisionerSeeder {
         }
         master.users().get(saUserId).roles().clientLevel(realmClientUuid).add(toAdd);
         log.info("[kc-provisioner] granted {} on managed realm '{}'", MANAGED_REALM_ROLES, managedRealm);
+    }
+
+    private String responseDetail(Response response) {
+        if (response == null) return "HTTP <no response>";
+        String body = "";
+        try {
+            if (response.hasEntity()) {
+                body = response.readEntity(String.class);
+            }
+        } catch (Exception ignored) {
+            body = "<unreadable response body>";
+        }
+        return body == null || body.isBlank()
+                ? "HTTP " + response.getStatus()
+                : "HTTP " + response.getStatus() + " body=" + body;
     }
 }

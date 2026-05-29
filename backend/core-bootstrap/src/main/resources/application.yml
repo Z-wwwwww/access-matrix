@@ -196,7 +196,7 @@ app:
       enabled:        ${CORE_KEYCLOAK_BOOTSTRAP_ENABLED:true}
       client-id:      ${CORE_KEYCLOAK_BOOTSTRAP_CLIENT_ID:admin-cli}
       username:       ${CORE_KEYCLOAK_BOOTSTRAP_USERNAME:admin}
-      password:       ${CORE_KEYCLOAK_BOOTSTRAP_PASSWORD:abcd@1234}
+      password:       ${CORE_KEYCLOAK_BOOTSTRAP_PASSWORD:admin}
       managed-realms: ${CORE_KEYCLOAK_BOOTSTRAP_MANAGED_REALMS:demo,system}
   # Outgoing mail — used by MailService for invite + onboarding notices.
   mail:
