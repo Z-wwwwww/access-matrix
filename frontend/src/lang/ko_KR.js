@@ -267,6 +267,26 @@ export default {
           terminated: '지원 세션을 종료했습니다'
         }
       },
+      resendInvite: {
+        tooltip: {
+          resend: '관리자 온보딩 초대 재전송 (이메일 미수신 또는 주소 오류)'
+        },
+        dialog: {
+          title: '관리자 초대 재전송',
+          body: '"{displayName}"({tenantCode}) 관리자에게 온보딩 초대를 다시 보냅니다.',
+          emailLabel: '받는 사람',
+          emailPlaceholder: 'admin@example.com',
+          emailHint: '현재 연락 이메일이 채워져 있습니다. 잘못된 주소는 수정하세요(사용자·Keycloak·테넌트 연락처를 갱신). 그대로 두면 재전송만 합니다.',
+          tokenNote: '새 초대 링크가 발급되며 이전 링크는 무효가 됩니다.',
+          activatedNote: '관리자가 아직 활성화하지 않은 경우에만 작동합니다.',
+          sending: '전송 중…',
+          confirm: '초대 재전송'
+        },
+        message: {
+          success: '초대를 다시 보냈습니다',
+          failed: '초대 재전송에 실패했습니다'
+        }
+      },
       message: {
         createSuccess: '테넌트를 생성하고 초대 이메일을 보냈습니다',
         createFailed: '테넌트 생성 실패',

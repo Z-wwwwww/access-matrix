@@ -79,6 +79,18 @@ public final class TenantDto {
     ) {}
 
     /**
+     * Request body for {@code POST /platform/tenants/{id}/resend-invite}.
+     * {@code email} is OPTIONAL: when blank, the invite is re-sent to the
+     * admin's current address (use when the first email simply didn't arrive);
+     * when provided, it CORRECTS the admin's email everywhere (core_auth_user +
+     * Keycloak user + the tenant's contact email) before re-sending (use when
+     * the first address was wrong).
+     */
+    public record ResendInviteRequest(
+            @Email @Size(max = 255) String email
+    ) {}
+
+    /**
      * Request body for {@code POST /platform/tenants/{id}/support-session}.
      * A non-blank {@code reason} is mandatory — it's the primary audit
      * justification and lands in {@code core_oplog.request_body} via the

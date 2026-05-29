@@ -159,6 +159,24 @@ public class KeycloakUserService {
         }
     }
 
+    /**
+     * Update a user's email (and keep it email-verified, since an admin set it).
+     * Used by the "resend invite / correct email" flow when the first address
+     * was wrong. No-op-safe: throws KeycloakOperationException on KC failure.
+     */
+    public void updateEmail(String realm, String keycloakUserId, String email) {
+        try (Keycloak kc = newAdminClient()) {
+            UserResource ur = kc.realm(realm).users().get(keycloakUserId);
+            UserRepresentation u = ur.toRepresentation();
+            u.setEmail(email);
+            u.setEmailVerified(true);
+            ur.update(u);
+            log.info("[kc] updated email for user {} in realm {}", keycloakUserId, realm);
+        } catch (WebApplicationException e) {
+            throw new KeycloakOperationException("Keycloak update-email failed: HTTP " + e.getResponse().getStatus(), e);
+        }
+    }
+
     public void disableUser(String realm, String keycloakUserId) {
         try (Keycloak kc = newAdminClient()) {
             UserResource ur = kc.realm(realm).users().get(keycloakUserId);

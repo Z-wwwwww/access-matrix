@@ -16,3 +16,7 @@ export const suspendTenantApi        = (id)             => request.post(`/platfo
 export const resumeTenantApi         = (id)             => request.post(`/platform/tenants/${id}/resume`)
 export const hardDeleteTenantApi     = (id, confirmCode) => request.delete(`/platform/tenants/${id}`, { data: { confirmCode } })
 export const startSupportSessionApi  = (id, reason)     => request.post(`/platform/tenants/${id}/support-session`, { reason })
+// Resend the tenant admin's onboarding invite. `email` is optional: omit (or
+// pass empty) to re-send to the current address; pass a value to CORRECT the
+// admin's email (DB + Keycloak + tenant contact) before re-sending.
+export const resendInviteApi         = (id, email)      => request.post(`/platform/tenants/${id}/resend-invite`, email ? { email } : {})

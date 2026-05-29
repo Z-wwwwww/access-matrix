@@ -8,16 +8,18 @@ import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useAuthStore } from '@/stores/auth'
-import { Plus, Search, RotateCcw, Trash2, Pause, Play, Pencil, LifeBuoy } from 'lucide-vue-next'
+import { Plus, Search, RotateCcw, Trash2, Pause, Play, Pencil, LifeBuoy, Send } from 'lucide-vue-next'
 import {
   listTenantsApi,
   suspendTenantApi, resumeTenantApi,
-  startSupportSessionApi
+  startSupportSessionApi,
+  resendInviteApi
 } from '../../../../services/tenant'
 import TenantCreate from './TenantCreate.vue'
 import TenantEdit from './TenantEdit.vue'
 import TenantSupportSession from './TenantSupportSession.vue'
 import TenantHardDelete from './TenantHardDelete.vue'
+import TenantResendInvite from './TenantResendInvite.vue'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
@@ -34,6 +36,7 @@ const showCreate = ref(false)
 const editTarget = ref(null)            // null = closed; row object = open with that row
 const supportTarget = ref(null)         // null = closed; row object = open support-session dialog
 const hardDeleteTarget = ref(null)      // null = closed; row object = open hard-delete confirmation
+const resendTarget = ref(null)          // null = closed; row object = open resend-invite dialog
 
 const columns = [
   { key: 'tenantCode',    label: () => t('platform.tenant.column.tenantCode'),    width: '180px' },
@@ -41,7 +44,7 @@ const columns = [
   { key: 'contactEmail',  label: () => t('platform.tenant.column.contactEmail'), width: '240px' },
   { key: 'status',        label: () => t('platform.tenant.column.status'),        width: '100px' },
   { key: 'createTime',    label: () => t('platform.tenant.column.createTime'),    width: '180px' },
-  { key: 'actions',       label: () => t('platform.tenant.column.actions'),       width: '160px' }
+  { key: 'actions',       label: () => t('platform.tenant.column.actions'),       width: '200px' }
 ]
 
 async function fetchData() {
@@ -160,6 +163,25 @@ async function handleSupportSession({ row, reason }) {
   }
 }
 
+function openResendInvite(row) {
+  resendTarget.value = row
+}
+
+async function handleResendInvite({ row, email }) {
+  try {
+    const res = await resendInviteApi(row.id, email)
+    if (res.data.code === 0) {
+      resendTarget.value = null
+      toast.success(t('platform.tenant.resendInvite.message.success'))
+      if (email) fetchData()   // contact email may have been corrected — refresh the row
+    } else {
+      toast.error(res.data.msg || t('platform.tenant.resendInvite.message.failed'))
+    }
+  } catch (e) {
+    toast.error(e.message || t('platform.tenant.resendInvite.message.failed'))
+  }
+}
+
 onMounted(() => {
   fetchData()
 })
@@ -253,6 +275,18 @@ onMounted(() => {
               <LifeBuoy class="size-3.5" />
             </button>
 
+            <!-- Resend admin invite — missed email or wrong address. Disabled
+                 for built-in tenants (their admins are seeded, no invite). -->
+            <button v-permission="'platform:tenant:update'"
+                    class="h-7 px-2 rounded hover:bg-primary/10 text-primary text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                    :disabled="isBuiltIn(row)"
+                    :title="isBuiltIn(row)
+                        ? t('platform.tenant.tooltip.builtInLocked')
+                        : t('platform.tenant.resendInvite.tooltip.resend')"
+                    @click="openResendInvite(row)">
+              <Send class="size-3.5" />
+            </button>
+
             <!-- Suspend / Resume toggle — same column slot, behavior swaps on row.status -->
             <button v-if="row.status === 1"
                     v-permission="'platform:tenant:update'"
@@ -301,5 +335,8 @@ onMounted(() => {
     <TenantHardDelete :row="hardDeleteTarget"
                       @close="hardDeleteTarget = null"
                       @deleted="() => { hardDeleteTarget = null; fetchData() }" />
+    <TenantResendInvite :row="resendTarget"
+                        @close="resendTarget = null"
+                        @resend="handleResendInvite" />
   </div>
 </template>

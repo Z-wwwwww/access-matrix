@@ -267,6 +267,26 @@ export default {
           terminated: 'Support session ended'
         }
       },
+      resendInvite: {
+        tooltip: {
+          resend: 'Resend the admin onboarding invite (missed email or wrong address)'
+        },
+        dialog: {
+          title: 'Resend admin invite',
+          body: 'Resend the onboarding invite for {displayName} ({tenantCode})\'s administrator.',
+          emailLabel: 'Send to',
+          emailPlaceholder: 'admin@example.com',
+          emailHint: 'Prefilled with the current contact email. Edit it to correct a wrong address (updates the user, Keycloak and the tenant contact); leave it unchanged to just resend.',
+          tokenNote: 'A fresh invite link is generated; any previous link stops working.',
+          activatedNote: 'Only works while the admin has not activated yet.',
+          sending: 'Sending...',
+          confirm: 'Resend invite'
+        },
+        message: {
+          success: 'Invitation re-sent',
+          failed: 'Failed to resend invitation'
+        }
+      },
       message: {
         createSuccess: 'Tenant created and invitation email sent',
         createFailed: 'Tenant creation failed',

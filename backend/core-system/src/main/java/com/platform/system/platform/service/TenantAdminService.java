@@ -338,6 +338,84 @@ public class TenantAdminService {
     }
 
     /**
+     * Resend the tenant admin's onboarding invite — for when the first email
+     * never arrived, or the address was wrong.
+     *
+     * <p>Targets the single admin invited at tenant creation, located via the
+     * outstanding (unconsumed) invite for the tenant. If {@code correctedEmail}
+     * is non-blank it first fixes the admin's email everywhere
+     * ({@code core_auth_user} + the Keycloak user + the tenant's contact email).
+     * Then it invalidates any still-open invites (so only the new link works),
+     * mints a fresh token, and re-sends.
+     *
+     * <p>Raw JDBC for the cross-tenant reads/writes so the MyBatis tenant
+     * interceptor doesn't scope them to the caller's ('system') tenant — same
+     * reason {@link #persistNewTenant} uses JDBC for the new tenant's rows.
+     *
+     * @param tenantId      the registry row id (ULID)
+     * @param correctedEmail nullable; when set, corrects the admin's email
+     */
+    @Transactional
+    public void resendAdminInvite(String tenantId, String correctedEmail) {
+        TenantEntity row = tenantMapper.selectById(tenantId);
+        if (row == null || !Integer.valueOf(1).equals(row.getMark())) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "Tenant not found: " + tenantId);
+        }
+        String tenantCode = row.getTenantCode();
+
+        List<Map<String, Object>> pending = jdbc.queryForList(
+                "SELECT user_id, keycloak_id FROM core_user_invite "
+                        + "WHERE tenant_id = ? AND used_at IS NULL AND mark = 1 "
+                        + "ORDER BY expires_at DESC LIMIT 1",
+                tenantCode);
+        if (pending.isEmpty()) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                    "No pending invite for tenant '" + tenantCode + "' — the admin may have "
+                            + "already activated their account.");
+        }
+        String userId = (String) pending.get(0).get("user_id");
+        String keycloakId = (String) pending.get(0).get("keycloak_id");
+
+        Map<String, Object> u = jdbc.queryForMap(
+                "SELECT username, display_name, email FROM core_auth_user WHERE id = ? AND mark = 1",
+                userId);
+        String username = (String) u.get("username");
+        String displayName = (String) u.get("display_name");
+        String currentEmail = (String) u.get("email");
+
+        boolean correcting = correctedEmail != null && !correctedEmail.isBlank();
+        String targetEmail = correcting ? correctedEmail.trim() : currentEmail;
+        if (targetEmail == null || targetEmail.isBlank()) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,
+                    "No email to send to — provide a corrected email in the request body.");
+        }
+
+        // Correct the email everywhere if a new one was given.
+        if (correcting && !targetEmail.equals(currentEmail)) {
+            LocalDateTime now = LocalDateTime.now();
+            jdbc.update("UPDATE core_auth_user SET email = ?, update_time = ? WHERE id = ?",
+                    targetEmail, now, userId);
+            jdbc.update("UPDATE core_tenant SET contact_email = ?, update_time = ? WHERE id = ?",
+                    targetEmail, now, tenantId);
+            KeycloakUserService userService = userServiceProvider.getIfAvailable();
+            if (userService != null && keycloakId != null && !keycloakId.isBlank()) {
+                userService.updateEmail(tenantCode, keycloakId, targetEmail);
+            }
+        }
+
+        // Invalidate any still-open invites so only the freshly-minted link works.
+        jdbc.update("UPDATE core_user_invite SET used_at = ? "
+                        + "WHERE tenant_id = ? AND user_id = ? AND used_at IS NULL AND mark = 1",
+                LocalDateTime.now(), tenantCode, userId);
+
+        String token = inviteTokenService.mint(tenantCode, userId, keycloakId);
+        sendInviteMail(username, targetEmail, displayName, tenantCode, token);
+
+        log.info("[tenant] resent admin invite for tenant '{}' to '{}' (corrected={})",
+                tenantCode, targetEmail, correcting);
+    }
+
+    /**
      * Resolve the admin username from the create request. If the operator
      * provided one, validate and use it. Otherwise derive from
      * {@code contactEmail}'s local-part: lowercase, keep alphanumeric +

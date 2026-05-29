@@ -105,6 +105,22 @@ public class PlatformTenantController {
     }
 
     /**
+     * Resend the tenant admin's onboarding invite — for a missed email or a
+     * wrong address. Body is optional: omit it (or leave {@code email} blank)
+     * to re-send to the current address; provide {@code email} to correct the
+     * admin's address (DB + Keycloak + tenant contact) before re-sending.
+     */
+    @PostMapping("/{id}/resend-invite")
+    @RequiresPermission(PlatformPermissions.TENANT_UPDATE)
+    @OpLog(module = "platform", action = "tenant.resendInvite", targetType = "tenant")
+    public JsonResult<Void> resendInvite(
+            @PathVariable String id,
+            @Valid @RequestBody(required = false) TenantDto.ResendInviteRequest body) {
+        tenantService.resendAdminInvite(id, body == null ? null : body.email());
+        return JsonResult.ok();
+    }
+
+    /**
      * Mint a 30-minute "support session" token that lets the platform-ops
      * caller act with the target tenant's SUPER_ADMIN authority. Reason is
      * mandatory and lands in {@code core_oplog.request_body} via the @OpLog

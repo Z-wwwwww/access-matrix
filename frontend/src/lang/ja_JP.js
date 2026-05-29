@@ -277,6 +277,26 @@ export default {
           terminated: 'サポートセッションを終了しました'
         }
       },
+      resendInvite: {
+        tooltip: {
+          resend: '管理者の招待を再送（メール未着・アドレス誤りのとき）'
+        },
+        dialog: {
+          title: '管理者招待の再送',
+          body: '「{displayName}」（{tenantCode}）の管理者へオンボーディング招待を再送します。',
+          emailLabel: '送信先',
+          emailPlaceholder: 'admin@example.com',
+          emailHint: '現在の連絡先メールを初期表示しています。誤りを直すには書き換えてください（ユーザー・Keycloak・テナント連絡先を更新）。そのままなら再送のみ。',
+          tokenNote: '新しい招待リンクを発行します。以前のリンクは無効になります。',
+          activatedNote: '管理者が未アクティベートの場合のみ有効です。',
+          sending: '送信中…',
+          confirm: '招待を再送'
+        },
+        message: {
+          success: '招待を再送しました',
+          failed: '招待の再送に失敗しました'
+        }
+      },
       message: {
         createSuccess: 'テナントを作成し、招待メールを送信しました',
         createFailed: 'テナント作成に失敗',
