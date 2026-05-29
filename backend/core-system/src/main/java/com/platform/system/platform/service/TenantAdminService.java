@@ -23,7 +23,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -112,6 +114,16 @@ public class TenantAdminService {
     private final ObjectProvider<MailService> mailProvider;
     private final AppMailProperties mailProps;
     private final JdbcTemplate jdbc;
+    /**
+     * Programmatic transaction wrapper for the pure-DB half of {@link #create}.
+     * We use this instead of method-level {@code @Transactional} there because
+     * create() makes external Keycloak calls that MUST NOT sit inside the DB
+     * transaction (they can't be rolled back) — so only the DB block runs under
+     * a transaction, and the external side effects are bracketed by explicit
+     * compensation. The other mutators stay on {@code @Transactional} since
+     * they wrap a single KC call + a single DB write with no atomicity gap.
+     */
+    private final TransactionTemplate txTemplate;
 
     public TenantAdminService(TenantMapper tenantMapper,
                               ObjectProvider<KeycloakRealmService> realmServiceProvider,
@@ -121,7 +133,8 @@ public class TenantAdminService {
                               InviteTokenService inviteTokenService,
                               ObjectProvider<MailService> mailProvider,
                               AppMailProperties mailProps,
-                              JdbcTemplate jdbc) {
+                              JdbcTemplate jdbc,
+                              PlatformTransactionManager txManager) {
         this.tenantMapper = tenantMapper;
         this.realmServiceProvider = realmServiceProvider;
         this.userServiceProvider = userServiceProvider;
@@ -131,6 +144,7 @@ public class TenantAdminService {
         this.mailProvider = mailProvider;
         this.mailProps = mailProps;
         this.jdbc = jdbc;
+        this.txTemplate = new TransactionTemplate(txManager);
     }
 
     public PageResult<TenantDto.View> list(long page, long size, String keyword) {
@@ -154,9 +168,31 @@ public class TenantAdminService {
         return toView(row);
     }
 
-    @Transactional
+    /**
+     * Provision a new tenant across Keycloak + the DB.
+     *
+     * <p><b>Consistency model (saga with compensation).</b> Creating a tenant
+     * mutates two systems that have no shared transaction: Keycloak (the realm
+     * + admin user) and our DB (registry row + RBAC + business user). We can't
+     * wrap a KC REST call in a DB transaction, so instead:
+     * <ol>
+     *   <li>Validate (no side effects).</li>
+     *   <li>Create the realm in KC, then the admin user in KC — the only two
+     *       external mutations, done <em>before</em> the DB work.</li>
+     *   <li>Run <em>all</em> DB writes in a single {@link #txTemplate}
+     *       transaction so they commit or roll back as one unit.</li>
+     *   <li>If the DB transaction (or the KC user creation) fails, compensate
+     *       by deleting the realm — which cascades away the KC admin user too.
+     *       This guarantees we never strand an orphan realm that would block a
+     *       retry on the {@code realmExists} guard.</li>
+     * </ol>
+     * Net effect: either the tenant exists fully in both systems, or in
+     * neither. The only residue a failure can leave is if compensation itself
+     * fails (KC unreachable mid-rollback) — that case is logged at ERROR with
+     * both stack traces for manual cleanup.
+     */
     public String create(TenantDto.CreateRequest req) {
-        // ── 1. Validate ─────────────────────────────────────────────
+        // ── 1. Validate (no side effects yet) ───────────────────────
         if (RESERVED_CODES.contains(req.tenantCode())) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR,
                     "Tenant code '" + req.tenantCode() + "' is reserved");
@@ -176,15 +212,70 @@ public class TenantAdminService {
                             + "either pick a different code or import it via the DB after manual cleanup");
         }
 
-        // ── 2. Create realm in Keycloak ─────────────────────────────
-        // If this throws, we haven't touched the DB yet → no orphan row.
+        String adminUsername = resolveAdminUsername(req);
+        String adminEmail = req.contactEmail();
+        String adminDisplayName = req.displayName() + " Admin";
+
+        // ── 2. External mutation: create the realm in Keycloak ───────
+        // Done outside any DB transaction. Compensated by deleteRealm in
+        // the catch below if anything downstream fails.
         realmService.createRealmFromTemplate(req.tenantCode(), req.displayName());
 
-        // ── 3. Insert registry row ──────────────────────────────────
-        // If THIS fails, the realm is orphaned in Keycloak. Retry of the
-        // same request will fail at the realmExists check above; the
-        // operator must either manually delete the orphan realm or
-        // hand-edit core_tenant to add the row.
+        try {
+            // ── 3. External mutation: create the KC admin user ───────
+            // No credentials — the invite landing page sets the password
+            // later. Created here (before the DB tx) so its kcId can be
+            // persisted atomically with the business rows.
+            String kcId = null;
+            KeycloakUserService userService = userServiceProvider.getIfAvailable();
+            if (userService != null) {
+                kcId = userService.createUser(req.tenantCode(), adminUsername, adminEmail,
+                        adminDisplayName, /* tempPassword = */ null);
+            }
+            final String kcIdFinal = kcId;
+
+            // ── 4. All DB writes, atomically ─────────────────────────
+            // Pure DB, no external calls inside (the invite email is
+            // fire-and-forget and swallows its own errors). Commits or
+            // rolls back as a unit.
+            return txTemplate.execute(status ->
+                    persistNewTenant(req, adminUsername, adminEmail, adminDisplayName, kcIdFinal));
+        } catch (RuntimeException e) {
+            // ── Compensation ─────────────────────────────────────────
+            // KC user creation or the DB transaction failed after the
+            // realm was created. Delete the realm so no orphan remains to
+            // block a retry. Deleting the realm cascades away the KC admin
+            // user, so one delete covers both external mutations.
+            try {
+                realmService.deleteRealm(req.tenantCode());
+                log.warn("[tenant] create failed for '{}' — compensated by deleting the orphan realm",
+                        req.tenantCode(), e);
+            } catch (RuntimeException ce) {
+                // Compensation failed → a real orphan realm remains. Log
+                // LOUDLY (both causes) so an operator can clean up by hand.
+                log.error("[tenant] create failed for '{}' AND compensation (realm delete) failed — "
+                                + "manual cleanup of the Keycloak realm is required. Original cause below.",
+                        req.tenantCode(), e);
+                log.error("[tenant] compensation failure detail", ce);
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Pure-DB half of {@link #create}, run inside {@link #txTemplate}: inserts
+     * the registry row, seeds numbering + RBAC, provisions the business admin
+     * user + SUPER_ADMIN binding, and mints/sends the invite. Contains NO
+     * external (Keycloak) calls — the only outbound I/O is the fire-and-forget
+     * invite email, whose failure is swallowed and never rolls back the tenant.
+     *
+     * @param kcId the Keycloak user id created in {@link #create} (nullable
+     *             when Keycloak user provisioning is unavailable)
+     * @return the new tenant registry row id (ULID)
+     */
+    private String persistNewTenant(TenantDto.CreateRequest req, String adminUsername,
+                                    String adminEmail, String adminDisplayName, String kcId) {
+        // ── Registry row ────────────────────────────────────────────
         TenantEntity row = new TenantEntity();
         row.setId(IdGenerator.ulid());
         row.setTenantId("system");
@@ -199,31 +290,16 @@ public class TenantAdminService {
         row.setUpdateTime(LocalDateTime.now());
         tenantMapper.insert(row);
 
-        // ── 4. Seed per-tenant numbering definitions ────────────────
+        // ── Per-tenant numbering definitions ────────────────────────
         // Without this, the new tenant's first numberingService.next("USER", ...)
         // would error with "Numbering definition not found".
         numberingService.seedDefaultsForTenant(req.tenantCode());
 
-        // ── 5. Seed RBAC scaffolding (role + perm + menus) ──────────
+        // ── RBAC scaffolding (role + perm + menus) ──────────────────
         // Returns the new SUPER_ADMIN role id so we can bind the admin user.
         String superAdminRoleId = rbacSeederService.seedDefaultsForTenant(req.tenantCode());
 
-        // ── 6. Provision the first admin user (no password, invite-driven) ──
-        String adminUsername = resolveAdminUsername(req);
-        String adminEmail = req.contactEmail();
-        String adminDisplayName = req.displayName() + " Admin";
-
-        // 6a. Keycloak user — no credentials. The invite landing page will
-        // call setPassword after the recipient picks one. Failure here aborts
-        // the whole transaction (realm is left as the orphan, same as step 3).
-        String kcId = null;
-        KeycloakUserService userService = userServiceProvider.getIfAvailable();
-        if (userService != null) {
-            kcId = userService.createUser(req.tenantCode(), adminUsername, adminEmail,
-                    adminDisplayName, /* tempPassword = */ null);
-        }
-
-        // 6b. Business user row. Use JdbcTemplate so we set tenant_id
+        // ── Business user row. Use JdbcTemplate so we set tenant_id ──
         // explicitly to the NEW tenant — going through UserMapper would
         // pick up RequestContext.tenantId() = 'system' via AuditMetaObjectHandler.
         String userId = IdGenerator.ulid();
@@ -239,17 +315,16 @@ public class TenantAdminService {
                 userId, req.tenantCode(), adminUsername, adminEmail, userNo,
                 adminDisplayName, kcId, now, now);
 
-        // 6c. user_role binding to SUPER_ADMIN.
+        // user_role binding to SUPER_ADMIN.
         jdbc.update(
                 "INSERT INTO core_rbac_user_role "
                         + "  (id, tenant_id, user_id, role_id, mark, create_user, update_user) "
                         + "VALUES (?, ?, ?, ?, 1, 'platform-admin', 'platform-admin')",
                 IdGenerator.ulid(), req.tenantCode(), userId, superAdminRoleId);
 
-        // ── 7. Mint invite + send email ─────────────────────────────
-        // Mint stays inside the transaction (the token row is durable).
-        // sendHtmlAsync is fire-and-forget; if mail fails, the row exists
-        // and operator can re-mint via a follow-up "resend" feature.
+        // ── Mint invite + send email ────────────────────────────────
+        // Mint is durable (token row). sendInviteMail is fire-and-forget;
+        // a flaky SMTP must not roll back the tenant, so it swallows errors.
         String token = inviteTokenService.mint(req.tenantCode(), userId, kcId);
         sendInviteMail(adminUsername, adminEmail, adminDisplayName,
                 req.tenantCode(), token);
