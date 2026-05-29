@@ -1,7 +1,6 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -22,7 +21,6 @@ import TenantHardDelete from './TenantHardDelete.vue'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
-const router = useRouter()
 const auth = useAuthStore()
 
 const loading = ref(false)
@@ -148,8 +146,12 @@ async function handleSupportSession({ row, reason }) {
       toast.success(t('platform.tenant.support.message.started', {
         tenantCode: data.tenantCode
       }))
-      // Hard reload so menu / sidebar / /me all re-render under the new identity.
-      router.push('/').then(() => window.location.reload())
+      // Hard navigation (NOT router.push) so menu / sidebar / /me all re-fetch
+      // under the new support identity on a clean page-load. Dynamic routes are
+      // registered once per load from the menu and aren't rebuilt on identity
+      // change, so a client-side push would keep the stale ops routes. Landing
+      // on '/' lets the fresh load redirect to the support identity's home.
+      window.location.assign('/')
     } else {
       toast.error(res.data.msg || t('platform.tenant.support.message.startFailed'))
     }

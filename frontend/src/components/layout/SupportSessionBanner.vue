@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import { LifeBuoy, X } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/useToast'
@@ -22,7 +21,6 @@ import { toast } from '@/composables/useToast'
  * revoke list is tracked as a follow-up.
  */
 const { t } = useI18n()
-const router = useRouter()
 const auth = useAuthStore()
 
 const now = ref(Date.now())
@@ -51,13 +49,16 @@ const remainingFmt = computed(() => {
 function terminate() {
   if (!auth.terminateSupportSession()) return
   toast.success(t('platform.tenant.support.message.terminated'))
-  // Hard reload back to the platform tenants list — easiest way to
-  // guarantee every cached page-level state (menu, route, /me) re-renders
-  // under the restored ops identity.
-  router.push('/platform/tenants').then(() => {
-    // Force a clean state — router.push alone won't re-init keep-alive caches.
-    window.location.reload()
-  })
+  // Hard navigation (NOT router.push) back to the platform tenants list.
+  // Dynamic routes are registered once per page-load from the menu and are
+  // never rebuilt on identity change — while a support session is active the
+  // in-memory routes are the *tenant's* menu, which has no /platform/* paths.
+  // A client-side router.push here would resolve against those stale routes,
+  // hit the catch-all 404, and only recover after the follow-up reload (the
+  // visible "404 flash"). A full document load reads the already-restored ops
+  // token, refetches the ops menu, and resolves /platform/tenants on first
+  // paint — no flash.
+  window.location.assign('/platform/tenants')
 }
 
 onMounted(() => {
