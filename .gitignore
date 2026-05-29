@@ -33,3 +33,7 @@ desktop.ini
 
 # Claude Code per-user override (skill prompts under .claude/commands/ stay committed)
 .claude/settings.local.json
+
+# Real backend deployment env (secrets). The committed template is
+# backend/.env.example; the filled-in .env must never be committed.
+/backend/.env
