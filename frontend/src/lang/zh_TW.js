@@ -129,6 +129,7 @@ export default {
       retry: '重試 SSO',
       retrying: '檢查中...'
     },
+    tenantRecovered: '租戶「{stale}」已不存在，已自動切換回預設租戶。',
     passwordBreakGlass: '密碼登入模式（應急）',
     backToSso: '返回 SSO',
     passwordModeHotzone: '2 秒內連點 5 次可解鎖密碼登入',
@@ -152,49 +153,130 @@ export default {
       },
       status: { active: '運作中', suspended: '已停用' },
       search: { placeholder: '依代碼或名稱搜尋' },
-      softDeleteHint: {
-        title: '僅軟刪除：',
-        body: '刪除租戶會停用其 Keycloak realm（使用者無法登入），但保留業務資料。完全刪除需透過獨立的維運流程執行。'
-      },
-      tooltip: {
-        softDelete: '軟刪除租戶',
-        builtInLocked: '內建租戶（system / demo）不可刪除'
-      },
-      confirm: {
-        deleteTitle: '刪除租戶',
-        deleteMessage: '確認軟刪除「{displayName}」（{tenantCode}）？\n\n• Keycloak realm 將被停用，使用者無法登入\n• 業務資料將保留\n• 重新啟用需在 KC 管理控制台手動操作',
-        deleteConfirm: '執行軟刪除'
-      },
-      button: { new: '新增租戶' },
-      message: {
-        loadFailed: '載入租戶清單失敗',
-        createSuccess: '租戶已建立',
-        createFailed: '租戶建立失敗',
-        deleteSuccess: '租戶已軟刪除',
-        deleteFailed: '刪除租戶失敗'
+      recycleBinHint: {
+        title: '刪除採用回收筒方式：',
+        body: '請先「停用」（Keycloak realm 將被停用、無法登入，但資料保留）。如需完全刪除，請在停用後的列中點擊紅色垃圾桶圖示 —— 輸入租戶代碼確認後，業務資料、KC realm、註冊表條目將全部實體刪除，且無法復原。'
       },
       edit: {
         titleCreate: '新增租戶',
+        titleEdit: '編輯租戶',
         intro: '一次操作建立 Keycloak realm + 中央註冊表條目。租戶代碼建立後不可修改。',
+        editIntro: '租戶代碼不可修改，僅可更新顯示名稱與聯絡信箱。',
         label: {
           tenantCode: '租戶代碼',
           displayName: '顯示名稱',
-          contactEmail: '聯絡信箱'
+          contactEmail: '聯絡信箱',
+          adminUsername: '管理員使用者名稱'
         },
         placeholder: {
           tenantCode: 'acme',
           displayName: 'Acme 公司',
-          contactEmail: 'admin@acme.example'
+          contactEmail: 'admin@acme.example',
+          adminUsername: 'admin'
         },
         hint: {
           tenantCode: '小寫字母、數字、連字號（RFC1035 標籤）。將用作 Keycloak realm 名稱和子網域。',
-          contactEmail: '選填 — 用於邀請第一位管理員'
+          contactEmail: '選填 — 用於邀請第一位管理員',
+          adminUsername: '留空時將從聯絡信箱的本地部分自動產生，之後可修改。'
         },
         error: {
           invalidCode: '租戶代碼必須是小寫 RFC1035 標籤（小寫字母、數字、連字號）',
-          missingDisplayName: '請輸入顯示名稱'
+          missingDisplayName: '請輸入顯示名稱',
+          invalidAdminUsername: '管理員使用者名稱須以小寫字母開頭，且只能包含小寫字母、數字、連字號和底線'
         },
         saving: '儲存中...'
+      },
+      button: {
+        new: '新增租戶',
+        edit: '編輯',
+        suspend: '停用',
+        resume: '恢復'
+      },
+      tooltip: {
+        suspend: '停用租戶（停用 Keycloak realm，可恢復）',
+        resume: '恢復已停用的租戶',
+        edit: '編輯租戶資訊',
+        builtInLocked: '內建租戶（system / demo）不可修改'
+      },
+      hardDelete: {
+        title: '完全刪除租戶',
+        tooltip: {
+          confirm: '完全刪除租戶（業務資料、KC realm、註冊表條目將全部實體刪除）'
+        },
+        warning: {
+          title: '此操作無法復原',
+          intro: '您即將完全刪除「{displayName}」（{tenantCode}）。以下內容將被永久清除：',
+          dropBusiness: '與該租戶關聯的所有業務表資料（使用者、角色、部門、任務等）',
+          dropRealm: 'Keycloak realm 本身（所有使用者 / 工作階段 / 用戶端設定）',
+          dropRegistry: '中央註冊表條目（core_tenant）',
+          noUndo: '無法復原，只能從備份手動還原。'
+        },
+        label: {
+          typeCode: '為確認，請準確輸入租戶代碼「{tenantCode}」'
+        },
+        error: {
+          mismatch: '租戶代碼不符'
+        },
+        button: {
+          confirm: '完全刪除',
+          deleting: '刪除中...'
+        },
+        message: {
+          success: '租戶「{tenantCode}」已完全刪除',
+          failed: '完全刪除租戶失敗'
+        }
+      },
+      confirm: {
+        suspendTitle: '停用租戶',
+        suspendMessage: '確認停用「{displayName}」（{tenantCode}）？\n\n• Keycloak realm 將被停用，使用者無法登入\n• 可隨時透過「恢復」按鈕還原',
+        suspendConfirm: '停用',
+        resumeTitle: '恢復租戶',
+        resumeMessage: '確認恢復「{displayName}」（{tenantCode}）？\n\nKeycloak realm 將重新啟用並接受登入。',
+        resumeConfirm: '恢復'
+      },
+      support: {
+        tooltip: {
+          start: '開始支援工作階段（以該租戶的 SUPER_ADMIN 權限操作 30 分鐘）',
+          disabledSuspended: '已停用的租戶無法開始支援工作階段'
+        },
+        dialog: {
+          title: '開始支援工作階段',
+          warning: {
+            title: '高權限操作確認',
+            body: '您將以 {displayName}（{tenantCode}）的 SUPER_ADMIN 身分操作 30 分鐘。\n本次工作階段中的所有操作都會以「[support] <您的使用者名稱>」記錄到稽核日誌。'
+          },
+          reasonLabel: '原因（必填）',
+          reasonPlaceholder: '例：OS-1234 重現使用者回報的問題',
+          reasonHint: '將儲存到稽核日誌（core_oplog.request_body），請填寫具體內容。',
+          ttlNote: '工作階段將在 30 分鐘後自動失效（不可延長）',
+          auditNote: '所有操作都會記錄到稽核日誌',
+          writeNote: '唯讀模式尚未實作（也可寫入）—— 請謹慎操作',
+          starting: '開始中...',
+          confirm: '開始支援工作階段'
+        },
+        banner: {
+          acting: '支援工作階段進行中：{displayName}（{tenantCode}）',
+          note: '所有操作都會記錄到稽核日誌'
+        },
+        button: {
+          terminate: '結束工作階段'
+        },
+        message: {
+          started: '已開始支援工作階段（{tenantCode}）',
+          startFailed: '開始支援工作階段失敗',
+          terminated: '已結束支援工作階段'
+        }
+      },
+      message: {
+        createSuccess: '租戶已建立，邀請信已寄出',
+        createFailed: '租戶建立失敗',
+        loadFailed: '載入租戶清單失敗',
+        suspendSuccess: '租戶已停用',
+        suspendFailed: '租戶停用失敗',
+        resumeSuccess: '租戶已恢復',
+        resumeFailed: '租戶恢復失敗',
+        updateSuccess: '租戶資訊已更新',
+        updateFailed: '租戶資訊更新失敗'
       }
     }
   },

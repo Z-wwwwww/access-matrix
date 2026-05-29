@@ -153,49 +153,130 @@ export default {
       },
       status: { active: '运行中', suspended: '已停用' },
       search: { placeholder: '按代码或名称搜索' },
-      softDeleteHint: {
-        title: '仅软删除：',
-        body: '删除租户会禁用其 Keycloak realm（用户无法登录），但保留业务数据。彻底删除需通过单独的运维流程执行。'
-      },
-      tooltip: {
-        softDelete: '软删除租户',
-        builtInLocked: '内置租户（system / demo）不可删除'
-      },
-      confirm: {
-        deleteTitle: '删除租户',
-        deleteMessage: '确认软删除「{displayName}」（{tenantCode}）？\n\n• Keycloak realm 将被禁用，用户无法登录\n• 业务数据将保留\n• 重新启用需在 KC 管理控制台手动操作',
-        deleteConfirm: '执行软删除'
-      },
-      button: { new: '新建租户' },
-      message: {
-        loadFailed: '加载租户列表失败',
-        createSuccess: '租户已创建',
-        createFailed: '租户创建失败',
-        deleteSuccess: '租户已软删除',
-        deleteFailed: '删除租户失败'
+      recycleBinHint: {
+        title: '删除采用回收站方式：',
+        body: '请先「停用」（Keycloak realm 将被禁用、无法登录，但数据保留）。如需彻底删除，请在停用后的行中点击红色垃圾桶图标 —— 输入租户代码确认后，业务数据、KC realm、注册表条目将全部物理删除，且无法恢复。'
       },
       edit: {
         titleCreate: '新建租户',
+        titleEdit: '编辑租户',
         intro: '一次操作创建 Keycloak realm + 中央注册表条目。租户代码创建后不可修改。',
+        editIntro: '租户代码不可修改，仅可更新显示名称与联系邮箱。',
         label: {
           tenantCode: '租户代码',
           displayName: '显示名称',
-          contactEmail: '联系邮箱'
+          contactEmail: '联系邮箱',
+          adminUsername: '管理员用户名'
         },
         placeholder: {
           tenantCode: 'acme',
           displayName: 'Acme 公司',
-          contactEmail: 'admin@acme.example'
+          contactEmail: 'admin@acme.example',
+          adminUsername: 'admin'
         },
         hint: {
           tenantCode: '小写字母、数字、连字符（RFC1035 标签）。将用作 Keycloak realm 名和子域名。',
-          contactEmail: '可选 — 用于邀请首位管理员'
+          contactEmail: '可选 — 用于邀请首位管理员',
+          adminUsername: '留空时将从联系邮箱的本地部分自动生成，之后可修改。'
         },
         error: {
           invalidCode: '租户代码必须是小写 RFC1035 标签（小写字母、数字、连字符）',
-          missingDisplayName: '请输入显示名称'
+          missingDisplayName: '请输入显示名称',
+          invalidAdminUsername: '管理员用户名须以小写字母开头，且只能包含小写字母、数字、连字符和下划线'
         },
         saving: '保存中...'
+      },
+      button: {
+        new: '新建租户',
+        edit: '编辑',
+        suspend: '停用',
+        resume: '恢复'
+      },
+      tooltip: {
+        suspend: '停用租户（禁用 Keycloak realm，可恢复）',
+        resume: '恢复已停用的租户',
+        edit: '编辑租户信息',
+        builtInLocked: '内置租户（system / demo）不可修改'
+      },
+      hardDelete: {
+        title: '彻底删除租户',
+        tooltip: {
+          confirm: '彻底删除租户（业务数据、KC realm、注册表条目将全部物理删除）'
+        },
+        warning: {
+          title: '此操作不可恢复',
+          intro: '您即将彻底删除「{displayName}」（{tenantCode}）。以下内容将被永久清除：',
+          dropBusiness: '与该租户关联的所有业务表数据（用户、角色、部门、任务等）',
+          dropRealm: 'Keycloak realm 本身（所有用户 / 会话 / 客户端配置）',
+          dropRegistry: '中央注册表条目（core_tenant）',
+          noUndo: '无法恢复，只能从备份手动还原。'
+        },
+        label: {
+          typeCode: '为确认，请准确输入租户代码「{tenantCode}」'
+        },
+        error: {
+          mismatch: '租户代码不匹配'
+        },
+        button: {
+          confirm: '彻底删除',
+          deleting: '删除中...'
+        },
+        message: {
+          success: '租户「{tenantCode}」已彻底删除',
+          failed: '彻底删除租户失败'
+        }
+      },
+      confirm: {
+        suspendTitle: '停用租户',
+        suspendMessage: '确认停用「{displayName}」（{tenantCode}）？\n\n• Keycloak realm 将被禁用，用户无法登录\n• 可随时通过「恢复」按钮还原',
+        suspendConfirm: '停用',
+        resumeTitle: '恢复租户',
+        resumeMessage: '确认恢复「{displayName}」（{tenantCode}）？\n\nKeycloak realm 将重新启用并接受登录。',
+        resumeConfirm: '恢复'
+      },
+      support: {
+        tooltip: {
+          start: '开始支持会话（以该租户的 SUPER_ADMIN 权限操作 30 分钟）',
+          disabledSuspended: '已停用的租户无法开始支持会话'
+        },
+        dialog: {
+          title: '开始支持会话',
+          warning: {
+            title: '高权限操作确认',
+            body: '您将以 {displayName}（{tenantCode}）的 SUPER_ADMIN 身份操作 30 分钟。\n本次会话中的所有操作都会以「[support] <您的用户名>」记录到审计日志。'
+          },
+          reasonLabel: '原因（必填）',
+          reasonPlaceholder: '例：OS-1234 复现用户报告的问题',
+          reasonHint: '将保存到审计日志（core_oplog.request_body），请填写具体内容。',
+          ttlNote: '会话将在 30 分钟后自动失效（不可延长）',
+          auditNote: '所有操作都会记录到审计日志',
+          writeNote: '只读模式尚未实现（也可写入）—— 请谨慎操作',
+          starting: '开始中...',
+          confirm: '开始支持会话'
+        },
+        banner: {
+          acting: '支持会话进行中：{displayName}（{tenantCode}）',
+          note: '所有操作都会记录到审计日志'
+        },
+        button: {
+          terminate: '结束会话'
+        },
+        message: {
+          started: '已开始支持会话（{tenantCode}）',
+          startFailed: '开始支持会话失败',
+          terminated: '已结束支持会话'
+        }
+      },
+      message: {
+        createSuccess: '租户已创建，邀请邮件已发送',
+        createFailed: '租户创建失败',
+        loadFailed: '加载租户列表失败',
+        suspendSuccess: '租户已停用',
+        suspendFailed: '租户停用失败',
+        resumeSuccess: '租户已恢复',
+        resumeFailed: '租户恢复失败',
+        updateSuccess: '租户信息已更新',
+        updateFailed: '租户信息更新失败'
       }
     }
   },
