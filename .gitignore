@@ -26,5 +26,10 @@ desktop.ini
 # committing — they bloat the repo and go stale immediately.
 .dev-screenshots/
 
+# Scratch dir for throwaway artifacts while iterating (draft commit
+# messages, screenshots, etc.). Never commit — keep work products in
+# proper files, not here.
+.tmp/
+
 # Claude Code per-user override (skill prompts under .claude/commands/ stay committed)
 .claude/settings.local.json
