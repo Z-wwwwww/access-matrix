@@ -129,6 +129,7 @@ export default {
       retry: 'SSO 재시도',
       retrying: '확인 중...'
     },
+    tenantRecovered: '테넌트 "{stale}"이(가) 더 이상 존재하지 않아 기본 테넌트로 전환했습니다.',
     passwordBreakGlass: '비밀번호 로그인 모드(긴급용)',
     backToSso: 'SSO로 돌아가기',
     passwordModeHotzone: '2초 안에 5번 클릭하면 비밀번호 로그인 해제',
@@ -152,49 +153,130 @@ export default {
       },
       status: { active: '활성', suspended: '중단' },
       search: { placeholder: '코드 또는 이름으로 검색' },
-      softDeleteHint: {
-        title: '소프트 삭제 전용:',
-        body: '테넌트를 삭제하면 Keycloak realm 이 비활성화되어 사용자가 로그인할 수 없게 되지만, 비즈니스 데이터는 보존됩니다. 완전 삭제는 별도의 운영 절차로 수행합니다.'
-      },
-      tooltip: {
-        softDelete: '테넌트 소프트 삭제',
-        builtInLocked: '기본 제공 테넌트(system / demo)는 삭제할 수 없습니다'
-      },
-      confirm: {
-        deleteTitle: '테넌트 삭제',
-        deleteMessage: '"{displayName}"({tenantCode})을(를) 소프트 삭제하시겠습니까?\n\n• Keycloak realm 이 비활성화되어 사용자는 로그인할 수 없습니다\n• 비즈니스 데이터는 보존됩니다\n• 재활성화는 KC 관리 콘솔에서 수동으로 수행해야 합니다',
-        deleteConfirm: '소프트 삭제 실행'
-      },
-      button: { new: '신규 테넌트' },
-      message: {
-        loadFailed: '테넌트 목록 로드 실패',
-        createSuccess: '테넌트가 생성되었습니다',
-        createFailed: '테넌트 생성 실패',
-        deleteSuccess: '테넌트가 소프트 삭제되었습니다',
-        deleteFailed: '테넌트 삭제 실패'
+      recycleBinHint: {
+        title: '삭제는 휴지통 방식입니다:',
+        body: '먼저 "중단"하세요(Keycloak realm 이 비활성화되어 로그인할 수 없게 되지만 데이터는 유지됩니다). 정말로 삭제하려면 중단된 행에 나타나는 빨간 휴지통 아이콘을 사용하세요 — 테넌트 코드를 입력해 확인하면 비즈니스 데이터·KC realm·레지스트리 항목이 모두 물리적으로 삭제되며, 되돌릴 수 없습니다.'
       },
       edit: {
         titleCreate: '신규 테넌트',
+        titleEdit: '테넌트 편집',
         intro: '한 번의 작업으로 Keycloak realm 과 중앙 레지스트리 항목을 생성합니다. 테넌트 코드는 생성 후 변경할 수 없습니다.',
+        editIntro: '테넌트 코드는 변경할 수 없습니다. 표시명과 연락처 이메일만 수정할 수 있습니다.',
         label: {
           tenantCode: '테넌트 코드',
           displayName: '표시명',
-          contactEmail: '연락처 이메일'
+          contactEmail: '연락처 이메일',
+          adminUsername: '관리자 사용자명'
         },
         placeholder: {
           tenantCode: 'acme',
           displayName: 'Acme 주식회사',
-          contactEmail: 'admin@acme.example'
+          contactEmail: 'admin@acme.example',
+          adminUsername: 'admin'
         },
         hint: {
           tenantCode: '소문자 영숫자·하이픈(RFC1035 레이블). Keycloak realm 이름과 서브도메인으로 사용됩니다.',
-          contactEmail: '선택 - 첫 관리자 초대에 사용'
+          contactEmail: '선택 - 첫 관리자 초대에 사용',
+          adminUsername: '비워 두면 연락처 이메일의 로컬 부분에서 자동 생성되며, 나중에 변경할 수 있습니다.'
         },
         error: {
           invalidCode: '테넌트 코드는 소문자 RFC1035 레이블이어야 합니다(소문자 영숫자·하이픈)',
-          missingDisplayName: '표시명을 입력해 주세요'
+          missingDisplayName: '표시명을 입력해 주세요',
+          invalidAdminUsername: '관리자 사용자명은 소문자로 시작하고 소문자 영숫자·하이픈·밑줄만 사용할 수 있습니다'
         },
         saving: '저장 중...'
+      },
+      button: {
+        new: '신규 테넌트',
+        edit: '편집',
+        suspend: '중단',
+        resume: '재개'
+      },
+      tooltip: {
+        suspend: '테넌트 중단(Keycloak realm 비활성화, 되돌릴 수 있음)',
+        resume: '중단된 테넌트 재개',
+        edit: '테넌트 정보 편집',
+        builtInLocked: '기본 제공 테넌트(system / demo)는 변경할 수 없습니다'
+      },
+      hardDelete: {
+        title: '테넌트 완전 삭제',
+        tooltip: {
+          confirm: '테넌트 완전 삭제(비즈니스 데이터·KC realm·레지스트리 항목 모두 물리적으로 삭제)'
+        },
+        warning: {
+          title: '되돌릴 수 없습니다',
+          intro: '"{displayName}"({tenantCode})을(를) 완전히 삭제하려고 합니다. 다음 항목이 모두 영구적으로 사라집니다:',
+          dropBusiness: '이 테넌트에 연결된 모든 비즈니스 테이블 데이터(사용자·역할·부서·작업 등)',
+          dropRealm: 'Keycloak realm 자체(모든 사용자 / 세션 / 클라이언트 설정)',
+          dropRegistry: '중앙 레지스트리 항목(core_tenant)',
+          noUndo: '복구할 수 없으며, 백업에서 수동 복원만 가능합니다.'
+        },
+        label: {
+          typeCode: '확인을 위해 테넌트 코드 "{tenantCode}"를 정확히 입력하세요'
+        },
+        error: {
+          mismatch: '테넌트 코드가 일치하지 않습니다'
+        },
+        button: {
+          confirm: '완전 삭제',
+          deleting: '삭제 중...'
+        },
+        message: {
+          success: '테넌트 "{tenantCode}"를 완전히 삭제했습니다',
+          failed: '테넌트 완전 삭제 실패'
+        }
+      },
+      confirm: {
+        suspendTitle: '테넌트 중단',
+        suspendMessage: '"{displayName}"({tenantCode})을(를) 중단하시겠습니까?\n\n• Keycloak realm 이 비활성화되어 로그인할 수 없습니다\n• "재개" 버튼으로 언제든지 복구할 수 있습니다',
+        suspendConfirm: '중단',
+        resumeTitle: '테넌트 재개',
+        resumeMessage: '"{displayName}"({tenantCode})을(를) 재개하시겠습니까?\n\nKeycloak realm 이 다시 활성화되어 로그인을 받습니다.',
+        resumeConfirm: '재개'
+      },
+      support: {
+        tooltip: {
+          start: '지원 세션 시작(이 테넌트의 SUPER_ADMIN 권한으로 30분간 작업)',
+          disabledSuspended: '중단된 테넌트는 지원 세션을 시작할 수 없습니다'
+        },
+        dialog: {
+          title: '지원 세션 시작',
+          warning: {
+            title: '고권한 작업 확인',
+            body: '{displayName}({tenantCode})의 SUPER_ADMIN 으로 30분간 작업합니다.\n이 세션 중의 모든 작업은 감사 로그에 "[support] <사용자명>"으로 기록됩니다.'
+          },
+          reasonLabel: '사유(필수)',
+          reasonPlaceholder: '예: OS-1234 사용자 보고 문제 재현 확인',
+          reasonHint: '감사 로그(core_oplog.request_body)에 저장됩니다. 구체적으로 작성하세요.',
+          ttlNote: '세션은 30분 후 자동으로 만료됩니다(연장 불가)',
+          auditNote: '모든 작업이 감사 로그에 기록됩니다',
+          writeNote: '읽기 전용 모드는 미구현(쓰기도 가능) — 신중하게 진행하세요',
+          starting: '시작 중...',
+          confirm: '지원 세션 시작'
+        },
+        banner: {
+          acting: '지원 세션 진행 중: {displayName}({tenantCode})',
+          note: '모든 작업이 감사 로그에 기록됩니다'
+        },
+        button: {
+          terminate: '세션 종료'
+        },
+        message: {
+          started: '지원 세션을 시작했습니다({tenantCode})',
+          startFailed: '지원 세션 시작 실패',
+          terminated: '지원 세션을 종료했습니다'
+        }
+      },
+      message: {
+        createSuccess: '테넌트를 생성하고 초대 이메일을 보냈습니다',
+        createFailed: '테넌트 생성 실패',
+        loadFailed: '테넌트 목록 로드 실패',
+        suspendSuccess: '테넌트를 중단했습니다',
+        suspendFailed: '테넌트 중단 실패',
+        resumeSuccess: '테넌트를 재개했습니다',
+        resumeFailed: '테넌트 재개 실패',
+        updateSuccess: '테넌트 정보를 업데이트했습니다',
+        updateFailed: '테넌트 정보 업데이트 실패'
       }
     }
   },

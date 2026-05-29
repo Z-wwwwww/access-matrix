@@ -153,49 +153,130 @@ export default {
       },
       status: { active: 'Active', suspended: 'Suspended' },
       search: { placeholder: 'Search by code or name' },
-      softDeleteHint: {
-        title: 'Soft delete only:',
-        body: 'Deleting a tenant disables its Keycloak realm (users can no longer sign in) but preserves the business data. Hard delete is a separate ops procedure.'
-      },
-      tooltip: {
-        softDelete: 'Soft-delete tenant',
-        builtInLocked: 'Built-in tenants (system / demo) cannot be deleted'
-      },
-      confirm: {
-        deleteTitle: 'Delete tenant',
-        deleteMessage: 'Soft-delete "{displayName}" ({tenantCode})?\n\n• The Keycloak realm will be disabled — users cannot sign in\n• Business data is preserved\n• Re-enabling requires manual intervention in the KC admin console',
-        deleteConfirm: 'Soft delete'
-      },
-      button: { new: 'New tenant' },
-      message: {
-        loadFailed: 'Failed to load tenants',
-        createSuccess: 'Tenant created',
-        createFailed: 'Tenant creation failed',
-        deleteSuccess: 'Tenant soft-deleted',
-        deleteFailed: 'Tenant deletion failed'
+      recycleBinHint: {
+        title: 'Deletion is a recycle-bin flow:',
+        body: 'Suspend first (the KC realm is disabled and sign-in is blocked, but data is kept). To truly delete, use the red trash icon that appears on a suspended row — after confirming by typing the tenant code, the business data, KC realm and registry row are all permanently removed. This cannot be undone.'
       },
       edit: {
         titleCreate: 'New tenant',
+        titleEdit: 'Edit tenant',
         intro: 'Creates the Keycloak realm + central registry row in one action. The tenant code cannot be changed after creation.',
+        editIntro: 'The tenant code cannot be changed. Only the display name and contact email can be updated.',
         label: {
           tenantCode: 'Tenant code',
           displayName: 'Display name',
-          contactEmail: 'Contact email'
+          contactEmail: 'Contact email',
+          adminUsername: 'Admin username'
         },
         placeholder: {
           tenantCode: 'acme',
           displayName: 'Acme Corp.',
-          contactEmail: 'admin@acme.example'
+          contactEmail: 'admin@acme.example',
+          adminUsername: 'admin'
         },
         hint: {
           tenantCode: 'Lowercase RFC1035 label (a-z, 0-9, hyphen). Used as the Keycloak realm name and the subdomain.',
-          contactEmail: 'Optional — used to invite the first admin'
+          contactEmail: 'Optional — used to invite the first admin',
+          adminUsername: 'Auto-generated from the local part of the contact email if left blank. Can be changed later.'
         },
         error: {
           invalidCode: 'Tenant code must be a lowercase RFC1035 label (a-z, 0-9, hyphen)',
-          missingDisplayName: 'Display name is required'
+          missingDisplayName: 'Display name is required',
+          invalidAdminUsername: 'Admin username must start with a lowercase letter and contain only lowercase letters, digits, hyphens and underscores'
         },
         saving: 'Saving...'
+      },
+      button: {
+        new: 'New tenant',
+        edit: 'Edit',
+        suspend: 'Suspend',
+        resume: 'Resume'
+      },
+      tooltip: {
+        suspend: 'Suspend tenant (disables the Keycloak realm, reversible)',
+        resume: 'Resume a suspended tenant',
+        edit: 'Edit tenant details',
+        builtInLocked: 'Built-in tenants (system / demo) cannot be changed'
+      },
+      hardDelete: {
+        title: 'Permanently delete tenant',
+        tooltip: {
+          confirm: 'Permanently delete tenant (business data, KC realm and registry row all physically removed)'
+        },
+        warning: {
+          title: 'This cannot be undone',
+          intro: 'You are about to permanently delete "{displayName}" ({tenantCode}). All of the following will be erased forever:',
+          dropBusiness: 'All business table rows tied to this tenant (users, roles, departments, tasks, etc.)',
+          dropRealm: 'The Keycloak realm itself (all users / sessions / client configuration)',
+          dropRegistry: 'The central registry row (core_tenant)',
+          noUndo: 'No recovery is possible — only a manual restore from backup.'
+        },
+        label: {
+          typeCode: 'To confirm, type the tenant code "{tenantCode}" exactly'
+        },
+        error: {
+          mismatch: 'Tenant code does not match'
+        },
+        button: {
+          confirm: 'Permanently delete',
+          deleting: 'Deleting...'
+        },
+        message: {
+          success: 'Tenant "{tenantCode}" permanently deleted',
+          failed: 'Permanent tenant deletion failed'
+        }
+      },
+      confirm: {
+        suspendTitle: 'Suspend tenant',
+        suspendMessage: 'Suspend "{displayName}" ({tenantCode})?\n\n• The Keycloak realm will be disabled and sign-in blocked\n• You can restore it anytime with the "Resume" button',
+        suspendConfirm: 'Suspend',
+        resumeTitle: 'Resume tenant',
+        resumeMessage: 'Resume "{displayName}" ({tenantCode})?\n\nThe Keycloak realm will be re-enabled and accept sign-in again.',
+        resumeConfirm: 'Resume'
+      },
+      support: {
+        tooltip: {
+          start: 'Start a support session (operate with this tenant\'s SUPER_ADMIN rights for 30 minutes)',
+          disabledSuspended: 'Cannot start a support session for a suspended tenant'
+        },
+        dialog: {
+          title: 'Start support session',
+          warning: {
+            title: 'High-privilege action',
+            body: 'You will operate as SUPER_ADMIN of {displayName} ({tenantCode}) for 30 minutes.\nEvery action during this session is recorded in the audit log as "[support] <your username>".'
+          },
+          reasonLabel: 'Reason (required)',
+          reasonPlaceholder: 'e.g. OS-1234 reproduce the user-reported issue',
+          reasonHint: 'Saved to the audit log (core_oplog.request_body). Please be specific.',
+          ttlNote: 'The session expires automatically after 30 minutes (no extension)',
+          auditNote: 'Every action is recorded in the audit log',
+          writeNote: 'Read-only mode is not implemented (writes are possible) — proceed carefully',
+          starting: 'Starting...',
+          confirm: 'Start support session'
+        },
+        banner: {
+          acting: 'Support session active: {displayName} ({tenantCode})',
+          note: 'Every action is recorded in the audit log'
+        },
+        button: {
+          terminate: 'End session'
+        },
+        message: {
+          started: 'Support session started ({tenantCode})',
+          startFailed: 'Failed to start support session',
+          terminated: 'Support session ended'
+        }
+      },
+      message: {
+        createSuccess: 'Tenant created and invitation email sent',
+        createFailed: 'Tenant creation failed',
+        loadFailed: 'Failed to load tenants',
+        suspendSuccess: 'Tenant suspended',
+        suspendFailed: 'Tenant suspend failed',
+        resumeSuccess: 'Tenant resumed',
+        resumeFailed: 'Tenant resume failed',
+        updateSuccess: 'Tenant details updated',
+        updateFailed: 'Tenant update failed'
       }
     }
   },
