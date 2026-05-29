@@ -61,6 +61,14 @@ public class KeycloakProvisionerSeeder {
     private static final String CREATE_REALM_ROLE = "create-realm";
     /** Client roles needed on each managed realm's {@code <realm>-realm} client. */
     private static final List<String> MANAGED_REALM_ROLES = List.of("manage-users", "view-users");
+    /**
+     * The throwaway provisioner secret shipped as the dev default in
+     * application.yml. Detecting it at boot lets us scream if it ever reaches a
+     * real deployment — a create-realm service account guarded by a
+     * publicly-known secret is a serious hole. Keep in sync with
+     * {@code app.keycloak.admin.client-secret}'s default.
+     */
+    private static final String DEV_DEFAULT_SECRET = "dev-provisioner-secret-change-in-prod";
 
     private final AppKeycloakProperties props;
     private final KeycloakAdminClientFactory factory;
@@ -81,6 +89,15 @@ public class KeycloakProvisionerSeeder {
         AppKeycloakProperties.Admin admin = props.admin();
         String provClientId = admin.clientId();
         String provSecret = admin.clientSecret();
+
+        // Un-ignorable runtime flag: the dev-default secret must never reach a
+        // real deployment. Fires on every boot that still uses it — harmless
+        // noise in local dev, a loud red flag in prod logs.
+        if (DEV_DEFAULT_SECRET.equals(provSecret)) {
+            log.warn("[kc-provisioner] ⚠️ using the DEV-DEFAULT provisioner secret — fine for "
+                    + "local dev, but NEVER for production. Set CORE_KEYCLOAK_PROVISIONER_SECRET "
+                    + "to a strong vault value (openssl rand -base64 32).");
+        }
 
         try (Keycloak kc = factory.bootstrapClient()) {
             RealmResource master = kc.realm(admin.realm());
