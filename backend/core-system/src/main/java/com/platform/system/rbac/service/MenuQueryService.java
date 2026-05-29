@@ -24,9 +24,11 @@ import java.util.stream.Collectors;
  *
  * <p>Algorithm:
  * <ol>
- *   <li>If the user holds {@code *:*} we return the full visible menu tree
- *       (every {@code mark=1, status=1} entry). Cheaper than maintaining
- *       a {@code role_menu} link to every menu, and admins should auto-see
+ *   <li>If the user holds either super-wildcard — {@code *:*} (platform
+ *       super) or {@code tenant:*} (business-tenant super) — we return the
+ *       full visible menu tree for the current tenant (every
+ *       {@code mark=1, status=1} entry). Cheaper than maintaining a
+ *       {@code role_menu} link to every menu, and admins should auto-see
  *       new menus the moment they are created.</li>
  *   <li>Otherwise we collect the user's directly-authorised menus via
  *       {@code core_rbac_role_menu}, then back-fill the parent chain so the
@@ -58,7 +60,17 @@ public class MenuQueryService {
         String tenantId = com.platform.core.common.context.RequestContext.tenantIdOrDefault();
         Set<String> perms = permissionQueryService.loadUserPermissions(userId);
         List<MenuEntity> flat;
-        if (perms.contains(PermissionMatcher.SUPER)) {
+        // Either super-wildcard sees the whole (tenant-scoped) menu tree:
+        //   - *:*       PLATFORM super (PLATFORM_ADMIN) — all menus in the
+        //                system tenant they operate in.
+        //   - tenant:*  TENANT super (business SUPER_ADMIN) — all menus in
+        //                their business tenant.
+        // Both mean "this user owns everything visible in this tenant", so
+        // they auto-see new menus without a role_menu link. Checking only
+        // *:* here (the original) silently gave business super-admins an
+        // empty menu, since they hold tenant:*, not *:*.
+        if (perms.contains(PermissionMatcher.SUPER)
+                || perms.contains(PermissionMatcher.TENANT_SUPER)) {
             flat = menuMapper.findAllVisible(tenantId);
         } else {
             List<MenuEntity> direct = menuMapper.findMenusByUserId(userId, tenantId);

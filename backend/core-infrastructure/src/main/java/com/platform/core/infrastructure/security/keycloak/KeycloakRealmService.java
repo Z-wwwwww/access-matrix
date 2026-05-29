@@ -311,6 +311,13 @@ public class KeycloakRealmService {
         // It accepts an InputStream of JSON and returns a fully-shaped
         // RealmRepresentation. The KC team ships this exact helper for
         // realm imports, so we're using it the way it was intended.
+        //
+        // Strict parse (fail-on-unknown) is intentional: keycloak-admin-client
+        // is pinned to MATCH the server version (see backend/pom.xml), so the
+        // template's fields are all modelled and any unknown field signals a
+        // real problem — a typo in the template or a forgotten client/server
+        // version bump — that we want to surface loudly rather than silently
+        // drop. If you upgrade the Keycloak server, bump the client to match.
         try {
             return org.keycloak.util.JsonSerialization.readValue(
                     new java.io.ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)),
