@@ -70,7 +70,7 @@ public class DataScopeAspect {
 
     private boolean isStrict() {
         for (String p : env.getActiveProfiles()) {
-            if ("local".equalsIgnoreCase(p) || "dev".equalsIgnoreCase(p) || "test".equalsIgnoreCase(p)) {
+            if ("dev".equalsIgnoreCase(p) || "test".equalsIgnoreCase(p)) {
                 return true;
             }
         }

@@ -249,7 +249,7 @@ public class PermissionConsistencyGuard {
         if (activeProfile == null || activeProfile.isBlank()) return false;
         return Arrays.stream(activeProfile.split(","))
                 .map(String::trim)
-                .anyMatch(p -> p.equalsIgnoreCase("dev") || p.equalsIgnoreCase("local"));
+                .anyMatch(p -> p.equalsIgnoreCase("dev"));
     }
 
     private void die(String msg) {

@@ -12,7 +12,7 @@ import java.lang.annotation.Target;
  * <p>Enforcement at runtime is wired through {@code DataScopeAspect}: any
  * annotated method invocation whose query-wrapper argument has not been
  * passed through {@code DataScopeHelper.apply(...)} in the current request
- * is rejected (strict profiles: {@code local} / {@code dev} / {@code test})
+ * is rejected (strict profiles: {@code dev} / {@code test})
  * or logged as {@code WARN} (prod). Service authors thus get an immediate
  * failure when they forget the scope filter — no silent "all rows" leak.
  *

@@ -208,35 +208,6 @@ app:
 
 ---
 
-## 模式翻转自动触发（opt-in）
-
-如果你更喜欢 "翻一下模式就完事"、不要第二个开关：
-
-```yaml
-app:
-  security:
-    mode: password       # or oidc — either direction works
-  migration:
-    auto-on-mode-flip: true    # off by default; opt-in per environment
-    tenants: demo
-```
-
-`ModeFlipDetector` 从 `core_meta.security.last_applied_mode`
-读取上次生效的模式，与当前模式比较，并派发对应方向的迁移。
-不需要 `run-on-startup`。
-
-注意事项：
-
-- 出于安全默认关闭 —— 在开发环境一个随手的模式翻转就让上千用户被群发邮件，
-  比生产环境多一行配置要糟糕得多。
-- 涉及 `permit-all` 的转换被忽略（不执行迁移，只重置基线）。
-- 第一次启动被视作 "无基线，只记录当前" —— 第一次真正的迁移必须显式触发。
-  之后的翻转会被自动派发。
-- 检测器在 `Ordered.LOWEST_PRECEDENCE` 上运行，所以它看到的是 Flyway 之后、
-  seeder 之后的状态。
-
----
-
 ## 回滚（窗口期内）
 
 反向迁移在用户开始完成重置流程之前是完全可逆的。具体来说：
@@ -312,7 +283,6 @@ V24 还会添加 `core_password_reset_token` 表；没有它，
 - [migration-password-to-sso.zh-CN.md](migration-password-to-sso.zh-CN.md) —— 正向方向
 - `backend/.../bootstrap/migration/SsoToPasswordMigrationService.java` —— 核心逻辑
 - `backend/.../bootstrap/migration/PasswordToSsoMigrationRunner.java` —— 启动钩子（同时处理两个方向）
-- `backend/.../bootstrap/migration/ModeFlipDetector.java` —— `auto-on-mode-flip` 自动检测
 - `backend/.../auth/controller/PasswordResetController.java` —— 免鉴权端点
 - `backend/core-bootstrap/src/main/resources/db/migration/V24__core_password_reset_and_nullable_pwhash.sql` —— 表结构
 - `frontend/src/views/login/ResetPasswordAccept.vue` —— 前端落地页

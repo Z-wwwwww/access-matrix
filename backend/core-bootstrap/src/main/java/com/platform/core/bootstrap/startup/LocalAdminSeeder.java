@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 import java.util.Locale;
 
 @Component
-@Profile("local")
+@Profile("dev")
 public class LocalAdminSeeder {
 
     /** The demo (business) tenant this seeder populates — matches the realm name. */

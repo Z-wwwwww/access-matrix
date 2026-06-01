@@ -20,7 +20,7 @@
             <groupId>com.platform</groupId>
             <artifactId>core-infrastructure</artifactId>
         </dependency>
-        <!-- DemoSeeder (local profile) needs the UserEntity / mappers from core-system -->
+        <!-- DemoSeeder (dev profile) needs the UserEntity / mappers from core-system -->
         <dependency>
             <groupId>com.platform</groupId>
             <artifactId>core-system</artifactId>

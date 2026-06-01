@@ -53,9 +53,9 @@ git clone <your-fork-url> access-matrix && cd access-matrix
 psql -h 127.0.0.1 -U postgres \
   -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
 
-# 3. 后端（local profile，自动建表 + 种 demo-admin/demo-admin）
+# 3. 后端（dev profile，自动建表 + 种 demo-admin/demo-admin）
 cd backend
-./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local
+./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
 
 # 4. 前端（另开终端）
 cd frontend
@@ -145,7 +145,7 @@ npm install && npm run dev
 
 > 两个 super-wildcard **对称豁免、互不覆盖** —— 业务超管不能调 `/platform/*`，平台管理员不能随意假冒业务用户（必须走带审计的"支持会话"）。
 
-### 种子用户（仅 `@Profile("local")` 创建；prod / dev 部署完全空表）
+### 种子用户（仅 `@Profile("dev")` 创建；prod / test 部署完全空表）
 
 | Realm | 账号 | 密码 | 角色 / 部门 |
 |---|---|---|---|

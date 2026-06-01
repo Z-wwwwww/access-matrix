@@ -38,7 +38,7 @@ psql -h 127.0.0.1 -U postgres \
   -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
 ```
 
-> The name `new_inntouch_core` is a historical project name. If you rename it, also update `spring.datasource.url` in `application-local.yml`.
+> The name `new_inntouch_core` is a historical project name. If you rename it, also update `spring.datasource.url` in the `dev` section of `application.yml`.
 
 ### 2.2 (Optional) Create the Keycloak schema
 
@@ -72,18 +72,18 @@ Keycloak stores its internal tables in this schema, physically separated from th
 
 ---
 
-## 3. Start the backend (local profile)
+## 3. Start the backend (dev profile)
 
 ```bash
 cd backend
-./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local
+./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 Windows PowerShell:
 
 ```powershell
 cd backend
-.\mvnw.cmd -pl core-bootstrap -am spring-boot:run "-Dspring-boot.run.profiles=local"
+.\mvnw.cmd -pl core-bootstrap -am spring-boot:run "-Dspring-boot.run.profiles=dev"
 ```
 
 **Expected tail of the output**:
@@ -92,16 +92,16 @@ cd backend
 ============================================================
   CORE-SERVICE is READY
 ------------------------------------------------------------
-  profile        : local
+  profile        : dev
   port           : 9135
   context-path   : /api
-  security.mode  : permit-all   (or oidc, depending on application-local.yml)
+  security.mode  : oidc          (per the active profile in application.yml)
 ============================================================
 LocalAdminSeeder: ensured demo-admin user (id=...) is bound to SUPER_ADMIN role
 SystemAdminSeeder: linked ops user to PLATFORM_ADMIN role
 ```
 
-**What the first startup does** (`local` profile):
+**What the first startup does** (`dev` profile):
 
 | Stage | Action |
 |---|---|
@@ -111,7 +111,7 @@ SystemAdminSeeder: linked ops user to PLATFORM_ADMIN role
 | `DemoSeeder` | Seeds five data-scope demo users (all with password `demo123`) plus 15 demo tasks. |
 | `*KeycloakAdminSeeder` | In OIDC mode, syncs both admin accounts into the matching Keycloak realm. |
 
-The full initial role / user matrix is in [README · Seed data](../README.md#-初始化与演示数据). Every seeder is `@Profile("local")` — **prod and dev deployments run only the migrations and seed no users**.
+The full initial role / user matrix is in [README · Seed data](../README.md#-初始化与演示数据). Every seeder is `@Profile("dev")` — **prod (and test) deployments run only the migrations and seed no users**.
 
 ---
 
@@ -172,7 +172,7 @@ For details on Keycloak configuration see [infra/keycloak/README.md](../infra/ke
 
 ### 5.3 Switch to OIDC mode
 
-Edit `backend/core-bootstrap/src/main/resources/application-local.yml`:
+The `dev` profile already defaults to `mode: oidc` (in the `dev` section of `backend/core-bootstrap/src/main/resources/application.yml`). If you set it to `permit-all` for IdP-free boot, switch it back:
 
 ```diff
 app:
@@ -230,7 +230,7 @@ $env:CORE_MAIL_ENABLED = "true"
 $env:CORE_MAIL_FROM = "your-name@your-company.com"
 ```
 
-Or drop them into `application-local.yml` (**never commit the password**):
+Or put the non-secret bits into the `dev` section of `application.yml` (keep the password in an env var / untracked file — `application.yml` is committed):
 
 ```yaml
 spring:
@@ -286,7 +286,7 @@ npm run test:e2e      # playwright (both backend and frontend must be running)
 
 **Cause**: `SPRING_PROFILES_ACTIVE` is unset, so the fail-closed prod default kicks in — and prod requires external env vars.
 
-**Fix**: add `-Dspring-boot.run.profiles=local` to the startup command, or set `$env:SPRING_PROFILES_ACTIVE = "local"`.
+**Fix**: add `-Dspring-boot.run.profiles=dev` to the startup command, or set `$env:SPRING_PROFILES_ACTIVE = "dev"`.
 
 ### 8.2 SSO sign-in page says `Invalid parameter: redirect_uri`
 

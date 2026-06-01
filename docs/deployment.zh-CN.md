@@ -54,7 +54,7 @@
 
 | 变量 | 必需 | 说明 | 例 |
 |---|---|---|---|
-| `SPRING_PROFILES_ACTIVE` | 必需 | `prod` / `dev` / `staging`。默认 `prod`（fail-closed） | `prod` |
+| `SPRING_PROFILES_ACTIVE` | 必需 | `prod` / `dev` / `test`。默认 `prod`（fail-closed） | `prod` |
 | `CORE_DB_URL` | 必需 | JDBC URL | `jdbc:postgresql://pg-prod:5432/access_matrix?stringtype=unspecified` |
 | `CORE_DB_USERNAME` | 必需 | DB 用户名 | `access_matrix_app` |
 | `CORE_DB_PASSWORD` | 必需 | DB 密码（推荐 secret manager 注入） | |
@@ -343,7 +343,7 @@ readinessProbe:
 - [ ] Keycloak Realm settings → Brute Force Detection 启用
 - [ ] CORS `CORE_CORS_ALLOWED_ORIGINS` 严格列举（不要用 `*`）
 - [ ] 反代加 `X-Frame-Options: SAMEORIGIN`、`Content-Security-Policy`、HSTS
-- [ ] application.yml / application-local.yml 里**没有** SMTP / DB / JWT 密码硬编码
+- [ ] `application.yml` 里**没有**硬编码的*生产* SMTP / DB / JWT 密钥（`dev` 段的本地一次性凭据无所谓；prod/dev 段用无默认 `${VAR}`）
 - [ ] Redis 启 AUTH，外网不可达
 - [ ] PG `pg_hba.conf` 限制 `md5` / `scram-sha-256`，不允许 `trust`
 - [ ] 全套日志 → 集中日志系统（不要 disk-only，磁盘满了你瞎了）

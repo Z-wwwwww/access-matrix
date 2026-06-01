@@ -23,8 +23,8 @@ The backend's `app.security.mode` decides which mode is active. In SSO mode both
 
 | Mode | Username | Password |
 |---|---|---|
-| Password (local profile) | `admin` | `admin` |
-| SSO (local profile) | `admin` | `admin` (created automatically at startup by `LocalKeycloakAdminSeeder`) |
+| Password (dev profile) | `admin` | `admin` |
+| SSO (dev profile) | `admin` | `admin` (created automatically at startup by `LocalKeycloakAdminSeeder`) |
 
 After signing in you land on the admin console. On a first SSO sign-in, `OidcJitUserService` automatically binds the Keycloak user to the business system's admin row (it writes `keycloak_id`).
 
@@ -219,7 +219,7 @@ When a user has multiple roles, **the data scope is the union** (the wider one w
 
 ### 4.3 Demo
 
-The `local` profile seeds five demo users and 15 task rows to illustrate all five scopes. See [data-scope demo](data-scope-demo.md) for the full walkthrough.
+The `dev` profile seeds five demo users and 15 task rows to illustrate all five scopes. See [data-scope demo](data-scope-demo.md) for the full walkthrough.
 
 ---
 

@@ -53,7 +53,7 @@ import java.util.Locale;
  * </pre>
  */
 @Component
-@Profile("local")
+@Profile("dev")
 public class DemoSeeder {
 
     private static final Logger log = LoggerFactory.getLogger(DemoSeeder.class);

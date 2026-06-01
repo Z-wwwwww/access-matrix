@@ -7,9 +7,9 @@
 ## 一键启动
 
 ```bash
-# 后端（local profile 会同时跑 LocalAdminSeeder + DemoSeeder）
+# 后端（dev profile 会同时跑 LocalAdminSeeder + DemoSeeder）
 cd access-matrix
-mvn -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local
+mvn -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
 
 # 前端
 cd access-matrix-front
@@ -81,7 +81,7 @@ DataScopeHelper.apply(w, decision, TaskEntity::getDeptId, TaskEntity::getCreateU
 Page<TaskEntity> result = taskMapper.selectPage(p, w);
 ```
 
-`@DataScope` 注解只是**门禁**：service 忘了调 `apply` 时，dev/local/test profile 会抛 `INTERNAL_ERROR` 把问题在第一次集成时暴露出来；prod 仅 WARN 不中断业务。
+`@DataScope` 注解只是**门禁**：service 忘了调 `apply` 时，dev/test profile 会抛 `INTERNAL_ERROR` 把问题在第一次集成时暴露出来；prod 仅 WARN 不中断业务。
 
 ## 复位
 

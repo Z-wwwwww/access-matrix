@@ -144,14 +144,15 @@ core-bootstrap/
     CoreApplication.java       @SpringBootApplication, main()
     startup/
       AuthSchemaBootstrap      startup sanity check
-      LocalAdminSeeder         seeds demo-admin/demo-admin user in dev (@Profile("local"))
+      LocalAdminSeeder         seeds demo-admin/demo-admin user in dev (@Profile("dev"))
       FlywayRepairConfig       FlywayMigrationStrategy bean, repair() + migrate()
   src/main/resources/
-    application.yml            shared config (mybatis-plus / management / actuator / springdoc)
-    application-local.yml      local (security.mode=permit-all, tenant.enabled=false, log expose-error-details=true)
-    application-dev.yml        staging (security.mode=jwt, tenant.enabled=true)
-    application-prod.yml       production (same as dev + Redis SSL)
-    application-test.yml       for junit
+    application.yml            shared base defaults (mybatis-plus / management / actuator /
+                                 springdoc; security.mode=oidc fail-closed default)
+    application-dev.yml        development (oidc, localhost DB, tenant on, cors *,
+                                 expose-error-details=true; @Profile("dev") seeders run here)
+    application-test.yml       test / junit (jwt, env-driven DB, no Keycloak)
+    application-prod.yml       production (oidc, Redis SSL, Swagger off; secrets as no-default ${VAR})
     db/migration/V*.sql        Flyway migrations (rules in the "Flyway" section)
     log4j2-spring.xml          logging config (MDC: traceId / tenantId / userId)
 ```
@@ -293,7 +294,7 @@ If you prefer (or need) to do it by hand, the DO / DON'T below is the spec.
 
 ## Multi-tenant
 
-- Switch: `app.mybatis.tenant.enabled`; local profile = false, dev/prod = true
+- Switch: `app.mybatis.tenant.enabled`; on in all profiles (fail-closed base default = true)
 - Resolution:
   - Authenticated requests: `CoreRequestContextFilter` reads from the JWT `tid` claim → writes to `RequestContext`
   - Unauthenticated requests: fall back to the `X-Tenant-Id` header, then to `default`
@@ -324,7 +325,7 @@ Five presets:
    DataScopeHelper.apply(w, dec, Foo::getDeptId, Foo::getCreateUser);
    return mapper.selectPage(page, w);
    ```
-4. `DataScopeAspect` verifies, prior to the Mapper call, that this request invoked `apply()` — **if not, throw 500 in local/dev/test and log a WARN in prod**.
+4. `DataScopeAspect` verifies, prior to the Mapper call, that this request invoked `apply()` — **if not, throw 500 in dev/test and log a WARN in prod**.
 
 See: `DataScopeHelper` / `DataScopeContext` / `DataScopeAspect`.
 
@@ -365,10 +366,9 @@ There is no `src/test` yet. Conventions for adding tests:
 
 | profile | security.mode | tenant | refresh-cookie.secure | debug.expose-error-details |
 |---------|---------------|--------|------------------------|----------------------------|
-| local   | permit-all    | off    | false                  | true                       |
-| dev     | jwt           | on     | true                   | false                      |
-| prod    | jwt           | on     | true (Redis SSL)       | false                      |
-| test    | (junit)       | -      | -                      | -                          |
+| dev     | oidc          | on     | false                  | true                       |
+| test    | jwt           | on     | true (base)            | false                      |
+| prod    | oidc          | on     | true (Redis SSL)       | false                      |
 
 ---
 

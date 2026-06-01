@@ -38,7 +38,7 @@ psql -h 127.0.0.1 -U postgres \
   -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
 ```
 
-> 名字 `new_inntouch_core` 是项目历史遗留命名。如要改，同时改 `application-local.yml` 的 `spring.datasource.url`。
+> 名字 `new_inntouch_core` 是项目历史遗留命名。如要改，同时改 `application.yml` 里 `dev` 段的 `spring.datasource.url`。
 
 ### 2.2 （可选）创建 Keycloak 用 schema
 
@@ -72,18 +72,18 @@ Keycloak 用这个 schema 存自己的内部表，跟应用业务表（`public` 
 
 ---
 
-## 3. 启动后端（local profile）
+## 3. 启动后端（dev profile）
 
 ```bash
 cd backend
-./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local
+./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 Windows PowerShell：
 
 ```powershell
 cd backend
-.\mvnw.cmd -pl core-bootstrap -am spring-boot:run "-Dspring-boot.run.profiles=local"
+.\mvnw.cmd -pl core-bootstrap -am spring-boot:run "-Dspring-boot.run.profiles=dev"
 ```
 
 **期望输出末尾**：
@@ -92,16 +92,16 @@ cd backend
 ============================================================
   CORE-SERVICE is READY
 ------------------------------------------------------------
-  profile        : local
+  profile        : dev
   port           : 9135
   context-path   : /api
-  security.mode  : permit-all   (or oidc, depending on application-local.yml)
+  security.mode  : oidc          (per the active profile in application.yml)
 ============================================================
 LocalAdminSeeder: ensured demo-admin user (id=...) is bound to SUPER_ADMIN role
 SystemAdminSeeder: linked ops user to PLATFORM_ADMIN role
 ```
 
-**首次启动会做的事**（`local` profile）：
+**首次启动会做的事**（`dev` profile）：
 
 | 阶段 | 动作 |
 |---|---|
@@ -111,7 +111,7 @@ SystemAdminSeeder: linked ops user to PLATFORM_ADMIN role
 | `DemoSeeder` | 种 5 个数据范围演示用户（密码统一 `demo123`）+ 15 条演示 task |
 | `*KeycloakAdminSeeder` | OIDC 模式下，把上面两个管理账号同步到 Keycloak 对应 realm |
 
-完整初始角色 / 用户矩阵见 [README · 初始化与演示数据](../README.md#-初始化与演示数据)。所有种子都是 `@Profile("local")` —— **prod / dev 部署只跑迁移，不种任何用户**。
+完整初始角色 / 用户矩阵见 [README · 初始化与演示数据](../README.md#-初始化与演示数据)。所有种子都是 `@Profile("dev")` —— **prod / test 部署只跑迁移，不种任何用户**。
 
 ---
 
@@ -172,7 +172,7 @@ infra/keycloak/start-keycloak.sh
 
 ### 5.3 切到 OIDC 模式
 
-编辑 `backend/core-bootstrap/src/main/resources/application-local.yml`：
+`dev` profile 默认就是 `mode: oidc`（在 `backend/core-bootstrap/src/main/resources/application.yml` 的 `dev` 段）。若你为了免 IdP 裸跑改成了 `permit-all`，改回来：
 
 ```diff
 app:
@@ -230,7 +230,7 @@ $env:CORE_MAIL_ENABLED = "true"
 $env:CORE_MAIL_FROM = "your-name@your-company.com"
 ```
 
-或者写进 `application-local.yml`（**不要提交 password**）：
+或者把非敏感项写进 `application.yml` 的 `dev` 段（password 仍放环境变量 / 未提交文件——`application.yml` 会被提交）：
 
 ```yaml
 spring:
@@ -286,7 +286,7 @@ npm run test:e2e      # playwright（需要前后端都在跑）
 
 **原因**：`SPRING_PROFILES_ACTIVE` 没设，走了 fail-closed 的 prod 默认，但 prod 要求外部环境变量。
 
-**修**：启动时加 `-Dspring-boot.run.profiles=local`，或者设环境变量 `$env:SPRING_PROFILES_ACTIVE = "local"`。
+**修**：启动时加 `-Dspring-boot.run.profiles=dev`，或者设环境变量 `$env:SPRING_PROFILES_ACTIVE = "dev"`。
 
 ### 8.2 SSO 登录页报 `Invalid parameter: redirect_uri`
 

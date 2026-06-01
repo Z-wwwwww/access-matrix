@@ -39,7 +39,7 @@ import org.springframework.stereotype.Component;
  *   5. RequestContext.userId = that ULID → admin has full perms immediately.
  * </pre>
  *
- * <p>Dev only (@Profile local + mode=oidc). Prod uses a properly-managed
+ * <p>Dev only (@Profile dev + mode=oidc). Prod uses a properly-managed
  * IdP — bootstrap admins there come from infra/IT processes, not from
  * application startup hooks.
  *
@@ -50,7 +50,7 @@ import org.springframework.stereotype.Component;
  * not mistaken for a successful boot.
  */
 @Component
-@Profile("local")
+@Profile("dev")
 @ConditionalOnProperty(name = "app.security.mode", havingValue = "oidc")
 public class LocalKeycloakAdminSeeder {
 

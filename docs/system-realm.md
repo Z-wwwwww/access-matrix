@@ -58,7 +58,7 @@ mirrors `demo`. Strict bits live exclusively on session/lockout.
 | `core_auth_user.tenant_id='system'` rows | Postgres | Platform-ops users live here, one row per staff member |
 | `PLATFORM_ADMIN` role | `core_rbac_role` under tenant `system` | Seeded by V26 with ULID `00000000000000000000ROLE50` |
 | `platform:*` wildcard permission | `core_rbac_permission` under tenant `system` | Seeded by V26 |
-| Default ops user (dev only) | `ops` / `ops` | Seeded by `SystemAdminSeeder` + `SystemKeycloakAdminSeeder` under `@Profile("local")` |
+| Default ops user (dev only) | `ops` / `ops` | Seeded by `SystemAdminSeeder` + `SystemKeycloakAdminSeeder` under `@Profile("dev")` |
 
 ## Permission model — `*:*` vs `tenant:*`
 
@@ -116,7 +116,7 @@ without the user existing in that realm) and at the role check
 
 ## Local dev setup
 
-After cloning the repo and running the backend with `local` profile:
+After cloning the repo and running the backend with `dev` profile:
 
 ```
 SystemAdminSeeder         → inserts ops user into core_auth_user (tenant=system)
@@ -144,7 +144,7 @@ The committed `system-realm.json` is the template. Tighten further:
 - Use a private network for the realm's admin console — platform ops
   shouldn't be reachable from public internet.
 - Rotate the ops users' passwords / tokens on the org's own schedule;
-  the `SystemAdminSeeder` is `@Profile("local")` and won't run in prod.
+  the `SystemAdminSeeder` is `@Profile("dev")` and won't run in prod.
 
 ## Adding a platform-ops user
 

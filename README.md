@@ -53,9 +53,9 @@ git clone <your-fork-url> access-matrix && cd access-matrix
 psql -h 127.0.0.1 -U postgres \
   -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
 
-# 3. Backend (local profile, auto-migrates + seeds demo-admin/demo-admin)
+# 3. Backend (dev profile, auto-migrates + seeds demo-admin/demo-admin)
 cd backend
-./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local
+./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
 
 # 4. Frontend (in another terminal)
 cd frontend
@@ -144,7 +144,7 @@ Module-level (for developers):
 
 > The two super-wildcards have **symmetric carve-outs** — a business super-admin can't reach `/platform/*`, a platform admin can't impersonate business users casually (they have to start a support session, which is audited).
 
-### Seed users (only on `@Profile("local")`; prod/dev deployments start empty)
+### Seed users (only on `@Profile("dev")`; prod/test deployments start empty)
 
 | Realm | Username | Password | Role / Department |
 |---|---|---|---|

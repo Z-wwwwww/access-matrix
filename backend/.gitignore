@@ -62,7 +62,7 @@ logs/
 .env
 .env.local
 *.local.properties
-application-local-override.yml
+application-dev-override.yml
 
 # ===== Claude Code local overrides =====
 .claude/settings.local.json

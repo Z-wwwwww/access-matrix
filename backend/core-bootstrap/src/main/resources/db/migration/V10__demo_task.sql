@@ -12,7 +12,7 @@
 --   6. role_dept binding for DEMO_CUSTOM → KYOTO (CUSTOM mode reads
 --      core_rbac_role_dept).
 --
--- What this file does NOT create (handled by DemoSeeder.java under @Profile("local")
+-- What this file does NOT create (handled by DemoSeeder.java under @Profile("dev")
 -- so password BCrypt hashes are computed by the same PasswordEncoder that
 -- AuthService uses, ensuring login actually works):
 --   - The 5 demo user rows.

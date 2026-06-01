@@ -78,9 +78,9 @@ core-common
 | `test`  | `jwt`               | 环境变量（结构同 dev） |
 | `prod`  | `jwt` 或 `oidc`     | 环境变量，`CORE_JWT_SECRET` ≥ 32 字节，Redis 开启 SSL |
 
-非 `local` profile 启动时，如 `CORE_JWT_SECRET` 缺失或长度不足 32 字节，将快速失败 —— 不会静默回退到 dev 占位值。
+非 `dev` profile 启动时，如 `CORE_JWT_SECRET` 缺失或长度不足 32 字节，将快速失败 —— 不会静默回退到 dev 占位值。
 
-`local` profile 额外会执行：
+`dev` profile 额外会执行：
 - `LocalAdminSeeder`（始终执行）—— 在业务侧 seed `demo-admin/demo-admin` 用户，绑定到 SUPER_ADMIN 角色 + HQ 部门
 - `LocalKeycloakAdminSeeder`（仅当 `mode=oidc` 时）—— 在 Keycloak 的 `demo` realm 中 seed `demo-admin/demo-admin` 用户，与上面的业务用户成对存在，使首次 SSO 登录通过 JIT 绑定到 SUPER_ADMIN 行
 

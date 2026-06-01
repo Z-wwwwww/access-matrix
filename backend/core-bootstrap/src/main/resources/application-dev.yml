@@ -1,25 +1,41 @@
+# =============================================================================
+# dev｜开发(development)：oidc(连本地 Keycloak)；DB/Redis 指向 127.0.0.1；
+# cors 全开；cookie 非 https；@Profile("dev") 的 seeder 全开。
+# 启动：-Dspring-boot.run.profiles=dev 或 SPRING_PROFILES_ACTIVE=dev。
+# 只覆盖与 base(application.yml) 不同的键。
+# =============================================================================
 spring:
   datasource:
-    url: ${CORE_DB_URL}
-    username: ${CORE_DB_USERNAME}
-    password: ${CORE_DB_PASSWORD}
+    url: jdbc:postgresql://127.0.0.1:5432/new_inntouch_core?stringtype=unspecified
+    username: postgres
+    password: abcd@1234                 # 本地固定弱口令，仅开发用
     driver-class-name: org.postgresql.Driver
   data:
     redis:
-      host: ${CORE_REDIS_HOST}
-      port: ${CORE_REDIS_PORT:6379}
-      password: ${CORE_REDIS_PASSWORD:}
-      database: ${CORE_REDIS_DB:0}
+      host: 127.0.0.1
+      port: 6379
+      password: ${REDIS_PASSWORD:abcd@1234}
+      database: 1                       # 本地用 1 号库
+  mail:
+    username: ${CORE_MAIL_USERNAME:}    # 无默认，按开发者自己的邮箱设
+    password: ${CORE_MAIL_PASSWORD:}    # ExMail 客户端专用密码；留空=不真发
 
 app:
   security:
-    mode: jwt
-    jwt:
-      secret: ${CORE_JWT_SECRET}
+    mode: oidc                          # 连本地 Keycloak(infra/keycloak)；裸跑无 IdP 时可临时改 permit-all
+    refresh-cookie:
+      secure: false                     # 本地走 http，故 false(生产为 true)
+      same-site: Lax                    # 本地跨端口，故 Lax(生产为 Strict)
   mybatis:
     tenant:
-      enabled: true
+      enabled: true                     # 显式开，避免历史上误继承 false 致跨租户可见
+  mail:
+    enabled:   ${CORE_MAIL_ENABLED:false}   # 默认 false=只打日志(因已无 baked 邮箱)；配好 CORE_MAIL_* 后设 true 真发
+    from:      ${CORE_MAIL_FROM:}           # 无默认，与 username 对齐(ExMail 要求)
+    from-name: ${CORE_MAIL_FROM_NAME:Access Matrix (dev)}
+    base-url:  ${CORE_APP_BASE_URL:http://localhost:5273}
   cors:
-    allowed-origins: ${CORE_CORS_ALLOWED_ORIGINS}
+    allowed-origins:
+      - "*"                             # 本地全开；生产绝不可用
   debug:
-    expose-error-details: false
+    expose-error-details: true          # 本地排错；生产为 false

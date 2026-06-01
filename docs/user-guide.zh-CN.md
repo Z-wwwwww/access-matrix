@@ -23,8 +23,8 @@
 
 | 模式 | 用户名 | 密码 |
 |---|---|---|
-| Password (local profile) | `admin` | `admin` |
-| SSO (local profile) | `admin` | `admin` （`LocalKeycloakAdminSeeder` 启动时自动建） |
+| Password (dev profile) | `admin` | `admin` |
+| SSO (dev profile) | `admin` | `admin` （`LocalKeycloakAdminSeeder` 启动时自动建） |
 
 登录后会看到管理后台。如果是 SSO 首次登录，`OidcJitUserService` 会自动把 Keycloak 用户跟业务系统的 admin 行绑定（写 `keycloak_id`）。
 
@@ -219,7 +219,7 @@ public List<Task> findAll() {
 
 ### 4.3 demo 演示
 
-`local` profile 种了 5 个 demo 用户 + 15 条 task 数据演示 5 种 scope。详见 [data-scope demo](data-scope-demo.zh-CN.md)。
+`dev` profile 种了 5 个 demo 用户 + 15 条 task 数据演示 5 种 scope。详见 [data-scope demo](data-scope-demo.zh-CN.md)。
 
 ---
 

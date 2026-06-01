@@ -131,8 +131,8 @@ docs(getting-started): clarify Keycloak port conflict with Spring Boot default
 
 ## 5. Don'ts
 
-- ❌ Do not hardcode passwords / tokens / API keys in `application.yml` or `application-*.yml`
-  - Use `${ENV_VAR:default}` or `application-local.yml` (gitignored)
+- ❌ Do not hardcode real passwords / tokens / API keys in `application.yml`
+  - Use `${ENV_VAR:default}`; shared local-dev defaults live in the `dev` section of `application.yml`. Keep real secrets in env vars / an untracked `.env` (only `/backend/.env` is gitignored)
 - ❌ Do not write placeholders / fake implementations ("TODO, return fake data for now") in business code — either don't do it, or do it for real
 - ❌ Do not break backward-compatible APIs (paths / params / response shape) unless the commit carries a `BREAKING CHANGE:` footer and bumps the major version
 - ❌ Do not push to `main` directly; all changes go through a PR

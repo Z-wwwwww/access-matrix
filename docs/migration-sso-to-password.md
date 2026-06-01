@@ -218,38 +218,6 @@ haven't reset) and mint fresh tokens. Old tokens expire on their own.
 
 ---
 
-## Auto-on-mode-flip (opt-in)
-
-If you'd rather have "flip the mode and that's it" with no second flag:
-
-```yaml
-app:
-  security:
-    mode: password       # or oidc — either direction works
-  migration:
-    auto-on-mode-flip: true    # off by default; opt-in per environment
-    tenants: demo
-```
-
-The `ModeFlipDetector` reads the last-applied mode from
-`core_meta.security.last_applied_mode`, compares to the current mode,
-and dispatches the right migration. No `run-on-startup` needed.
-
-Caveats:
-
-- Off by default for safety — auto-firing a thousand-user email blast
-  on a stray dev-environment mode flip is a worse failure mode than
-  needing an extra config line in prod.
-- Transitions involving `permit-all` are ignored (no migration, just
-  rebaseline).
-- First-ever boot is treated as "no baseline, just record current" —
-  the very first migration must be triggered explicitly. After that,
-  subsequent flips are auto-dispatched.
-- The detector runs at `Ordered.LOWEST_PRECEDENCE` so it sees the post-
-  Flyway, post-seeder state.
-
----
-
 ## Rollback (during the window)
 
 The reverse migration is fully reversible UNTIL users start completing
@@ -333,7 +301,6 @@ purely about which template the migration job picks.
 - [migration-password-to-sso.md](migration-password-to-sso.md) — the forward direction
 - `backend/.../bootstrap/migration/SsoToPasswordMigrationService.java` — core logic
 - `backend/.../bootstrap/migration/PasswordToSsoMigrationRunner.java` — startup hook (handles both directions)
-- `backend/.../bootstrap/migration/ModeFlipDetector.java` — `auto-on-mode-flip` auto-detection
 - `backend/.../auth/controller/PasswordResetController.java` — the pre-auth endpoint
 - `backend/core-bootstrap/src/main/resources/db/migration/V24__core_password_reset_and_nullable_pwhash.sql` — schema
 - `frontend/src/views/login/ResetPasswordAccept.vue` — frontend landing page

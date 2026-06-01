@@ -18,7 +18,7 @@
 -- The symptom: SystemAdminSeeder's ops user (tenant=system, user_no
 -- =U00000001) collides on the global uk_core_auth_user_user_no with
 -- LocalAdminSeeder's demo-admin (tenant=demo, user_no=U00000001), and
--- the backend refuses to start in @Profile("local"). Same hazard exists
+-- the backend refuses to start in @Profile("dev"). Same hazard exists
 -- for `username` once any two tenants share an admin/ops name.
 --
 -- This migration is purely defensive: IF EXISTS makes it a no-op on

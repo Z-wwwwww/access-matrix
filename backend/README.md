@@ -83,10 +83,10 @@ system function → subpackage of `core-system`. See
 | `test`  | `jwt`                   | env (same shape as dev) |
 | `prod`  | `jwt` or `oidc`         | env, `CORE_JWT_SECRET` ≥ 32 bytes, Redis SSL on |
 
-Non-local profiles fail-fast at startup if `CORE_JWT_SECRET` is missing
+Non-dev profiles fail-fast at startup if `CORE_JWT_SECRET` is missing
 or under 32 bytes — no silent fallback to dev placeholder.
 
-`local` profile additionally runs:
+`dev` profile additionally runs:
 - `LocalAdminSeeder` (always) — seeds business-side `demo-admin/demo-admin`
   user bound to SUPER_ADMIN role + HQ department
 - `LocalKeycloakAdminSeeder` (only when `mode=oidc`) — seeds Keycloak's

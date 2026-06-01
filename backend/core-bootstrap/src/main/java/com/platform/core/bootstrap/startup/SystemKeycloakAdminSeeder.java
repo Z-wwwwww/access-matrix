@@ -35,7 +35,7 @@ import org.springframework.stereotype.Component;
  * first SSO login.
  */
 @Component
-@Profile("local")
+@Profile("dev")
 @ConditionalOnProperty(name = "app.security.mode", havingValue = "oidc")
 public class SystemKeycloakAdminSeeder {
 

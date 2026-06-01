@@ -1,271 +1,217 @@
 server:
-  port: 9135
+  port: 9135                      # 监听端口
   servlet:
-    context-path: /api
+    context-path: /api            # 所有接口统一前缀；改这里前端的 baseURL 也要同步
   compression:
-    enabled: true
-  forward-headers-strategy: framework
+    enabled: true                 # true=对响应做 gzip 压缩 | false=不压缩
+  forward-headers-strategy: framework   # framework=信任反代的 X-Forwarded-* (部署在 nginx/网关后用这个) | native | none
 
 spring:
   application:
-    name: core-service
+    name: core-service            # 服务名，出现在日志/监控里
   profiles:
-    # fail-closed default: missing SPRING_PROFILES_ACTIVE → prod (jwt + tenant on).
-    # Local development must set SPRING_PROFILES_ACTIVE=local explicitly.
-    active: ${SPRING_PROFILES_ACTIVE:prod}
+    # 未设 SPRING_PROFILES_ACTIVE 时默认 prod（fail-closed：默认带鉴权+租户隔离）。
+    # 本地开发必须显式 SPRING_PROFILES_ACTIVE=dev（profile 配置见 application-dev.yml）。
+    active: ${SPRING_PROFILES_ACTIVE:prod}   # 可填 prod|dev|test
   jackson:
-    time-zone: Asia/Tokyo
+    time-zone: Asia/Tokyo         # JSON 序列化时间所用时区
     datatype:
       datetime:
-        write-dates-as-timestamps: false
-  # Spring Mail — JavaMailSender wired from these properties. Concrete
-  # creds live in profile-specific yml (application-local.yml fills
-  # in CORE_MAIL_*). Defaults match Tencent ExMail (腾讯企业邮),
-  # the SMTP relay the inntouch project uses for *@example-corp.com /
-  # *@acme.com style mailboxes (see SendMailUtil.hostMap).
-  #
-  # ExMail-specific quirks:
-  #   * port 465 with IMPLICIT TLS  → mail.smtp.ssl.enable=true,
-  #     starttls.enable=false (NOT 587 / STARTTLS — that's a different
-  #     endpoint that may or may not be enabled per account).
-  #   * TLSv1.2+ required; TLS 1.0/1.1 are rejected.
-  #   * AUTH must be enabled; username is the FULL email address
-  #     (e.g. you@example.com), password is the "client-specific
-  #     password" from ExMail console → 安全设置 → 客户端专用密码,
-  #     NOT your login password.
-  #   * Server-identity check is on so a hijacked DNS can't redirect
-  #     us at a fake SMTP endpoint that accepts our creds.
+        write-dates-as-timestamps: false   # false=日期序列化为 ISO 字符串 | true=序列化为数字时间戳
+
+  # ─── 出站 SMTP ───
+  # host / 凭据按环境用 CORE_MAIL_* 提供——「无默认」，因为各家邮件服务器不一致。
+  # 下面的 ssl/starttls 属性按「465 隐式 TLS」(腾讯企业邮 ExMail 这类)预设；
+  # 改用 587 STARTTLS 的服务商(Gmail/SES 等)时需相应调整 port/ssl.enable/starttls.enable。
   mail:
-    host: ${CORE_MAIL_HOST:smtp.exmail.qq.com}
-    port: ${CORE_MAIL_PORT:465}
-    username: ${CORE_MAIL_USERNAME:}
-    password: ${CORE_MAIL_PASSWORD:}
+    host: ${CORE_MAIL_HOST:}                     # SMTP 主机；无默认，按环境提供（各家不同）
+    port: ${CORE_MAIL_PORT:465}                  # 465=隐式 TLS（配合下面 ssl.enable=true）；587=STARTTLS（需另改 starttls.enable=true）
+    username: ${CORE_MAIL_USERNAME:}             # 完整邮箱地址；留空则发信功能不可用
+    password: ${CORE_MAIL_PASSWORD:}             # ExMail「客户端专用密码」(非登录密码)；留空则发信功能不可用
     default-encoding: UTF-8
     properties:
-      mail.smtp.auth: true
-      mail.smtp.ssl.enable: true
-      mail.smtp.ssl.protocols: TLSv1.2
-      mail.smtp.ssl.checkserveridentity: true
-      mail.smtp.starttls.enable: false
-      mail.smtp.connectiontimeout: 5000
-      mail.smtp.timeout: 5000
-      mail.smtp.writetimeout: 5000
-      # Envelope-FROM (return-path / bounce target). Tencent ExMail
-      # rejects messages whose envelope FROM doesn't match the
-      # authenticated user, so we explicitly bind it to the SMTP user.
-      mail.smtp.from: ${CORE_MAIL_USERNAME:}
-  # Freemarker — used by MailService to render mailtemplate/*.ftl. JSON API
-  # so we disable the MVC view resolver; the FreeMarkerConfigurer bean stays
-  # auto-wired and MailService injects it directly.
+      mail.smtp.auth: true                       # true=登录认证（ExMail 必须）
+      mail.smtp.ssl.enable: true                 # true=隐式 TLS（端口 465）| false=明文/STARTTLS（端口 587）
+      mail.smtp.ssl.protocols: TLSv1.2           # 允许的 TLS 版本；ExMail 拒绝 1.0/1.1
+      mail.smtp.ssl.checkserveridentity: true    # true=校验服务器证书域名，防 DNS 劫持到假 SMTP | false=不校验(不安全)
+      mail.smtp.starttls.enable: false           # false=不用 STARTTLS（因为走 465 隐式 TLS）| true=端口 587 时启用
+      mail.smtp.connectiontimeout: 5000          # 建连超时(ms)
+      mail.smtp.timeout: 5000                     # 读超时(ms)
+      mail.smtp.writetimeout: 5000               # 写超时(ms)
+      mail.smtp.from: ${CORE_MAIL_USERNAME:}     # 信封 FROM(退信地址)；ExMail 要求与认证用户一致，故绑定为 SMTP 用户
+
+  # ─── Freemarker：渲染 mailtemplate/*.ftl 邮件模板 ───
   freemarker:
-    enabled: true
-    suffix: .ftl
-    template-loader-path: classpath:/mailtemplate/
-    cache: false
+    enabled: true                       # true=装配 FreeMarkerConfigurer（MailService 直接注入用）
+    suffix: .ftl                        # 模板后缀
+    template-loader-path: classpath:/mailtemplate/   # 模板目录
+    cache: false                        # false=每次重新读模板(改模板免重启) | true=缓存（生产可设 true 提性能）
     charset: UTF-8
     settings:
       default_encoding: UTF-8
-      localized_lookup: false
+      localized_lookup: false           # false=不按 locale 找 xx_zh.ftl 这类变体 | true=启用本地化查找
   threads:
     virtual:
-      enabled: true
+      enabled: true                     # true=用 JDK21 虚拟线程跑请求 | false=平台线程
   datasource:
     hikari:
       pool-name: core-hikari
-      maximum-pool-size: 20
-      minimum-idle: 5
-      connection-timeout: 5000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      leak-detection-threshold: 60000
+      maximum-pool-size: 20             # 连接池上限；高并发可调大，受 DB max_connections 约束
+      minimum-idle: 5                   # 最少空闲连接
+      connection-timeout: 5000          # 拿不到连接的等待超时(ms)
+      idle-timeout: 600000              # 空闲连接回收阈值(ms)=10min
+      max-lifetime: 1800000             # 连接最大存活(ms)=30min，应略小于 DB 侧超时
+      leak-detection-threshold: 60000   # 连接借出超过(ms)未还则告警(疑似泄漏)；0=关闭检测
   flyway:
-    enabled: true
-    baseline-on-migrate: true
-    repair-on-migrate: true
-    locations: classpath:db/migration
+    enabled: true                       # true=启动时跑 db/migration 迁移 | false=不迁移
+    baseline-on-migrate: true           # true=对已有非空库自动建基线（接管历史库）| false=非空库直接报错
+    repair-on-migrate: true             # true=每次迁移前自动 repair 校验和（修历史脏记录）| false=不修
+    locations: classpath:db/migration   # 迁移脚本位置
   data:
     redis:
-      timeout: 3000ms
+      timeout: 3000ms                   # 命令超时
       lettuce:
         pool:
-          max-active: 50
-          max-idle: 10
-          min-idle: 2
+          max-active: 50                # 连接池最大活跃连接；-1=无限
+          max-idle: 10                  # 最大空闲连接
+          min-idle: 2                   # 最小空闲连接
 
 mybatis-plus:
   configuration:
-    map-underscore-to-camel-case: true
-    cache-enabled: false
+    map-underscore-to-camel-case: true  # true=下划线列名自动映射驼峰字段
+    cache-enabled: false                # false=关闭 MyBatis 二级缓存（避免与业务缓存不一致）| true=开启
   global-config:
     db-config:
-      id-type: assign_id
-      logic-delete-field: mark
-      logic-delete-value: 0
-      logic-not-delete-value: 1
+      id-type: assign_id                # assign_id=雪花ID(应用生成) | auto=DB自增 | input=手动传
+      logic-delete-field: mark          # 逻辑删除标记字段名
+      logic-delete-value: 0             # mark=0 表示「已删除」
+      logic-not-delete-value: 1         # mark=1 表示「未删除」
   mapper-locations: classpath*:mapper/**/*.xml
 
 management:
   endpoints:
     web:
       base-path: /actuator
+      # 对外暴露的 actuator 端点。注意 loggers 是「可写」端点(运行时改日志级别)，
+      # 故 base 不含它；如需在某 profile 临时开启可在该 profile 覆盖本行追加 loggers。
       exposure:
-        include: health,info,metrics,prometheus,caches,loggers
+        include: health,info,metrics,prometheus,caches   # 逗号分隔；可选项还有 loggers,env,beans,threaddump 等
   endpoint:
     health:
-      show-details: when-authorized
+      show-details: when-authorized     # never=只显示 UP/DOWN | when-authorized=鉴权后显示细节 | always=总是显示(不要用于生产)
       probes:
-        enabled: true
+        enabled: true                   # true=暴露 /health/liveness 和 /readiness（K8s 探针用）
 
 springdoc:
   api-docs:
-    path: /v3/api-docs
+    path: /v3/api-docs                  # OpenAPI JSON 路径（prod 已整体关闭 springdoc）
   swagger-ui:
-    path: /swagger-ui.html
-    tags-sorter: alpha
-    operations-sorter: alpha
+    path: /swagger-ui.html              # Swagger UI 路径
+    tags-sorter: alpha                  # alpha=按字母排序 | as-is=按定义顺序
+    operations-sorter: alpha            # 同上，作用于操作列表
 
 app:
   security:
-    # permit-all | jwt | oidc
-    #   permit-all : no auth check (tests / smoke only)
-    #   jwt        : legacy HS256, tokens signed by AdminAuthController
-    #   oidc       : Keycloak / external IdP; JIT-provisions core_auth_user
-    #                rows via OidcJitUserService on first login
-    mode: permit-all
-    jwt:
-      secret: ${CORE_JWT_SECRET:dev-placeholder-secret-please-override-32bytes!}
-      tenant-claim: tid
-      user-id-claim: sub
-      username-claim: preferred_username
-      authorities-claim: scope
-    oidc:
-      # Multi-tenant trust prefix — recommended. When set, the backend accepts
-      # tokens from ANY realm hosted under this Keycloak base (one realm per
-      # tenant; realm name == tenant id). JWKS for each realm is fetched
-      # lazily on first sighting and cached. Default points at the locally-
-      # launched Keycloak in infra/keycloak/.
-      issuer-base-uri: ${CORE_OIDC_ISSUER_BASE_URI:http://localhost:8180}
-      # Single-realm pin (legacy / locked-down deploys). When set AND
-      # issuer-base-uri is unset, the backend only accepts tokens from this
-      # exact realm. Use one or the other — base-uri wins if both are set.
-      issuer-uri: ${CORE_OIDC_ISSUER_URI:}
+    # 鉴权模式。permit-all=不校验(仅测试/冒烟) | jwt=legacy HS256，由 AdminAuthController 签发
+    #          | oidc=Keycloak/外部 IdP，首登时由 OidcJitUserService 即时建 core_auth_user 行。
+    # base 默认 oidc（fail-closed：即使某 profile 漏配 mode，也默认带鉴权而非放行）。
+    # permit-all 只应在显式需要时(test / 冒烟)由对应 profile 覆盖。
+    mode: oidc                          # 可填 permit-all|jwt|oidc
+    jwt:                                # 仅 mode=jwt 时生效
+      secret: ${CORE_JWT_SECRET:dev-placeholder-secret-please-override-32bytes!}   # HS256 密钥(≥32字节)；占位值会被 JwtSecretValidator 拒绝启动
+      tenant-claim: tid                 # 从 token 取租户 id 的 claim 名
+      user-id-claim: sub                # 取用户 id 的 claim 名
+      username-claim: preferred_username   # 取用户名的 claim 名
+      authorities-claim: scope          # 取权限/scope 的 claim 名
+    oidc:                               # 仅 mode=oidc 时生效
+      # 多租户信任前缀(推荐)：设了它就接受该 Keycloak base 下任意 realm 的 token
+      # (一租户一 realm，realm 名==租户 id)；各 realm 的 JWKS 首次见到时懒加载并缓存。
+      issuer-base-uri: ${CORE_OIDC_ISSUER_BASE_URI:http://localhost:8180}   # Keycloak 根地址；与下面 issuer-uri 二选一，base-uri 优先
+      # 单 realm 锁定(legacy/收紧部署)：仅当设了它且 issuer-base-uri 未设时，只接受这个确切 realm 的 token。
+      issuer-uri: ${CORE_OIDC_ISSUER_URI:}   # 形如 http://host:8180/realms/<realm>；留空=不启用单realm锁定
     rate-limit:
-      enabled: true
-      requests-per-minute: 30
-      refill-period: 1m
+      enabled: true                     # true=对接口做限流 | false=不限流
+      requests-per-minute: 30           # 每分钟允许的请求数(令牌桶容量)
+      refill-period: 1m                 # 令牌补充周期
     lockout:
-      enabled: true
-      max-failures: 5
-      window: 15m
-      lock-duration: 15m
+      enabled: true                     # true=登录失败达阈值后锁定账号 | false=不锁
+      max-failures: 5                   # 触发锁定的连续失败次数
+      window: 15m                       # 统计失败次数的滑动窗口
+      lock-duration: 15m                # 锁定时长
     password-policy:
-      min-length: 8
-      max-length: 128
-      require-digit: true
-      require-upper: true
-      require-lower: true
-      require-symbol: true
-      hibp-enabled: true
-      hibp-base-url: https://api.pwnedpasswords.com
-      hibp-timeout: 3s
-      fail-open-on-hibp-error: true
+      min-length: 8                     # 密码最短长度
+      max-length: 128                   # 密码最长长度
+      require-digit: true               # true=必须含数字
+      require-upper: true               # true=必须含大写字母
+      require-lower: true               # true=必须含小写字母
+      require-symbol: true              # true=必须含符号
+      hibp-enabled: true                # true=对照 HaveIBeenPwned 拒绝已泄露密码 | false=跳过该检查
+      hibp-base-url: https://api.pwnedpasswords.com   # HIBP range API 根地址；离线/内网部署可指向自建镜像
+      hibp-timeout: 3s                  # 单次 HIBP 调用超时；超时按下面 fail-open 策略处理
+      # HIBP 不可达(超时/网络错)时的取舍：
+      #   false = fail-closed(本默认)：拒绝该次改密，更安全；代价是 HIBP 宕机期间所有改密都会失败
+      #   true  = fail-open：放行该次改密，可用性优先；代价是 HIBP 宕机时已泄露密码可能被设置
+      fail-open-on-hibp-error: false
     refresh-cookie:
-      name: core_refresh
-      path: /api/auth
-      secure: true
-      same-site: Strict
+      name: core_refresh                # 刷新令牌 cookie 名
+      path: /api/auth                   # cookie 作用路径
+      secure: true                      # true=仅 HTTPS 下发送(生产必须) | false=允许 HTTP(仅本地 http 开发)
+      same-site: Strict                 # Strict=最严，跨站不带 | Lax=同站导航带 | None=跨站带(需 secure=true)
   keycloak:
-    # RUNTIME identity for ALL backend → Keycloak Admin REST calls: a dedicated
-    # service-account client using the client_credentials grant. ONE path, dev
-    # and prod identical — no username/password at runtime. The client itself is
-    # auto-provisioned at startup by KeycloakProvisionerSeeder (see `bootstrap`
-    # below), so no manual Keycloak console setup is ever required.
+    # 后端→Keycloak Admin REST 的运行时身份：专用 service-account 客户端(client_credentials)，
+    # 该客户端由下面 bootstrap 在启动时自动创建，无需手动在 KC 控制台配置。
     admin:
-      server-url:    ${CORE_KEYCLOAK_SERVER_URL:http://localhost:8180}
-      realm:         ${CORE_KEYCLOAK_ADMIN_REALM:master}
-      client-id:     ${CORE_KEYCLOAK_PROVISIONER_CLIENT_ID:access-matrix-provisioner}
-      # Dev default is a fixed throwaway secret so a fresh checkout just works.
-      # In prod set CORE_KEYCLOAK_PROVISIONER_SECRET to a strong value from vault.
+      server-url:    ${CORE_KEYCLOAK_SERVER_URL:http://localhost:8180}   # Keycloak 根地址
+      realm:         ${CORE_KEYCLOAK_ADMIN_REALM:master}                 # provisioner 客户端所在 realm
+      client-id:     ${CORE_KEYCLOAK_PROVISIONER_CLIENT_ID:access-matrix-provisioner}   # provisioner 客户端 id
+      # 运行时凭据。dev 用固定的一次性弱默认值让全新检出即可跑；prod 必须从 vault 注入强值
+      # （prod profile 已把它写成无默认 ${VAR}，未提供即启动失败）。
       client-secret: ${CORE_KEYCLOAK_PROVISIONER_SECRET:dev-provisioner-secret-change-in-prod}
-    # ONE-TIME bootstrap of the provisioner client above. Uses a throwaway admin
-    # credential (dev: Keycloak's own admin/admin) to create the client and grant
-    # it create-realm + manage-users on the pre-existing managed realms. In prod:
-    # supply a one-time root credential, boot once, then set enabled=false and
-    # drop the credential (the provisioner client persists). See infra/keycloak/README.md.
+    # 一次性引导：用临时 root 凭据创建上面的 provisioner 客户端并授予 create-realm + 托管 realm 的 manage-users。
+    # prod：首次启动用 enabled=true 跑一遍，之后设 enabled=false 并撤掉 root 凭据(provisioner 客户端会保留)。
+    # 仅在 mode=oidc 时运行（KeycloakProvisionerSeeder 上有 @ConditionalOnProperty）。
     bootstrap:
-      enabled:        ${CORE_KEYCLOAK_BOOTSTRAP_ENABLED:true}
-      client-id:      ${CORE_KEYCLOAK_BOOTSTRAP_CLIENT_ID:admin-cli}
-      username:       ${CORE_KEYCLOAK_BOOTSTRAP_USERNAME:admin}
-      password:       ${CORE_KEYCLOAK_BOOTSTRAP_PASSWORD:abcd@1234}
-      managed-realms: ${CORE_KEYCLOAK_BOOTSTRAP_MANAGED_REALMS:demo,system}
-  # Outgoing mail — used by MailService for invite + onboarding notices.
+      enabled:        ${CORE_KEYCLOAK_BOOTSTRAP_ENABLED:true}            # true=启动时执行引导 | false=跳过(provisioner 已建好后用)
+      client-id:      ${CORE_KEYCLOAK_BOOTSTRAP_CLIENT_ID:admin-cli}     # 引导用的临时客户端
+      username:       ${CORE_KEYCLOAK_BOOTSTRAP_USERNAME:admin}         # 临时 root 用户名
+      password:       ${CORE_KEYCLOAK_BOOTSTRAP_PASSWORD:abcd@1234}     # 临时 root 密码(dev 弱默认；prod 必须用强值并在引导后撤掉)
+      managed-realms: ${CORE_KEYCLOAK_BOOTSTRAP_MANAGED_REALMS:demo,system}   # 逗号分隔；这些 realm 是导入的，需额外授予 manage-users
+  # ─── 出站邮件（MailService 用于邀请/重置/入驻通知）───
   mail:
-    enabled:    ${CORE_MAIL_ENABLED:false}
-    from:       ${CORE_MAIL_FROM:noreply@localhost}
-    from-name:  ${CORE_MAIL_FROM_NAME:Access Matrix}
-    base-url:   ${CORE_APP_BASE_URL:http://localhost:5273}
+    enabled:    ${CORE_MAIL_ENABLED:false}        # false=不真发，只打日志记录意图(默认) | true=真实发送(需配好 spring.mail 凭据)
+    from:       ${CORE_MAIL_FROM:noreply@localhost}   # 显示发件地址；应与 spring.mail.username 一致(ExMail 要求)
+    from-name:  ${CORE_MAIL_FROM_NAME:Access Matrix}  # 发件人显示名(自由文本)
+    base-url:   ${CORE_APP_BASE_URL:http://localhost:5273}   # 邮件里链接的前端根地址(邀请/重置链接拼这个)
   invite:
-    # Invite token lifetime — default 7 days, matching Keycloak's default for
-    # `executeActionsEmail`. Override per environment.
-    token-ttl:  ${CORE_INVITE_TOKEN_TTL:7d}
+    token-ttl:  ${CORE_INVITE_TOKEN_TTL:7d}       # 邀请 token 有效期；与 Keycloak executeActionsEmail 默认对齐，可按环境覆盖
   migration:
-    # One-shot password→SSO migration. Only honoured when
-    #   app.security.mode = oidc
-    #
-    # Two recognised values:
-    #   password-to-sso          Mirror every legacy core_auth_user row
-    #                            (keycloak_id IS NULL) into the matching
-    #                            Keycloak realm and trigger UPDATE_PASSWORD
-    #                            reset-email. Idempotent — users already in
-    #                            KC are skipped, not re-emailed.
-    #   password-to-sso-resend   Companion mode: for users mirrored already
-    #                            but who let Keycloak's reset link expire
-    #                            (default 12h), fire a fresh reset-email
-    #                            against the existing KC user. Does NOT
-    #                            create new KC users.
-    #
-    # See docs/migration-password-to-sso.md for the full playbook + gotchas.
-    # Leave UNSET in normal operation. Set, restart, verify report, UNSET, restart.
-    run-on-startup: ${CORE_MIGRATION_RUN_ON_STARTUP:}
-    # Comma-separated list of tenant ids (== realm names) to migrate. The
-    # service iterates them sequentially with a synthetic RequestContext per
-    # tenant so MyBatis-Plus's tenant interceptor scopes the candidate query
-    # correctly. Default = "default" alone.
-    tenants:        ${CORE_MIGRATION_TENANTS:default}
-    # Where the per-user JSON report lands. One file per run, timestamped.
-    report-dir:     ${CORE_MIGRATION_REPORT_DIR:logs}
-    # Auto-detect mode flips and trigger the matching migration. Off by
-    # default — explicitly setting it to "true" lets the operator change
-    # only `app.security.mode` and have the right migration fire without
-    # also remembering to set `run-on-startup`. Detection compares the
-    # current value against the last-applied value stored in core_meta
-    # (key: security.last_applied_mode) and dispatches:
-    #   password → oidc:     PasswordToSsoMigrationService.run
-    #   oidc → password:     SsoToPasswordMigrationService.run
-    # Other transitions (anything involving permit-all, no baseline yet,
-    # same-as-last) are no-ops; in all cases the current mode is recorded
-    # back to core_meta so the next boot picks up from there.
-    auto-on-mode-flip: ${CORE_MIGRATION_AUTO_ON_MODE_FLIP:false}
+    # 一次性鉴权迁移，启动时跑一遍。run-on-startup 可填的值：
+    #   password-to-sso        = 把每个 legacy 用户(keycloak_id 为空)镜像进对应 KC realm 并触发改密邮件(幂等)
+    #   password-to-sso-resend = 仅对已镜像但重置链接过期的用户重发邮件，不新建 KC 用户
+    #   sso-to-password        = 反向：给 keycloak_id 非空的用户发我方重置链接，设密后与 KC 解绑
+    # 正常运行留空；用时设值→重启→看报告→清空→再重启。详见 docs/migration-password-to-sso.md。
+    run-on-startup: ${CORE_MIGRATION_RUN_ON_STARTUP:}   # 留空=不迁移；拼错会被静默忽略
+    tenants:        ${CORE_MIGRATION_TENANTS:default}   # 逗号分隔的租户 id(==realm 名)，顺序迁移
+    report-dir:     ${CORE_MIGRATION_REPORT_DIR:logs}   # 每次运行的逐用户 JSON 报告输出目录
   mybatis:
     tenant:
-      # Tenant row-level isolation. FAIL-CLOSED default: ON unless a profile
-      # explicitly opts out. This is a security control — a forgotten/new
-      # profile must default to ISOLATED, never to cross-tenant-visible. The
-      # only legitimate "false" is a no-auth / no-tenant-context profile
-      # (application-test.yml), which opts out explicitly. Real (authenticated,
-      # multi-tenant) deployments must keep this true; false there = data leak.
-      # Platform-ops cross-tenant reads do NOT need this off — they use the
-      # system-tenant ignoreTable bypass inside MybatisPlusConfig.
-      enabled: ${CORE_MYBATIS_TENANT_ENABLED:true}
+      # 租户行级隔离。FAIL-CLOSED：默认 ON，新/漏配 profile 也隔离，绝不默认跨租户可见。
+      # 唯一合法的 false 是无鉴权/无租户上下文的 profile，且必须在该 profile 段显式关。
+      # 真实多租户部署必须保持 true，否则=数据泄漏。平台级跨租户读不靠这个关，走 system 租户 ignoreTable 旁路。
+      enabled: ${CORE_MYBATIS_TENANT_ENABLED:true}   # true=按租户过滤行 | false=不过滤(仅无租户 profile)
   cache:
-    default-spec: "maximumSize=10000,expireAfterWrite=10m,recordStats"
+    # Caffeine 缓存规格。语法：maximumSize=条数,expireAfterWrite=写后过期,recordStats=记统计
+    default-spec: "maximumSize=10000,expireAfterWrite=10m,recordStats"   # 未单列的缓存用此默认
     specs:
-      userPermissions: "maximumSize=5000,expireAfterWrite=5m,recordStats"
-      userMenu:        "maximumSize=5000,expireAfterWrite=5m,recordStats"
-      userDataScope:   "maximumSize=5000,expireAfterWrite=5m,recordStats"
-      deptTree:        "maximumSize=64,expireAfterWrite=30m,recordStats"
-      deptSubtree:     "maximumSize=2000,expireAfterWrite=30m,recordStats"
+      userPermissions: "maximumSize=5000,expireAfterWrite=5m,recordStats"   # 用户权限缓存
+      userMenu:        "maximumSize=5000,expireAfterWrite=5m,recordStats"   # 用户菜单缓存
+      userDataScope:   "maximumSize=5000,expireAfterWrite=5m,recordStats"   # 用户数据范围缓存
+      deptTree:        "maximumSize=64,expireAfterWrite=30m,recordStats"    # 部门树缓存
+      deptSubtree:     "maximumSize=2000,expireAfterWrite=30m,recordStats"  # 部门子树缓存
   cors:
-    allowed-origins: []
+    # 允许的跨域来源。base 为空=默认不允许任何跨域；各 profile 覆盖
+    # （dev 用 "*"，prod 用 ${CORE_CORS_ALLOWED_ORIGINS} 明确列白名单）。
+    allowed-origins: []                 # 字符串数组，如 ["https://app.example.com"]；[] 或 "*"(仅本地)
   debug:
+    # true=向客户端返回异常堆栈/细节(仅本地排错) | false=只返通用错误(生产必须，防信息泄漏)
     expose-error-details: false

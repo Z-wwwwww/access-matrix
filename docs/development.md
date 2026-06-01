@@ -248,7 +248,7 @@ CREATE INDEX IF NOT EXISTS idx_core_dict_tenant ON core_dict (tenant_id) WHERE m
 ### 4.4 Run it once you've written it
 
 ```bash
-./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local
+./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 Seeing `Successfully applied migration V23` in the startup log means you're good.
@@ -392,7 +392,7 @@ public final class XxxPermissions {
 ### 6. Boot — guards do the rest
 
 ```bash
-./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local
+./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 Three layers catch deviations:

@@ -16,10 +16,10 @@ public interface PermissionMapper extends BaseMapper<PermissionEntity> {
      * respecting all three tables' mark=1 and the role's status=1.
      *
      * <p>Tenant scoping: every table in the JOIN is filtered by {@code tenant_id}
-     * (defense-in-depth). The {@code TenantLineInnerInterceptor} would already
-     * inject this in dev/prod, but we duplicate it here so the SQL is correct
-     * even when the interceptor is disabled (local profile), and so the intent
-     * is self-evident on read.
+     * (defense-in-depth). The {@code TenantLineInnerInterceptor} already injects
+     * this whenever tenant isolation is on (every profile by default), but we
+     * duplicate it here so the SQL stays correct even if the interceptor is ever
+     * disabled/bypassed, and so the intent is self-evident on read.
      */
     @Select("""
             SELECT DISTINCT p.code

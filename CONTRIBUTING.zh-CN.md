@@ -131,8 +131,8 @@ docs(getting-started): clarify Keycloak port conflict with Spring Boot default
 
 ## 5. 不要做的事
 
-- ❌ 不要在 `application.yml` 或 `application-*.yml` 里硬编码密码 / token / API key
-  - 用 `${ENV_VAR:default}` 或 `application-local.yml`（已 gitignored）
+- ❌ 不要在 `application.yml` 里硬编码真实密码 / token / API key
+  - 用 `${ENV_VAR:default}`；本地开发的共享默认值放在 `application.yml` 的 `dev` 段；真正的密钥放环境变量 / 未提交的 `.env`（只有 `/backend/.env` 被 gitignore）
 - ❌ 不要在业务代码里写 placeholder / 假实现（"TODO 后面实现，先返回假数据"）—— 要么不做，要么真做
 - ❌ 不要破坏向后兼容的 API（路径 / 参数 / 返回格式），除非 commit 带 `BREAKING CHANGE:` footer 并升大版本
 - ❌ 不要直接 push 到 `main`，所有 change 走 PR

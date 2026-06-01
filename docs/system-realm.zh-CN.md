@@ -54,7 +54,7 @@
 | `core_auth_user.tenant_id='system'` 的行 | Postgres | 平台运维用户存在这里，每位员工一行 |
 | `PLATFORM_ADMIN` 角色 | 租户 `system` 下的 `core_rbac_role` | 由 V26 用 ULID `00000000000000000000ROLE50` 初始化 |
 | `platform:*` 通配权限 | 租户 `system` 下的 `core_rbac_permission` | 由 V26 初始化 |
-| 默认运维用户（仅 dev） | `ops` / `ops` | 由 `SystemAdminSeeder` + `SystemKeycloakAdminSeeder` 在 `@Profile("local")` 下生成 |
+| 默认运维用户（仅 dev） | `ops` / `ops` | 由 `SystemAdminSeeder` + `SystemKeycloakAdminSeeder` 在 `@Profile("dev")` 下生成 |
 
 ## 权限模型 —— `*:*` vs `tenant:*`
 
@@ -107,7 +107,7 @@
 
 ## 本地开发环境
 
-克隆仓库后，用 `local` profile 启动后端：
+克隆仓库后，用 `dev` profile 启动后端：
 
 ```
 SystemAdminSeeder         → 把 ops 用户插入 core_auth_user（tenant=system）
@@ -133,7 +133,7 @@ $KEYCLOAK_HOME/bin/kc.sh start --import-realm
 - 给每位运维用户开启 MFA（`requiredActions` 中加入 `CONFIGURE_TOTP`）。
 - 把 realm 的管理控制台放在私有网络里 —— 平台运维不应当从公网可达。
 - 按组织自己的节奏轮换运维用户的密码 / token；`SystemAdminSeeder`
-  是 `@Profile("local")` 的，生产环境根本不会跑。
+  是 `@Profile("dev")` 的，生产环境根本不会跑。
 
 ## 添加平台运维用户
 

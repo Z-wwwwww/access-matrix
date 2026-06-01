@@ -1,44 +1,50 @@
 # =============================================================================
-# Production profile. Most settings come from application.yml (defaults) — this
-# file only pins what differs in prod and wires the externalised secrets.
-#
-# WHAT YOU MUST PROVIDE (env vars) — see backend/.env.example for the full,
-# tiered, copy-paste template with examples and defaults:
-#   [1] Boot-required:  CORE_DB_URL / CORE_DB_USERNAME / CORE_DB_PASSWORD,
-#                       CORE_REDIS_HOST, CORE_JWT_SECRET,
-#                       CORE_CORS_ALLOWED_ORIGINS
-#   [2] Email (for invites / reset / onboarding): CORE_MAIL_ENABLED,
-#                       CORE_MAIL_HOST/USERNAME/PASSWORD/FROM, CORE_APP_BASE_URL
-#   [2] SSO (only if APP_SECURITY_MODE=oidc): CORE_OIDC_ISSUER_BASE_URI,
-#                       CORE_KEYCLOAK_PROVISIONER_SECRET (runtime identity) +
-#                       one-time CORE_KEYCLOAK_BOOTSTRAP_* — see infra/keycloak/README.md
-# Everything else has a sane default in application.yml; override only with a
-# reason. Vars with NO default below ( ${VAR} ) fail fast at startup if unset.
+# prod｜生产(production)：oidc 鉴权；密钥用无默认 ${VAR}(缺失即启动失败)；
+# 关 Swagger；收紧 actuator。必填环境变量见 backend/.env.example。
+# 只覆盖与 base(application.yml) 不同的键。
 # =============================================================================
 spring:
   datasource:
-    url: ${CORE_DB_URL}
-    username: ${CORE_DB_USERNAME}
-    password: ${CORE_DB_PASSWORD}
+    url: ${CORE_DB_URL}                 # 无默认→必填
+    username: ${CORE_DB_USERNAME}       # 无默认→必填
+    password: ${CORE_DB_PASSWORD}       # 无默认→必填
     driver-class-name: org.postgresql.Driver
   data:
     redis:
-      host: ${CORE_REDIS_HOST}
+      host: ${CORE_REDIS_HOST}          # 无默认→必填
       port: ${CORE_REDIS_PORT:6379}
-      password: ${CORE_REDIS_PASSWORD:}
+      password: ${CORE_REDIS_PASSWORD:} # 留空=无密码连接；生产建议设强密码
       database: ${CORE_REDIS_DB:0}
       ssl:
-        enabled: true
+        enabled: true                   # true=TLS 连 Redis(生产)；无 TLS 的 Redis 需改 false
 
 app:
   security:
-    mode: jwt
-    jwt:
-      secret: ${CORE_JWT_SECRET}
+    mode: oidc                          # 生产钉死 oidc；回退 legacy 用 APP_SECURITY_MODE=jwt + CORE_JWT_SECRET
+    oidc:
+      issuer-base-uri: ${CORE_OIDC_ISSUER_BASE_URI}   # 无默认→必填，Keycloak 根地址(一租户一 realm)
+  keycloak:
+    admin:
+      server-url:    ${CORE_KEYCLOAK_SERVER_URL}            # 无默认→必填
+      client-secret: ${CORE_KEYCLOAK_PROVISIONER_SECRET}   # 无默认→必填(强值)，缺失即启动失败，不退回 dev 弱默认
+    bootstrap:
+      enabled: false                    # 稳态钉死 false；仅首次部署临时设 true 引导 provisioner 客户端
   mybatis:
     tenant:
-      enabled: true
+      enabled: true                     # 生产必须：租户行级隔离
   cors:
-    allowed-origins: ${CORE_CORS_ALLOWED_ORIGINS}
+    allowed-origins: ${CORE_CORS_ALLOWED_ORIGINS}   # 无默认→必填，明确白名单(逗号分隔)，勿用 "*"
   debug:
-    expose-error-details: false
+    expose-error-details: false         # 生产必须 false
+
+springdoc:
+  api-docs:
+    enabled: false                      # 生产关闭，不暴露接口清单
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,caches   # 去掉可写的 loggers

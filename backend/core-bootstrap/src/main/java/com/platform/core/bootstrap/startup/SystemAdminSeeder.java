@@ -28,7 +28,7 @@ import java.util.Locale;
  * PLATFORM_ADMIN role bound — analogue of {@link LocalAdminSeeder} for
  * the platform-ops tenant.
  *
- * <p>This is dev-only ({@code @Profile("local")}). In prod the platform
+ * <p>This is dev-only ({@code @Profile("dev")}). In prod the platform
  * operator provisions their own staff into the system tenant out-of-band
  * (a SaaS company doesn't want a deployment artefact deciding who their
  * platform admins are).
@@ -53,7 +53,7 @@ import java.util.Locale;
  * with the wrong tenant_id.
  */
 @Component
-@Profile("local")
+@Profile("dev")
 public class SystemAdminSeeder {
 
     private static final Logger log = LoggerFactory.getLogger(SystemAdminSeeder.class);

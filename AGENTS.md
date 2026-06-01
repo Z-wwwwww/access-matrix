@@ -84,10 +84,10 @@ Cross-stack PRs must pass CI on both sides (the path filter triggers the corresp
 
 ## Startup order
 
-1. Backend first: `cd backend && ./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=local`
+1. Backend first: `cd backend && ./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev`
 2. Then frontend: `cd frontend && npm install && npm run dev`
 
-The backend's local profile automatically runs Flyway migrations + LocalAdminSeeder + DemoSeeder, so no manual SQL is required.
+The backend's dev profile automatically runs Flyway migrations + LocalAdminSeeder + DemoSeeder, so no manual SQL is required.
 
 ## Adding a new business module (AI quick reference)
 

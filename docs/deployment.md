@@ -55,7 +55,7 @@ The backend is stateless and scales horizontally. Sessions, refresh tokens, and 
 
 | Variable | Required | Description | Example |
 |---|---|---|---|
-| `SPRING_PROFILES_ACTIVE` | Required | `prod` / `dev` / `staging`. Defaults to `prod` (fail-closed) | `prod` |
+| `SPRING_PROFILES_ACTIVE` | Required | `prod` / `dev` / `test`. Defaults to `prod` (fail-closed) | `prod` |
 | `CORE_DB_URL` | Required | JDBC URL | `jdbc:postgresql://pg-prod:5432/access_matrix?stringtype=unspecified` |
 | `CORE_DB_USERNAME` | Required | DB username | `access_matrix_app` |
 | `CORE_DB_PASSWORD` | Required | DB password (inject via a secret manager) | |
@@ -344,7 +344,7 @@ readinessProbe:
 - [ ] Keycloak Realm settings → Brute Force Detection is enabled
 - [ ] `CORE_CORS_ALLOWED_ORIGINS` lists origins strictly (no `*`)
 - [ ] Reverse proxy adds `X-Frame-Options: SAMEORIGIN`, `Content-Security-Policy`, and HSTS
-- [ ] `application.yml` / `application-local.yml` contain **no** hard-coded SMTP / DB / JWT secrets
+- [ ] `application.yml` contains **no** hard-coded *production* SMTP / DB / JWT secrets (the `dev` section's throwaway dev creds are fine; prod/dev sections use no-default `${VAR}`)
 - [ ] Redis has AUTH enabled and isn't reachable from the public internet
 - [ ] PG `pg_hba.conf` restricts methods to `md5` / `scram-sha-256`; `trust` is not allowed
 - [ ] All logs ship to a centralised log system (don't go disk-only — a full disk leaves you blind)
