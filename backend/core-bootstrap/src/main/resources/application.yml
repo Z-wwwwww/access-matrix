@@ -166,6 +166,7 @@ app:
       client-id:     ${CORE_KEYCLOAK_PROVISIONER_CLIENT_ID:access-matrix-provisioner}   # provisioner 客户端 id
       # 运行时凭据。dev 用固定的一次性弱默认值让全新检出即可跑；prod 必须从 vault 注入强值
       # （prod profile 已把它写成无默认 ${VAR}，未提供即启动失败）。
+      # 注意：这个值是 bootstrap seeder「推进」KC 设成客户端 secret 的，不是从 KC 抄出来的——强度由你负责。
       client-secret: ${CORE_KEYCLOAK_PROVISIONER_SECRET:dev-provisioner-secret-change-in-prod}
     # 一次性引导：用临时 root 凭据创建上面的 provisioner 客户端并授予 create-realm + 托管 realm 的 manage-users。
     # prod：首次启动用 enabled=true 跑一遍，之后设 enabled=false 并撤掉 root 凭据(provisioner 客户端会保留)。

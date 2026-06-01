@@ -28,7 +28,8 @@ app:
       server-url:    ${CORE_KEYCLOAK_SERVER_URL}            # 无默认→必填
       client-secret: ${CORE_KEYCLOAK_PROVISIONER_SECRET}   # 无默认→必填(强值)，缺失即启动失败，不退回 dev 弱默认
     bootstrap:
-      enabled: false                    # 稳态钉死 false；仅首次部署临时设 true 引导 provisioner 客户端
+      # 稳态 false；仅首次部署临时设 CORE_KEYCLOAK_BOOTSTRAP_ENABLED=true 引导 provisioner 客户端，成功后改回。
+      enabled: ${CORE_KEYCLOAK_BOOTSTRAP_ENABLED:false}
   mybatis:
     tenant:
       enabled: true                     # 生产必须：租户行级隔离
