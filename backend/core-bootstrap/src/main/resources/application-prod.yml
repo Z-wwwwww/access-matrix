@@ -1,44 +1,71 @@
 # =============================================================================
-# Production profile. Most settings come from application.yml (defaults) — this
-# file only pins what differs in prod and wires the externalised secrets.
+# 生产 profile。大部分值继承自 application.yml，这里只钉住 prod 与默认不同的部分
+# 并接入外部化的 secret。注释约定同 base：每行标「可填什么值」+「什么效果」。
+# ${VAR}(无默认) = 未提供环境变量则启动直接失败（天然 fail-fast，不靠代码校验）。
 #
-# WHAT YOU MUST PROVIDE (env vars) — see backend/.env.example for the full,
-# tiered, copy-paste template with examples and defaults:
-#   [1] Boot-required:  CORE_DB_URL / CORE_DB_USERNAME / CORE_DB_PASSWORD,
-#                       CORE_REDIS_HOST, CORE_JWT_SECRET,
-#                       CORE_CORS_ALLOWED_ORIGINS
-#   [2] Email (for invites / reset / onboarding): CORE_MAIL_ENABLED,
-#                       CORE_MAIL_HOST/USERNAME/PASSWORD/FROM, CORE_APP_BASE_URL
-#   [2] SSO (only if APP_SECURITY_MODE=oidc): CORE_OIDC_ISSUER_BASE_URI,
-#                       CORE_KEYCLOAK_PROVISIONER_SECRET (runtime identity) +
-#                       one-time CORE_KEYCLOAK_BOOTSTRAP_* — see infra/keycloak/README.md
-# Everything else has a sane default in application.yml; override only with a
-# reason. Vars with NO default below ( ${VAR} ) fail fast at startup if unset.
+# 必须提供的环境变量（完整模板见 backend/.env.example）：
+#   [1] 启动必需：CORE_DB_URL / CORE_DB_USERNAME / CORE_DB_PASSWORD,
+#                CORE_REDIS_HOST, CORE_CORS_ALLOWED_ORIGINS
+#   [1] SSO(prod 默认 oidc)：CORE_OIDC_ISSUER_BASE_URI, CORE_KEYCLOAK_SERVER_URL,
+#                CORE_KEYCLOAK_PROVISIONER_SECRET（运行时身份，无默认→必填）
+#   [2] 邮件(邀请/重置/入驻)：CORE_MAIL_ENABLED=true + CORE_MAIL_HOST/USERNAME/
+#                PASSWORD/FROM, CORE_APP_BASE_URL（不设则邮件只打日志、不真发）
+#   [一次性] 首次引导 Keycloak provisioner 客户端时：临时把
+#                CORE_KEYCLOAK_BOOTSTRAP_ENABLED=true 并提供
+#                CORE_KEYCLOAK_BOOTSTRAP_PASSWORD(强值)，跑一次后撤掉，见下方说明。
+# 其余项 application.yml 已有合理默认，无理由不必覆盖。
 # =============================================================================
 spring:
   datasource:
-    url: ${CORE_DB_URL}
-    username: ${CORE_DB_USERNAME}
-    password: ${CORE_DB_PASSWORD}
+    url: ${CORE_DB_URL}                 # 无默认→必填，如 jdbc:postgresql://host:5432/db
+    username: ${CORE_DB_USERNAME}       # 无默认→必填
+    password: ${CORE_DB_PASSWORD}       # 无默认→必填
     driver-class-name: org.postgresql.Driver
   data:
     redis:
-      host: ${CORE_REDIS_HOST}
-      port: ${CORE_REDIS_PORT:6379}
-      password: ${CORE_REDIS_PASSWORD:}
-      database: ${CORE_REDIS_DB:0}
+      host: ${CORE_REDIS_HOST}          # 无默认→必填
+      port: ${CORE_REDIS_PORT:6379}     # 默认 6379
+      password: ${CORE_REDIS_PASSWORD:} # 留空=无密码连接(仅当 Redis 本身不要求时)；生产建议设强密码
+      database: ${CORE_REDIS_DB:0}      # Redis 逻辑库编号
       ssl:
-        enabled: true
+        enabled: true                   # true=用 TLS 连 Redis(生产)；自建无 TLS 的 Redis 需改 false
 
 app:
   security:
-    mode: jwt
-    jwt:
-      secret: ${CORE_JWT_SECRET}
+    # prod 默认 oidc：经 Keycloak/外部 IdP 鉴权，首登 JIT 建 core_auth_user 行。
+    # 不再用 legacy HS256 jwt（如需回退可改 mode: jwt 并提供 CORE_JWT_SECRET）。
+    mode: oidc                          # 可填 oidc|jwt|permit-all；prod 钉死 oidc
+    oidc:
+      issuer-base-uri: ${CORE_OIDC_ISSUER_BASE_URI}   # 无默认→必填，Keycloak 根地址(一租户一 realm)
+  keycloak:
+    admin:
+      server-url:    ${CORE_KEYCLOAK_SERVER_URL}        # 无默认→必填，Keycloak 根地址
+      # 运行时 provisioner 凭据。prod 写成无默认→未从 vault 注入即启动失败，
+      # 避免误用 application.yml 里的 dev 弱默认值。
+      client-secret: ${CORE_KEYCLOAK_PROVISIONER_SECRET}   # 无默认→必填(强值)
+    bootstrap:
+      # 稳态钉死 false：provisioner 客户端建好后不再每次重启都拿 root 凭据去连 KC。
+      # 仅首次部署时临时改回 true(或设 CORE_KEYCLOAK_BOOTSTRAP_ENABLED=true)+给强 root 口令，
+      # 引导成功后改回 false 并撤掉 root 凭据。
+      enabled: false                    # true=执行一次性引导 | false=跳过(prod 稳态)
   mybatis:
     tenant:
-      enabled: true
+      enabled: true                     # true=租户行级隔离(生产必须)；false=跨租户泄漏
   cors:
-    allowed-origins: ${CORE_CORS_ALLOWED_ORIGINS}
+    allowed-origins: ${CORE_CORS_ALLOWED_ORIGINS}   # 无默认→必填，明确的来源白名单(逗号分隔)，勿用 "*"
   debug:
-    expose-error-details: false
+    expose-error-details: false         # 生产必须 false：只返通用错误，不泄漏堆栈
+
+# Swagger / OpenAPI：生产关闭，不对外暴露接口清单。
+springdoc:
+  api-docs:
+    enabled: false                      # false=不暴露 /v3/api-docs | true=暴露(仅非生产)
+  swagger-ui:
+    enabled: false                      # false=不暴露 /swagger-ui.html | true=暴露(仅非生产)
+
+# Actuator：prod 收紧暴露面，去掉可写的 loggers 端点（base 本就不含，此处再钉一遍以防继承变动）。
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,caches   # 只读端点；不含 loggers/env/beans 等
