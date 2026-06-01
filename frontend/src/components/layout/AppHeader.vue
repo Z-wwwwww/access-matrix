@@ -234,7 +234,7 @@ onBeforeUnmount(() => {
               <User :size="16" class="text-muted-foreground" />
             </div>
             <span class="flex-1 text-sm font-medium text-foreground hidden sm:block text-left truncate">
-              {{ authStore.userInfo?.realname || t('layout.header.userFallback') }}
+              {{ authStore.userInfo?.displayName || authStore.userInfo?.username || t('layout.header.userFallback') }}
             </span>
             <ChevronDown
               :size="14"
