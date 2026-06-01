@@ -248,7 +248,15 @@ app:
     auto-on-mode-flip: ${CORE_MIGRATION_AUTO_ON_MODE_FLIP:false}
   mybatis:
     tenant:
-      enabled: false
+      # Tenant row-level isolation. FAIL-CLOSED default: ON unless a profile
+      # explicitly opts out. This is a security control — a forgotten/new
+      # profile must default to ISOLATED, never to cross-tenant-visible. The
+      # only legitimate "false" is a no-auth / no-tenant-context profile
+      # (application-test.yml), which opts out explicitly. Real (authenticated,
+      # multi-tenant) deployments must keep this true; false there = data leak.
+      # Platform-ops cross-tenant reads do NOT need this off — they use the
+      # system-tenant ignoreTable bypass inside MybatisPlusConfig.
+      enabled: ${CORE_MYBATIS_TENANT_ENABLED:true}
   cache:
     default-spec: "maximumSize=10000,expireAfterWrite=10m,recordStats"
     specs:

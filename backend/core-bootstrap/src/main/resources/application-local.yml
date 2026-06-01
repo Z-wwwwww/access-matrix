@@ -39,6 +39,13 @@ app:
     refresh-cookie:
       secure: false
       same-site: Lax
+  mybatis:
+    tenant:
+      # Tenant row-level isolation, pinned ON explicitly for clarity. (The base
+      # default is now fail-closed true, so this is redundant — but it documents
+      # the intent at the dev profile that previously inherited the old `false`
+      # and leaked cross-tenant: a acme admin could see demo's rows.)
+      enabled: true
   mail:
     # Set CORE_MAIL_ENABLED=true to actually send mail. When false, MailService
     # short-circuits and logs the intended recipient + template so dev can
