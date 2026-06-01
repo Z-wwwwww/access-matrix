@@ -1,6 +1,7 @@
 package com.platform.core.bootstrap.startup;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.platform.core.common.context.RequestContext;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
 import com.platform.system.rbac.entity.RoleEntity;
@@ -20,10 +21,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Component
 @Profile("local")
 public class LocalAdminSeeder {
+
+    /** The demo (business) tenant this seeder populates — matches the realm name. */
+    private static final String DEMO_TENANT = "demo";
 
     private static final Logger log = LoggerFactory.getLogger(LocalAdminSeeder.class);
 
@@ -43,9 +48,20 @@ public class LocalAdminSeeder {
     @EventListener(ApplicationReadyEvent.class)
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public void seed() {
-        UserEntity admin = ensureAdminUser();
-        ensureSuperAdminLink(admin);
-        ensureHqDeptLink(admin);
+        // Pin a synthetic RequestContext to the demo tenant so the MP tenant
+        // interceptor scopes every SELECT/INSERT here to 'demo' explicitly,
+        // rather than relying on the interceptor's hardcoded "demo" fallback
+        // (see MybatisPlusConfig.getTenantId). Same idiom SystemAdminSeeder
+        // uses for the 'system' tenant — without it this seeder only works by
+        // the accident that the fallback happens to equal our target tenant.
+        RequestContext.set(DEMO_TENANT, "system", "system", Locale.JAPAN, "local-admin-seeder");
+        try {
+            UserEntity admin = ensureAdminUser();
+            ensureSuperAdminLink(admin);
+            ensureHqDeptLink(admin);
+        } finally {
+            RequestContext.clear();
+        }
     }
 
     private void ensureHqDeptLink(UserEntity admin) {

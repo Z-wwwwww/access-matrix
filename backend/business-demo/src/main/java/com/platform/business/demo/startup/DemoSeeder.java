@@ -1,6 +1,7 @@
 package com.platform.business.demo.startup;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.platform.core.common.context.RequestContext;
 import com.platform.business.demo.task.entity.TaskEntity;
 import com.platform.business.demo.task.mapper.TaskMapper;
 import com.platform.core.infrastructure.security.rbac.DataScopeContext;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Seeds 5 demo users (one per data_scope mode), their role bindings, and a
@@ -56,6 +58,8 @@ public class DemoSeeder {
 
     private static final Logger log = LoggerFactory.getLogger(DemoSeeder.class);
     private static final String DEMO_PASSWORD = "demo123";
+    /** The demo (business) tenant all rows below belong to — matches the realm name. */
+    private static final String DEMO_TENANT = "demo";
 
     // Fixed placeholder ULIDs so seed rows can reference each other deterministically.
     private static final String USER_DEMO_ALL     = "00000000000000000000USER11";
@@ -92,6 +96,10 @@ public class DemoSeeder {
     @EventListener(ApplicationReadyEvent.class)
     @Order(Ordered.HIGHEST_PRECEDENCE + 10)
     public void seed() {
+        // Pin the demo tenant on this thread so the MP tenant interceptor scopes
+        // these SELECT/INSERTs to 'demo' explicitly instead of leaning on its
+        // hardcoded "demo" fallback (see MybatisPlusConfig / SystemAdminSeeder).
+        RequestContext.set(DEMO_TENANT, "system", "system", Locale.JAPAN, "demo-seeder");
         try {
             ensureUser(USER_DEMO_ALL,     "tanaka_taro",        "田中 太郎", "tanaka.taro@demo.local",        "U00000011", DEPT_HQ);
             ensureUser(USER_DEMO_DEPTSUB, "yamada_hanako",      "山田 花子", "yamada.hanako@demo.local",      "U00000012", DEPT_TOKYO);
@@ -113,6 +121,7 @@ public class DemoSeeder {
             // Seeder runs outside any HTTP request — make sure no thread-local
             // bookkeeping bleeds into whatever worker thread Spring reuses next.
             DataScopeContext.clear();
+            RequestContext.clear();
         }
     }
 

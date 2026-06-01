@@ -2,6 +2,7 @@ package com.platform.system.security;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.core.common.security.PermissionRegistry;
 import com.platform.core.common.security.RequiresPermission;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -85,6 +87,16 @@ public class PermissionConsistencyGuard {
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void verify() {
+        // System-wide, cross-tenant reconciliation of built-in permissions — it
+        // must run UNSCOPED. Acting as the platform (system) tenant triggers the
+        // MyBatis tenant interceptor's system-tenant bypass (see
+        // MybatisPlusConfig.ignoreTable), so the SELECTs see built-ins across ALL
+        // tenants. Without this, once tenant isolation is enabled the startup
+        // SELECT gets scoped to a fallback tenant, misses built-ins living under
+        // other tenants, and re-inserts them → unique-key collision on
+        // (tenant_id, code).
+        RequestContext.set("system", "system", "system", Locale.ROOT, "perm-consistency-guard");
+        try {
         Set<String> registered = PermissionRegistry.allCodes();
         Set<String> annotated  = scanAnnotations();
         Set<String> inDb       = loadBuiltInCodesFromDb();
@@ -135,6 +147,9 @@ public class PermissionConsistencyGuard {
                 // i18n パッチ失敗は本体の起動を止めない（前後端が同一 repo に居ないケースもある）
                 log.warn("[PermissionGuard] i18n patcher failed: {}", e.getMessage());
             }
+        }
+        } finally {
+            RequestContext.clear();
         }
     }
 

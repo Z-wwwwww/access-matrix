@@ -97,13 +97,10 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
             // Default: trust the JWT subject as-is. For HS256 (in-house
             // AdminAuthController.login) the sub IS already the business
             // ULID; for OIDC tokens it's the Keycloak UUID and the resolver
-            // below translates it (or no-ops for non-OIDC tokens).
+            // below translates it (or no-ops for non-OIDC tokens). The
+            // resolve is deferred until AFTER the tenant context is set —
+            // see the RequestContext.set below.
             userId = jwt.getSubject();
-            OidcUserResolver resolver = oidcResolver.getIfAvailable();
-            if (resolver != null) {
-                String businessId = resolver.resolveBusinessUserId(jwt);
-                if (businessId != null) userId = businessId;
-            }
         }
         // No locale on the JWT (pre-auth / legacy / claim missing) → take it
         // from Accept-Language. The resolver falls back to ja_JP if nothing
@@ -123,7 +120,28 @@ public class CoreRequestContextFilter extends OncePerRequestFilter {
             tenantId = (header == null || header.isBlank()) ? DEFAULT_TENANT : header.trim();
         }
 
+        // Establish the tenant context BEFORE any tenant-scoped DB access.
+        // The OIDC JIT resolver below issues tenant-scoped lookups
+        // (findByKeycloakIdAndTenant / findByIdentifier); with row-level
+        // tenant isolation enabled, the MyBatis interceptor injects
+        // `WHERE tenant_id = <RequestContext.tenantId>`. If we resolved the
+        // user BEFORE setting the context (as this filter used to), that
+        // tenant was null and the interceptor fell back to "demo" — the
+        // lookups then missed the real row under e.g. 'acme', JIT assumed
+        // a brand-new user, and the INSERT collided on
+        // uk_core_auth_user_tenant_username. userId here is still the KC sub;
+        // we refresh it to the resolved business id once the resolver returns.
         RequestContext.set(tenantId, userId, username, locale, traceId);
+        if (jwt != null) {
+            OidcUserResolver resolver = oidcResolver.getIfAvailable();
+            if (resolver != null) {
+                String businessId = resolver.resolveBusinessUserId(jwt);
+                if (businessId != null) {
+                    userId = businessId;
+                    RequestContext.set(tenantId, userId, username, locale, traceId);
+                }
+            }
+        }
         MDC.put("traceId", traceId);
         if (tenantId != null) MDC.put("tenantId", tenantId);
         if (userId != null) MDC.put("userId", userId);
