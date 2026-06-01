@@ -120,15 +120,32 @@ public class MailService {
         }
     }
 
-    /** Async wrapper around {@link #sendHtml}. Returns a future whose failure is the caller's to drain. */
+    /**
+     * Async wrapper around {@link #sendHtml}. Returns a future whose failure is
+     * the caller's to drain — but we ALSO log any failure here so a fire-and-
+     * forget caller (the common case: invite / reset emails) never loses an
+     * SMTP error silently. Without this, a failed send on the async thread
+     * completes the future exceptionally and, if nobody calls join()/get(),
+     * vanishes — leaving "email never arrived" with nothing in the logs.
+     * {@code whenComplete} does not swallow the exception, so callers that DO
+     * drain the future still see it.
+     */
     public CompletableFuture<Void> sendHtmlAsync(String to,
                                                  Locale locale,
                                                  String subjectKey,
                                                  Object[] subjectArgs,
                                                  String templateBase,
                                                  Map<String, Object> model) {
-        return CompletableFuture.runAsync(
-                () -> sendHtml(to, locale, subjectKey, subjectArgs, templateBase, model));
+        return CompletableFuture
+                .runAsync(() -> sendHtml(to, locale, subjectKey, subjectArgs, templateBase, model))
+                .whenComplete((v, ex) -> {
+                    if (ex != null) {
+                        Throwable cause = ex instanceof java.util.concurrent.CompletionException && ex.getCause() != null
+                                ? ex.getCause() : ex;
+                        log.error("[mail] async send FAILED: template={} to={} : {}",
+                                templateBase, to, cause.toString(), cause);
+                    }
+                });
     }
 
     private String resolveSubject(String key, Object[] args, Locale locale) {

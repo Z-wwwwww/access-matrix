@@ -33,7 +33,7 @@
                 <span style="word-break:break-all;color:#374151;">${inviteUrl}</span>
               </p>
               <p style="margin:16px 0;font-size:12px;color:#6b7280;">
-                このリンクの有効期限は <strong>${expiresIn!"7 日間"}</strong> です。期限が切れた場合は管理者に再発行を依頼してください。
+                このリンクの有効期限は <strong>${expiresIn!"7"} 日間</strong> です。期限が切れた場合は管理者に再発行を依頼してください。
               </p>
             </td>
           </tr>

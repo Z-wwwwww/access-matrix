@@ -31,7 +31,7 @@
                 <span style="word-break:break-all;color:#374151;">${inviteUrl}</span>
               </p>
               <p style="margin:16px 0;font-size:12px;color:#6b7280;">
-                이 링크의 유효 기간은 <strong>${expiresIn!"7일"}</strong> 입니다. 만료되면 관리자에게 재발급을 요청하세요.
+                이 링크의 유효 기간은 <strong>${expiresIn!"7"}일</strong> 입니다. 만료되면 관리자에게 재발급을 요청하세요.
               </p>
             </td>
           </tr>

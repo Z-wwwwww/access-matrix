@@ -477,7 +477,10 @@ public class TenantAdminService {
             model.put("tenantId", tenantCode);
             model.put("supportEmail", mailProps.from());
             model.put("inviteUrl", mailProps.baseUrl() + "/invite/" + token);
-            model.put("expiresIn", "7");
+            // Validity quoted in the email — derived from the configured invite
+            // TTL (app.invite.token-ttl), not a hardcoded literal, so it stays
+            // truthful if the TTL changes. The template appends the unit ("days").
+            model.put("expiresIn", String.valueOf(inviteTokenService.ttlDays()));
 
             Object[] subjectArgs = new Object[] { "[" + mailProps.fromName() + "]" };
             // Recipient locale: the platform admin's current locale is the best

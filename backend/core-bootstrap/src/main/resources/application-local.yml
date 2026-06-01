@@ -44,7 +44,7 @@ app:
     # short-circuits and logs the intended recipient + template so dev can
     # confirm the wiring without burning real sends. Default false so a fresh
     # checkout (no SMTP password yet) doesn't error on user-create.
-    enabled: ${CORE_MAIL_ENABLED:false}
+    enabled: ${CORE_MAIL_ENABLED:true}
     # ExMail requires the envelope FROM to match the authenticated user —
     # keep `from` aligned with spring.mail.username above. The display name
     # (`from-name`) is free-form; it shows in mail clients next to the address.

@@ -31,7 +31,7 @@
                 <span style="word-break:break-all;color:#374151;">${inviteUrl}</span>
               </p>
               <p style="margin:16px 0;font-size:12px;color:#6b7280;">
-                此連結有效期為 <strong>${expiresIn!"7 天"}</strong>。過期後請聯絡管理員重新發送邀請。
+                此連結有效期為 <strong>${expiresIn!"7"} 天</strong>。過期後請聯絡管理員重新發送邀請。
               </p>
             </td>
           </tr>

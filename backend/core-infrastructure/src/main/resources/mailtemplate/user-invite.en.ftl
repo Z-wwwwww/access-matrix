@@ -31,7 +31,7 @@
                 <span style="word-break:break-all;color:#374151;">${inviteUrl}</span>
               </p>
               <p style="margin:16px 0;font-size:12px;color:#6b7280;">
-                This link is valid for <strong>${expiresIn!"7 days"}</strong>. After that, please ask an administrator for a fresh invite.
+                This link is valid for <strong>${expiresIn!"7"} days</strong>. After that, please ask an administrator for a fresh invite.
               </p>
             </td>
           </tr>

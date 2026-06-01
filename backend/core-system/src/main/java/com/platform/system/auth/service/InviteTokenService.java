@@ -51,6 +51,18 @@ public class InviteTokenService {
     }
 
     /**
+     * Effective token lifetime in whole days — what invite emails should quote
+     * as the validity period, so the number stays in sync with the configured
+     * {@code app.invite.token-ttl} instead of a hardcoded literal. (Falls back
+     * to 7 if the binding is somehow null; floors to 1 for sub-day TTLs so the
+     * email never says "0 days".)
+     */
+    public long ttlDays() {
+        Duration d = ttl != null ? ttl : Duration.ofDays(7);
+        return Math.max(1, d.toDays());
+    }
+
+    /**
      * Generate a new invite token, persist its hash, and return the
      * cleartext token (caller will embed it in the email URL).
      *
