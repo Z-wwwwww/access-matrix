@@ -93,11 +93,21 @@ public class KeycloakProvisionerSeeder {
 
         // Un-ignorable runtime flag: the dev-default secret must never reach a
         // real deployment. Fires on every boot that still uses it — harmless
-        // noise in local dev, a loud red flag in prod logs.
+        // noise in local dev, a loud banner otherwise. Multi-line on purpose so
+        // it can't be skimmed past in startup logs.
         if (DEV_DEFAULT_SECRET.equals(provSecret)) {
-            log.warn("[kc-provisioner] ⚠️ using the DEV-DEFAULT provisioner secret — fine for "
-                    + "local dev, but NEVER for production. Set CORE_KEYCLOAK_PROVISIONER_SECRET "
-                    + "to a strong vault value (openssl rand -base64 32).");
+            log.warn("""
+
+                    ============================================================================
+                    ⚠️  KEYCLOAK PROVISIONER — 用的是 DEV 默认 secret
+                    ----------------------------------------------------------------------------
+                      CORE_KEYCLOAK_PROVISIONER_SECRET 未设置，回退到公开已知的 dev 默认值
+                      'dev-provisioner-secret-change-in-prod'。
+                        • 本地开发：无所谓，忽略即可。
+                        • 生产：绝不可用！这是一个 create-realm 服务账号的口令，
+                          公开已知 = 严重安全漏洞。
+                        • 生产请设强值： CORE_KEYCLOAK_PROVISIONER_SECRET=$(openssl rand -base64 32)
+                    ============================================================================""");
         }
 
         try (Keycloak kc = factory.bootstrapClient()) {
