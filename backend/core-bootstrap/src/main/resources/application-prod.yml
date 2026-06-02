@@ -16,6 +16,10 @@ spring:
       database: ${CORE_REDIS_DB:0}
       ssl:
         enabled: true                   # true=TLS 连 Redis(生产)；无 TLS 的 Redis 需改 false
+  freemarker:
+    cache: true                         # 生产缓存编译后的模板（dev 为 false，便于改模板免重启）
+  flyway:
+    repair-on-migrate: false            # 生产不自动 repair：校验和不符即启动失败，暴露被改过/漂移的历史迁移
 
 app:
   security:
