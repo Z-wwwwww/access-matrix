@@ -38,7 +38,7 @@ psql -h 127.0.0.1 -U postgres \
   -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
 ```
 
-> 名字 `new_inntouch_core` 是项目历史遗留命名。如要改，同时改 `application.yml` 里 `dev` 段的 `spring.datasource.url`。
+> 名字 `new_inntouch_core` 是项目历史遗留命名。如要改，同时改 `backend/.env.dev` 里的 `CORE_DB_URL` —— dev profile 的 `spring.datasource.url` 取自该环境变量，并非 `application.yml` 里的硬编码值。
 
 ### 2.2 （可选）创建 Keycloak 用 schema
 

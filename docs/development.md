@@ -539,5 +539,4 @@ PRs welcome.
 
 - Backend: [backend/AGENTS.md](../backend/AGENTS.md) — AI collaboration conventions + module constraints
 - Frontend: [frontend/AGENTS.md](../frontend/AGENTS.md) — component layering + services conventions
-- RBAC design: [backend/docs/RBAC建设方案.md](../backend/docs/RBAC建设方案.md)
 - Deployment: [Deployment](deployment.md)

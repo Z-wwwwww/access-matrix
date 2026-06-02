@@ -37,13 +37,13 @@ access-matrix/
 | **审计** | `@OpLog` 注解 → `core_oplog` 表异步落库 |
 | **国际化** | 邮件模板 5 语言（ja_JP / en / zh_CN / zh_TW / ko_KR），UI 同步 |
 | **启动期自检** | `TenantSchemaGuard` 检测业务表必须含 `tenant_id` 列且不在错误的 EXCLUDED 名单；`PermissionConsistencyGuard` 自动同步 Java 常量与 DB 权限行 |
-| **测试** | 后端 180 + 前端 64，含 Testcontainers 端到端集成 |
+| **测试** | 后端 210 + 前端 69，含 Testcontainers 端到端集成 |
 
 ---
 
 ## 🚀 5 分钟跑起来
 
-**前置**：JDK 25、Node 20+、PostgreSQL 15+、Redis 7+。
+**前置**：JDK 25、Node 20+、PostgreSQL 15+、Redis 7+ —— 若用 SSO 登录还需 Keycloak 26+（`dev` profile 的默认方式，见步骤后的说明）。
 
 ```bash
 # 1. clone
@@ -53,8 +53,11 @@ git clone <your-fork-url> access-matrix && cd access-matrix
 psql -h 127.0.0.1 -U postgres \
   -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
 
-# 3. 后端（dev profile，自动建表 + 种 demo-admin/demo-admin）
+# 3. 后端 —— dev profile 的 DB/Redis 连接走环境变量（无默认值）。
+#    先加载 backend/.env.dev（已提交的本地 throwaway 值），否则启动会因
+#    缺 CORE_DB_URL 报错。自动建表 + 种 demo-admin。
 cd backend
+set -a; . ./.env.dev; set +a   # PowerShell / IDE 运行配置：见 docs/getting-started.zh-CN.md §3
 ./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
 
 # 4. 前端（另开终端）
@@ -62,9 +65,9 @@ cd frontend
 npm install && npm run dev
 ```
 
-浏览器开 http://localhost:5273/login → `demo-admin` / `demo-admin` → 进入系统。
+浏览器开 http://localhost:5273/login → 用 `demo-admin` / `demo-admin` 登录 → 进入系统。
 
-> 默认走自家 password 登录。要启用 SSO（Keycloak），见 [完整启动指南](docs/getting-started.zh-CN.md#5-启用-sso-keycloak-模式)。
+> `dev` profile 默认走 **OIDC（Keycloak）**，登录会跳转 Keycloak —— 先用 `infra/keycloak/start-keycloak.{sh,bat}` 启动它（会自动导入 `demo` + `system` realm），完整步骤见 [完整启动指南 §5](docs/getting-started.zh-CN.md#5-启用-sso-keycloak-模式)。想免 IdP 裸跑，把 `application.yml` 的 `dev` 段改成 `mode: permit-all`。
 > **已有 password 项目要切 SSO**？走自动化迁移：[docs/migration-password-to-sso.md](docs/migration-password-to-sso.zh-CN.md)，改一行 yml + 重启搞定，业务数据零损失。
 
 ---

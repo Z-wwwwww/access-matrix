@@ -539,5 +539,4 @@ scope：`backend` / `frontend` / `infra` / `docs` / `repo`
 
 - 后端：[backend/AGENTS.md](../backend/AGENTS.md) — AI 协作约定 + 模块约束
 - 前端：[frontend/AGENTS.md](../frontend/AGENTS.md) — 组件分层 + services 约定
-- RBAC 设计：[backend/docs/RBAC建设方案.md](../backend/docs/RBAC建设方案.md)
 - 部署：[Deployment](deployment.zh-CN.md)

@@ -38,7 +38,7 @@ psql -h 127.0.0.1 -U postgres \
   -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
 ```
 
-> The name `new_inntouch_core` is a historical project name. If you rename it, also update `spring.datasource.url` in the `dev` section of `application.yml`.
+> The name `new_inntouch_core` is a historical project name. If you rename it, also update `CORE_DB_URL` in `backend/.env.dev` — the dev profile reads `spring.datasource.url` from that env var, not a hardcoded value in `application.yml`.
 
 ### 2.2 (Optional) Create the Keycloak schema
 

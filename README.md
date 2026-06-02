@@ -37,13 +37,13 @@ access-matrix/
 | **Audit** | `@OpLog` annotation → `core_oplog` table written async |
 | **i18n** | Mail templates in 5 languages (ja_JP / en / zh_CN / zh_TW / ko_KR); UI in step |
 | **Self-checking startup** | `TenantSchemaGuard` refuses to boot if any business table is missing its `tenant_id` column or is wrongly excluded; `PermissionConsistencyGuard` keeps DB permission rows in sync with Java constants |
-| **Tests** | 180 backend + 64 frontend, plus Testcontainers integration tests |
+| **Tests** | 210 backend + 69 frontend, plus Testcontainers integration tests |
 
 ---
 
 ## 🚀 Five-minute quick start
 
-**Prerequisites**: JDK 25, Node 20+, PostgreSQL 15+, Redis 7+.
+**Prerequisites**: JDK 25, Node 20+, PostgreSQL 15+, Redis 7+ — plus Keycloak 26+ if you sign in via SSO (the `dev` profile's default; see the note after the steps).
 
 ```bash
 # 1. Clone
@@ -53,8 +53,11 @@ git clone <your-fork-url> access-matrix && cd access-matrix
 psql -h 127.0.0.1 -U postgres \
   -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
 
-# 3. Backend (dev profile, auto-migrates + seeds demo-admin/demo-admin)
+# 3. Backend — the dev profile reads DB/Redis from env vars (no defaults).
+#    Load backend/.env.dev first (committed throwaway local values), or
+#    startup fails on a missing CORE_DB_URL. Auto-migrates + seeds demo-admin.
 cd backend
+set -a; . ./.env.dev; set +a   # PowerShell / IDE run config: see docs/getting-started.md §3
 ./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
 
 # 4. Frontend (in another terminal)
@@ -62,9 +65,9 @@ cd frontend
 npm install && npm run dev
 ```
 
-Open http://localhost:5273/login → `demo-admin` / `demo-admin` → you're in.
+Open http://localhost:5273/login → sign in as `demo-admin` / `demo-admin` → you're in.
 
-> Default flow is in-house password login. To enable SSO via Keycloak see [Getting Started](docs/getting-started.md#5-enable-sso-keycloak-mode). To migrate an existing password-mode deploy to SSO without data loss: [docs/migration-password-to-sso.md](docs/migration-password-to-sso.md).
+> The `dev` profile defaults to **OIDC (Keycloak)**, so sign-in goes through Keycloak — start it first via `infra/keycloak/start-keycloak.{sh,bat}` (auto-imports the `demo` + `system` realms); full walkthrough in [Getting Started §5](docs/getting-started.md#5-enable-sso-keycloak-mode). For an IdP-free boot, set `mode: permit-all` in the `dev` section of `application.yml`. To migrate a deploy between password and SSO without data loss: [docs/migration-password-to-sso.md](docs/migration-password-to-sso.md).
 
 ---
 

@@ -259,4 +259,3 @@ no Docker → auto-skip, build stays green.
 - [/docs/development.md](../docs/development.md) — adding menus / permissions / migrations
 - [/docs/deployment.md](../docs/deployment.md) — production deployment
 - [AGENTS.md](AGENTS.md) — backend-specific AI/dev conventions
-- [docs/RBAC建设方案.md](docs/RBAC建设方案.md) — RBAC design document (Chinese)

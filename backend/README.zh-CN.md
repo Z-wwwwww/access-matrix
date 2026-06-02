@@ -246,4 +246,3 @@ Spring Boot Maven 插件已将下列参数接入 `mvn spring-boot:run`，生产�
 - [/docs/development.zh-CN.md](../docs/development.zh-CN.md) —— 新增菜单 / 权限 / 迁移
 - [/docs/deployment.zh-CN.md](../docs/deployment.zh-CN.md) —— 生产部署
 - [AGENTS.md](AGENTS.md) —— 后端专属的 AI / 开发约定
-- [docs/RBAC建设方案.md](docs/RBAC建设方案.md) —— RBAC 设计文档（中文）
