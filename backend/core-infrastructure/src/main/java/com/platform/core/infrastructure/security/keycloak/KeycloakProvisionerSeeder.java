@@ -15,6 +15,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -73,11 +74,17 @@ public class KeycloakProvisionerSeeder {
 
     private final AppKeycloakProperties props;
     private final KeycloakAdminClientFactory factory;
+    private final Environment env;
 
-    public KeycloakProvisionerSeeder(AppKeycloakProperties props, KeycloakAdminClientFactory factory) {
+    public KeycloakProvisionerSeeder(AppKeycloakProperties props, KeycloakAdminClientFactory factory,
+                                     Environment env) {
         this.props = props;
         this.factory = factory;
+        this.env = env;
     }
+
+    /** Result of {@link #ensureClient}: the client UUID and whether we just created it. */
+    private record EnsureResult(String uuid, boolean created) {}
 
     @EventListener(ApplicationReadyEvent.class)
     @Order(Ordered.HIGHEST_PRECEDENCE + 1)
@@ -113,8 +120,8 @@ public class KeycloakProvisionerSeeder {
         try (Keycloak kc = factory.bootstrapClient()) {
             RealmResource master = kc.realm(admin.realm());
 
-            String clientUuid = ensureClient(master, provClientId, provSecret);
-            UserRepresentation saUser = master.clients().get(clientUuid).getServiceAccountUser();
+            EnsureResult ec = ensureClient(master, provClientId, provSecret);
+            UserRepresentation saUser = master.clients().get(ec.uuid()).getServiceAccountUser();
             String saUserId = saUser.getId();
 
             grantRealmRole(master, saUserId, CREATE_REALM_ROLE);
@@ -123,6 +130,7 @@ public class KeycloakProvisionerSeeder {
             }
             log.info("[kc-provisioner] provisioner ready (client='{}', granted create-realm + manage-users on {})",
                     provClientId, boot.managedRealms());
+            warnIfBootstrapNotCleanedUp(ec);
         } catch (Exception e) {
             String msg = "Keycloak provisioner bootstrap failed for client '%s'. "
                     + "Check Keycloak is running and app.keycloak.bootstrap.* matches the Keycloak root admin "
@@ -136,7 +144,7 @@ public class KeycloakProvisionerSeeder {
      * Create the provisioner client if missing; otherwise sync its secret and
      * confidential/service-account flags. Returns the client's internal UUID.
      */
-    private String ensureClient(RealmResource master, String clientId, String secret) {
+    private EnsureResult ensureClient(RealmResource master, String clientId, String secret) {
         List<ClientRepresentation> existing = master.clients().findByClientId(clientId);
         if (existing != null && !existing.isEmpty()) {
             ClientRepresentation c = existing.get(0);
@@ -149,7 +157,7 @@ public class KeycloakProvisionerSeeder {
             c.setPublicClient(false);
             master.clients().get(c.getId()).update(c);
             log.info("[kc-provisioner] client '{}' already present — secret + flags synced", clientId);
-            return c.getId();
+            return new EnsureResult(c.getId(), false);
         }
         ClientRepresentation c = new ClientRepresentation();
         c.setClientId(clientId);
@@ -167,7 +175,41 @@ public class KeycloakProvisionerSeeder {
         }
         String uuid = master.clients().findByClientId(clientId).get(0).getId();
         log.info("[kc-provisioner] created provisioner client '{}' (uuid={})", clientId, uuid);
-        return uuid;
+        return new EnsureResult(uuid, true);
+    }
+
+    /**
+     * If bootstrap ran on a real (non-dev) environment AND the provisioner client
+     * already existed, the one-time KC root credentials were never cleaned up after
+     * the first boot. Scream — a standing create-everything root credential is a
+     * needless risk, and bootstrap re-runs pointlessly on every restart.
+     */
+    private void warnIfBootstrapNotCleanedUp(EnsureResult ec) {
+        if (ec.created() || isDevLikeProfile()) {
+            return;   // first-ever creation, or a dev profile where re-running bootstrap is expected
+        }
+        log.warn("""
+
+                ============================================================================
+                ⚠️  KEYCLOAK BOOTSTRAP — 一次性引导凭据没清理
+                ----------------------------------------------------------------------------
+                  provisioner 客户端已存在（非首次创建），但 bootstrap 仍处于 enabled。
+                  说明首次引导早已完成，却没撤掉一次性 KC root 凭据——它能管理整个 Keycloak，
+                  留着 = 不必要的高权限风险，且每次重启都白连一次 KC 重跑引导。
+                  请收紧：
+                    • 设 CORE_KEYCLOAK_BOOTSTRAP_ENABLED=false
+                    • 删除 CORE_KEYCLOAK_BOOTSTRAP_USERNAME / CORE_KEYCLOAK_BOOTSTRAP_PASSWORD
+                ============================================================================""");
+    }
+
+    /** dev / local / test legitimately keep bootstrap enabled across boots — no nag there. */
+    private boolean isDevLikeProfile() {
+        for (String p : env.getActiveProfiles()) {
+            if ("dev".equalsIgnoreCase(p) || "local".equalsIgnoreCase(p) || "test".equalsIgnoreCase(p)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Grant a realm-level role to the service-account user (idempotent). */
