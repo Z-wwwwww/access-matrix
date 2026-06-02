@@ -266,7 +266,7 @@ ops 新建租户时，后端要调 Keycloak Admin REST API 建 realm + 首个管
 
 #### 运维 runbook（生产）
 
-首次部署 —— 在后端环境变量里设（见 `backend/.env.example`）：
+首次部署 —— 在后端环境变量里设（见 `backend/.env.prod.example`）：
 
 ```bash
 APP_SECURITY_MODE=oidc

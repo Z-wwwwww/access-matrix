@@ -383,7 +383,7 @@ than a full IdP-root compromise.
 
 #### Operator runbook (prod)
 
-First deploy — set in the backend env (see `backend/.env.example`):
+First deploy — set in the backend env (see `backend/.env.prod.example`):
 
 ```bash
 APP_SECURITY_MODE=oidc
