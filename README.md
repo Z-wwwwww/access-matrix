@@ -105,7 +105,6 @@ See [docs/system-realm.md](docs/system-realm.md) for the full design — audit p
 | [**User Guide**](docs/user-guide.md) | How to use the admin console (login / users / roles / permissions / data scopes / multi-tenancy) |
 | [**Development**](docs/development.md) | Adding menus / permissions / migrations; testing conventions; module layout |
 | [**Deployment**](docs/deployment.md) | Production deployment (env vars / Keycloak / Postgres / Redis) |
-| [Contributing](CONTRIBUTING.md) | Conventional Commits, PR rules, branch model |
 | [data-scope demo](docs/data-scope-demo.md) | The five data-scope modes demonstrated with five seeded users |
 | [Keycloak setup](infra/keycloak/README.md) | Local Keycloak launcher + realm config |
 | [**`system` realm**](docs/system-realm.md) | The hidden platform-ops realm; tenant lifecycle + support sessions |
@@ -245,8 +244,6 @@ feat(backend): add SAML 2.0 support
 fix(frontend): close menu drawer on route change
 docs(getting-started): clarify Keycloak port conflict
 ```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 

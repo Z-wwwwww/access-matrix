@@ -106,7 +106,6 @@ npm install && npm run dev
 | [**User Guide**](docs/user-guide.zh-CN.md) | 使用手册（登录 / 用户管理 / 角色 / 权限 / 数据范围 / 多租户） |
 | [**Development**](docs/development.zh-CN.md) | 开发指南（项目结构 / 加菜单 / 加权限 / 测试规范） |
 | [**Deployment**](docs/deployment.zh-CN.md) | 生产部署（环境变量 / Keycloak / Postgres / Redis） |
-| [Contributing](CONTRIBUTING.zh-CN.md) | 贡献指南、Conventional Commits、PR 规范 |
 | [data-scope demo](docs/data-scope-demo.zh-CN.md) | 5 种数据范围实际效果演示（5 个 demo 用户） |
 | [Keycloak setup](infra/keycloak/README.zh-CN.md) | 本地 Keycloak 启动 + realm 配置 |
 | [**`system` realm（平台运维）**](docs/system-realm.zh-CN.md) | 平台运营专用的隐形 realm + 租户生命周期 + 支持会话 |
@@ -248,8 +247,6 @@ feat(backend): add SAML 2.0 support
 fix(frontend): close menu drawer on route change
 docs(getting-started): clarify Keycloak port conflict
 ```
-
-详见 [CONTRIBUTING.md](CONTRIBUTING.zh-CN.md)。
 
 ---
 
