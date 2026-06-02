@@ -170,6 +170,8 @@ core-bootstrap/
 9. **NO `confirm()`-style imperative approval skipping** — risky actions (deleting SUPER_ADMIN / changing tenant / changing password policy) must go through `core_oplog` audit + a secondary confirmation.
 10. **NO unchecked `selectById` after JWT** on multi-tenant-enabled paths — note that the refresh token path uses `findByIdAndTenant` to prevent the MyBatis-Plus tenant interceptor from mis-applying the `X-Tenant-Id` header to the token holder.
 11. **NEVER modify an already-shipped `V*__*.sql`** — adding/changing columns means creating `V{N+1}__*.sql`. `FlywayRepairConfig` tolerates checksum drift, but schema-history readability still relies on append-only.
+12. **NO state change outside a `@Service`** — controllers/aspects/utilities must not write business tables directly. Mutations live in a service so audit + domain-event emission have exactly one seam (and so an AI actor can later be plugged in there). See "Domain events & state-change conventions".
+13. **NO mutated current-value-only column for revenue-relevant fields** (price / status / availability) — keep an append-only history (change events or history rows). This data is non-back-fillable and is the substrate for future AI / revenue management.
 
 ## Business code recipe — adding a new table / endpoint
 
@@ -213,6 +215,7 @@ If you prefer (or need) to do it by hand, the DO / DON'T below is the spec.
 - **Controller**: `@RestController` + `@RequestMapping("/business-xxx/...")`. Every public HTTP method MUST be annotated with `@RequiresPermission(XxxPermissions.SOME_CODE)`. NEVER use a string literal — always a constant from a `*Permissions.java` class.
 - **Permission codes** register through a constants class: `public static final String XXX_READ = "xxx:read"` + `static { PermissionCode.registerAll(XxxPermissions.class, "xxx"); }`. `PermissionConsistencyGuard` will fail-fast on startup if a `@RequiresPermission` references an unregistered string.
 - **Service does the work**: controller delegates to a `@Service` class. Controllers don't access mappers directly, services don't access controllers.
+- **Emit a domain event on every state change**: inside the `@Service`, in the same `@Transactional` method as the write, inject `EventPublisher` and call `publish(DomainEvent.of("<AggregateType>", id, "<aggregate>.<verb>", payloadDto))` (e.g. `"Reservation"`, `"reservation.created"`). For revenue-relevant fields (price / status / availability) also keep append-only history, never a current-value-only column. See "Domain events & state-change conventions" + Hard Rules 12–13.
 
 ### DON'T
 
@@ -335,6 +338,29 @@ See: `DataScopeHelper` / `DataScopeContext` / `DataScopeAspect`.
 - `OpLogAspect` (order=50, runs after `PermissionAspect` order=10) automatically persists to `core_oplog`: operator / time / module / action / target ID / request URI / request body (password fields force-masked) / client IP / UA / success flag / error message / elapsed ms
 - Async write: `@Async`; failures only WARN and never block the business flow
 - Login audit goes through `LoginAuditService.record(tenantId, ...)` separately (note: tenantId must be passed explicitly because worker threads do not inherit the ThreadLocal)
+
+## Domain events & state-change conventions (`core_domain_event`)
+
+Foundation-stage groundwork so future AI / revenue-management features have the *time-series, non-back-fillable* data they need (booking pace, pickup curves, every price change + reason). `core_domain_event` (V36) is the platform **event store + transactional outbox** — distinct from `core_oplog`:
+
+| | `core_oplog` (@OpLog) | `core_domain_event` |
+|---|---|---|
+| Records | *who called which HTTP endpoint* (request audit) | *what changed in the domain* (business fact) |
+| Shape | request URI / body / IP / UA | `aggregate_type` + `event_type` + structured `payload` JSONB |
+| Reader | a human admin | machines: analytics / AI / projections |
+| Lifecycle | insert-only | insert + outbox dispatch bookkeeping |
+
+These conventions apply as business modules land (they have no effect on a request that changes nothing):
+
+1. **All state changes go through a `@Service`** — never scatter table writes across controllers/aspects/utilities. This is the only place an event can be reliably emitted and the only seam where an AI actor can later be plugged in. (Reinforces Hard Rules 6–7.)
+2. **A state-changing service emits a domain event** into `core_domain_event`, **in the same transaction** as the business write (transactional outbox — no event without the write, no write without the event). Serialize `payload` with the Jackson3 `JsonMapper` bean (not Jackson 2 `ObjectMapper`). Set `actor` / `actor_type` from `RequestContext` (1 human / 2 AI service account / 3 system).
+3. **Keep history for revenue-relevant fields** (price, status, availability) — model them as append-only change events / history rows, not just a mutated current-value column. The current value is recoverable from history; history is not recoverable from the current value.
+4. Standard audit columns (`create_user` / `update_user` / `create_time` / `update_time`) stay mandatory and auto-filled — see Flyway conventions. They answer "who last touched the row"; domain events answer "what happened, in order".
+
+**Java side** (in `core-infrastructure/.../event/`):
+- Emit: inject `EventPublisher` and call `publish(DomainEvent.of("Rate", id, "rate.price_changed", payloadDto))` inside the business `@Transactional` method. `OutboxEventPublisher` writes synchronously in that same transaction (payload → JSONB via the Jackson3 `JsonMapper`; tenant/actor/trace from `RequestContext`).
+- Drain: `OutboxDispatcher` (`@Scheduled`) polls pending rows cross-tenant (it runs as the `system` tenant so the MP interceptor bypasses scoping) and hands each to an `EventDispatchSink`. With no sink bean registered it falls back to `LoggingEventDispatchSink` — events are persisted but not forwarded downstream. **To forward to a bus/analytics store, register one `@Component implements EventDispatchSink`.**
+- Config: `app.outbox.enabled` (default true) / `poll-interval-ms` (5000) / `batch-size` (200) / `max-attempts` (5).
 
 ## Error codes & exceptions
 
