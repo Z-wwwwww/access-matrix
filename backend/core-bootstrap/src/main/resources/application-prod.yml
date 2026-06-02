@@ -1,17 +1,16 @@
 # =============================================================================
-# prod｜生产(production)：oidc 鉴权；密钥用无默认 ${VAR}(缺失即启动失败)；
-# 关 Swagger；收紧 actuator。必填环境变量见 backend/.env.example。
-# 只覆盖与 base(application.yml) 不同的键。
+# prod｜生产(production)：oidc 鉴权；连接/密钥走环境变量；关 Swagger；收紧 actuator。
+# 必填环境变量见 backend/.env.example。只覆盖与 base(application.yml) 不同的键。
 # =============================================================================
 spring:
   datasource:
-    url: ${CORE_DB_URL}                 # 无默认→必填
-    username: ${CORE_DB_USERNAME}       # 无默认→必填
-    password: ${CORE_DB_PASSWORD}       # 无默认→必填
+    url: ${CORE_DB_URL}
+    username: ${CORE_DB_USERNAME}
+    password: ${CORE_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   data:
     redis:
-      host: ${CORE_REDIS_HOST}          # 无默认→必填
+      host: ${CORE_REDIS_HOST}
       port: ${CORE_REDIS_PORT:6379}
       password: ${CORE_REDIS_PASSWORD:} # 留空=无密码连接；生产建议设强密码
       database: ${CORE_REDIS_DB:0}
@@ -22,11 +21,11 @@ app:
   security:
     mode: oidc                          # 生产钉死 oidc；回退 legacy 用 APP_SECURITY_MODE=jwt + CORE_JWT_SECRET
     oidc:
-      issuer-base-uri: ${CORE_OIDC_ISSUER_BASE_URI}   # 无默认→必填，Keycloak 根地址(一租户一 realm)
+      issuer-base-uri: ${CORE_OIDC_ISSUER_BASE_URI}   # Keycloak 根地址(一租户一 realm)
   keycloak:
     admin:
-      server-url:    ${CORE_KEYCLOAK_SERVER_URL}            # 无默认→必填
-      client-secret: ${CORE_KEYCLOAK_PROVISIONER_SECRET}   # 无默认→必填(强值)，缺失即启动失败，不退回 dev 弱默认
+      server-url:    ${CORE_KEYCLOAK_SERVER_URL}
+      client-secret: ${CORE_KEYCLOAK_PROVISIONER_SECRET}   # 强值；base 注释说明它是推进 KC 的
     bootstrap:
       # 稳态 false；仅首次部署临时设 CORE_KEYCLOAK_BOOTSTRAP_ENABLED=true 引导 provisioner 客户端，成功后改回。
       enabled: ${CORE_KEYCLOAK_BOOTSTRAP_ENABLED:false}
@@ -34,7 +33,7 @@ app:
     tenant:
       enabled: true                     # 生产必须：租户行级隔离
   cors:
-    allowed-origins: ${CORE_CORS_ALLOWED_ORIGINS}   # 无默认→必填，明确白名单(逗号分隔)，勿用 "*"
+    allowed-origins: ${CORE_CORS_ALLOWED_ORIGINS}   # 明确白名单(逗号分隔)，勿用 "*"
   debug:
     expose-error-details: false         # 生产必须 false
 

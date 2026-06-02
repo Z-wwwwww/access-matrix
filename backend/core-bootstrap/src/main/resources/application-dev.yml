@@ -1,24 +1,25 @@
 # =============================================================================
-# dev｜开发(development)：oidc(连本地 Keycloak)；DB/Redis 指向 127.0.0.1；
-# cors 全开；cookie 非 https；@Profile("dev") 的 seeder 全开。
+# dev｜开发(development)：oidc(连本地 Keycloak)；cors 全开；cookie 非 https；
+# @Profile("dev") 的 seeder 全开。连接值与 prod/test 一样走环境变量——
+# 本地值见 backend/.env.dev（交给 IDE 运行配置加载）。
 # 启动：-Dspring-boot.run.profiles=dev 或 SPRING_PROFILES_ACTIVE=dev。
 # 只覆盖与 base(application.yml) 不同的键。
 # =============================================================================
 spring:
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/new_inntouch_core?stringtype=unspecified
-    username: postgres
-    password: abcd@1234                 # 本地固定弱口令，仅开发用
+    url: ${CORE_DB_URL}
+    username: ${CORE_DB_USERNAME}
+    password: ${CORE_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   data:
     redis:
-      host: 127.0.0.1
-      port: 6379
-      password: ${REDIS_PASSWORD:abcd@1234}
-      database: 1                       # 本地用 1 号库
+      host: ${CORE_REDIS_HOST}
+      port: ${CORE_REDIS_PORT:6379}
+      password: ${CORE_REDIS_PASSWORD:}
+      database: ${CORE_REDIS_DB:0}
   mail:
-    username: ${CORE_MAIL_USERNAME:}    # 无默认，按开发者自己的邮箱设
-    password: ${CORE_MAIL_PASSWORD:}    # ExMail 客户端专用密码；留空=不真发
+    username: ${CORE_MAIL_USERNAME:}    # ExMail 完整邮箱地址；留空则发信不可用
+    password: ${CORE_MAIL_PASSWORD:}    # ExMail 客户端专用密码
 
 app:
   security:
@@ -30,8 +31,8 @@ app:
     tenant:
       enabled: true                     # 显式开，避免历史上误继承 false 致跨租户可见
   mail:
-    enabled:   ${CORE_MAIL_ENABLED:false}   # 默认 false=只打日志(因已无 baked 邮箱)；配好 CORE_MAIL_* 后设 true 真发
-    from:      ${CORE_MAIL_FROM:}           # 无默认，与 username 对齐(ExMail 要求)
+    enabled:   ${CORE_MAIL_ENABLED:true}    # 默认 true=真发(需配好 CORE_MAIL_*)；设 false 则只打日志
+    from:      ${CORE_MAIL_FROM:}            # 与 username 对齐(ExMail 要求)
     from-name: ${CORE_MAIL_FROM_NAME:Access Matrix (dev)}
     base-url:  ${CORE_APP_BASE_URL:http://localhost:5273}
   cors:

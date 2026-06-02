@@ -8,11 +8,11 @@ server:
 
 spring:
   application:
-    name: core-service            # 服务名，出现在日志/监控里
+    name: am-core-service            # 服务名，出现在日志/监控里
   profiles:
     # 未设 SPRING_PROFILES_ACTIVE 时默认 prod（fail-closed：默认带鉴权+租户隔离）。
     # 本地开发必须显式 SPRING_PROFILES_ACTIVE=dev（profile 配置见 application-dev.yml）。
-    active: ${SPRING_PROFILES_ACTIVE:prod}   # 可填 prod|dev|test
+    active: ${SPRING_PROFILES_ACTIVE:dev}   # 可填 prod|dev|test
   jackson:
     time-zone: Asia/Tokyo         # JSON 序列化时间所用时区
     datatype:
@@ -24,7 +24,7 @@ spring:
   # 下面的 ssl/starttls 属性按「465 隐式 TLS」(腾讯企业邮 ExMail 这类)预设；
   # 改用 587 STARTTLS 的服务商(Gmail/SES 等)时需相应调整 port/ssl.enable/starttls.enable。
   mail:
-    host: ${CORE_MAIL_HOST:}                     # SMTP 主机；无默认，按环境提供（各家不同）
+    host: ${CORE_MAIL_HOST:}                     # SMTP 主机；按环境提供（各家不同），留空则发信不可用
     port: ${CORE_MAIL_PORT:465}                  # 465=隐式 TLS（配合下面 ssl.enable=true）；587=STARTTLS（需另改 starttls.enable=true）
     username: ${CORE_MAIL_USERNAME:}             # 完整邮箱地址；留空则发信功能不可用
     password: ${CORE_MAIL_PASSWORD:}             # ExMail「客户端专用密码」(非登录密码)；留空则发信功能不可用
@@ -175,7 +175,7 @@ app:
       enabled:        ${CORE_KEYCLOAK_BOOTSTRAP_ENABLED:true}            # true=启动时执行引导 | false=跳过(provisioner 已建好后用)
       client-id:      ${CORE_KEYCLOAK_BOOTSTRAP_CLIENT_ID:admin-cli}     # 引导用的临时客户端
       username:       ${CORE_KEYCLOAK_BOOTSTRAP_USERNAME:admin}         # 临时 root 用户名
-      password:       ${CORE_KEYCLOAK_BOOTSTRAP_PASSWORD:abcd@1234}     # 临时 root 密码(dev 弱默认；prod 必须用强值并在引导后撤掉)
+      password:       ${CORE_KEYCLOAK_BOOTSTRAP_PASSWORD:admin}     # 临时 root 密码(dev 弱默认；prod 必须用强值并在引导后撤掉)
       managed-realms: ${CORE_KEYCLOAK_BOOTSTRAP_MANAGED_REALMS:demo,system}   # 逗号分隔；这些 realm 是导入的，需额外授予 manage-users
   # ─── 出站邮件（MailService 用于邀请/重置/入驻通知）───
   mail:

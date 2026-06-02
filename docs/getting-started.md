@@ -74,6 +74,8 @@ Keycloak stores its internal tables in this schema, physically separated from th
 
 ## 3. Start the backend (dev profile)
 
+> The dev profile reads its DB/Redis connection from environment variables (same shape as prod/test). Load `backend/.env.dev` first — point your IDE run config at it (IntelliJ: *Environment variables* field or the EnvFile plugin), or in a shell run `set -a; . ./backend/.env.dev; set +a` before the command below. Without it, startup fails on a missing `CORE_DB_URL`.
+
 ```bash
 cd backend
 ./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev

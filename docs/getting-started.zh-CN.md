@@ -74,6 +74,8 @@ Keycloak 用这个 schema 存自己的内部表，跟应用业务表（`public` 
 
 ## 3. 启动后端（dev profile）
 
+> dev profile 的 DB/Redis 连接走环境变量（和 prod/test 一致）。先加载 `backend/.env.dev`：用 IDE 运行配置指向它（IntelliJ：*Environment variables* 字段，或 EnvFile 插件），或在 shell 里先 `set -a; . ./backend/.env.dev; set +a` 再执行下面的命令。不加载会因缺 `CORE_DB_URL` 启动失败。
+
 ```bash
 cd backend
 ./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
