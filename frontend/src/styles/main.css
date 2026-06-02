@@ -6,6 +6,11 @@
  * Palettes (selectable at runtime via `data-palette` on <html>):
  *   • warm      — Warm Neutral + Deep Navy             ← DEFAULT (no attribute)
  *                 (original v1 design system)
+ *   • champagne — Warm cream surfaces + Champagne gold  (#f6f1e8 + #c9a875)
+ *   • iris      — Cool slate neutrals + Violet accent   (Linear / modern SaaS)
+ *   • teal      — Cool neutrals + Deep teal accent      (clean, professional)
+ *   • clay      — Warm neutrals + Terracotta accent     (warm, not yellow)
+ *   • rose      — Neutral grays + Rose-red accent       (elegant, brand-y)
  *   • black     — Monochrome surfaces + Electric Blue  (Apple bg + Vercel blue)
  *   • indigo    — Slate neutrals + Indigo accent       (shadcn/Linear style)
  *   • sand      — Stone neutrals + Amber accent        (Notion style)
@@ -359,6 +364,223 @@
   --input: hsl(217, 20%, 18%);
   --ring: hsl(189, 94%, 55%);
   --brand-orange: hsl(189, 94%, 38%);
+}
+
+/* ── Champagne — Warm cream surfaces + Champagne-gold accent ──
+   Built from the brand pair #f6f1e8 (warm cream) and #c9a875 (champagne
+   gold). The gold is light, so primary/accent carry a dark warm-brown
+   foreground (gold button + dark text) which both reads as premium and
+   clears WCAG AA. The gold is the selection signature (--brand-orange). */
+[data-palette="champagne"] {
+  --background: hsl(39, 44%, 94%);
+  --foreground: hsl(36, 30%, 12%);
+  /* White card surface (header / sidebar / content cards) so the cream
+     #f6f1e8 canvas reads as a tint behind clean white panels, instead of
+     the whole screen washing out yellow. */
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(36, 30%, 12%);
+  --primary: hsl(36, 44%, 62%);
+  --primary-foreground: hsl(36, 40%, 12%);
+  --accent: hsl(36, 50%, 55%);
+  --accent-foreground: hsl(36, 40%, 12%);
+  --secondary: hsl(39, 35%, 89%);
+  --secondary-foreground: hsl(36, 30%, 12%);
+  --muted: hsl(39, 30%, 88%);
+  --muted-foreground: hsl(36, 15%, 40%);
+  --destructive: hsl(0, 84%, 55%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(39, 28%, 82%);
+  --input: hsl(39, 28%, 82%);
+  --ring: hsl(36, 44%, 62%);
+  --brand-orange: hsl(36, 44%, 62%);
+}
+.dark[data-palette="champagne"] {
+  --background: hsl(36, 12%, 7%);
+  --foreground: hsl(39, 30%, 92%);
+  --card: hsl(36, 12%, 12%);
+  --card-foreground: hsl(39, 30%, 92%);
+  --primary: hsl(36, 52%, 64%);
+  --primary-foreground: hsl(36, 40%, 8%);
+  --accent: hsl(38, 60%, 68%);
+  --accent-foreground: hsl(36, 40%, 8%);
+  --secondary: hsl(36, 10%, 18%);
+  --secondary-foreground: hsl(39, 30%, 92%);
+  --muted: hsl(36, 8%, 20%);
+  --muted-foreground: hsl(39, 12%, 62%);
+  --destructive: hsl(0, 84%, 55%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(36, 10%, 24%);
+  --input: hsl(36, 10%, 24%);
+  --ring: hsl(36, 52%, 64%);
+  --brand-orange: hsl(36, 52%, 64%);
+}
+
+/* ── Iris — Cool slate neutrals + Violet accent (Linear / modern SaaS) ── */
+[data-palette="iris"] {
+  --background: hsl(264, 40%, 99%);
+  --foreground: hsl(263, 25%, 11%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(263, 25%, 11%);
+  --primary: hsl(262, 83%, 58%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(258, 90%, 66%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(264, 30%, 96%);
+  --secondary-foreground: hsl(263, 25%, 11%);
+  --muted: hsl(264, 30%, 96%);
+  --muted-foreground: hsl(263, 15%, 45%);
+  --destructive: hsl(0, 84%, 55%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(264, 25%, 91%);
+  --input: hsl(264, 25%, 91%);
+  --ring: hsl(262, 83%, 58%);
+  --brand-orange: hsl(262, 83%, 58%);
+}
+.dark[data-palette="iris"] {
+  --background: hsl(264, 30%, 5%);
+  --foreground: hsl(264, 30%, 96%);
+  --card: hsl(264, 24%, 10%);
+  --card-foreground: hsl(264, 30%, 96%);
+  --primary: hsl(258, 90%, 74%);
+  --primary-foreground: hsl(264, 40%, 10%);
+  --accent: hsl(255, 92%, 80%);
+  --accent-foreground: hsl(264, 40%, 10%);
+  --secondary: hsl(264, 18%, 16%);
+  --secondary-foreground: hsl(264, 30%, 96%);
+  --muted: hsl(264, 16%, 18%);
+  --muted-foreground: hsl(264, 15%, 65%);
+  --destructive: hsl(0, 84%, 55%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(264, 16%, 22%);
+  --input: hsl(264, 16%, 22%);
+  --ring: hsl(258, 90%, 74%);
+  --brand-orange: hsl(258, 90%, 74%);
+}
+
+/* ── Teal — Cool neutrals + Deep teal accent (clean, professional) ── */
+[data-palette="teal"] {
+  --background: hsl(170, 40%, 97%);
+  --foreground: hsl(185, 30%, 11%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(185, 30%, 11%);
+  --primary: hsl(175, 77%, 26%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(174, 78%, 32%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(170, 30%, 95%);
+  --secondary-foreground: hsl(185, 30%, 11%);
+  --muted: hsl(170, 30%, 95%);
+  --muted-foreground: hsl(185, 12%, 42%);
+  --destructive: hsl(0, 84%, 55%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(172, 25%, 88%);
+  --input: hsl(172, 25%, 88%);
+  --ring: hsl(175, 77%, 26%);
+  --brand-orange: hsl(175, 77%, 26%);
+}
+.dark[data-palette="teal"] {
+  --background: hsl(185, 35%, 5%);
+  --foreground: hsl(170, 30%, 95%);
+  --card: hsl(185, 28%, 9%);
+  --card-foreground: hsl(170, 30%, 95%);
+  --primary: hsl(172, 66%, 50%);
+  --primary-foreground: hsl(185, 40%, 8%);
+  --accent: hsl(168, 76%, 60%);
+  --accent-foreground: hsl(185, 40%, 8%);
+  --secondary: hsl(185, 18%, 15%);
+  --secondary-foreground: hsl(170, 30%, 95%);
+  --muted: hsl(185, 16%, 17%);
+  --muted-foreground: hsl(180, 14%, 64%);
+  --destructive: hsl(0, 84%, 55%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(185, 16%, 21%);
+  --input: hsl(185, 16%, 21%);
+  --ring: hsl(172, 66%, 50%);
+  --brand-orange: hsl(172, 66%, 50%);
+}
+
+/* ── Clay — Warm neutrals + Terracotta accent (warm, but not yellow) ── */
+[data-palette="clay"] {
+  --background: hsl(24, 33%, 97%);
+  --foreground: hsl(15, 25%, 12%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(15, 25%, 12%);
+  --primary: hsl(12, 52%, 49%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(14, 62%, 53%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(24, 25%, 94%);
+  --secondary-foreground: hsl(15, 25%, 12%);
+  --muted: hsl(24, 25%, 94%);
+  --muted-foreground: hsl(15, 12%, 42%);
+  --destructive: hsl(0, 84%, 55%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(22, 22%, 88%);
+  --input: hsl(22, 22%, 88%);
+  --ring: hsl(12, 52%, 49%);
+  --brand-orange: hsl(12, 52%, 49%);
+}
+.dark[data-palette="clay"] {
+  --background: hsl(15, 18%, 6%);
+  --foreground: hsl(24, 25%, 93%);
+  --card: hsl(15, 16%, 11%);
+  --card-foreground: hsl(24, 25%, 93%);
+  --primary: hsl(14, 72%, 64%);
+  --primary-foreground: hsl(15, 35%, 8%);
+  --accent: hsl(18, 78%, 70%);
+  --accent-foreground: hsl(15, 35%, 8%);
+  --secondary: hsl(15, 12%, 16%);
+  --secondary-foreground: hsl(24, 25%, 93%);
+  --muted: hsl(15, 10%, 18%);
+  --muted-foreground: hsl(24, 12%, 64%);
+  --destructive: hsl(0, 84%, 55%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(15, 12%, 22%);
+  --input: hsl(15, 12%, 22%);
+  --ring: hsl(14, 72%, 64%);
+  --brand-orange: hsl(14, 72%, 64%);
+}
+
+/* ── Rose — Neutral grays + Rose-red accent (elegant, brand-y) ── */
+[data-palette="rose"] {
+  --background: hsl(340, 40%, 99%);
+  --foreground: hsl(340, 20%, 12%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(340, 20%, 12%);
+  --primary: hsl(346, 83%, 41%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --accent: hsl(346, 80%, 45%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(340, 30%, 96%);
+  --secondary-foreground: hsl(340, 20%, 12%);
+  --muted: hsl(340, 30%, 96%);
+  --muted-foreground: hsl(340, 10%, 45%);
+  --destructive: hsl(0, 84%, 55%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(340, 25%, 91%);
+  --input: hsl(340, 25%, 91%);
+  --ring: hsl(346, 83%, 41%);
+  --brand-orange: hsl(346, 83%, 41%);
+}
+.dark[data-palette="rose"] {
+  --background: hsl(340, 25%, 5%);
+  --foreground: hsl(340, 25%, 95%);
+  --card: hsl(340, 20%, 10%);
+  --card-foreground: hsl(340, 25%, 95%);
+  --primary: hsl(350, 90%, 68%);
+  --primary-foreground: hsl(340, 40%, 10%);
+  --accent: hsl(351, 95%, 74%);
+  --accent-foreground: hsl(340, 40%, 10%);
+  --secondary: hsl(340, 15%, 16%);
+  --secondary-foreground: hsl(340, 25%, 95%);
+  --muted: hsl(340, 13%, 18%);
+  --muted-foreground: hsl(340, 12%, 65%);
+  --destructive: hsl(0, 84%, 55%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(340, 13%, 22%);
+  --input: hsl(340, 13%, 22%);
+  --ring: hsl(350, 90%, 68%);
+  --brand-orange: hsl(350, 90%, 68%);
 }
 
 /* ── Register tokens in Tailwind v4 @theme ── */

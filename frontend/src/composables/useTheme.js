@@ -12,8 +12,9 @@ const STORAGE_KEY_PALETTE = 'theme-palette'
  * tokens so the picker conveys their identity at a glance.
  */
 export const PALETTES = [
-  // Warm Classic is the project's original design system — restored as the
-  // default. No data-palette attribute set when this palette is active.
+  // Warm Classic is the project's original design system. No data-palette
+  // attribute is set when this palette is active. (Default is now 'clay' —
+  // see getInitialPalette.)
   {
     value: 'warm',
     label: 'Warm Classic',
@@ -33,6 +34,56 @@ export const PALETTES = [
       bg: 'hsl(0, 0%, 4%)',
       card: 'hsl(0, 0%, 8%)',
       primary: 'hsl(217, 91%, 65%)'
+    }
+  },
+  // Champagne — brand pair #f6f1e8 (warm cream) + #c9a875 (champagne gold).
+  {
+    value: 'champagne',
+    label: 'Champagne',
+    swatch: {
+      bg: 'hsl(39, 44%, 94%)',
+      card: 'hsl(0, 0%, 100%)',
+      primary: 'hsl(36, 44%, 62%)'
+    }
+  },
+  // Iris — cool slate neutrals + violet accent (Linear / modern SaaS).
+  {
+    value: 'iris',
+    label: 'Iris',
+    swatch: {
+      bg: 'hsl(264, 40%, 99%)',
+      card: 'hsl(0, 0%, 100%)',
+      primary: 'hsl(262, 83%, 58%)'
+    }
+  },
+  // Teal — cool neutrals + deep teal accent (clean, professional).
+  {
+    value: 'teal',
+    label: 'Teal',
+    swatch: {
+      bg: 'hsl(170, 40%, 97%)',
+      card: 'hsl(0, 0%, 100%)',
+      primary: 'hsl(175, 77%, 26%)'
+    }
+  },
+  // Clay — warm neutrals + terracotta accent (warm, but not yellow).
+  {
+    value: 'clay',
+    label: 'Clay',
+    swatch: {
+      bg: 'hsl(24, 33%, 97%)',
+      card: 'hsl(0, 0%, 100%)',
+      primary: 'hsl(12, 52%, 49%)'
+    }
+  },
+  // Rose — neutral grays + rose-red accent (elegant, brand-y).
+  {
+    value: 'rose',
+    label: 'Rose',
+    swatch: {
+      bg: 'hsl(340, 40%, 99%)',
+      card: 'hsl(0, 0%, 100%)',
+      primary: 'hsl(346, 83%, 41%)'
     }
   },
   {
@@ -101,7 +152,7 @@ function getInitialMode() {
 
 function getInitialPalette() {
   const stored = localStorage.getItem(STORAGE_KEY_PALETTE)
-  return PALETTE_VALUES.includes(stored) ? stored : 'warm'
+  return PALETTE_VALUES.includes(stored) ? stored : 'clay'
 }
 
 const mode = ref(getInitialMode())
