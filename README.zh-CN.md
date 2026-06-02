@@ -238,18 +238,6 @@ app:
 
 ---
 
-## 🤝 贡献
-
-PR 欢迎。请按 [Conventional Commits](https://www.conventionalcommits.org/) 写 commit message，`scope` 用 `backend` / `frontend` / `infra` / `docs`：
-
-```
-feat(backend): add SAML 2.0 support
-fix(frontend): close menu drawer on route change
-docs(getting-started): clarify Keycloak port conflict
-```
-
----
-
 ## 📄 License
 
 [MIT](LICENSE) © Access Matrix contributors.

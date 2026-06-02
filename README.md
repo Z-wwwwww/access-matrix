@@ -235,18 +235,6 @@ Detail in [docs/migration-password-to-sso.md](docs/migration-password-to-sso.md)
 
 ---
 
-## 🤝 Contributing
-
-PRs welcome. Please follow [Conventional Commits](https://www.conventionalcommits.org/) and use `backend` / `frontend` / `infra` / `docs` as the scope:
-
-```
-feat(backend): add SAML 2.0 support
-fix(frontend): close menu drawer on route change
-docs(getting-started): clarify Keycloak port conflict
-```
-
----
-
 ## 📄 License
 
 [MIT](LICENSE) © Access Matrix contributors.
