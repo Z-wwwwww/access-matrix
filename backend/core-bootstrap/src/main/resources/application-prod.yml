@@ -4,9 +4,9 @@
 # =============================================================================
 spring:
   datasource:
-    url: ${CORE_DB_URL}
-    username: ${CORE_DB_USERNAME}
-    password: ${CORE_DB_PASSWORD}
+    url: ${CORE_DB_URL}                 # 无默认→必填，如 jdbc:postgresql://host:5432/db
+    username: ${CORE_DB_USERNAME}       # 无默认→必填
+    password: ${CORE_DB_PASSWORD}       # 无默认→必填
     driver-class-name: org.postgresql.Driver
   data:
     redis:
