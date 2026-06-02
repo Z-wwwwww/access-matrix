@@ -3,12 +3,15 @@ import { ref, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notification'
+import { useNotificationStream } from '@/composables/useNotificationStream'
 import { useTheme } from '@/composables/useTheme'
-import { Menu, LogOut, User, Sun, Moon, Palette, Languages, ChevronDown, Check, KeyRound, ShieldAlert } from 'lucide-vue-next'
+import { Menu, LogOut, User, Sun, Moon, Palette, Languages, ChevronDown, Check, KeyRound, ShieldAlert, Bell, AlertCircle } from 'lucide-vue-next'
 import ChangePasswordDialog from './ChangePasswordDialog.vue'
 import BreakGlassPasswordDialog from './BreakGlassPasswordDialog.vue'
 import { usePermission } from '@/composables/usePermission'
 import { oidcConfig } from '@/utils/oidc'
+import { toJST } from '@/lib/date'
 
 defineProps({
   collapsed: {
@@ -47,6 +50,54 @@ function pickPalette(value) {
   setPalette(value)
   paletteOpen.value = false
   document.removeEventListener('mousedown', closePaletteMenu, true)
+}
+
+// ── Notifications (站内通知 + 即时红点) ──
+const notificationStore = useNotificationStore()
+useNotificationStream()                 // open SSE; pushes update store.unread
+const bellOpen = ref(false)
+const bellPanelRef = ref(null)
+const bellTriggerRef = ref(null)
+
+// コンパクトな時刻表示(JST、MM/DD HH:mm)。relativeTime プラグインは未導入なので
+// プロジェクト共通の lib/date に揃える。
+function notifTime(v) {
+  if (!v) return ''
+  const d = toJST(v)
+  return d.isValid() ? d.format('MM/DD HH:mm') : ''
+}
+
+function toggleBellMenu() {
+  bellOpen.value = !bellOpen.value
+  if (bellOpen.value) {
+    notificationStore.fetchList()       // lazy-load recent items on open
+    setTimeout(() => document.addEventListener('mousedown', closeBellMenu, true), 0)
+  }
+}
+
+function closeBellMenu(e) {
+  if (bellPanelRef.value?.contains(e?.target)) return
+  if (bellTriggerRef.value?.contains(e?.target)) return
+  bellOpen.value = false
+  document.removeEventListener('mousedown', closeBellMenu, true)
+}
+
+function openNotification(item) {
+  // info 型は開いた時点で既読。action 型は「実際に処理完了(resolve)」されるまで
+  // 未読のまま=「待処理」バッジと赤点を維持する(開いただけでは消さない)。
+  if (item.kind !== 1) notificationStore.markRead(item.id)
+  bellOpen.value = false
+  document.removeEventListener('mousedown', closeBellMenu, true)
+  if (!item.link) return
+  if (item.bizId) {
+    // ドロワー型:対象 id は URL に出さず store 経由で渡し、遷移はクリーンな link のみ。
+    // URL/keep-alive キャッシュキーが変わらないのでドロワー多重化を防げる。
+    notificationStore.setPendingNav({ path: item.link, bizType: item.bizType, id: item.bizId })
+    router.push(item.link)
+  } else {
+    // 普通のページ遷移(タブを開く)。
+    router.push(item.link)
+  }
 }
 
 // ── Language switcher ──
@@ -122,6 +173,7 @@ function handleLogout() {
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', closeLangMenu, true)
   document.removeEventListener('mousedown', closePaletteMenu, true)
+  document.removeEventListener('mousedown', closeBellMenu, true)
 })
 </script>
 
@@ -140,6 +192,80 @@ onBeforeUnmount(() => {
 
     <!-- Right -->
     <div class="flex items-center gap-1">
+      <!-- Notifications (站内通知 + 即时红点) -->
+      <div class="relative">
+        <button
+          ref="bellTriggerRef"
+          class="relative p-2 rounded-lg hover:bg-muted transition-colors"
+          :class="{ 'bg-muted': bellOpen }"
+          :aria-label="t('layout.notification.title')"
+          @click="toggleBellMenu"
+        >
+          <Bell :size="18" class="text-foreground" />
+          <span
+            v-if="notificationStore.unread > 0"
+            class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-signal-red text-white text-[10px] leading-4 font-medium text-center"
+          >{{ notificationStore.unread > 99 ? '99+' : notificationStore.unread }}</span>
+        </button>
+        <div
+          v-if="bellOpen"
+          ref="bellPanelRef"
+          class="absolute right-0 top-full mt-1 w-[360px] rounded-2xl border border-border bg-card shadow-xl z-50 overflow-hidden"
+        >
+          <div class="flex items-center justify-between px-4 h-11 border-b border-border">
+            <span class="text-sm font-semibold text-foreground">{{ t('layout.notification.title') }}</span>
+            <button
+              v-if="notificationStore.unread > 0"
+              class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              @click="notificationStore.markAllRead()"
+            >{{ t('layout.notification.markAllRead') }}</button>
+          </div>
+          <div class="max-h-[420px] overflow-y-auto scrollbar-thin p-1">
+            <p
+              v-if="!notificationStore.list.length"
+              class="px-4 py-10 text-center text-sm text-muted-foreground"
+            >{{ t('layout.notification.empty') }}</p>
+            <!-- フラットな行リスト(GitHub/Linear 風)。未読は背景を薄く染め + 先頭ドット、
+                 末尾に「待処理」を控えめに表示。カード枠は付けず雑然さを避ける。 -->
+            <button
+              v-for="item in notificationStore.list"
+              :key="item.id"
+              class="flex w-full gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted/60"
+              :class="{ 'bg-primary/5': item.readFlag !== 1 }"
+              @click="openNotification(item)"
+            >
+              <span class="mt-1 shrink-0 w-2 flex justify-center">
+                <span v-if="item.readFlag !== 1" class="w-2 h-2 rounded-full bg-primary" />
+              </span>
+              <!-- 本文(タイトル/内容)。改行せず、右の meta 列に触れる手前で … 省略。 -->
+              <span class="flex-1 min-w-0">
+                <span
+                  class="block truncate text-sm"
+                  :class="item.readFlag === 1 ? 'text-muted-foreground' : 'font-medium text-foreground'"
+                  :title="item.title"
+                >{{ item.title }}</span>
+                <span
+                  v-if="item.content"
+                  class="mt-0.5 block truncate text-xs text-muted-foreground"
+                  :title="item.content"
+                >{{ item.content }}</span>
+              </span>
+              <!-- meta 列:時刻が上、待処理アイコンは常にその真下(固定位置、折り返さない)。 -->
+              <span class="shrink-0 flex flex-col items-end gap-1 pl-1">
+                <span class="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">{{ notifTime(item.createTime) }}</span>
+                <span
+                  v-if="item.kind === 1 && item.readFlag !== 1"
+                  class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400"
+                >
+                  <AlertCircle :size="11" />
+                  {{ t('layout.notification.actionRequired') }}
+                </span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Theme toggle -->
       <button class="p-2 rounded-lg hover:bg-muted transition-colors" @click="toggleTheme">
         <Sun v-if="theme === 'dark'" :size="18" class="text-foreground" />

@@ -1,6 +1,7 @@
 <script setup>
-import { onMounted, reactive, ref, computed } from 'vue'
+import { onMounted, onActivated, onDeactivated, reactive, ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useNotificationStore } from '@/stores/notification'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -13,13 +14,14 @@ import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { Plus, Search, RotateCcw, Pencil, Trash2 } from 'lucide-vue-next'
 import {
-  getDemoTaskListApi, addDemoTaskApi, updateDemoTaskApi, deleteDemoTaskApi
+  getDemoTaskListApi, getDemoTaskApi, addDemoTaskApi, updateDemoTaskApi, deleteDemoTaskApi
 } from '../../../../services/demoTask'
 import { getDeptTreeApi } from '../../../../services/dept'
 import { getUserListApi } from '../../../../services/user'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
+const notificationStore = useNotificationStore()
 
 const loading = ref(false)
 const list = ref([])
@@ -208,11 +210,39 @@ async function handleDelete(row) {
   } catch (e) { toast.error(e.message) }
 }
 
+/**
+ * 通知からの遷移:詳細は専用ルートではなくドロワー表示。taskId は URL ではなく
+ * notification store(pendingNav)経由で受け取り、該当タスクを取得して開く。
+ */
+async function openById(id) {
+  try {
+    const res = await getDemoTaskApi(id)
+    if (res.data.code === 0 && res.data.data) openEdit(res.data.data)
+    else toast.error(res.data.msg || t('task.message.loadFailed'))
+  } catch (e) { toast.error(e.message) }
+}
+
 onMounted(() => {
   fetchData()
   loadDepts()
   loadUsers()
 })
+
+// store(pendingNav)から対象 id を取り出してドロワーを開く。take は consume(一度きり)。
+function consumeDrawerNav() {
+  const nav = notificationStore.takePendingNav('/demo/task')
+  if (nav && nav.bizType === 'demo_task' && nav.id) openById(nav.id)
+}
+
+// URL は常に /demo/task で不変 → keep-alive のインスタンスは 1 つだけ。よって以下の
+// watch も 1 インスタンスにしか存在せず、過去の“多重発火”は起きない。
+//   - onActivated:別ページから遷移してきた / 初回マウント時。
+//   - watch     :既に本ページがアクティブな状態で別の通知を再クリック(route 変化なし)した時。
+// drawerNavActive で「アクティブな時だけ開く」よう絞り、非表示状態での誤オープンを防ぐ。
+let drawerNavActive = false
+onActivated(() => { drawerNavActive = true; consumeDrawerNav() })
+onDeactivated(() => { drawerNavActive = false })
+watch(() => notificationStore.pendingNav, () => { if (drawerNavActive) consumeDrawerNav() })
 </script>
 
 <template>

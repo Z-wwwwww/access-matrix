@@ -30,3 +30,4 @@
 | scope | services/scope.js | データ範囲（`/scope/me` で現在ユーザーの decision） | AI | 2026-05-21 |
 | oplog | services/oplog.js | 操作ログ 一覧・詳細 | AI | 2026-05-21 |
 | dict | services/dict.js | 辞書マスタ + 辞書データ CRUD（旧 PMS 互換 / `useDict` composable は別ルートで静的取得） | AI | 2026-04-16 |
+| notification | services/notification.js | 站内通知：未読数 / 一覧 / 既読 / 全既読 + SSE ticket（即時赤ドット。stream は EventSource で `useNotificationStream` が接続） | AI | 2026-06-02 |

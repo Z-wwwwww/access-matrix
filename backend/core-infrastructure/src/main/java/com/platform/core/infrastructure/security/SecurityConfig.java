@@ -19,6 +19,10 @@ public class SecurityConfig {
     private static final String[] PERMIT_PATHS = {
             "/health/**",
             "/auth/**",
+            // SSE notification stream: EventSource can't send a Bearer header,
+            // so this path authenticates via a one-time ticket (minted by the
+            // authenticated POST /notification/sse-ticket) instead of JWT.
+            "/notification/stream",
             "/actuator/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",

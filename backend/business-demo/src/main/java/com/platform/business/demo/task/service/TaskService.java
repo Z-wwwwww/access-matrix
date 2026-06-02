@@ -5,13 +5,17 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.platform.business.demo.task.dto.TaskDto;
 import com.platform.business.demo.task.entity.TaskEntity;
 import com.platform.business.demo.task.mapper.TaskMapper;
+import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
+import com.platform.core.common.notification.NotificationEvent;
+import com.platform.core.common.notification.NotificationResolvedEvent;
 import com.platform.core.common.result.PageResult;
 import com.platform.core.infrastructure.security.rbac.DataScopeDecision;
 import com.platform.core.infrastructure.security.rbac.DataScopeHelper;
 import com.platform.core.infrastructure.security.rbac.DataScopeResolver;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,10 +26,32 @@ public class TaskService {
 
     private final TaskMapper taskMapper;
     private final DataScopeResolver dataScopeResolver;
+    private final ApplicationEventPublisher publisher;
 
-    public TaskService(TaskMapper taskMapper, DataScopeResolver dataScopeResolver) {
+    public TaskService(TaskMapper taskMapper, DataScopeResolver dataScopeResolver,
+                       ApplicationEventPublisher publisher) {
         this.taskMapper = taskMapper;
         this.dataScopeResolver = dataScopeResolver;
+        this.publisher = publisher;
+    }
+
+    /**
+     * Fire an in-app notification to the assignee. Published inside the
+     * @Transactional method; the core listener runs AFTER_COMMIT (async), so a
+     * rolled-back save never notifies. Business stays decoupled — it depends
+     * only on {@link NotificationEvent} in core-common, not the notification
+     * module.
+     */
+    private void notifyAssignee(TaskEntity t) {
+        if (t.getAssigneeUserId() == null || t.getAssigneeUserId().isBlank()) return;
+        // action 型:担当者が「対応すべき」もの。UI は「待処理」バッジで区別し、
+        // タスクを完了/取消にすると NotificationResolvedEvent で既読になる。
+        // link はクリーンな一覧ルート。詳細は bizType/bizId を手がかりにフロントが
+        // ドロワーで開く(id は URL ではなく store 経由)。
+        publisher.publishEvent(NotificationEvent.action(
+                RequestContext.tenantIdOrDefault(), t.getAssigneeUserId(),
+                "task.assigned", "対応が必要なタスクが割り当てられました", t.getTitle(),
+                "/demo/task", "demo_task", t.getId()));
     }
 
     /**
@@ -78,6 +104,7 @@ public class TaskService {
         t.setAssigneeUserId(req.assigneeUserId());
         t.setDueDate(req.dueDate());
         taskMapper.insert(t);
+        notifyAssignee(t);
         return t.getId();
     }
 
@@ -92,9 +119,17 @@ public class TaskService {
         if (req.content() != null) t.setContent(req.content());
         if (req.status() != null) t.setStatus(req.status());
         if (req.priority() != null) t.setPriority(req.priority());
+        boolean assigneeChanged = req.assigneeUserId() != null
+                && !req.assigneeUserId().equals(t.getAssigneeUserId());
         if (req.assigneeUserId() != null) t.setAssigneeUserId(req.assigneeUserId());
         if (req.dueDate() != null) t.setDueDate(req.dueDate());
         taskMapper.updateById(t);
+        if (assigneeChanged) notifyAssignee(t);
+        // 「処理完了」= 完了(3)/取消(4)。この時点で該当タスクの action 通知を既読化する。
+        if (req.status() != null && (req.status() == 3 || req.status() == 4)) {
+            publisher.publishEvent(new NotificationResolvedEvent(
+                    RequestContext.tenantIdOrDefault(), "demo_task", id));
+        }
     }
 
     @Transactional

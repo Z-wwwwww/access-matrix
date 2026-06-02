@@ -103,6 +103,12 @@ export default {
     },
     footer: {
       copyright: 'Copyright © 2026 ACME Co.,Ltd.'
+    },
+    notification: {
+      title: '通知',
+      empty: '暂无通知',
+      markAllRead: '全部标为已读',
+      actionRequired: '待处理'
     }
   },
 
