@@ -13,8 +13,12 @@ const TENANT   = process.env.E2E_TENANT   || 'demo'
  */
 async function isStackUp() {
   try {
-    const res = await fetch(`${BACKEND}/actuator/health`, {
-      signal: AbortSignal.timeout(2000)
+    // Probe liveness, not the aggregated /health — the latter fans out to
+    // DB/Redis/mail indicators and can take several seconds, blowing the
+    // probe budget and causing false "stack down" skips. Liveness answers
+    // exactly what we need: "is the app process up?"
+    const res = await fetch(`${BACKEND}/actuator/health/liveness`, {
+      signal: AbortSignal.timeout(5000)
     })
     return res.ok
   } catch {
@@ -49,7 +53,9 @@ export const test = base.extend({
 
     await page.goto('/login')
     await page.getByLabel(/username|ユーザー|用户名/i).fill(USER)
-    await page.getByLabel(/password|パスワード|密码/i).fill(PASS)
+    // #password targets the input only — getByLabel(/password/i) also matches
+    // the "Show password" toggle button (aria-label), a strict-mode violation.
+    await page.locator('#password').fill(PASS)
     await page.getByRole('button', { name: /sign in|ログイン|登录/i }).click()
     await expect(page).not.toHaveURL(/\/login/, { timeout: 10_000 })
 

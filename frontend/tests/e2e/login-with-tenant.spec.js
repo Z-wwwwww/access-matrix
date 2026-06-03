@@ -27,7 +27,7 @@ test('login attaches X-Tenant-Id from localStorage', async ({ page, stack }) => 
   )
 
   await page.getByLabel(/username|ユーザー|用户名/i).fill(env.USER)
-  await page.getByLabel(/password|パスワード|密码/i).fill(env.PASS)
+  await page.locator('#password').fill(env.PASS)
   await page.getByRole('button', { name: /sign in|ログイン|登录/i }).click()
 
   const loginReq = await loginReqPromise
