@@ -11,9 +11,9 @@ import { defineConfig, devices } from '@playwright/test'
  * Override with env vars:
  *   E2E_BASE_URL   — frontend (default http://127.0.0.1:5273)
  *   E2E_API_URL    — backend  (default http://127.0.0.1:9135/api)
- *   E2E_USERNAME   — login user (default 'admin')
- *   E2E_PASSWORD   — login password (default 'admin123!A')
- *   E2E_TENANT     — tenant id sent in X-Tenant-Id header (default 'default')
+ *   E2E_USERNAME   — login user (default 'demo-admin', the LocalAdminSeeder user)
+ *   E2E_PASSWORD   — login password (default 'demo-admin')
+ *   E2E_TENANT     — tenant id sent in X-Tenant-Id header (default 'demo')
  */
 export default defineConfig({
   testDir: './tests/e2e',

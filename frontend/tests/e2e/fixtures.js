@@ -2,9 +2,9 @@ import { test as base, expect } from '@playwright/test'
 
 const FRONTEND = process.env.E2E_BASE_URL || 'http://127.0.0.1:5273'
 const BACKEND  = process.env.E2E_API_URL  || 'http://127.0.0.1:9135/api'
-const USER     = process.env.E2E_USERNAME || 'admin'
-const PASS     = process.env.E2E_PASSWORD || 'admin123!A'
-const TENANT   = process.env.E2E_TENANT   || 'default'
+const USER     = process.env.E2E_USERNAME || 'demo-admin'
+const PASS     = process.env.E2E_PASSWORD || 'demo-admin'
+const TENANT   = process.env.E2E_TENANT   || 'demo'
 
 /**
  * Cheap probe: does the backend respond? We don't want to fail every test
