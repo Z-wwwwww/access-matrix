@@ -14,6 +14,7 @@
  * 注：legacy: false により Composition API モード有効。
  *     globalInjection: true でテンプレート内 $t() も使用可（旧コード互換）。
  */
+import { watch } from 'vue'
 import { createI18n } from 'vue-i18n'
 import enLocale from './en'
 import zhCNLocale from './zh_CN'
@@ -39,5 +40,26 @@ const i18n = createI18n({
   fallbackWarn: false,
   silentTranslationWarn: true
 })
+
+/**
+ * Keep <html lang> in sync with the active locale so CSS `:lang()` rules
+ * (locale-aware font stack in main.css) take effect. BCP-47 script subtags
+ * for Chinese (zh-Hans / zh-Hant) drive the Noto Sans SC / TC selection;
+ * the others map to their plain language tag.
+ */
+const HTML_LANG = {
+  en: 'en',
+  zh_CN: 'zh-Hans',
+  zh_TW: 'zh-Hant',
+  ja_JP: 'ja',
+  ko_KR: 'ko'
+}
+
+function applyHtmlLang(locale) {
+  document.documentElement.lang = HTML_LANG[locale] || 'ja'
+}
+
+applyHtmlLang(i18n.global.locale.value)
+watch(i18n.global.locale, applyHtmlLang)
 
 export default i18n

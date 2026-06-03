@@ -585,7 +585,11 @@
 
 /* ── Register tokens in Tailwind v4 @theme ── */
 @theme {
-  --font-sans: 'Noto Sans JP', sans-serif;
+  /* Default (ja) stack: JP first. SC/TC trail as a backstop so CJK glyphs the
+     JP face lacks still resolve to a Noto sibling rather than the OS fallback
+     (which differs in weight and breaks visual consistency). Per-locale
+     overrides below (:lang) promote the matching Chinese face to the front. */
+  --font-sans: 'Noto Sans JP', 'Noto Sans SC', 'Noto Sans TC', sans-serif;
   --font-serif: 'Noto Serif JP', serif;
   /* Mono stack: prefer JetBrains Mono (loaded via index.html), then OS-native
      monospace fonts (SF Mono on macOS, Cascadia Code on Win11, etc.).
@@ -658,6 +662,23 @@
   }
 }
 
+/* ── Locale-aware font stack ──
+   Chinese hanzi and Japanese kanji overlap in Unicode, so a JP-only stack
+   renders the glyphs Noto Sans JP covers in that face and silently falls the
+   rest back to the OS Chinese font — two faces, two weights, one sentence.
+   Promote the matching Chinese Noto face (loaded via index.html) to the front
+   per <html lang>, so Chinese text renders entirely in one consistent face.
+   `html:lang(...)` (0,1,1) outranks @theme's `:root` (0,1,0), and because
+   these are custom-property overrides they cascade to every element that
+   resolves `font-sans`. lang/index.js keeps <html lang> in sync with the i18n
+   locale (zh_CN→zh-Hans, zh_TW→zh-Hant). */
+html:lang(zh-Hans) {
+  --font-sans: 'Noto Sans SC', 'Noto Sans JP', sans-serif;
+}
+html:lang(zh-Hant) {
+  --font-sans: 'Noto Sans TC', 'Noto Sans JP', sans-serif;
+}
+
 /* ── Base layer ── */
 @layer base {
   *,
@@ -669,7 +690,7 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
-    font-family: 'Noto Sans JP', sans-serif;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
