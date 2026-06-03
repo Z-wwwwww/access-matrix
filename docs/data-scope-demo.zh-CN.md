@@ -9,7 +9,8 @@
 ```bash
 # 后端（dev profile 会同时跑 LocalAdminSeeder + DemoSeeder）
 cd access-matrix
-mvn -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
+mvn -DskipTests install
+mvn -pl core-bootstrap spring-boot:run -Dspring-boot.run.profiles=dev
 
 # 前端
 cd access-matrix-front

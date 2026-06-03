@@ -58,7 +58,8 @@ psql -h 127.0.0.1 -U postgres \
 #    缺 CORE_DB_URL 报错。自动建表 + 种 demo-admin。
 cd backend
 set -a; . ./.env.dev; set +a   # PowerShell / IDE 运行配置：见 docs/getting-started.zh-CN.md §3
-./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
+./mvnw -DskipTests install
+./mvnw -pl core-bootstrap spring-boot:run -Dspring-boot.run.profiles=dev
 
 # 4. 前端（另开终端）
 cd frontend

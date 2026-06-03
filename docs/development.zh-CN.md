@@ -248,7 +248,8 @@ CREATE INDEX IF NOT EXISTS idx_core_dict_tenant ON core_dict (tenant_id) WHERE m
 ### 4.4 写完跑一遍
 
 ```bash
-./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
+./mvnw -DskipTests install
+./mvnw -pl core-bootstrap spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 启动 log 看到 `Successfully applied migration V23` 就 OK。
@@ -392,7 +393,8 @@ public final class XxxPermissions {
 ### 6. 启动 — 后面 guard 接管
 
 ```bash
-./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
+./mvnw -DskipTests install
+./mvnw -pl core-bootstrap spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 三层防线兜底：

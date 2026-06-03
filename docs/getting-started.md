@@ -78,14 +78,16 @@ Keycloak stores its internal tables in this schema, physically separated from th
 
 ```bash
 cd backend
-./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
+./mvnw -DskipTests install
+./mvnw -pl core-bootstrap spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 Windows PowerShell:
 
 ```powershell
 cd backend
-.\mvnw.cmd -pl core-bootstrap -am spring-boot:run "-Dspring-boot.run.profiles=dev"
+.\mvnw.cmd -DskipTests install
+.\mvnw.cmd -pl core-bootstrap spring-boot:run "-Dspring-boot.run.profiles=dev"
 ```
 
 **Expected tail of the output**:

@@ -58,7 +58,8 @@ psql -h 127.0.0.1 -U postgres \
 #    startup fails on a missing CORE_DB_URL. Auto-migrates + seeds demo-admin.
 cd backend
 set -a; . ./.env.dev; set +a   # PowerShell / IDE run config: see docs/getting-started.md §3
-./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev
+./mvnw -DskipTests install
+./mvnw -pl core-bootstrap spring-boot:run -Dspring-boot.run.profiles=dev
 
 # 4. Frontend (in another terminal)
 cd frontend
