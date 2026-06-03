@@ -24,7 +24,7 @@ test('force-delete an in-use role goes through the IN_USE → confirm → retry 
   // Seed: create a role + assign it to a user via the API. We do this through
   // the API rather than the UI so the test focuses on the delete flow, not
   // role-creation UX (covered separately).
-  const apiCreate = await loggedInPage.request.post(`${stack.backend}/admin/roles`, {
+  const apiCreate = await loggedInPage.request.post(`${stack.backend}/admin/role`, {
     headers: { 'X-Tenant-Id': env.TENANT },
     data: { name: TEST_ROLE_NAME, dataScope: 1 }
   })

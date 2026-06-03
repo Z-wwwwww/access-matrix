@@ -3,7 +3,7 @@ import { test, expect, env } from './fixtures.js'
 /**
  * Tenant-aware login flow:
  *
- *   1. The collapsible "tenant" field on the login page sets localStorage.tenantId
+ *   1. The collapsible "tenant" field on the login page sets localStorage.tenant_id
  *   2. services/request.js reads it and attaches X-Tenant-Id to every request
  *   3. The backend's pre-auth /auth/login uses it to scope (username, tenant)
  *
@@ -15,8 +15,8 @@ import { test, expect, env } from './fixtures.js'
 test('login attaches X-Tenant-Id from localStorage', async ({ page, stack }) => {
   // Pre-seed tenant via localStorage so we can assert it's read on the very
   // first XHR. The login page also offers an inline field; we test both paths.
-  await page.addInitScript((tenantId) => {
-    window.localStorage.setItem('tenantId', tenantId)
+  await page.addInitScript((tenant) => {
+    window.localStorage.setItem('tenant_id', tenant)
   }, env.TENANT)
 
   await page.goto('/login')

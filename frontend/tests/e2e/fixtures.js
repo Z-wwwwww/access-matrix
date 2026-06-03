@@ -43,8 +43,8 @@ export const test = base.extend({
     // Seed the tenant via localStorage before the app boots, so the request
     // interceptor (services/request.js) attaches X-Tenant-Id from the first
     // request. Matches what the production tenant-aware login does.
-    await page.addInitScript((tenantId) => {
-      window.localStorage.setItem('tenantId', tenantId)
+    await page.addInitScript((tenant) => {
+      window.localStorage.setItem('tenant_id', tenant)
     }, TENANT)
 
     await page.goto('/login')
