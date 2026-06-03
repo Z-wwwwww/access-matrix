@@ -187,85 +187,17 @@ onBeforeUnmount(() => {
       >
         <Menu :size="18" class="text-foreground" />
       </button>
-      <img src="@/assets/logo.svg" alt="Access Matrix" class="h-8 hidden sm:block" />
+      <!-- Brand lockup: gold matrix mark (image) + wordmark (text). The
+           wordmark is real text so its color follows the theme via
+           `text-foreground` — an inline SVG couldn't react to dark mode. -->
+      <div class="hidden sm:flex items-center gap-2">
+        <img src="@/assets/logo-mark.svg" alt="" class="h-5 w-5 shrink-0" />
+        <span class="text-sm font-semibold tracking-tight text-foreground">Access Matrix</span>
+      </div>
     </div>
 
     <!-- Right -->
     <div class="flex items-center gap-1">
-      <!-- Notifications (站内通知 + 即时红点) -->
-      <div class="relative">
-        <button
-          ref="bellTriggerRef"
-          class="relative p-2 rounded-lg hover:bg-muted transition-colors"
-          :class="{ 'bg-muted': bellOpen }"
-          :aria-label="t('layout.notification.title')"
-          @click="toggleBellMenu"
-        >
-          <Bell :size="18" class="text-foreground" />
-          <span
-            v-if="notificationStore.unread > 0"
-            class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-signal-red text-white text-[10px] leading-4 font-medium text-center"
-          >{{ notificationStore.unread > 99 ? '99+' : notificationStore.unread }}</span>
-        </button>
-        <div
-          v-if="bellOpen"
-          ref="bellPanelRef"
-          class="absolute right-0 top-full mt-1 w-[360px] rounded-2xl border border-border bg-card shadow-xl z-50 overflow-hidden"
-        >
-          <div class="flex items-center justify-between px-4 h-11 border-b border-border">
-            <span class="text-sm font-semibold text-foreground">{{ t('layout.notification.title') }}</span>
-            <button
-              v-if="notificationStore.unread > 0"
-              class="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              @click="notificationStore.markAllRead()"
-            >{{ t('layout.notification.markAllRead') }}</button>
-          </div>
-          <div class="max-h-[420px] overflow-y-auto scrollbar-thin p-1">
-            <p
-              v-if="!notificationStore.list.length"
-              class="px-4 py-10 text-center text-sm text-muted-foreground"
-            >{{ t('layout.notification.empty') }}</p>
-            <!-- フラットな行リスト(GitHub/Linear 風)。未読は背景を薄く染め + 先頭ドット、
-                 末尾に「待処理」を控えめに表示。カード枠は付けず雑然さを避ける。 -->
-            <button
-              v-for="item in notificationStore.list"
-              :key="item.id"
-              class="flex w-full gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted/60"
-              :class="{ 'bg-primary/5': item.readFlag !== 1 }"
-              @click="openNotification(item)"
-            >
-              <span class="mt-1 shrink-0 w-2 flex justify-center">
-                <span v-if="item.readFlag !== 1" class="w-2 h-2 rounded-full bg-primary" />
-              </span>
-              <!-- 本文(タイトル/内容)。改行せず、右の meta 列に触れる手前で … 省略。 -->
-              <span class="flex-1 min-w-0">
-                <span
-                  class="block truncate text-sm"
-                  :class="item.readFlag === 1 ? 'text-muted-foreground' : 'font-medium text-foreground'"
-                  :title="item.title"
-                >{{ item.title }}</span>
-                <span
-                  v-if="item.content"
-                  class="mt-0.5 block truncate text-xs text-muted-foreground"
-                  :title="item.content"
-                >{{ item.content }}</span>
-              </span>
-              <!-- meta 列:時刻が上、待処理アイコンは常にその真下(固定位置、折り返さない)。 -->
-              <span class="shrink-0 flex flex-col items-end gap-1 pl-1">
-                <span class="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">{{ notifTime(item.createTime) }}</span>
-                <span
-                  v-if="item.kind === 1 && item.readFlag !== 1"
-                  class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400"
-                >
-                  <AlertCircle :size="11" />
-                  {{ t('layout.notification.actionRequired') }}
-                </span>
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       <!-- Theme toggle -->
       <button class="p-2 rounded-lg hover:bg-muted transition-colors" @click="toggleTheme">
         <Sun v-if="theme === 'dark'" :size="18" class="text-foreground" />
@@ -342,6 +274,80 @@ onBeforeUnmount(() => {
               class="shrink-0 ml-2 text-primary"
             />
           </button>
+        </div>
+      </div>
+
+      <!-- Notifications (站内通知 + 即时红点) -->
+      <div class="relative">
+        <button
+          ref="bellTriggerRef"
+          class="relative p-2 rounded-lg hover:bg-muted transition-colors"
+          :class="{ 'bg-muted': bellOpen }"
+          :aria-label="t('layout.notification.title')"
+          @click="toggleBellMenu"
+        >
+          <Bell :size="18" class="text-foreground" />
+          <span
+            v-if="notificationStore.unread > 0"
+            class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-signal-red text-white text-[10px] leading-4 font-medium text-center"
+          >{{ notificationStore.unread > 99 ? '99+' : notificationStore.unread }}</span>
+        </button>
+        <div
+          v-if="bellOpen"
+          ref="bellPanelRef"
+          class="absolute right-0 top-full mt-1 w-[360px] rounded-2xl border border-border bg-card shadow-xl z-50 overflow-hidden"
+        >
+          <div class="flex items-center justify-between px-4 h-11 border-b border-border">
+            <span class="text-sm font-semibold text-foreground">{{ t('layout.notification.title') }}</span>
+            <button
+              v-if="notificationStore.unread > 0"
+              class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              @click="notificationStore.markAllRead()"
+            >{{ t('layout.notification.markAllRead') }}</button>
+          </div>
+          <div class="max-h-[420px] overflow-y-auto scrollbar-thin p-1">
+            <p
+              v-if="!notificationStore.list.length"
+              class="px-4 py-10 text-center text-sm text-muted-foreground"
+            >{{ t('layout.notification.empty') }}</p>
+            <!-- フラットな行リスト(GitHub/Linear 風)。未読は背景を薄く染め + 先頭ドット、
+                 末尾に「待処理」を控えめに表示。カード枠は付けず雑然さを避ける。 -->
+            <button
+              v-for="item in notificationStore.list"
+              :key="item.id"
+              class="flex w-full gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted/60"
+              :class="{ 'bg-primary/5': item.readFlag !== 1 }"
+              @click="openNotification(item)"
+            >
+              <span class="mt-1 shrink-0 w-2 flex justify-center">
+                <span v-if="item.readFlag !== 1" class="w-2 h-2 rounded-full bg-primary" />
+              </span>
+              <!-- 本文(タイトル/内容)。改行せず、右の meta 列に触れる手前で … 省略。 -->
+              <span class="flex-1 min-w-0">
+                <span
+                  class="block truncate text-sm"
+                  :class="item.readFlag === 1 ? 'text-muted-foreground' : 'font-medium text-foreground'"
+                  :title="item.title"
+                >{{ item.title }}</span>
+                <span
+                  v-if="item.content"
+                  class="mt-0.5 block truncate text-xs text-muted-foreground"
+                  :title="item.content"
+                >{{ item.content }}</span>
+              </span>
+              <!-- meta 列:時刻が上、待処理アイコンは常にその真下(固定位置、折り返さない)。 -->
+              <span class="shrink-0 flex flex-col items-end gap-1 pl-1">
+                <span class="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">{{ notifTime(item.createTime) }}</span>
+                <span
+                  v-if="item.kind === 1 && item.readFlag !== 1"
+                  class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400"
+                >
+                  <AlertCircle :size="11" />
+                  {{ t('layout.notification.actionRequired') }}
+                </span>
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
