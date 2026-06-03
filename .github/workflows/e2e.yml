@@ -1,0 +1,184 @@
+name: e2e
+
+# End-to-end (Playwright) against a REAL OIDC stack: Postgres + Redis +
+# Keycloak + backend (dev/oidc) + frontend (vite dev). Mirrors the recipe
+# verified locally (see frontend/tests/e2e). The login specs exercise the
+# Keycloak-brokered flow, so a real KC with the demo realm is required —
+# E2E_REQUIRE_STACK=1 turns "stack down" into a hard failure (no silent skips).
+#
+# NOTE: the Keycloak bring-up (realm import + backend provisioner bootstrap +
+# demo-admin seeding) is the fragile part and may need a shakeout iteration on
+# its first real run; failure steps dump KC/backend/frontend logs to help.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'infra/keycloak/**'
+      - '.github/workflows/e2e.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'infra/keycloak/**'
+      - '.github/workflows/e2e.yml'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  e2e:
+    name: playwright (oidc stack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: new_inntouch_core
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Keycloak shares the app's database under its own schema (matches the
+      # local KC_DB_URL ?currentSchema=keycloak). KC needs the schema to exist.
+      - name: Create Keycloak DB schema
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d new_inntouch_core -c "CREATE SCHEMA IF NOT EXISTS keycloak;"
+
+      # Run KC with host networking so it reaches the postgres service on
+      # localhost:5432 and exposes 8180 on the host for the backend + SPA.
+      # --import-realm loads infra/keycloak/realms/*.json (demo + system) on
+      # first boot — same mechanism as infra/keycloak/start-keycloak.*.
+      - name: Start Keycloak (import realms)
+        run: |
+          docker run -d --name keycloak --network host \
+            -e KC_DB=postgres \
+            -e KC_DB_URL='jdbc:postgresql://localhost:5432/new_inntouch_core?currentSchema=keycloak' \
+            -e KC_DB_USERNAME=postgres \
+            -e KC_DB_PASSWORD=postgres \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
+            -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+            -e KC_HTTP_PORT=8180 \
+            -e KC_HOSTNAME_STRICT=false \
+            -v "$PWD/infra/keycloak/realms:/opt/keycloak/data/import:ro" \
+            quay.io/keycloak/keycloak:26.6.2 \
+            start-dev --import-realm --http-port=8180
+
+      - name: Wait for Keycloak
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8180/ || true)
+            if [ "$code" = "200" ] || [ "$code" = "302" ]; then echo "Keycloak up"; exit 0; fi
+            sleep 3
+          done
+          echo "::error::Keycloak did not come up"; docker logs keycloak | tail -80; exit 1
+
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Backend in dev profile (oidc). Runs Flyway + seeders, bootstraps the
+      # Keycloak provisioner client (admin-cli root admin/admin) and seeds
+      # demo-admin into the demo realm. Backgrounded; next step waits for it.
+      - name: Start backend (dev / oidc)
+        working-directory: backend
+        env:
+          SPRING_PROFILES_ACTIVE: dev
+          CORE_DB_URL: jdbc:postgresql://localhost:5432/new_inntouch_core?stringtype=unspecified
+          CORE_DB_USERNAME: postgres
+          CORE_DB_PASSWORD: postgres
+          CORE_REDIS_HOST: localhost
+          CORE_REDIS_PORT: '6379'
+          CORE_REDIS_PASSWORD: ''
+          CORE_REDIS_DB: '1'
+          CORE_KEYCLOAK_SERVER_URL: http://localhost:8180
+          CORE_MAIL_ENABLED: 'false'
+        run: |
+          chmod +x mvnw
+          nohup ./mvnw -B -ntp -pl core-bootstrap -am spring-boot:run > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
+          echo "started backend pid $!"
+
+      - name: Wait for backend
+        run: |
+          for i in $(seq 1 120); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9135/api/actuator/health/liveness || true)
+            if [ "$code" = "200" ]; then echo "backend up"; exit 0; fi
+            sleep 4
+          done
+          echo "::error::backend did not come up"; tail -150 "$GITHUB_WORKSPACE/backend.log"; exit 1
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      # vite dev server reads .env.development (VITE_OIDC_* → localhost:8180,
+      # client access-matrix-backend) and serves on :5273.
+      - name: Start frontend (vite dev)
+        working-directory: frontend
+        run: nohup npm run dev > "$GITHUB_WORKSPACE/frontend.log" 2>&1 &
+
+      - name: Wait for frontend
+        run: |
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5273/ || true)
+            if [ "$code" = "200" ]; then echo "frontend up"; exit 0; fi
+            sleep 2
+          done
+          echo "::error::frontend did not come up"; tail -80 "$GITHUB_WORKSPACE/frontend.log"; exit 1
+
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E
+        working-directory: frontend
+        env:
+          E2E_REQUIRE_STACK: '1'
+          E2E_BASE_URL: http://localhost:5273
+          E2E_API_URL: http://localhost:9135/api
+          E2E_USERNAME: demo-admin
+          E2E_PASSWORD: demo-admin
+          E2E_TENANT: demo
+        run: npx playwright test --reporter=list
+
+      - name: Dump service logs on failure
+        if: failure()
+        run: |
+          echo "===== keycloak ====="; docker logs keycloak 2>&1 | tail -120 || true
+          echo "===== backend ====="; tail -200 "$GITHUB_WORKSPACE/backend.log" || true
+          echo "===== frontend ====="; tail -100 "$GITHUB_WORKSPACE/frontend.log" || true
+
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: frontend/test-results
+          retention-days: 7
