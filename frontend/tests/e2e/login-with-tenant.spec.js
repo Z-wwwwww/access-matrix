@@ -1,40 +1,37 @@
 import { test, expect, env } from './fixtures.js'
 
 /**
- * Tenant-aware login flow:
+ * Tenant-aware login flow (OIDC):
  *
- *   1. The collapsible "tenant" field on the login page sets localStorage.tenant_id
- *   2. services/request.js reads it and attaches X-Tenant-Id to every request
- *   3. The backend's pre-auth /auth/login uses it to scope (username, tenant)
+ *   1. The login page reads the tenant from localStorage.tenant_id
+ *      (set by the collapsible "tenant" field / subdomain / sticky value)
+ *   2. In OIDC mode the SPA brokers login through Keycloak — it auto-redirects
+ *      to that tenant's realm authorize endpoint: /realms/{tenant}/protocol/
+ *      openid-connect/auth. Credentials are entered on KC's hosted page; the
+ *      SPA never POSTs /auth/login (that was the legacy jwt-mode flow).
  *
- * If any leg of that chain regresses, multi-tenant logins silently use
- * tenant="default", which is the exact failure mode V20 was designed to
- * prevent — different tenants colliding on the same username.
+ * The realm in the authorize URL IS the multi-tenant propagation. If it
+ * regresses to the wrong realm, different tenants collide — the exact failure
+ * mode V20 was designed to prevent.
  */
 
-test('login attaches X-Tenant-Id from localStorage', async ({ page, stack }) => {
-  // Pre-seed tenant via localStorage so we can assert it's read on the very
-  // first XHR. The login page also offers an inline field; we test both paths.
+test('login redirects to the tenant realm authorize endpoint (OIDC)', async ({ page, stack }) => {
   await page.addInitScript((tenant) => {
     window.localStorage.setItem('tenant_id', tenant)
   }, env.TENANT)
 
-  await page.goto('/login')
-
-  // Capture the actual /auth/login request to verify the header is set.
-  const loginReqPromise = page.waitForRequest((req) =>
-    req.url().includes('/auth/login') && req.method() === 'POST'
+  // Arm the matcher BEFORE goto: the SPA auto-redirects to Keycloak shortly
+  // after the login page mounts, so the authorize request can fire on its own.
+  const authReqPromise = page.waitForRequest(
+    (req) => req.url().includes('/protocol/openid-connect/auth'),
+    { timeout: 20_000 }
   )
 
-  await page.getByLabel(/username|ユーザー|用户名/i).fill(env.USER)
-  await page.locator('#password').fill(env.PASS)
-  await page.getByRole('button', { name: /sign in|ログイン|登录/i }).click()
+  await page.goto('/login')
 
-  const loginReq = await loginReqPromise
-  const headers = loginReq.headers()
-
-  expect(headers['x-tenant-id']).toBe(env.TENANT)
-  await expect(page).not.toHaveURL(/\/login/, { timeout: 10_000 })
+  const authReq = await authReqPromise
+  // The realm segment carries the tenant — this is the propagation under test.
+  expect(authReq.url()).toContain(`/realms/${env.TENANT}/`)
 })
 
 test('login form has a tenant field (collapsible)', async ({ page, stack }) => {

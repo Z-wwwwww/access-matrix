@@ -49,6 +49,9 @@ export const test = base.extend({
     // request. Matches what the production tenant-aware login does.
     await page.addInitScript((tenant) => {
       window.localStorage.setItem('tenant_id', tenant)
+      // Pin the SPA locale so button-text assertions (create/新增…) are
+      // deterministic instead of depending on the ambient default (ja_JP).
+      window.localStorage.setItem('i18n-lang', 'zh_CN')
     }, TENANT)
 
     await page.goto('/login')
@@ -57,7 +60,11 @@ export const test = base.extend({
     // the "Show password" toggle button (aria-label), a strict-mode violation.
     await page.locator('#password').fill(PASS)
     await page.getByRole('button', { name: /sign in|ログイン|登录/i }).click()
-    await expect(page).not.toHaveURL(/\/login/, { timeout: 10_000 })
+    // OIDC login finishes asynchronously: KC authenticates → /sso/callback →
+    // the SPA exchanges the code for a token and stores it. Wait for the token
+    // itself. "Left /login" returns mid-callback (still on /sso/callback,
+    // token not yet stored) — tests that act immediately would 401.
+    await page.waitForFunction(() => !!localStorage.getItem('access_token'), null, { timeout: 15_000 })
 
     await use(page)
   }
