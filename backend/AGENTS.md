@@ -362,6 +362,54 @@ These conventions apply as business modules land (they have no effect on a reque
 - Drain: `OutboxDispatcher` (`@Scheduled`) polls pending rows cross-tenant (it runs as the `system` tenant so the MP interceptor bypasses scoping) and hands each to an `EventDispatchSink`. With no sink bean registered it falls back to `LoggingEventDispatchSink` — events are persisted but not forwarded downstream. **To forward to a bus/analytics store, register one `@Component implements EventDispatchSink`.**
 - Config: `app.outbox.enabled` (default true) / `poll-interval-ms` (5000) / `batch-size` (200) / `max-attempts` (5).
 
+**Naming conventions:**
+- `aggregateType` — **PascalCase singular** noun naming the entity kind: `Reservation`, `Rate`, `Room`, `Invoice`. NOT the table name (`pms_reservation`), NOT plural. One aggregate type per business entity that has a lifecycle worth tracking.
+- `eventType` — **`<aggregate>.<verb>`**, lowercase, dot-separated, **past tense** (it already happened): `reservation.created`, `reservation.cancelled`, `rate.price_changed`, `room.status_changed`. The prefix is the lowercased aggregate; the verb is `snake_case` if multi-word. Stable string — analytics/AI filter on it, so don't rename casually.
+- `payload` — a small DTO or `Map` carrying the *delta*, not the whole entity. For a change, include both sides (`old`/`new`) so consumers needn't replay history to see what moved. Use a Java `record` for type safety; it serializes to JSONB via the Jackson3 `JsonMapper`.
+
+**Complete service example** (the canonical shape — copy this when adding a state-changing endpoint):
+
+```java
+@Service
+public class RateService {
+
+    private final RateMapper rateMapper;
+    private final EventPublisher events;          // inject the publisher
+
+    public RateService(RateMapper rateMapper, EventPublisher events) {
+        this.rateMapper = rateMapper;
+        this.events = events;
+    }
+
+    /** Payload record — the delta, serialized to JSONB. */
+    public record PriceChanged(BigDecimal oldPrice, BigDecimal newPrice, LocalDate stayDate) {}
+
+    @Transactional                                 // event + write share ONE transaction
+    public void changePrice(String rateId, BigDecimal newPrice, LocalDate stayDate) {
+        RateEntity rate = rateMapper.selectById(rateId);
+        if (rate == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "rate not found");
+        }
+        BigDecimal oldPrice = rate.getPrice();
+
+        rate.setPrice(newPrice);                   // 1. the business write
+        rateMapper.updateById(rate);
+
+        events.publish(DomainEvent.of(             // 2. the event — same tx, after the write
+            "Rate",                                //    aggregateType  (PascalCase singular)
+            rateId,                                //    aggregateId
+            "rate.price_changed",                  //    eventType      (<aggregate>.<verb>, past tense)
+            new PriceChanged(oldPrice, newPrice, stayDate)));  // payload (the delta)
+    }
+}
+```
+
+Notes that keep it correct:
+- The `@Transactional` is on the **service** method — the event insert and the business write commit or roll back together. Don't put it on the controller.
+- `tenant_id`, `actor`, `actor_type`, `trace_id`, `occurred_at` are filled by `OutboxEventPublisher` from `RequestContext` — **do not** set them in the payload.
+- Use `DomainEvent.system(...)` instead of `.of(...)` when the change comes from a background job (no end user on the thread); it stamps `actor_type=3`.
+- Nothing extra to register: `core_domain_event` already exists (V36) and `EventPublisher` is an injectable bean. You only write the two lines above.
+
 ## Error codes & exceptions
 
 - Business exception: `throw new BusinessException(ErrorCode.X, "msg")`
