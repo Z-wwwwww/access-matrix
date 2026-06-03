@@ -22,18 +22,24 @@ import java.util.stream.Collectors;
 /**
  * Loads the menu tree visible to a given user.
  *
+ * <p>Menus are a single GLOBAL set (V41) — one shared navigation tree for all
+ * tenants — and visibility is decided per user by {@code permission_code}.
+ *
  * <p>Algorithm:
  * <ol>
- *   <li>If the user holds either super-wildcard — {@code *:*} (platform
- *       super) or {@code tenant:*} (business-tenant super) — we return the
- *       full visible menu tree for the current tenant (every
- *       {@code mark=1, status=1} entry). Cheaper than maintaining a
- *       {@code role_menu} link to every menu, and admins should auto-see
- *       new menus the moment they are created.</li>
- *   <li>Otherwise we collect the user's directly-authorised menus via
- *       {@code core_rbac_role_menu}, then back-fill the parent chain so the
- *       tree never has orphan branches. Finally we assemble parent_id-keyed
- *       buckets into a tree, sorted by {@code sort_order}.</li>
+ *   <li>If the user holds either super-wildcard — {@code *:*} (platform super)
+ *       or {@code tenant:*} (business-tenant super) — start from the full global
+ *       menu set ({@code findAllVisible()}).</li>
+ *   <li>Otherwise collect the user's directly-authorised menus via
+ *       {@code core_rbac_role_menu} (role joins stay tenant-scoped).</li>
+ *   <li><b>Both branches</b> then filter by {@code permission_code}: a
+ *       {@code *:*} platform admin keeps only {@code platform:*} menus, a
+ *       {@code tenant:*} business super keeps only business menus — the two
+ *       wildcards are namespace-disjoint ({@link PermissionMatcher}), so this
+ *       cleanly separates the platform console from business navigation.</li>
+ *   <li>Back-fill parent chains, assemble the tree, then prune directory nodes
+ *       left empty after filtering (so the "other" admin never sees an empty
+ *       container).</li>
  * </ol>
  */
 @Service
@@ -56,36 +62,34 @@ public class MenuQueryService {
     public List<MenuNode> loadUserMenuTree(String userId) {
         if (userId == null || userId.isBlank()) return List.of();
 
-        // Tenant from RequestContext (post-auth JWT tid). Mapper queries are tenant-scoped explicitly.
+        // Tenant from RequestContext (post-auth JWT tid) — drives the per-tenant
+        // role joins below. Menus themselves are global (no tenant scope).
         String tenantId = com.platform.core.common.context.RequestContext.tenantIdOrDefault();
         Set<String> perms = permissionQueryService.loadUserPermissions(userId);
-        List<MenuEntity> flat;
-        // Either super-wildcard sees the whole (tenant-scoped) menu tree:
-        //   - *:*       PLATFORM super (PLATFORM_ADMIN) — all menus in the
-        //                system tenant they operate in.
-        //   - tenant:*  TENANT super (business SUPER_ADMIN) — all menus in
-        //                their business tenant.
-        // Both mean "this user owns everything visible in this tenant", so
-        // they auto-see new menus without a role_menu link. Checking only
-        // *:* here (the original) silently gave business super-admins an
-        // empty menu, since they hold tenant:*, not *:*.
+
+        // Source set: super-wildcards start from the whole global menu set;
+        // everyone else from their role_menu-granted menus (tenant-scoped joins).
+        List<MenuEntity> source;
         if (perms.contains(PermissionMatcher.SUPER)
                 || perms.contains(PermissionMatcher.TENANT_SUPER)) {
-            flat = menuMapper.findAllVisible(tenantId);
+            source = menuMapper.findAllVisible();
         } else {
-            List<MenuEntity> direct = menuMapper.findMenusByUserId(userId, tenantId);
-            if (direct.isEmpty()) return List.of();
-            // Two-pass filter: drop leaf menus whose permission_code the user
-            // does not hold, even though a role granted them the menu link.
-            // (e.g. role X has the "Orders" menu, but only includes order:read,
-            // so any "Orders > Delete" leaf with permission_code=order:delete
-            // is hidden.) Containers (no permission_code) survive because the
-            // tree-assembler still needs them to host the leaves the user can see.
-            List<MenuEntity> permitted = filterByPermissionCode(direct, perms);
-            if (permitted.isEmpty()) return List.of();
-            flat = withAncestors(permitted, tenantId);
+            source = menuMapper.findMenusByUserId(userId, tenantId);
         }
-        return assembleTree(flat);
+        if (source.isEmpty()) return List.of();
+
+        // Filter by permission_code for ALL callers. Leaves whose code the user
+        // does not hold are dropped; containers (no permission_code) survive here
+        // and are pruned later if they end up childless. This is what keeps a
+        // *:* platform admin from seeing business menus and a tenant:* business
+        // super from seeing the platform console (namespace-disjoint wildcards).
+        List<MenuEntity> permitted = filterByPermissionCode(source, perms);
+        if (permitted.isEmpty()) return List.of();
+
+        List<MenuEntity> flat = withAncestors(permitted);
+        List<MenuNode> tree = assembleTree(flat);
+        pruneEmptyDirectories(tree);
+        return tree;
     }
 
     /**
@@ -105,7 +109,7 @@ public class MenuQueryService {
     }
 
     /** Make sure every node's parent chain is included so the tree assembler does not drop branches. */
-    private List<MenuEntity> withAncestors(List<MenuEntity> direct, String tenantId) {
+    private List<MenuEntity> withAncestors(List<MenuEntity> direct) {
         Map<String, MenuEntity> byId = new HashMap<>();
         Set<String> needed = new HashSet<>();
         for (MenuEntity m : direct) {
@@ -117,7 +121,7 @@ public class MenuQueryService {
         }
         // Walk up the parent chain; one fetch per generation, until we converge.
         while (!needed.isEmpty()) {
-            List<MenuEntity> fetched = menuMapper.findByIdIn(new ArrayList<>(needed), tenantId);
+            List<MenuEntity> fetched = menuMapper.findByIdIn(new ArrayList<>(needed));
             needed.clear();
             for (MenuEntity m : fetched) {
                 if (byId.put(m.getId(), m) == null) {
@@ -169,6 +173,22 @@ public class MenuQueryService {
                                             .thenComparing(MenuNode::getCode));
         }
         return roots;
+    }
+
+    /**
+     * Recursively drop directory nodes ({@code menuType == 1}) left with no
+     * children after permission filtering — e.g. the "Platform" container for a
+     * business super admin, or the "System" container for a platform admin.
+     * Leaf/page nodes ({@code menuType != 1}) are never pruned.
+     */
+    private void pruneEmptyDirectories(List<MenuNode> nodes) {
+        if (nodes == null || nodes.isEmpty()) return;
+        nodes.removeIf(n -> {
+            pruneEmptyDirectories(n.getChildren());
+            boolean isDirectory = n.getMenuType() != null && n.getMenuType() == 1;
+            boolean hasNoChildren = n.getChildren() == null || n.getChildren().isEmpty();
+            return isDirectory && hasNoChildren;
+        });
     }
 
     private MenuNode toNode(MenuEntity m) {

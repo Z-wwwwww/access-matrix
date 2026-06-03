@@ -64,7 +64,9 @@ class MenuQueryServiceTest {
     @Test
     void tenantSuperWildcard_seesAllVisibleMenus_withoutRoleMenuBindings() {
         when(permissionQueryService.loadUserPermissions("u-1")).thenReturn(Set.of("tenant:*"));
-        when(menuMapper.findAllVisible("demo"))
+        // Menus are global now — findAllVisible() takes no tenant arg.
+        // These have no permission_code, so they survive the permission filter.
+        when(menuMapper.findAllVisible())
                 .thenReturn(List.of(menu("m-1", "dashboard"), menu("m-2", "users")));
 
         List<MenuNode> tree = service.loadUserMenuTree("u-1");
@@ -72,20 +74,43 @@ class MenuQueryServiceTest {
         assertThat(tree).extracting(MenuNode::getCode)
                 .containsExactlyInAnyOrder("dashboard", "users");
         // Must take the all-visible path, NOT the role_menu binding path.
-        verify(menuMapper).findAllVisible("demo");
+        verify(menuMapper).findAllVisible();
         verify(menuMapper, never()).findMenusByUserId(anyString(), anyString());
     }
 
     @Test
     void platformSuperWildcard_stillSeesAllVisibleMenus() {
         when(permissionQueryService.loadUserPermissions("u-1")).thenReturn(Set.of("*:*"));
-        when(menuMapper.findAllVisible("demo")).thenReturn(List.of(menu("m-1", "dashboard")));
+        when(menuMapper.findAllVisible()).thenReturn(List.of(menu("m-1", "dashboard")));
 
         List<MenuNode> tree = service.loadUserMenuTree("u-1");
 
         assertThat(tree).extracting(MenuNode::getCode).containsExactly("dashboard");
-        verify(menuMapper).findAllVisible("demo");
+        verify(menuMapper).findAllVisible();
         verify(menuMapper, never()).findMenusByUserId(anyString(), anyString());
+    }
+
+    @Test
+    void superWildcard_filtersByPermissionNamespace() {
+        // Platform admin (*:*) sees only platform: menus; a business menu
+        // (user:read) is filtered out even on the all-visible path. Its empty
+        // parent directory is pruned.
+        when(permissionQueryService.loadUserPermissions("u-1")).thenReturn(Set.of("*:*"));
+        MenuEntity sysDir = menu("d-sys", "system");
+        sysDir.setMenuType(1);
+        MenuEntity bizLeaf = menu("m-user", "system.user");
+        bizLeaf.setMenuType(2);
+        bizLeaf.setParentId("d-sys");
+        bizLeaf.setPermissionCode("user:read");
+        MenuEntity platLeaf = menu("m-tenant", "platform.tenant");
+        platLeaf.setMenuType(2);
+        platLeaf.setPermissionCode("platform:tenant:read");
+        when(menuMapper.findAllVisible()).thenReturn(List.of(sysDir, bizLeaf, platLeaf));
+
+        List<MenuNode> tree = service.loadUserMenuTree("u-1");
+
+        // Only the platform leaf survives; the empty "system" directory is pruned.
+        assertThat(tree).extracting(MenuNode::getCode).containsExactly("platform.tenant");
     }
 
     @Test
@@ -97,6 +122,6 @@ class MenuQueryServiceTest {
 
         assertThat(tree).isEmpty();
         verify(menuMapper).findMenusByUserId("u-1", "demo");
-        verify(menuMapper, never()).findAllVisible(anyString());
+        verify(menuMapper, never()).findAllVisible();
     }
 }

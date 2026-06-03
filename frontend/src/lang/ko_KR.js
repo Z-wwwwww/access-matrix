@@ -6,6 +6,20 @@
 import permissions from './generated/permissions.ko_KR.json'
 
 export default {
+  job: {
+    title: '예약 작업 관리',
+    search: { placeholder: { keyword: '작업명 / 코드로 검색' } },
+    scope: { platform: '플랫폼', tenant: '테넌트' },
+    status: { enabled: '활성', disabled: '중지' },
+    triggerType: { cron: '예약', manual: '수동', startup: '시작' },
+    runStatus: { running: '실행 중', success: '성공', fail: '실패', skipped: '건너뜀', none: '—' },
+    column: { name: '작업', code: '코드', scope: '범위', cron: 'Cron 식', status: '상태', nextFire: '다음 실행', lastResult: '최근 결과', actions: '작업' },
+    action: { edit: 'Cron 편집', run: '즉시 실행', viewLog: '로그', enable: '활성화', disable: '중지' },
+    edit: { title: '작업 설정', label: { cron: 'Cron 식', maxRunSeconds: '최대 실행 초', concurrent: '중복 실행 허용', remark: '비고' }, placeholder: { cron: '예: 0 0 3 * * *', remark: '비고(선택)' } },
+    log: { title: '실행 로그', column: { triggerType: '트리거', status: '상태', startTime: '시작', duration: '소요(ms)', node: '노드', triggeredBy: '실행자', error: '오류' }, empty: '실행 기록이 없습니다' },
+    confirm: { runTitle: '즉시 실행', runMessage: '"{name}"을(를) 지금 한 번 실행하시겠습니까?' },
+    message: { saveSuccess: '저장했습니다', runStarted: '실행을 시작했습니다', enabled: '활성화했습니다', disabled: '중지했습니다', updateFailed: '저장 실패', runFailed: '실행 실패' }
+  },
   common: {
     confirm: {
       forceTitle: '강제 삭제',

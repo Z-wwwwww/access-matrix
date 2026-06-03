@@ -11,18 +11,26 @@ import java.util.List;
 @Mapper
 public interface MenuMapper extends BaseMapper<MenuEntity> {
 
-    /** All visible (mark=1, status=1) menus within a tenant — used by super admin. */
+    /**
+     * All visible (mark=1, status=1) menus — used by super admins. Menus are a
+     * single GLOBAL set (V41), so this is NOT tenant-scoped; the caller filters
+     * by permission_code. core_rbac_menu is in TENANT_EXCLUDED_TABLES, so the
+     * interceptor never injects a tenant predicate here either.
+     */
     @Select("""
             SELECT *
               FROM core_rbac_menu
              WHERE mark = 1
                AND status = 1
-               AND tenant_id = #{tenantId}
              ORDER BY sort_order, code
             """)
-    List<MenuEntity> findAllVisible(@Param("tenantId") String tenantId);
+    List<MenuEntity> findAllVisible();
 
-    /** Distinct menus a user can see (walks user→role→role_menu→menu), tenant-scoped. */
+    /**
+     * Distinct menus a user can see (walks user→role→role_menu→menu). The
+     * role/role_menu/user_role joins stay tenant-scoped (roles are per-tenant);
+     * the menu side is global (no m.tenant_id filter).
+     */
     @Select("""
             SELECT DISTINCT m.*
               FROM core_rbac_menu m
@@ -34,27 +42,24 @@ public interface MenuMapper extends BaseMapper<MenuEntity> {
                 ON ur.role_id = r.id AND ur.mark = 1 AND ur.tenant_id = #{tenantId}
              WHERE m.mark = 1
                AND m.status = 1
-               AND m.tenant_id = #{tenantId}
                AND ur.user_id = #{userId}
              ORDER BY sort_order, code
             """)
     List<MenuEntity> findMenusByUserId(@Param("userId") String userId,
                                        @Param("tenantId") String tenantId);
 
-    /** Hydrate parent chain for the supplied id set — tenant-scoped. */
+    /** Hydrate parent chain for the supplied id set (global menu set). */
     @Select("""
             <script>
             SELECT *
               FROM core_rbac_menu
              WHERE mark = 1
                AND status = 1
-               AND tenant_id = #{tenantId}
                AND id IN
             <foreach item='id' collection='ids' open='(' separator=',' close=')'>
               #{id}
             </foreach>
             </script>
             """)
-    List<MenuEntity> findByIdIn(@Param("ids") List<String> ids,
-                                @Param("tenantId") String tenantId);
+    List<MenuEntity> findByIdIn(@Param("ids") List<String> ids);
 }

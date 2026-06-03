@@ -20,7 +20,7 @@ public interface RoleMenuMapper extends BaseMapper<RoleMenuEntity> {
             SELECT rm.menu_id
               FROM core_rbac_role_menu rm
               JOIN core_rbac_menu m
-                ON m.id = rm.menu_id AND m.mark = 1 AND m.tenant_id = #{tenantId}
+                ON m.id = rm.menu_id AND m.mark = 1
              WHERE rm.role_id = #{roleId}
                AND rm.mark = 1
                AND rm.tenant_id = #{tenantId}

@@ -38,10 +38,12 @@ public final class SystemPermissions {
     public static final String ROLE_DELETE = "role:delete";
 
     // ---- menu ----
+    // READ stays in the business namespace: business-tenant SUPER_ADMIN (tenant:*)
+    // must list menus to bind them to non-super roles (Role-edit menu picker).
+    // CREATE/UPDATE/DELETE moved to PlatformPermissions (platform:menu:*) — menu
+    // management is platform-only now (V41). Removing them here makes the guard
+    // soft-delete the orphaned menu:create/update/delete permission rows on boot.
     public static final String MENU_READ   = "menu:read";
-    public static final String MENU_CREATE = "menu:create";
-    public static final String MENU_UPDATE = "menu:update";
-    public static final String MENU_DELETE = "menu:delete";
 
     // ---- dept ----
     public static final String DEPT_READ   = "dept:read";

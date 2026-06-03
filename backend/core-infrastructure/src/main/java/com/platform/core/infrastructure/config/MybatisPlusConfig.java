@@ -47,7 +47,19 @@ public class MybatisPlusConfig {
      */
     static final Set<String> TENANT_EXCLUDED_TABLES = Set.of(
             "flyway_schema_history",
-            "core_meta"
+            "core_meta",
+            // Distributed lock for the dynamic scheduler (V39). Global table:
+            // the lock_name already encodes the tenant, and it has no tenant_id
+            // column — so it must be excluded or TenantSchemaGuard fails the boot.
+            "core_job_lock",
+            // Navigation menus are a single GLOBAL set (V41): one shared tree for
+            // all tenants, filtered per user by permission_code. The tenant_id
+            // column is retained (all active rows = 'system') for BaseEntity/audit
+            // compatibility, so TenantSchemaGuard logs a harmless "wasted exclusion"
+            // WARN — intentional. Excluding it stops the interceptor injecting
+            // tenant_id='<caller>' into the now-global menu queries, which would
+            // otherwise hide the global menus from business-tenant callers.
+            "core_rbac_menu"
     );
 
     /**

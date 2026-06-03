@@ -41,6 +41,15 @@ public final class PlatformPermissions {
     public static final String TENANT_DELETE      = "platform:tenant:delete";
     public static final String TENANT_IMPERSONATE = "platform:tenant:impersonate";
 
+    // ---- menu（ナビゲーション構造はグローバル一元管理＝平台運維の職責。V41） ----
+    // 読みは業務 super も必要（ロール編集のメニュー割当ピッカー）なので
+    // SystemPermissions.MENU_READ を残し、controller 側で anyOf で両対応する。
+    // 書き（作成/更新/削除）はここに移し、PLATFORM_ADMIN(*:* / platform:*) 専用にする。
+    public static final String MENU_READ   = "platform:menu:read";
+    public static final String MENU_CREATE = "platform:menu:create";
+    public static final String MENU_UPDATE = "platform:menu:update";
+    public static final String MENU_DELETE = "platform:menu:delete";
+
     static {
         PermissionCode.registerAll(PlatformPermissions.class, "platform");
     }
