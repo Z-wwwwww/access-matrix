@@ -53,7 +53,7 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 12
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Keycloak shares the app's database under its own schema (matches the
       # local KC_DB_URL ?currentSchema=keycloak). KC needs the schema to exist.
@@ -91,14 +91,14 @@ jobs:
           echo "::error::Keycloak did not come up"; docker logs keycloak | tail -80; exit 1
 
       - name: Set up JDK 25 (Temurin)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
 
       - name: Set up Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: npm
