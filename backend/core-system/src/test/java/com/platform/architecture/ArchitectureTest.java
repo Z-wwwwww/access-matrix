@@ -54,7 +54,8 @@ public class ArchitectureTest {
             "LoginLogEntity",            // append-only audit log, no soft-delete
             "OpLogEntity",               // append-only audit log
             "UserInviteEntity",          // single-use token; token IS the auth, no tenant_id needed
-            "PasswordResetTokenEntity"   // same single-use token shape
+            "PasswordResetTokenEntity",  // same single-use token shape
+            "DomainEventEntity"          // append-only event store / outbox (V36); no soft-delete, like OpLogEntity
     );
 
     /** Controllers where every HTTP method is a public/pre-auth endpoint by design. */
@@ -67,7 +68,8 @@ public class ArchitectureTest {
             "MeMenuController",          // /me/menus — JWT IS the auth
             "MePermissionController",    // /me/permissions — same
             "UserController",            // /user/me — same
-            "ScopeMeController"          // /scope/me — same
+            "ScopeMeController",         // /scope/me — same
+            "NotificationController"     // /notification/* — personal inbox, JWT-is-auth like /menu/me
     );
 
     private static List<Class<?>> entities;
