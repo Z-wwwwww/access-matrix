@@ -84,7 +84,13 @@ Cross-stack PRs must pass CI on both sides (the path filter triggers the corresp
 
 ## Startup order
 
-1. Backend first: `cd backend && ./mvnw -pl core-bootstrap -am spring-boot:run -Dspring-boot.run.profiles=dev`
+1. Backend first: build the modules once, then run only `core-bootstrap`:
+   ```bash
+   cd backend
+   ./mvnw -DskipTests install                                              # build sibling modules into your local repo
+   ./mvnw -pl core-bootstrap spring-boot:run -Dspring-boot.run.profiles=dev
+   ```
+   Do **not** use `-pl core-bootstrap -am spring-boot:run`: with Spring Boot 4's plugin the `run` goal also fires on upstream modules (incl. the `core-parent` aggregator, which has no main class) and fails with *"Unable to find a suitable main class"*.
 2. Then frontend: `cd frontend && npm install && npm run dev`
 
 The backend's dev profile automatically runs Flyway migrations + LocalAdminSeeder + DemoSeeder, so no manual SQL is required.
