@@ -343,7 +343,7 @@ export default {
     title: '비상용 비밀번호',
     intro: {
       what: 'Keycloak(SSO)을 사용할 수 없을 때 시스템에 로그인하기 위한 비상용 전용 비밀번호입니다.',
-      howDifferent: '평소 SSO 로그인에 사용하는 비밀번호(Keycloak 관리)와는 **별개**이며 **동기화되지 않습니다**. 같은 비밀번호를 사용하지 마십시오.',
+      howDifferent: '평소 SSO 로그인에 사용하는 비밀번호(Keycloak 관리)와는 별개이며 동기화되지 않습니다. 같은 비밀번호를 사용하지 마십시오.',
       whenUsed: 'KC 장애 등 SSO 를 사용할 수 없을 때 /login 의 비밀번호 필드로만 사용됩니다. 슈퍼 관리자만 보유합니다.'
     },
     status: {

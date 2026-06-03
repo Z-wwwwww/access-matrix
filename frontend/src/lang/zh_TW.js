@@ -343,7 +343,7 @@ export default {
     title: '應急密碼',
     intro: {
       what: '這是一組僅用於「應急」的密碼，專門在 Keycloak（SSO）無法使用時用來登入系統。',
-      howDifferent: '它與您日常使用的 SSO 密碼（保存在 Keycloak）**完全獨立**，兩者**不會同步**。請勿使用相同的密碼。',
+      howDifferent: '它與您日常使用的 SSO 密碼（保存在 Keycloak）完全獨立，兩者不會同步。請勿使用相同的密碼。',
       whenUsed: '僅在 KC 故障等 SSO 無法存取時，透過 /login 的密碼欄位使用。只有超級管理員擁有此密碼。'
     },
     status: {

@@ -343,7 +343,7 @@ export default {
     title: '应急密码',
     intro: {
       what: '这是一个仅用于"应急"的密码，专门用于 Keycloak（SSO）不可用时登录系统。',
-      howDifferent: '它与您日常使用的 SSO 密码（保存在 Keycloak 中）**完全独立**，二者**不会同步**。请不要使用相同的密码。',
+      howDifferent: '它与您日常使用的 SSO 密码（保存在 Keycloak 中）完全独立，二者不会同步。请不要使用相同的密码。',
       whenUsed: '仅在 KC 故障等 SSO 无法访问时，通过 /login 的密码字段使用。仅超级管理员拥有此密码。'
     },
     status: {
