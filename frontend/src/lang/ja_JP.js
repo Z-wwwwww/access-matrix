@@ -61,7 +61,7 @@ export default {
     runStatus: { running: '実行中', success: '成功', fail: '失敗', skipped: 'スキップ', none: '—' },
     column: { label: '名称', name: 'タスク', cron: 'Cron 式', status: '状態', nextFire: '次回実行', lastResult: '直近結果', actions: '操作' },
     action: { edit: 'Cron 編集', run: '即時実行', viewLog: 'ログ' },
-    edit: { title: 'タスク設定', label: { cron: 'Cron 式', maxRunSeconds: '最大実行秒数', concurrent: '重複実行を許可', remark: '備考' }, placeholder: { cron: '例: 0 0 3 * * *', remark: '備考(任意)' } },
+    edit: { title: 'タスク設定', label: { cron: 'Cron 式', maxRunSeconds: '最大実行秒数', concurrent: '重複実行を許可', remark: '備考' }, tip: { concurrent: '前回の実行がまだ終わっていない時に、次の発火を並行して実行するか。オフ（既定）なら実行中はスキップし、同一タスクが重ならない（分散ロックで保証）。冪等で並行しても安全な場合のみオン。' }, placeholder: { cron: '例: 0 0 3 * * *', remark: '備考(任意)' } },
     log: { title: '実行ログ', column: { triggerType: 'きっかけ', status: '状態', startTime: '開始', duration: '所要(ms)', node: 'ノード', triggeredBy: '実行者', error: 'エラー' }, empty: '実行履歴はありません' },
     confirm: { runTitle: '即時実行', runMessage: '「{name}」を今すぐ 1 回実行しますか?' },
     message: { saveSuccess: '保存しました', runStarted: '実行を開始しました', enabled: '有効にしました', disabled: '停止しました', updateFailed: '保存に失敗しました', runFailed: '実行に失敗しました' }

@@ -54,7 +54,7 @@ export default {
     runStatus: { running: '运行中', success: '成功', fail: '失败', skipped: '跳过', none: '—' },
     column: { label: '名称', name: '任务', cron: 'Cron 表达式', status: '状态', nextFire: '下次执行', lastResult: '最近结果', actions: '操作' },
     action: { edit: '编辑 Cron', run: '立即执行', viewLog: '日志' },
-    edit: { title: '任务设置', label: { cron: 'Cron 表达式', maxRunSeconds: '最大执行秒数', concurrent: '允许重复执行', remark: '备注' }, placeholder: { cron: '例: 0 0 3 * * *', remark: '备注(可选)' } },
+    edit: { title: '任务设置', label: { cron: 'Cron 表达式', maxRunSeconds: '最大执行秒数', concurrent: '允许重复执行', remark: '备注' }, tip: { concurrent: '上一次执行还没结束时，是否并行启动下一次。关闭（默认）：本次触发被跳过，同一任务不会重叠（由分布式锁保证）。仅当任务可安全并行时才开启。' }, placeholder: { cron: '例: 0 0 3 * * *', remark: '备注(可选)' } },
     log: { title: '执行日志', column: { triggerType: '触发', status: '状态', startTime: '开始', duration: '耗时(ms)', node: '节点', triggeredBy: '执行人', error: '错误' }, empty: '暂无执行历史' },
     confirm: { runTitle: '立即执行', runMessage: '确定立即执行一次「{name}」吗?' },
     message: { saveSuccess: '已保存', runStarted: '已开始执行', enabled: '已启用', disabled: '已停止', updateFailed: '保存失败', runFailed: '执行失败' }

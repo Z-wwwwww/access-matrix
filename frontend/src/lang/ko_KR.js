@@ -54,7 +54,7 @@ export default {
     runStatus: { running: '실행 중', success: '성공', fail: '실패', skipped: '건너뜀', none: '—' },
     column: { label: '이름', name: '작업', cron: 'Cron 식', status: '상태', nextFire: '다음 실행', lastResult: '최근 결과', actions: '작업' },
     action: { edit: 'Cron 편집', run: '즉시 실행', viewLog: '로그' },
-    edit: { title: '작업 설정', label: { cron: 'Cron 식', maxRunSeconds: '최대 실행 초', concurrent: '중복 실행 허용', remark: '비고' }, placeholder: { cron: '예: 0 0 3 * * *', remark: '비고(선택)' } },
+    edit: { title: '작업 설정', label: { cron: 'Cron 식', maxRunSeconds: '최대 실행 초', concurrent: '중복 실행 허용', remark: '비고' }, tip: { concurrent: '이전 실행이 아직 끝나지 않았을 때 다음 트리거를 병렬로 실행할지. 끔(기본): 실행 중이면 이번 트리거를 건너뛰어 같은 작업이 겹치지 않음(분산 락으로 보장). 병렬 실행이 안전한 경우에만 켜기.' }, placeholder: { cron: '예: 0 0 3 * * *', remark: '비고(선택)' } },
     log: { title: '실행 로그', column: { triggerType: '트리거', status: '상태', startTime: '시작', duration: '소요(ms)', node: '노드', triggeredBy: '실행자', error: '오류' }, empty: '실행 기록이 없습니다' },
     confirm: { runTitle: '즉시 실행', runMessage: '"{name}"을(를) 지금 한 번 실행하시겠습니까?' },
     message: { saveSuccess: '저장했습니다', runStarted: '실행을 시작했습니다', enabled: '활성화했습니다', disabled: '중지했습니다', updateFailed: '저장 실패', runFailed: '실행 실패' }

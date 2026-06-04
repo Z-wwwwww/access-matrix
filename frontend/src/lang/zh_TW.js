@@ -54,7 +54,7 @@ export default {
     runStatus: { running: '執行中', success: '成功', fail: '失敗', skipped: '略過', none: '—' },
     column: { label: '名稱', name: '任務', cron: 'Cron 運算式', status: '狀態', nextFire: '下次執行', lastResult: '最近結果', actions: '操作' },
     action: { edit: '編輯 Cron', run: '立即執行', viewLog: '日誌' },
-    edit: { title: '任務設定', label: { cron: 'Cron 運算式', maxRunSeconds: '最大執行秒數', concurrent: '允許重複執行', remark: '備註' }, placeholder: { cron: '例: 0 0 3 * * *', remark: '備註(可選)' } },
+    edit: { title: '任務設定', label: { cron: 'Cron 運算式', maxRunSeconds: '最大執行秒數', concurrent: '允許重複執行', remark: '備註' }, tip: { concurrent: '上一次執行還沒結束時，是否並行啟動下一次。關閉（預設）：本次觸發被跳過，同一任務不會重疊（由分散式鎖保證）。僅當任務可安全並行時才開啟。' }, placeholder: { cron: '例: 0 0 3 * * *', remark: '備註(可選)' } },
     log: { title: '執行日誌', column: { triggerType: '觸發', status: '狀態', startTime: '開始', duration: '耗時(ms)', node: '節點', triggeredBy: '執行人', error: '錯誤' }, empty: '尚無執行紀錄' },
     confirm: { runTitle: '立即執行', runMessage: '確定立即執行一次「{name}」嗎?' },
     message: { saveSuccess: '已儲存', runStarted: '已開始執行', enabled: '已啟用', disabled: '已停止', updateFailed: '儲存失敗', runFailed: '執行失敗' }

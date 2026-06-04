@@ -10,7 +10,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useDict } from '@/composables/useDict'
-import { Search, RotateCcw, Pencil, Play, ScrollText } from 'lucide-vue-next'
+import { Search, RotateCcw, Pencil, Play, ScrollText, HelpCircle } from 'lucide-vue-next'
 import {
   getJobListApi, getJobLogListApi, updateJobApi,
   enableJobApi, disableJobApi, runJobApi
@@ -266,6 +266,10 @@ onMounted(fetchData)
         <div class="flex items-center gap-2">
           <Switch v-model="editForm.concurrent" :checked-value="1" :unchecked-value="0" />
           <span class="text-sm">{{ t('job.edit.label.concurrent') }}</span>
+          <span class="inline-flex cursor-help text-muted-foreground/70 hover:text-foreground"
+                :title="t('job.edit.tip.concurrent')">
+            <HelpCircle class="size-3.5" />
+          </span>
         </div>
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('job.edit.label.remark') }}</label>

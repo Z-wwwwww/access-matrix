@@ -54,7 +54,7 @@ export default {
     runStatus: { running: 'Running', success: 'Success', fail: 'Failed', skipped: 'Skipped', none: '—' },
     column: { label: 'Name', name: 'Task', cron: 'Cron', status: 'Status', nextFire: 'Next run', lastResult: 'Last result', actions: 'Actions' },
     action: { edit: 'Edit cron', run: 'Run now', viewLog: 'Logs' },
-    edit: { title: 'Task settings', label: { cron: 'Cron expression', maxRunSeconds: 'Max run seconds', concurrent: 'Allow concurrent runs', remark: 'Remark' }, placeholder: { cron: 'e.g. 0 0 3 * * *', remark: 'Remark (optional)' } },
+    edit: { title: 'Task settings', label: { cron: 'Cron expression', maxRunSeconds: 'Max run seconds', concurrent: 'Allow concurrent runs', remark: 'Remark' }, tip: { concurrent: 'Whether a new run may start while the previous run of this job is still going. Off (default): the new fire is skipped, so the job never overlaps itself (enforced by a distributed lock). Turn on only if the job is safe to run in parallel.' }, placeholder: { cron: 'e.g. 0 0 3 * * *', remark: 'Remark (optional)' } },
     log: { title: 'Execution log', column: { triggerType: 'Trigger', status: 'Status', startTime: 'Start', duration: 'Duration (ms)', node: 'Node', triggeredBy: 'By', error: 'Error' }, empty: 'No execution history' },
     confirm: { runTitle: 'Run now', runMessage: 'Run "{name}" once right now?' },
     message: { saveSuccess: 'Saved', runStarted: 'Run started', enabled: 'Enabled', disabled: 'Stopped', updateFailed: 'Save failed', runFailed: 'Run failed' }
