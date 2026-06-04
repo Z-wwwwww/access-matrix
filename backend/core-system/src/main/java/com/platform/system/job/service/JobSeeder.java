@@ -22,8 +22,8 @@ import java.util.Locale;
  * （{@code OutboxDispatcher} と同じ）。管理は平台運維(Platform Admin)が行い、業務租户には
  * 見せない。
  *
- * <p>既存行があれば <b>cron / enabled / concurrent / max_run_seconds は触らない</b>
- * （管理者が変更した値が真実の源）。name のみ最新化し、soft-deleted 行は復活させる。
+ * <p>既存行があれば <b>cron / enabled / concurrent / max_run_seconds / name は触らない</b>
+ * （管理者が変更した値が真実の源）。soft-deleted 行のみ復活させる。
  */
 @Service
 public class JobSeeder {
@@ -61,11 +61,10 @@ public class JobSeeder {
                 .last("LIMIT 1"));
 
         if (existing != null) {
-            // 管理者が変えうる cron/enabled/concurrent/max_run_seconds は保持。
-            // name を最新化し、soft-deleted なら復活。
+            // 管理者が変えうる値は保持：cron/enabled/concurrent/max_run_seconds に加え、
+            // name も管理画面で編集可になったので上書きしない。soft-deleted のみ復活。
             jobMapper.update(null, new UpdateWrapper<CoreJobEntity>()
                     .eq("id", existing.getId())
-                    .set("name", job.code())
                     .set("mark", 1));
             return 0;
         }
@@ -73,7 +72,7 @@ public class JobSeeder {
         CoreJobEntity row = new CoreJobEntity();
         row.setId(IdGenerator.ulid());
         row.setJobCode(job.code());
-        row.setName(job.code());            // 表示は i18n(job.<code>) が担う。DB の name は fallback。
+        row.setName(job.code());            // 初期表示名は code。管理画面で編集可（以後 seeder は上書きしない）。
         row.setCron(job.defaultCron());
         row.setEnabled(job.enabledByDefault() ? 1 : 0);
         row.setConcurrent(job.concurrentAllowed() ? 1 : 0);

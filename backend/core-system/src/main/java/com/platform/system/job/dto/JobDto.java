@@ -16,6 +16,7 @@ public final class JobDto {
      * job_code は変更不可（コード側が真実の源）。
      */
     public record UpdateRequest(
+            @Size(max = 128) String name,
             @NotBlank @Size(max = 128) String cron,
             @Min(1) @Max(86400) Integer maxRunSeconds,
             @Min(0) @Max(1) Integer concurrent,

@@ -83,6 +83,7 @@ public class JobAdminService {
                 .eq("id", id).eq("mark", 1)
                 .set("cron", req.cron())
                 .set("update_time", LocalDateTime.now());
+        if (req.name() != null && !req.name().isBlank()) u.set("name", req.name());
         if (req.maxRunSeconds() != null) u.set("max_run_seconds", req.maxRunSeconds());
         if (req.concurrent() != null) u.set("concurrent", req.concurrent());
         if (req.remark() != null) u.set("remark", req.remark());

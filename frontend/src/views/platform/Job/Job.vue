@@ -16,7 +16,7 @@ import {
   enableJobApi, disableJobApi, runJobApi
 } from '@/services/job'
 
-const { t, te } = useI18n()
+const { t } = useI18n()
 const { confirm } = useConfirm()
 
 // ── list state ──────────────────────────────────────────────
@@ -27,16 +27,9 @@ const page = ref(1)
 const pageSize = ref(20)
 const search = reactive({ keyword: '' })
 
-// 人間可読の「何をするジョブか」ラベル。i18n `job.names.<code>` が真の表示名（: は . に正規化）、
-// 無ければ DB の name（= code フォールバック）。新ジョブ追加時はここに i18n を 1 行足すだけ。
-function jobLabel(row) {
-  const key = 'job.names.' + (row.jobCode || '').replaceAll(':', '.')
-  return te(key) ? t(key) : (row.name || row.jobCode || '')
-}
-
 const columns = computed(() => [
-  { key: 'label', title: t('job.column.label'), minWidth: '200px' },
-  { key: 'name', title: t('job.column.name'), minWidth: '160px' },
+  { key: 'name', title: t('job.column.label'), minWidth: '200px' },     // 名称 = core_job.name（編集可）
+  { key: 'jobCode', title: t('job.column.name'), minWidth: '160px' },   // タスク = job_code（不変）
   { key: 'cron', title: t('job.column.cron'), minWidth: '130px' },
   { key: 'status', title: t('job.column.status'), minWidth: '80px', align: 'center' },
   { key: 'nextFireTime', title: t('job.column.nextFire'), minWidth: '150px' },
@@ -95,10 +88,11 @@ async function runNow(row) {
 
 // ── edit drawer ─────────────────────────────────────────────
 const showEdit = ref(false)
-const editForm = reactive({ id: '', name: '', cron: '', maxRunSeconds: 300, concurrent: 0, remark: '' })
+const editForm = reactive({ id: '', jobCode: '', name: '', cron: '', maxRunSeconds: 300, concurrent: 0, remark: '' })
 
 function openEdit(row) {
   editForm.id = row.id
+  editForm.jobCode = row.jobCode
   editForm.name = row.name
   editForm.cron = row.cron
   editForm.maxRunSeconds = row.maxRunSeconds
@@ -110,6 +104,7 @@ function openEdit(row) {
 async function saveEdit() {
   try {
     const res = await updateJobApi(editForm.id, {
+      name: editForm.name,
       cron: editForm.cron,
       maxRunSeconds: editForm.maxRunSeconds,
       concurrent: editForm.concurrent,
@@ -206,10 +201,10 @@ onMounted(fetchData)
         @update:page="fetchData"
         @update:page-size="fetchData"
       >
-        <template #cell-label="{ row }">
-          <span class="font-medium">{{ jobLabel(row) }}</span>
-        </template>
         <template #cell-name="{ row }">
+          <span class="font-medium">{{ row.name }}</span>
+        </template>
+        <template #cell-jobCode="{ row }">
           <code class="text-xs text-muted-foreground">{{ row.jobCode }}</code>
         </template>
         <template #cell-cron="{ row }">
@@ -254,7 +249,11 @@ onMounted(fetchData)
       <div class="space-y-3">
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('job.column.name') }}</label>
-          <div class="text-sm">{{ editForm.name }}</div>
+          <div class="text-sm"><code class="text-xs text-muted-foreground">{{ editForm.jobCode }}</code></div>
+        </div>
+        <div>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('job.column.label') }}</label>
+          <Input v-model="editForm.name" />
         </div>
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('job.edit.label.cron') }}</label>

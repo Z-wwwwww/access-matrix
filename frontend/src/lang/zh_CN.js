@@ -53,7 +53,6 @@ export default {
     triggerType: { cron: '定时', manual: '手动', startup: '启动' },
     runStatus: { running: '运行中', success: '成功', fail: '失败', skipped: '跳过', none: '—' },
     column: { label: '名称', name: '任务', cron: 'Cron 表达式', status: '状态', nextFire: '下次执行', lastResult: '最近结果', actions: '操作' },
-    names: { demo: { heartbeat: '系统存活心跳（定期记录运行状态）' } },
     action: { edit: '编辑 Cron', run: '立即执行', viewLog: '日志' },
     edit: { title: '任务设置', label: { cron: 'Cron 表达式', maxRunSeconds: '最大执行秒数', concurrent: '允许重复执行', remark: '备注' }, placeholder: { cron: '例: 0 0 3 * * *', remark: '备注(可选)' } },
     log: { title: '执行日志', column: { triggerType: '触发', status: '状态', startTime: '开始', duration: '耗时(ms)', node: '节点', triggeredBy: '执行人', error: '错误' }, empty: '暂无执行历史' },
