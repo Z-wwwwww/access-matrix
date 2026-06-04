@@ -184,7 +184,8 @@ End-to-end onboarding inside one `@Transactional`:
 2. Insert `core_tenant` registry row
 3. Seed `core_numbering_management` (per-tenant counter)
 4. Seed RBAC: tenant:* permission + SUPER_ADMIN role + role-permission
-   binding + clone of demo's menu tree
+   binding (menus are a single global set since V41 — no per-tenant clone;
+   the SUPER_ADMIN sees the global menu tree filtered by permission)
 5. Create first admin user (no password) + bind to SUPER_ADMIN
 6. Create matching Keycloak user (no credentials)
 7. Mint an invite token and email the link to `contactEmail`
