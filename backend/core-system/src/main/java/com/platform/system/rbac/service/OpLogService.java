@@ -49,6 +49,7 @@ public class OpLogService implements OpLogSink {
             e.setRequestBody(record.requestBody());
             e.setSuccess(record.success());
             e.setErrorMsg(record.errorMsg());
+            e.setErrorCode(record.errorCode());
             e.setCostMs(record.costMs());
             e.setCreateTime(LocalDateTime.now());
             mapper.insert(e);

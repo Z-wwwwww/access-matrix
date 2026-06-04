@@ -63,6 +63,10 @@ public class OpLogEntity {
     @TableField("error_msg")
     private String errorMsg;
 
+    /** Error code on failure: BusinessException ErrorCode (expected) or 500 (unexpected). Null on success. */
+    @TableField("error_code")
+    private Integer errorCode;
+
     @TableField("cost_ms")
     private Integer costMs;
 

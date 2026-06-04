@@ -3,6 +3,8 @@ package com.platform.core.infrastructure.audit;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.platform.core.common.audit.OpLog;
 import com.platform.core.common.context.RequestContext;
+import com.platform.core.common.error.BusinessException;
+import com.platform.core.common.error.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -94,6 +96,11 @@ public class OpLogAspect {
         String ua      = req == null ? null : req.getHeader("User-Agent");
         boolean ok     = thrown == null;
         String errMsg  = thrown == null ? null : safe(thrown.getMessage(), 500);
+        // Error classification: a BusinessException is a deliberate, expected
+        // rejection (carries its own 4xx/7xx ErrorCode); anything else is an
+        // unexpected failure → 500. Lets monitoring count only real errors.
+        Integer errorCode = thrown == null ? null
+                : (thrown instanceof BusinessException be ? be.errorCode().code() : ErrorCode.INTERNAL_ERROR.code());
 
         return new OpLogRecord(
                 tenantId == null ? "default" : tenantId,
@@ -110,6 +117,7 @@ public class OpLogAspect {
                 body,
                 ok,
                 errMsg,
+                errorCode,
                 costMs
         );
     }

@@ -19,5 +19,8 @@ public record OpLogRecord(
         String requestBody,
         boolean success,
         String errorMsg,
+        /** Error code when {@code success=false}: a BusinessException's ErrorCode
+         *  (4xx/7xx = expected rejection) or 500 (unexpected). Null on success. */
+        Integer errorCode,
         int costMs
 ) {}

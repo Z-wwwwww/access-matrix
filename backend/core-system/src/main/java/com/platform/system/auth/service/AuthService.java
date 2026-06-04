@@ -240,7 +240,7 @@ public class AuthService {
                     user.getTenantId(), user.getId(), user.getUsername(),
                     "system", "auth.breakGlass", "user", user.getId(),
                     "/auth/login", "POST", clientIp, userAgent, null,
-                    true, null, 0));
+                    true, null, null, 0));
         } catch (Exception e) {
             log.warn("[break-glass] could not record audit oplog for user {} ({}): {}",
                     user.getId(), user.getTenantId(), e.toString());
