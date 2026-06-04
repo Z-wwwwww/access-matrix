@@ -16,11 +16,10 @@ export default {
   job: {
     title: 'スケジュールタスク管理',
     search: { placeholder: { keyword: 'タスク名 / コードで検索' } },
-    scope: { platform: 'プラットフォーム', tenant: 'テナント' },
     status: { enabled: '有効', disabled: '停止' },
     triggerType: { cron: '定時', manual: '手動', startup: '起動' },
     runStatus: { running: '実行中', success: '成功', fail: '失敗', skipped: 'スキップ', none: '—' },
-    column: { name: 'タスク', code: 'コード', scope: 'スコープ', cron: 'Cron 式', status: '状態', nextFire: '次回実行', lastResult: '直近結果', actions: '操作' },
+    column: { name: 'タスク', cron: 'Cron 式', status: '状態', nextFire: '次回実行', lastResult: '直近結果', actions: '操作' },
     action: { edit: 'Cron 編集', run: '即時実行', viewLog: 'ログ', enable: '有効化', disable: '停止' },
     edit: { title: 'タスク設定', label: { cron: 'Cron 式', maxRunSeconds: '最大実行秒数', concurrent: '重複実行を許可', remark: '備考' }, placeholder: { cron: '例: 0 0 3 * * *', remark: '備考(任意)' } },
     log: { title: '実行ログ', column: { triggerType: 'きっかけ', status: '状態', startTime: '開始', duration: '所要(ms)', node: 'ノード', triggeredBy: '実行者', error: 'エラー' }, empty: '実行履歴はありません' },
