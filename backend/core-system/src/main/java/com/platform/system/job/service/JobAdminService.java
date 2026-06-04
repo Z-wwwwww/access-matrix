@@ -49,7 +49,7 @@ public class JobAdminService {
         Page<CoreJobEntity> p = new Page<>(page, size);
         QueryWrapper<CoreJobEntity> w = new QueryWrapper<CoreJobEntity>()
                 .eq("mark", 1)
-                .orderByAsc("scope").orderByAsc("job_code");
+                .orderByAsc("job_code");   // scope column dropped in V42 — order by code only
         if (keyword != null && !keyword.isBlank()) {
             w.and(q -> q.like("job_code", keyword).or().like("name", keyword));
         }
@@ -71,7 +71,7 @@ public class JobAdminService {
         return PageResult.of(records, result.getTotal(), page, size);
     }
 
-    /** cron / max-run / concurrent / remark を変更（scope/code は不変）。 */
+    /** cron / max-run / concurrent / remark を変更（job_code は不変）。 */
     @Transactional
     public void update(String id, JobDto.UpdateRequest req) {
         CoreJobEntity row = require(id);

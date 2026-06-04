@@ -13,7 +13,7 @@ public final class JobDto {
 
     /**
      * 設定編集リクエスト。cron は必須、その他は省略可（null なら据え置き）。
-     * scope / job_code は変更不可（コード側が真実の源）。
+     * job_code は変更不可（コード側が真実の源）。
      */
     public record UpdateRequest(
             @NotBlank @Size(max = 128) String cron,
