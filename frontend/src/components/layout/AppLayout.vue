@@ -47,11 +47,27 @@ watch(
 // 不走 EmptyLayout），所以 EmptyLayout 内层的 cacheKey 机制对这些路由失效。
 // 在此处再做一层同样的版本号 key，关 tab 时 evictCache 让 key 变化 →
 // keep-alive 视为新 vnode 重新挂载，避免再次打开 tab 时搜索表单等残留旧输入。
-const cacheKey = computed(() => {
+//
+// 但若被路由的组件本身就是 EmptyLayout（目录占位组件），绝不能用随 fullPath 变化
+// 的 key 把它塞进这层 keep-alive：那样每访问一个新 fullPath 都会缓存一份独立的
+// EmptyLayout 实例，实例里页面的 watcher / onActivated 全部存活，导航时多个实例
+// 一起响应 → 同一请求被重复发送，且打开的 tab 越多重复越多。
+// 因此 EmptyLayout 走 v-if 分支：不套外层 keep-alive、且用固定 key 'layout:empty'，
+// 全局只保留一个 EmptyLayout 实例，页面缓存交由它内层自己的 keep-alive 处理。
+function getComponentName(component) {
+  return component?.name || component?.__name || component?.type?.name || component?.type?.__name || ''
+}
+
+function isEmptyLayoutComponent(component) {
+  return getComponentName(component) === 'EmptyLayout'
+}
+
+function cacheKeyFor(component) {
+  if (isEmptyLayoutComponent(component)) return 'layout:empty'
   const fp = route.fullPath
   const v = tabsStore.refreshVersions[fp] || 0
   return v > 0 ? `${fp}#${v}` : fp
-})
+}
 
 // 路由 meta 中的 hideSidebar / hideFooter 标志（菜单管理里配置，
 // 经 utils/menu-to-routes.js 写入 route.meta），允许某些页面（打印预览、
@@ -89,8 +105,13 @@ const hideFooter = computed(() => route.meta?.hideFooter === true)
         <!-- Main content (window 滚动: main 不再是独立滚动容器) -->
         <main class="flex-1 min-w-0 px-3 pb-3 md:px-4 md:pb-4 lg:px-6 lg:pb-6 pt-2">
           <router-view v-slot="{ Component }">
-            <keep-alive :max="50">
-              <component :is="Component" :key="cacheKey" />
+            <component
+              v-if="isEmptyLayoutComponent(Component)"
+              :is="Component"
+              :key="cacheKeyFor(Component)"
+            />
+            <keep-alive v-else :max="50">
+              <component :is="Component" :key="cacheKeyFor(Component)" />
             </keep-alive>
           </router-view>
         </main>
