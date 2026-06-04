@@ -223,15 +223,35 @@ export default {
         empty: '없음',
         activation: {
           title: '온보딩 / 활성화 퍼널', pending: '미활성', expired: '만료', rate: '활성화율',
-          median: '온보딩 소요(중앙값)', listTitle: '활성화 대기 테넌트', expiredBadge: '만료'
+          median: '온보딩 소요(중앙값)', listTitle: '활성화 대기 테넌트', expiredBadge: '만료',
+          tip: {
+            pending: '초대했지만 관리자가 아직 활성화하지 않은 테넌트 수',
+            expired: '초대가 만료되어 한 번도 활성화되지 않은 테넌트 수',
+            rate: '비내장 테넌트 중 관리자가 로그인에 성공한 비율',
+            median: '테넌트 생성부터 관리자 첫 로그인까지 소요 시간의 중앙값'
+          }
         },
         engagement: {
           title: '활성도 / 참여', active7d: '활성(7일)', active30d: '활성(30일)', dau: 'DAU', mau: 'MAU',
-          silent: '휴면', trendTitle: '로그인 추이(14일)', silentListTitle: '휴면 테넌트(30일 무로그인)', never: '로그인 없음'
+          silent: '휴면', trendTitle: '로그인 추이(14일)', silentListTitle: '휴면 테넌트(30일 무로그인)', never: '로그인 없음',
+          tip: {
+            active7d: '최근 7일 내 로그인 성공이 있는 테넌트 수',
+            active30d: '최근 30일 내 로그인 성공이 있는 테넌트 수',
+            dau: '최근 24시간 활성 사용자 수(중복 제거)',
+            mau: '최근 30일 활성 사용자 수(중복 제거)',
+            silent: '운영 중이나 최근 30일 로그인이 없는 테넌트 수(이탈 위험)'
+          }
         },
         reliability: {
           title: '플랫폼 상태', jobFailures: '작업 실패(24h)', eventBacklog: '이벤트 적체',
-          backlogAge: '최장 적체', oplogErrors: 'API 오류(24h)', failuresListTitle: '최근 작업 실패'
+          backlogAge: '최장 적체', oplogErrors: 'API 오류(24h)', failuresListTitle: '최근 작업 실패',
+          errorsListTitle: '최근 API 오류', statePending: '대기', stateFailed: '실패',
+          tip: {
+            jobFailures: '최근 24시간 실패한 예약 작업 횟수',
+            eventBacklog: '미전송 도메인 이벤트 수(대기+실패)',
+            backlogAge: '가장 오래된 미전송 이벤트의 적체 시간',
+            oplogErrors: '최근 24시간 예기치 않은 서버 오류(500) 수'
+          }
         },
         security: {
           title: '보안 / 권한 모니터링', activeSupport: '지원 세션 진행중', support7d: '지원(7일)',

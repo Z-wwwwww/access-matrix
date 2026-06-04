@@ -233,15 +233,35 @@ export default {
         empty: '対象なし',
         activation: {
           title: '入居・有効化ファネル', pending: '未有効化', expired: '期限切れ', rate: '有効化率',
-          median: '入居所要(中央値)', listTitle: '招待保留中のテナント', expiredBadge: '期限切れ'
+          median: '入居所要(中央値)', listTitle: '招待保留中のテナント', expiredBadge: '期限切れ',
+          tip: {
+            pending: '招待済みだが管理者がまだ有効化していないテナント数',
+            expired: '招待が期限切れになり一度も有効化されなかったテナント数',
+            rate: '非組み込みテナントのうち管理者がログイン成功した割合',
+            median: 'テナント作成から管理者初回ログインまでの所要時間の中央値'
+          }
         },
         engagement: {
           title: '活性・エンゲージメント', active7d: '活性(7日)', active30d: '活性(30日)', dau: 'DAU', mau: 'MAU',
-          silent: '休眠', trendTitle: 'ログイン推移(14日)', silentListTitle: '休眠テナント(30日無ログイン)', never: '未ログイン'
+          silent: '休眠', trendTitle: 'ログイン推移(14日)', silentListTitle: '休眠テナント(30日無ログイン)', never: '未ログイン',
+          tip: {
+            active7d: '直近7日間にログイン成功があったテナント数',
+            active30d: '直近30日間にログイン成功があったテナント数',
+            dau: '直近24時間のアクティブユーザー数(重複排除)',
+            mau: '直近30日間のアクティブユーザー数(重複排除)',
+            silent: '稼働中だが直近30日ログインのないテナント数(解約予兆)'
+          }
         },
         reliability: {
           title: 'プラットフォーム健全性', jobFailures: 'ジョブ失敗(24h)', eventBacklog: 'イベント滞留',
-          backlogAge: '最古滞留', oplogErrors: 'APIエラー(24h)', failuresListTitle: '直近のジョブ失敗'
+          backlogAge: '最古滞留', oplogErrors: 'APIエラー(24h)', failuresListTitle: '直近のジョブ失敗',
+          errorsListTitle: '直近のAPIエラー', statePending: '保留', stateFailed: '失敗',
+          tip: {
+            jobFailures: '直近24時間に失敗した定時タスクの回数',
+            eventBacklog: '未配信のドメインイベント数(保留＋失敗)',
+            backlogAge: '最も古い未配信イベントの滞留時間',
+            oplogErrors: '直近24時間の想定外サーバーエラー(500)数'
+          }
         },
         security: {
           title: 'セキュリティ・高権限監視', activeSupport: 'サポート進行中', support7d: 'サポート(7日)',

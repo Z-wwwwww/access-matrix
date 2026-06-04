@@ -223,15 +223,35 @@ export default {
         empty: 'Nothing to show',
         activation: {
           title: 'Onboarding / activation funnel', pending: 'Pending', expired: 'Expired', rate: 'Activation rate',
-          median: 'Median onboarding', listTitle: 'Tenants awaiting activation', expiredBadge: 'Expired'
+          median: 'Median onboarding', listTitle: 'Tenants awaiting activation', expiredBadge: 'Expired',
+          tip: {
+            pending: 'Tenants invited but whose admin has not activated yet',
+            expired: 'Tenants whose admin invite expired without ever activating',
+            rate: 'Share of non-built-in tenants whose admin has logged in at least once',
+            median: 'Median time from tenant creation to the admin first login'
+          }
         },
         engagement: {
           title: 'Engagement', active7d: 'Active (7d)', active30d: 'Active (30d)', dau: 'DAU', mau: 'MAU',
-          silent: 'Silent', trendTitle: 'Logins (14d)', silentListTitle: 'Silent tenants (no login 30d)', never: 'Never'
+          silent: 'Silent', trendTitle: 'Logins (14d)', silentListTitle: 'Silent tenants (no login 30d)', never: 'Never',
+          tip: {
+            active7d: 'Tenants with a successful login in the last 7 days',
+            active30d: 'Tenants with a successful login in the last 30 days',
+            dau: 'Distinct users active in the last 24 hours',
+            mau: 'Distinct users active in the last 30 days',
+            silent: 'Active tenants with no login in the last 30 days (churn risk)'
+          }
         },
         reliability: {
           title: 'Platform health', jobFailures: 'Job failures (24h)', eventBacklog: 'Event backlog',
-          backlogAge: 'Oldest backlog', oplogErrors: 'API errors (24h)', failuresListTitle: 'Recent job failures'
+          backlogAge: 'Oldest backlog', oplogErrors: 'API errors (24h)', failuresListTitle: 'Recent job failures',
+          errorsListTitle: 'Recent API errors', statePending: 'Pending', stateFailed: 'Failed',
+          tip: {
+            jobFailures: 'Scheduled-job runs that failed in the last 24 hours',
+            eventBacklog: 'Undispatched domain events (pending + failed)',
+            backlogAge: 'Age of the oldest undispatched event',
+            oplogErrors: 'Unexpected server errors (500) in the last 24 hours'
+          }
         },
         security: {
           title: 'Security & privileged access', activeSupport: 'Support live', support7d: 'Support (7d)',

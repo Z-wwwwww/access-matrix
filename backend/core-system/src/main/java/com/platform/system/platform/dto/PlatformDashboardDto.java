@@ -38,7 +38,8 @@ public final class PlatformDashboardDto {
             long expiredUnactivated,
             double activationRate,
             Double medianOnboardingHours,
-            List<PendingInvite> pending
+            List<PendingInvite> pending,
+            List<PendingInvite> expired
     ) {}
 
     public record PendingInvite(
@@ -88,7 +89,18 @@ public final class PlatformDashboardDto {
             long eventFailed,
             Long eventBacklogOldestMin,
             long oplogErrors24h,
-            List<JobFailure> recentJobFailures
+            List<JobFailure> recentJobFailures,
+            List<OplogError> recentOplogErrors,
+            List<BacklogEvent> backlogEvents
+    ) {}
+
+    /** An undispatched outbox event (core_domain_event.dispatch_state != 1). */
+    public record BacklogEvent(
+            String aggregateType,
+            String eventType,
+            LocalDateTime occurredAt,
+            int dispatchState,   // 0=pending, 2=failed
+            int attempts
     ) {}
 
     public record JobFailure(
@@ -96,6 +108,15 @@ public final class PlatformDashboardDto {
             LocalDateTime startTime,
             Long durationMs,
             String error
+    ) {}
+
+    /** A failed request (core_oplog.success = false) in the last 24h. */
+    public record OplogError(
+            String module,
+            String action,
+            String username,
+            String errorMsg,
+            LocalDateTime time
     ) {}
 
     // ── 5. Security & privileged-access monitoring ─────────────────────────

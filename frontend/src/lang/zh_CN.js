@@ -223,15 +223,35 @@ export default {
         empty: '暂无',
         activation: {
           title: '入驻 / 激活漏斗', pending: '待激活', expired: '已过期', rate: '激活率',
-          median: '入驻时长(中位)', listTitle: '待激活租户(邀请未使用)', expiredBadge: '已过期'
+          median: '入驻时长(中位)', listTitle: '待激活租户(邀请未使用)', expiredBadge: '已过期',
+          tip: {
+            pending: '已发送邀请但管理员尚未激活的租户数',
+            expired: '邀请已过期且从未激活的租户数',
+            rate: '非内置租户中管理员已成功登录过的比例',
+            median: '从创建租户到管理员首次登录的时长中位数'
+          }
         },
         engagement: {
           title: '活跃与参与', active7d: '活跃(7天)', active30d: '活跃(30天)', dau: 'DAU', mau: 'MAU',
-          silent: '沉默', trendTitle: '登录趋势(14天)', silentListTitle: '沉默租户(30天无登录)', never: '从未登录'
+          silent: '沉默', trendTitle: '登录趋势(14天)', silentListTitle: '沉默租户(30天无登录)', never: '从未登录',
+          tip: {
+            active7d: '近7天有成功登录的租户数',
+            active30d: '近30天有成功登录的租户数',
+            dau: '近24小时活跃用户数(按用户去重)',
+            mau: '近30天活跃用户数(按用户去重)',
+            silent: '运行中但近30天无登录的租户数(流失预警)'
+          }
         },
         reliability: {
           title: '平台健康', jobFailures: '任务失败(24h)', eventBacklog: '事件积压',
-          backlogAge: '最久积压', oplogErrors: '接口错误(24h)', failuresListTitle: '最近任务失败'
+          backlogAge: '最久积压', oplogErrors: '接口错误(24h)', failuresListTitle: '最近任务失败',
+          errorsListTitle: '最近接口错误', statePending: '待分发', stateFailed: '失败',
+          tip: {
+            jobFailures: '近24小时失败的定时任务次数',
+            eventBacklog: '未分发的领域事件数(待分发+失败)',
+            backlogAge: '最旧未分发事件的滞留时长',
+            oplogErrors: '近24小时非业务的服务端错误(500)数'
+          }
         },
         security: {
           title: '安全与高权限监视', activeSupport: '支持会话进行中', support7d: '支持会话(7天)',

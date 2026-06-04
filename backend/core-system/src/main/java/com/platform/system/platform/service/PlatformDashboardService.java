@@ -74,21 +74,29 @@ public class PlatformDashboardService {
                         + "      WHERE t.mark = 1 AND t.tenant_code NOT IN ('system','demo') "
                         + "      GROUP BY t.id, t.create_time) x");
 
-        List<PlatformDashboardDto.PendingInvite> list = jdbc.query(
+        // Still-valid pending invites (soonest-expiring first).
+        List<PlatformDashboardDto.PendingInvite> pendingList = invites(
+                "AND i.expires_at > now() ORDER BY i.expires_at ASC", false);
+        // Expired-unused invites (most-recently-expired first).
+        List<PlatformDashboardDto.PendingInvite> expiredList = invites(
+                "AND i.expires_at <= now() ORDER BY i.expires_at DESC", true);
+
+        return new PlatformDashboardDto.Activation(pending, expired, rate, medianHours, pendingList, expiredList);
+    }
+
+    /** Shared invite-list query for the pending / expired activation cards. */
+    private List<PlatformDashboardDto.PendingInvite> invites(String tail, boolean expired) {
+        return jdbc.query(
                 "SELECT t.id, t.tenant_code, t.display_name, t.contact_email, "
-                        + "       i.create_time AS invited_at, i.expires_at, "
-                        + "       (i.expires_at <= now()) AS expired "
+                        + "       i.create_time AS invited_at, i.expires_at "
                         + "FROM core_user_invite i "
                         + "JOIN core_tenant t ON t.tenant_code = i.tenant_id AND t.mark = 1 "
-                        + "WHERE i.used_at IS NULL AND i.mark = 1 "
-                        + "ORDER BY i.expires_at ASC LIMIT " + LIST_CAP,
+                        + "WHERE i.used_at IS NULL AND i.mark = 1 " + tail + " LIMIT " + LIST_CAP,
                 (rs, n) -> new PlatformDashboardDto.PendingInvite(
                         rs.getString("id"), rs.getString("tenant_code"),
                         rs.getString("display_name"), rs.getString("contact_email"),
                         ts(rs.getObject("invited_at")), ts(rs.getObject("expires_at")),
-                        rs.getBoolean("expired")));
-
-        return new PlatformDashboardDto.Activation(pending, expired, rate, medianHours, list);
+                        expired));
     }
 
     // ── 3. Engagement ──────────────────────────────────────────────────────
@@ -163,8 +171,10 @@ public class PlatformDashboardService {
                 "SELECT CAST(EXTRACT(EPOCH FROM (now() - MIN(occurred_at))) / 60 AS BIGINT) "
                         + "FROM core_domain_event WHERE dispatch_state <> 1");
 
+        // Only unexpected server errors (error_code = 500) count — deliberate
+        // BusinessException rejections (4xx/7xx) are normal outcomes, not errors.
         long oplogErr = q1Long(
-                "SELECT COUNT(*) FROM core_oplog WHERE success = false "
+                "SELECT COUNT(*) FROM core_oplog WHERE success = false AND error_code = 500 "
                         + "AND create_time >= now() - INTERVAL '24 hours'");
 
         List<PlatformDashboardDto.JobFailure> recent = jdbc.query(
@@ -174,8 +184,32 @@ public class PlatformDashboardService {
                         rs.getString("job_code"), ts(rs.getObject("start_time")),
                         (Long) rs.getObject("duration_ms"), rs.getString("error")));
 
+        // Drill-down for the "API errors (24h)" KPI: the actual failed requests,
+        // bounded to the same 24h window so the list and the count agree.
+        List<PlatformDashboardDto.OplogError> recentErrors = jdbc.query(
+                "SELECT module, action, username, error_msg, create_time FROM core_oplog "
+                        + "WHERE success = false AND error_code = 500 "
+                        + "AND create_time >= now() - INTERVAL '24 hours' "
+                        + "ORDER BY create_time DESC LIMIT " + LIST_CAP,
+                (rs, n) -> new PlatformDashboardDto.OplogError(
+                        rs.getString("module"), rs.getString("action"),
+                        rs.getString("username"), rs.getString("error_msg"),
+                        ts(rs.getObject("create_time"))));
+
+        // Undispatched outbox events, oldest first (so the "oldest backlog" card's
+        // detail leads with the worst offender).
+        List<PlatformDashboardDto.BacklogEvent> backlog = jdbc.query(
+                "SELECT aggregate_type, event_type, occurred_at, dispatch_state, dispatch_attempts "
+                        + "FROM core_domain_event WHERE dispatch_state <> 1 "
+                        + "ORDER BY occurred_at ASC LIMIT " + LIST_CAP,
+                (rs, n) -> new PlatformDashboardDto.BacklogEvent(
+                        rs.getString("aggregate_type"), rs.getString("event_type"),
+                        ts(rs.getObject("occurred_at")), rs.getInt("dispatch_state"),
+                        rs.getInt("dispatch_attempts")));
+
         return new PlatformDashboardDto.Reliability(
-                jobFail, jobRuns, failRate, eventPending, eventFailed, oldestMin, oplogErr, recent);
+                jobFail, jobRuns, failRate, eventPending, eventFailed, oldestMin, oplogErr,
+                recent, recentErrors, backlog);
     }
 
     // ── 5. Security ────────────────────────────────────────────────────────

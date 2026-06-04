@@ -13,7 +13,7 @@ import { toJSTDateTimeDisp } from '@/lib/date'
 import { getPlatformDashboardApi } from '@/services/tenant'
 import {
   UserCheck, Activity, ServerCog, ShieldAlert,
-  Clock, MailWarning, Inbox, AlarmClockOff, LifeBuoy, KeyRound, Flame
+  Clock, AlarmClockOff, LifeBuoy, KeyRound, Flame
 } from 'lucide-vue-next'
 
 use([CanvasRenderer, LineChart, TooltipComponent, GridComponent])
@@ -26,6 +26,35 @@ const data = reactive({
   engagement: null,
   reliability: null,
   security: null
+})
+
+// Selectable detail cards: which metric's detail list is shown, per panel.
+// Defaults (set in fetchDashboard) to the first card that has a value, so the
+// panel always shows the most relevant detail without a click. Clicking just
+// switches — there's always exactly one selected.
+const sel = reactive({ act: 'pending', rel: 'jobs' })
+function pick(group, key) {
+  sel[group] = key
+}
+// First key whose value is > 0, else the first key — used to pick the default card.
+function firstWithValue(candidates) {
+  const hit = candidates.find(([, v]) => (v || 0) > 0)
+  return (hit || candidates[0])[0]
+}
+function cardCls(group, key) {
+  // All cards have a background; the selected one gets a stronger tint + a
+  // primary border. Unselected keeps a transparent border so selecting never
+  // shifts layout by a pixel.
+  return sel[group] === key
+    ? 'bg-primary/10 border-primary text-foreground'
+    : 'bg-muted/40 border-transparent hover:bg-muted/70'
+}
+// Activation detail list for the selected card.
+const actList = computed(() => {
+  if (!data.activation) return null
+  if (sel.act === 'pending') return data.activation.pending
+  if (sel.act === 'expired') return data.activation.expired
+  return null
 })
 
 function cssVar(name) {
@@ -111,10 +140,28 @@ async function fetchDashboard() {
     const res = await getPlatformDashboardApi()
     if (res.data.code === 0) {
       const d = res.data.data || {}
-      data.activation = d.activation
-      data.engagement = d.engagement
-      data.reliability = d.reliability
-      data.security = d.security
+      // Be resilient to backend version skew: default every rendered list to []
+      // so a not-yet-deployed field (e.g. backlogEvents) can never throw on
+      // `.length` and silently break card selection.
+      const A = d.activation || {};  A.pending ||= [];           A.expired ||= []
+      const E = d.engagement || {};  E.silentTenants ||= [];     E.loginTrend ||= []
+      const R = d.reliability || {}; R.recentJobFailures ||= []; R.recentOplogErrors ||= []; R.backlogEvents ||= []
+      const S = d.security || {};    S.recentSupportSessions ||= []; S.recentBreakGlass ||= []
+      data.activation = A
+      data.engagement = E
+      data.reliability = R
+      data.security = S
+      // Default-select the first card that has a value (else the first card).
+      sel.act = firstWithValue([
+        ['pending', d.activation?.pendingTenants],
+        ['expired', d.activation?.expiredUnactivated]
+      ])
+      sel.rel = firstWithValue([
+        ['jobs', d.reliability?.jobFailures24h],
+        ['backlog', (d.reliability?.eventPending || 0) + (d.reliability?.eventFailed || 0)],
+        ['oldest', d.reliability?.eventBacklogOldestMin],
+        ['errors', d.reliability?.oplogErrors24h]
+      ])
       loaded.value = true
     } else {
       toast.error(res.data.msg)
@@ -136,40 +183,42 @@ onMounted(fetchDashboard)
         <span class="text-sm font-medium">{{ t('platform.tenant.ops.activation.title') }}</span>
       </div>
       <div class="grid grid-cols-4 gap-2 mb-3">
-        <div class="text-center">
+        <button type="button" class="rounded-lg border p-2 text-center cursor-pointer transition-colors"
+                :class="cardCls('act','pending')" @click="pick('act','pending')"
+                :title="t('platform.tenant.ops.activation.tip.pending')">
           <div class="text-xl font-semibold" :class="alertClass(data.activation.pendingTenants)">{{ data.activation.pendingTenants }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.activation.pending') }}</div>
-        </div>
-        <div class="text-center">
+        </button>
+        <button type="button" class="rounded-lg border p-2 text-center cursor-pointer transition-colors"
+                :class="cardCls('act','expired')" @click="pick('act','expired')"
+                :title="t('platform.tenant.ops.activation.tip.expired')">
           <div class="text-xl font-semibold" :class="alertClass(data.activation.expiredUnactivated)">{{ data.activation.expiredUnactivated }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.activation.expired') }}</div>
-        </div>
-        <div class="text-center">
+        </button>
+        <div class="p-2 text-center" :title="t('platform.tenant.ops.activation.tip.rate')">
           <div class="text-xl font-semibold">{{ pct(data.activation.activationRate) }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.activation.rate') }}</div>
         </div>
-        <div class="text-center">
+        <div class="p-2 text-center" :title="t('platform.tenant.ops.activation.tip.median')">
           <div class="text-xl font-semibold">{{ fmtHours(data.activation.medianOnboardingHours) }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.activation.median') }}</div>
         </div>
       </div>
-      <div class="text-[11px] text-muted-foreground mb-1 flex items-center gap-1">
-        <MailWarning class="size-3.5" /> {{ t('platform.tenant.ops.activation.listTitle') }}
-      </div>
-      <div v-if="data.activation.pending.length" class="divide-y divide-border/60">
-        <div v-for="p in data.activation.pending" :key="p.tenantId"
-             class="py-1.5 flex items-center gap-2 text-sm">
-          <span class="font-mono text-xs shrink-0">{{ p.tenantCode }}</span>
-          <span class="truncate text-muted-foreground">{{ p.contactEmail || '—' }}</span>
-          <span class="ml-auto shrink-0 text-xs" :class="p.expired ? 'text-destructive' : 'text-muted-foreground'">
-            <Clock class="size-3 inline -mt-0.5" /> {{ fmtDate(p.expiresAt) }}
-            <Badge v-if="p.expired" variant="outline" class="ml-1 text-[10px] border-destructive/40 text-destructive">
-              {{ t('platform.tenant.ops.activation.expiredBadge') }}
-            </Badge>
-          </span>
+
+      <!-- detail for the selected card -->
+      <template v-if="actList">
+        <div v-if="actList.length" class="divide-y divide-border/60">
+          <div v-for="p in actList" :key="p.tenantId"
+               class="py-1.5 flex items-center gap-2 text-sm">
+            <span class="font-mono text-xs shrink-0">{{ p.tenantCode }}</span>
+            <span class="truncate text-muted-foreground">{{ p.contactEmail || '—' }}</span>
+            <span class="ml-auto shrink-0 text-xs" :class="p.expired ? 'text-destructive' : 'text-muted-foreground'">
+              <Clock class="size-3 inline -mt-0.5" /> {{ fmtDate(p.expiresAt) }}
+            </span>
+          </div>
         </div>
-      </div>
-      <div v-else class="py-3 text-center text-xs text-muted-foreground">{{ t('platform.tenant.ops.empty') }}</div>
+        <div v-else class="py-3 text-center text-xs text-muted-foreground">{{ t('platform.tenant.ops.empty') }}</div>
+      </template>
     </Card>
 
     <!-- ── 3. Engagement ────────────────────────────────────────────── -->
@@ -179,23 +228,23 @@ onMounted(fetchDashboard)
         <span class="text-sm font-medium">{{ t('platform.tenant.ops.engagement.title') }}</span>
       </div>
       <div class="grid grid-cols-5 gap-2 mb-3">
-        <div class="text-center">
+        <div class="text-center" :title="t('platform.tenant.ops.engagement.tip.active7d')">
           <div class="text-xl font-semibold">{{ data.engagement.activeTenants7d }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.engagement.active7d') }}</div>
         </div>
-        <div class="text-center">
+        <div class="text-center" :title="t('platform.tenant.ops.engagement.tip.active30d')">
           <div class="text-xl font-semibold">{{ data.engagement.activeTenants30d }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.engagement.active30d') }}</div>
         </div>
-        <div class="text-center">
+        <div class="text-center" :title="t('platform.tenant.ops.engagement.tip.dau')">
           <div class="text-xl font-semibold">{{ data.engagement.dau }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.engagement.dau') }}</div>
         </div>
-        <div class="text-center">
+        <div class="text-center" :title="t('platform.tenant.ops.engagement.tip.mau')">
           <div class="text-xl font-semibold">{{ data.engagement.mau }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.engagement.mau') }}</div>
         </div>
-        <div class="text-center">
+        <div class="text-center" :title="t('platform.tenant.ops.engagement.tip.silent')">
           <div class="text-xl font-semibold" :class="alertClass(data.engagement.silentTenantsCount)">{{ data.engagement.silentTenantsCount }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.engagement.silent') }}</div>
         </div>
@@ -224,37 +273,75 @@ onMounted(fetchDashboard)
         <span class="text-sm font-medium">{{ t('platform.tenant.ops.reliability.title') }}</span>
       </div>
       <div class="grid grid-cols-4 gap-2 mb-3">
-        <div class="text-center">
+        <button type="button" class="rounded-lg border p-2 text-center cursor-pointer transition-colors"
+                :class="cardCls('rel','jobs')" @click="pick('rel','jobs')"
+                :title="t('platform.tenant.ops.reliability.tip.jobFailures')">
           <div class="text-xl font-semibold" :class="alertClass(data.reliability.jobFailures24h)">{{ data.reliability.jobFailures24h }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.reliability.jobFailures') }}</div>
-        </div>
-        <div class="text-center">
+        </button>
+        <button type="button" class="rounded-lg border p-2 text-center cursor-pointer transition-colors"
+                :class="cardCls('rel','backlog')" @click="pick('rel','backlog')"
+                :title="t('platform.tenant.ops.reliability.tip.eventBacklog')">
           <div class="text-xl font-semibold" :class="alertClass(data.reliability.eventPending + data.reliability.eventFailed)">
             {{ data.reliability.eventPending + data.reliability.eventFailed }}
           </div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.reliability.eventBacklog') }}</div>
-        </div>
-        <div class="text-center">
+        </button>
+        <button type="button" class="rounded-lg border p-2 text-center cursor-pointer transition-colors"
+                :class="cardCls('rel','oldest')" @click="pick('rel','oldest')"
+                :title="t('platform.tenant.ops.reliability.tip.backlogAge')">
           <div class="text-xl font-semibold">{{ fmtMinutes(data.reliability.eventBacklogOldestMin) }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.reliability.backlogAge') }}</div>
-        </div>
-        <div class="text-center">
+        </button>
+        <button type="button" class="rounded-lg border p-2 text-center cursor-pointer transition-colors"
+                :class="cardCls('rel','errors')" @click="pick('rel','errors')"
+                :title="t('platform.tenant.ops.reliability.tip.oplogErrors')">
           <div class="text-xl font-semibold" :class="alertClass(data.reliability.oplogErrors24h)">{{ data.reliability.oplogErrors24h }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.reliability.oplogErrors') }}</div>
+        </button>
+      </div>
+
+      <!-- job failures -->
+      <template v-if="sel.rel === 'jobs'">
+        <div v-if="data.reliability.recentJobFailures.length" class="divide-y divide-border/60">
+          <div v-for="(f, i) in data.reliability.recentJobFailures" :key="i"
+               class="py-1.5 flex items-center gap-2 text-sm">
+            <span class="font-mono text-xs shrink-0">{{ f.jobCode }}</span>
+            <span class="truncate text-destructive/80" :title="f.error">{{ f.error || '—' }}</span>
+            <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ fmtDate(f.startTime) }}</span>
+          </div>
         </div>
-      </div>
-      <div class="text-[11px] text-muted-foreground mb-1 flex items-center gap-1">
-        <Inbox class="size-3.5" /> {{ t('platform.tenant.ops.reliability.failuresListTitle') }}
-      </div>
-      <div v-if="data.reliability.recentJobFailures.length" class="divide-y divide-border/60">
-        <div v-for="(f, i) in data.reliability.recentJobFailures" :key="i"
-             class="py-1.5 flex items-center gap-2 text-sm">
-          <span class="font-mono text-xs shrink-0">{{ f.jobCode }}</span>
-          <span class="truncate text-destructive/80" :title="f.error">{{ f.error || '—' }}</span>
-          <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ fmtDate(f.startTime) }}</span>
+        <div v-else class="py-3 text-center text-xs text-muted-foreground">{{ t('platform.tenant.ops.empty') }}</div>
+      </template>
+      <!-- event backlog + oldest backlog share the same undispatched-event list -->
+      <template v-else-if="sel.rel === 'backlog' || sel.rel === 'oldest'">
+        <div v-if="data.reliability.backlogEvents.length" class="divide-y divide-border/60">
+          <div v-for="(b, i) in data.reliability.backlogEvents" :key="i"
+               class="py-1.5 flex items-center gap-2 text-sm">
+            <span class="font-mono text-xs shrink-0 truncate">{{ b.eventType }}</span>
+            <Badge variant="outline" class="text-[10px] shrink-0"
+                   :class="b.dispatchState === 2 ? 'border-destructive/40 text-destructive' : 'border-amber-500/40 text-amber-600'">
+              {{ b.dispatchState === 2 ? t('platform.tenant.ops.reliability.stateFailed') : t('platform.tenant.ops.reliability.statePending') }}
+            </Badge>
+            <span class="shrink-0 text-xs text-muted-foreground">×{{ b.attempts }}</span>
+            <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ fmtDate(b.occurredAt) }}</span>
+          </div>
         </div>
-      </div>
-      <div v-else class="py-3 text-center text-xs text-muted-foreground">{{ t('platform.tenant.ops.empty') }}</div>
+        <div v-else class="py-3 text-center text-xs text-muted-foreground">{{ t('platform.tenant.ops.empty') }}</div>
+      </template>
+      <!-- API errors -->
+      <template v-else-if="sel.rel === 'errors'">
+        <div v-if="data.reliability.recentOplogErrors.length" class="divide-y divide-border/60">
+          <div v-for="(e, i) in data.reliability.recentOplogErrors" :key="i"
+               class="py-1.5 flex items-center gap-2 text-sm">
+            <span class="font-mono text-xs shrink-0">{{ e.module }}.{{ e.action }}</span>
+            <span class="truncate text-destructive/80" :title="e.errorMsg">{{ e.errorMsg || '—' }}</span>
+            <span class="shrink-0 text-xs text-muted-foreground">{{ e.username || '—' }}</span>
+            <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ fmtDate(e.time) }}</span>
+          </div>
+        </div>
+        <div v-else class="py-3 text-center text-xs text-muted-foreground">{{ t('platform.tenant.ops.empty') }}</div>
+      </template>
     </Card>
 
     <!-- ── 5. Security & privileged access ──────────────────────────── -->
