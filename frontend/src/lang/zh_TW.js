@@ -7,13 +7,11 @@ import permissions from './generated/permissions.zh_TW.json'
 
 export default {
   job: {
-    title: '定時任務管理',
     search: { placeholder: { keyword: '依任務名 / 代碼搜尋' } },
-    status: { enabled: '已啟用', disabled: '已停止' },
     triggerType: { cron: '定時', manual: '手動', startup: '啟動' },
     runStatus: { running: '執行中', success: '成功', fail: '失敗', skipped: '略過', none: '—' },
     column: { name: '任務', cron: 'Cron 運算式', status: '狀態', nextFire: '下次執行', lastResult: '最近結果', actions: '操作' },
-    action: { edit: '編輯 Cron', run: '立即執行', viewLog: '日誌', enable: '啟用', disable: '停止' },
+    action: { edit: '編輯 Cron', run: '立即執行', viewLog: '日誌' },
     edit: { title: '任務設定', label: { cron: 'Cron 運算式', maxRunSeconds: '最大執行秒數', concurrent: '允許重複執行', remark: '備註' }, placeholder: { cron: '例: 0 0 3 * * *', remark: '備註(可選)' } },
     log: { title: '執行日誌', column: { triggerType: '觸發', status: '狀態', startTime: '開始', duration: '耗時(ms)', node: '節點', triggeredBy: '執行人', error: '錯誤' }, empty: '尚無執行紀錄' },
     confirm: { runTitle: '立即執行', runMessage: '確定立即執行一次「{name}」嗎?' },

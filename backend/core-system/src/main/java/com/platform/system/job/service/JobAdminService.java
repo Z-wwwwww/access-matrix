@@ -133,7 +133,7 @@ public class JobAdminService {
             next = CronExpression.parse(e.getCron()).next(LocalDateTime.now());
         }
         return new JobDto.View(
-                e.getId(), e.getTenantId(), e.getJobCode(), e.getName(), e.getScope(),
+                e.getId(), e.getTenantId(), e.getJobCode(), e.getName(),
                 e.getCron(), e.getEnabled(), e.getConcurrent(), e.getMaxRunSeconds(),
                 e.getLastFireTime(), e.getLastStatus(), e.getLastDurationMs(), next,
                 e.getRemark(), e.getCreateTime(), e.getUpdateTime());

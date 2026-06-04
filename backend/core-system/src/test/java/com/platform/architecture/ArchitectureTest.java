@@ -55,7 +55,8 @@ public class ArchitectureTest {
             "OpLogEntity",               // append-only audit log
             "UserInviteEntity",          // single-use token; token IS the auth, no tenant_id needed
             "PasswordResetTokenEntity",  // same single-use token shape
-            "DomainEventEntity"          // append-only event store / outbox (V36); no soft-delete, like OpLogEntity
+            "DomainEventEntity",         // append-only event store / outbox (V36); no soft-delete, like OpLogEntity
+            "MenuEntity"                 // single GLOBAL menu set (V41/V43); no tenant_id by design (declares its own mark+audit)
     );
 
     /** Controllers where every HTTP method is a public/pre-auth endpoint by design. */

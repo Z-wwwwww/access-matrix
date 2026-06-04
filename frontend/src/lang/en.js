@@ -7,13 +7,11 @@ import permissions from './generated/permissions.en.json'
 
 export default {
   job: {
-    title: 'Scheduled Tasks',
     search: { placeholder: { keyword: 'Search by name / code' } },
-    status: { enabled: 'Enabled', disabled: 'Stopped' },
     triggerType: { cron: 'Cron', manual: 'Manual', startup: 'Startup' },
     runStatus: { running: 'Running', success: 'Success', fail: 'Failed', skipped: 'Skipped', none: '—' },
     column: { name: 'Task', cron: 'Cron', status: 'Status', nextFire: 'Next run', lastResult: 'Last result', actions: 'Actions' },
-    action: { edit: 'Edit cron', run: 'Run now', viewLog: 'Logs', enable: 'Enable', disable: 'Stop' },
+    action: { edit: 'Edit cron', run: 'Run now', viewLog: 'Logs' },
     edit: { title: 'Task settings', label: { cron: 'Cron expression', maxRunSeconds: 'Max run seconds', concurrent: 'Allow concurrent runs', remark: 'Remark' }, placeholder: { cron: 'e.g. 0 0 3 * * *', remark: 'Remark (optional)' } },
     log: { title: 'Execution log', column: { triggerType: 'Trigger', status: 'Status', startTime: 'Start', duration: 'Duration (ms)', node: 'Node', triggeredBy: 'By', error: 'Error' }, empty: 'No execution history' },
     confirm: { runTitle: 'Run now', runMessage: 'Run "{name}" once right now?' },

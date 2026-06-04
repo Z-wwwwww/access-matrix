@@ -30,8 +30,10 @@ import static org.mockito.Mockito.when;
  * <p>Regression guard: a business-tenant SUPER_ADMIN holds {@code tenant:*},
  * NOT {@code *:*}. An earlier version short-circuited only on {@code *:*}, so
  * business super-admins fell through to the {@code role_menu} path with zero
- * bindings and saw an empty menu (no nav, no buttons). Both wildcards must
- * resolve to "see every visible menu in the current tenant".
+ * bindings and saw an empty menu (no nav, no buttons). Both wildcards must start
+ * from the global menu set ({@code findAllVisible()}); the result is then
+ * filtered by permission_code, so each super-admin sees only its own namespace
+ * (business menus for {@code tenant:*}, platform menus for {@code *:*}).
  */
 @ExtendWith(MockitoExtension.class)
 class MenuQueryServiceTest {

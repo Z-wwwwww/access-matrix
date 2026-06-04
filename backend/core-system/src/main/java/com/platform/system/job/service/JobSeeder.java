@@ -74,7 +74,6 @@ public class JobSeeder {
         row.setId(IdGenerator.ulid());
         row.setJobCode(job.code());
         row.setName(job.code());            // 表示は i18n(job.<code>) が担う。DB の name は fallback。
-        row.setScope(1);                    // すべてシステムレベル(列は NOT NULL のため定数 1)
         row.setCron(job.defaultCron());
         row.setEnabled(job.enabledByDefault() ? 1 : 0);
         row.setConcurrent(job.concurrentAllowed() ? 1 : 0);

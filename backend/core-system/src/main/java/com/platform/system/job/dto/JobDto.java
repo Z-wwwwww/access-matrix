@@ -29,7 +29,6 @@ public final class JobDto {
             String tenantId,
             String jobCode,
             String name,
-            Integer scope,           // 1=PLATFORM 2=TENANT
             String cron,
             Integer enabled,         // 1=有効 0=停止
             Integer concurrent,

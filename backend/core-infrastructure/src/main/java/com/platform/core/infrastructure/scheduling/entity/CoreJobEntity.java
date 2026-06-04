@@ -30,10 +30,6 @@ public class CoreJobEntity extends BaseEntity {
     @TableField("name")
     private String name;
 
-    /** 1=PLATFORM 2=TENANT */
-    @TableField("scope")
-    private Integer scope;
-
     @TableField("cron")
     private String cron;
 

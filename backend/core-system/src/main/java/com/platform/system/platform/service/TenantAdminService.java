@@ -671,10 +671,12 @@ public class TenantAdminService {
         deleteByTenant("core_rbac_role_menu", tenantCode);
         deleteByTenant("core_rbac_role_permission", tenantCode);
         deleteByTenant("core_rbac_user_role", tenantCode);
-        // Then the four "parents" the junctions referenced.
+        // Then the "parents" the junctions referenced. Menus are a single global
+        // set since V41 (no tenant_id column) — NOT per-tenant — so core_rbac_menu
+        // is intentionally not deleted here; the role_menu bindings removed above
+        // are the only tenant-owned menu link.
         deleteByTenant("core_rbac_role", tenantCode);
         deleteByTenant("core_rbac_permission", tenantCode);
-        deleteByTenant("core_rbac_menu", tenantCode);
         deleteByTenant("core_rbac_dept", tenantCode);
         // Users after user_role.
         deleteByTenant("core_auth_user", tenantCode);

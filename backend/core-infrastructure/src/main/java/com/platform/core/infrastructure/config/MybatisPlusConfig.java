@@ -52,13 +52,12 @@ public class MybatisPlusConfig {
             // the lock_name already encodes the tenant, and it has no tenant_id
             // column — so it must be excluded or TenantSchemaGuard fails the boot.
             "core_job_lock",
-            // Navigation menus are a single GLOBAL set (V41): one shared tree for
-            // all tenants, filtered per user by permission_code. The tenant_id
-            // column is retained (all active rows = 'system') for BaseEntity/audit
-            // compatibility, so TenantSchemaGuard logs a harmless "wasted exclusion"
-            // WARN — intentional. Excluding it stops the interceptor injecting
-            // tenant_id='<caller>' into the now-global menu queries, which would
-            // otherwise hide the global menus from business-tenant callers.
+            // Navigation menus are a single GLOBAL set (V41) with NO tenant_id
+            // column (dropped in V43) — one shared tree for all tenants, filtered
+            // per user by permission_code. Like core_meta it is platform-global,
+            // so it must be excluded: the interceptor never injects a tenant
+            // predicate, and TenantSchemaGuard sees "no tenant_id column + excluded"
+            // = the correct config (no leak, no warning).
             "core_rbac_menu"
     );
 
