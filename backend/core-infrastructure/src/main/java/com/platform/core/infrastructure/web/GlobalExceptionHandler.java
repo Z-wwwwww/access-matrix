@@ -18,6 +18,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -78,6 +79,22 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<JsonResult<Object>> handleAuth(AuthenticationException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(JsonResult.error(ErrorCode.UNAUTHORIZED));
+    }
+
+    /**
+     * A client (typically an SSE / {@code EventSource} tab from
+     * {@code SseEmitterRegistry}) disconnected before the response finished
+     * writing. Tomcat reports the broken write through the servlet async
+     * machinery, which surfaces here as an {@link AsyncRequestNotUsableException}
+     * (it {@code extends IOException}, so without this it would fall into
+     * {@link #handleGeneric} and be logged as a bogus server error — and then
+     * fail again trying to serialize a JsonResult onto a {@code text/event-stream}
+     * response). The connection is already gone: there is nothing to send back,
+     * so return {@code void} and log at debug.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientDisconnect(AsyncRequestNotUsableException ex) {
+        log.debug("Client disconnected before the response finished: {}", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
