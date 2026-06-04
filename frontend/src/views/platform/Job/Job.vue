@@ -16,7 +16,7 @@ import {
   enableJobApi, disableJobApi, runJobApi
 } from '@/services/job'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const { confirm } = useConfirm()
 
 // ── list state ──────────────────────────────────────────────
@@ -27,8 +27,16 @@ const page = ref(1)
 const pageSize = ref(20)
 const search = reactive({ keyword: '' })
 
+// 人間可読の「何をするジョブか」ラベル。i18n `job.names.<code>` が真の表示名（: は . に正規化）、
+// 無ければ DB の name（= code フォールバック）。新ジョブ追加時はここに i18n を 1 行足すだけ。
+function jobLabel(row) {
+  const key = 'job.names.' + (row.jobCode || '').replaceAll(':', '.')
+  return te(key) ? t(key) : (row.name || row.jobCode || '')
+}
+
 const columns = computed(() => [
-  { key: 'name', title: t('job.column.name'), minWidth: '180px' },
+  { key: 'label', title: t('job.column.label'), minWidth: '200px' },
+  { key: 'name', title: t('job.column.name'), minWidth: '160px' },
   { key: 'cron', title: t('job.column.cron'), minWidth: '130px' },
   { key: 'status', title: t('job.column.status'), minWidth: '80px', align: 'center' },
   { key: 'nextFireTime', title: t('job.column.nextFire'), minWidth: '150px' },
@@ -198,6 +206,12 @@ onMounted(fetchData)
         @update:page="fetchData"
         @update:page-size="fetchData"
       >
+        <template #cell-label="{ row }">
+          <span class="font-medium">{{ jobLabel(row) }}</span>
+        </template>
+        <template #cell-name="{ row }">
+          <code class="text-xs text-muted-foreground">{{ row.jobCode }}</code>
+        </template>
         <template #cell-cron="{ row }">
           <code class="text-xs">{{ row.cron }}</code>
         </template>
