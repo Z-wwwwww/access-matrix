@@ -21,33 +21,21 @@ All conventions live in [AGENTS.md](AGENTS.md):
 
 - Component layering (`ui/` / `shared/` / `layout/` / `views/`)
 - Business-prefixed service naming (`pmsXxx.js` / `demoXxx.js`)
-- Mandatory shared components: `DataTable` / `Drawer` / `Input` / `Select` / `Checkbox` / `DatePicker` / `UserPicker` / `DictPicker` / `ConfirmDialog`
+- Mandatory shared components: `DataTable` / `Drawer` / `Input` / `Select` / `Checkbox` / `DatePicker` / `UserPicker` / `ConfirmDialog`
 - No hand-written `<table>` / `<input type=date>` / `window.confirm()` / inline `style`
-
-## AI Skill entry points
-
-```bash
-npm run ai:create-page UserList
-npm run ai:create-component UserAvatar
-npm run ai:generate userService
-npm run ai:inspect compliance
-npm run ai:analyze src/views/system/User/User.vue
-```
-
-Under the hood, `scripts/ai-cli.mjs` calls Claude Code.
 
 ## Main directories
 
 ```
-services/         API wrappers (flat, prefix-distinguished)
+src/services/     API wrappers (flat, prefix-distinguished)
 src/components/
   ├── ui/         foundation UI
   ├── shared/     shared business components
   └── layout/     AppLayout etc.
 src/views/
-  ├── system/     system admin (User/Role/Permission/Menu/Dept/OpLog/Profile)
-  └── demo/      business demo (Task — data-scope showcase)
-src/composables/  useDict / useConfirm / useTheme ...
-src/dict/storage.js   static dictionaries
+  ├── system/     system admin (User/Role/Dept/OpLog/Profile)
+  ├── platform/   platform ops, tid=system (Tenant/Menu/Job)
+  └── demo/       business demo (Task — data-scope showcase)
+src/composables/  useConfirm / useTheme / useToast ...
 src/lang/         vue-i18n translations
 ```

@@ -18,10 +18,10 @@ import {
   getRolePermissionsApi, bindRolePermissionsApi,
   getRoleMenusApi, bindRoleMenusApi,
   getRoleDeptsApi, bindRoleDeptsApi
-} from '../../../../services/role'
-import { getPermissionsByModuleApi } from '../../../../services/permission'
-import { getMenuIndexApi } from '../../../../services/menu'
-import { getDeptTreeApi } from '../../../../services/dept'
+} from '@/services/role'
+import { getPermissionsByModuleApi } from '@/services/permission'
+import { getMenuIndexApi } from '@/services/menu'
+import { getDeptTreeApi } from '@/services/dept'
 
 const { t } = useI18n()
 const { translate: translateMenu } = useMenuTitle()

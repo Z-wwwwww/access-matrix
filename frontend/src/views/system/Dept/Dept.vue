@@ -14,8 +14,8 @@ import { useConfirm } from '@/composables/useConfirm'
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Info } from 'lucide-vue-next'
 import {
   getDeptTreeApi, addDeptApi, updateDeptApi, deleteDeptApi
-} from '../../../../services/dept'
-import { getUserListApi } from '../../../../services/user'
+} from '@/services/dept'
+import { getUserListApi } from '@/services/user'
 
 const { t } = useI18n()
 

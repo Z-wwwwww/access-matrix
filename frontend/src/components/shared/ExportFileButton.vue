@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import request from '../../../services/request'
+import request from '@/services/request'
 import { toast } from '@/composables/useToast'
 
 defineOptions({ name: 'ExportFileButton' })

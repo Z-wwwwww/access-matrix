@@ -11,7 +11,7 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useNotificationStore } from '@/stores/notification'
 import { useAuthStore } from '@/stores/auth'
-import { getSseTicketApi } from '../../services/notification'
+import { getSseTicketApi } from '@/services/notification'
 
 const STREAM_URL = '/proxy_url/notification/stream'  // 同 services/request.js 的 baseURL,走 Vite 代理
 const POLL_MS = 20000

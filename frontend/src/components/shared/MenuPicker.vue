@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import TreePicker from './TreePicker.vue'
-import { getMenuIndexApi } from '../../../services/menu'
+import { getMenuIndexApi } from '@/services/menu'
 import { useMenuTitle } from '@/composables/useMenuTitle'
 
 const { translate: translateMenu } = useMenuTitle()

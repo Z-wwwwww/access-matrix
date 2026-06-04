@@ -15,9 +15,9 @@ import { useConfirm } from '@/composables/useConfirm'
 import { Plus, Search, RotateCcw, Pencil, Trash2 } from 'lucide-vue-next'
 import {
   getDemoTaskListApi, getDemoTaskApi, addDemoTaskApi, updateDemoTaskApi, deleteDemoTaskApi
-} from '../../../../services/demoTask'
-import { getDeptTreeApi } from '../../../../services/dept'
-import { getUserListApi } from '../../../../services/user'
+} from '@/services/demoTask'
+import { getDeptTreeApi } from '@/services/dept'
+import { getUserListApi } from '@/services/user'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()

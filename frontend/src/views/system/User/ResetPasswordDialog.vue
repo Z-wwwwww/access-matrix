@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import Dialog from '@/components/ui/Dialog.vue'
 import Input from '@/components/ui/Input.vue'
 import { toast } from '@/composables/useToast'
-import { resetPasswordApi } from '../../../../services/user'
+import { resetPasswordApi } from '@/services/user'
 
 const { t } = useI18n()
 

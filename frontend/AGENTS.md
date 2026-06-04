@@ -4,7 +4,7 @@
 > Vite proxies to the backend via `/proxy_url`; the dev port defaults to `5273`.
 
 ## Project Overview
-This project is the admin frontend for **Access Matrix** (RBAC / permission matrix): system features such as users, roles, permissions, menus, departments, and op log, plus business modules (e.g. PMS) that can be plugged in later. Views, components, and services follow an **AI-driven development workflow** (Spec + Skill + natural language).
+This project is the admin frontend for **Access Matrix** (RBAC / permission matrix): system features such as users, roles, permissions, menus, departments, and op log, plus business modules (e.g. PMS) that can be plugged in later.
 
 ## Tech Stack (MANDATORY)
 - Vue 3.5+ (Composition API, `<script setup>`)
@@ -17,13 +17,13 @@ This project is the admin frontend for **Access Matrix** (RBAC / permission matr
 - lucide-vue-next (icons)
 - Vue Router 4
 - Pinia
-- Axios (global interceptors in services/request.js)
+- Axios (global interceptors in src/services/request.js)
 - **vue-i18n v9** (Composition API mode, `legacy: false`) — supports ja_JP / en / zh_CN / zh_TW / ko_KR; default ja_JP
 
 ## Hard Rules
 1. **NO TypeScript** — JS across the stack
 2. **NO inline styles** — Tailwind classes only
-3. **NO API calls in components** — all HTTP goes through `services/`
+3. **NO API calls in components** — all HTTP goes through `src/services/`
 4. **NO pages in components/** — pages live under `src/views/`
 5. **NO duplicate components** — check `docs/component-register.md` before creating one
 6. **NO hand-written `<table>`** — all data tables use `@/components/shared/DataTable` (tree usage in the "Tree table" section)
@@ -31,9 +31,8 @@ This project is the admin frontend for **Access Matrix** (RBAC / permission matr
 8. **NO `window.confirm()` / `alert()`** — use `useConfirm()` plus the globally mounted `<ConfirmDialog />`
 9. Naming: components PascalCase; services / composables camelCase
 10. All props must have a `default`
-11. Dictionary data lives in `src/dict/storage.js` (statically bundled); access it via `useDict(code)` / `useDicts([code,...])`
-12. **NO hardcoded business strings** (in new code) — user-visible labels / titles / placeholders / buttons / toasts must use `t()`, with translations placed in `src/lang/{locale}.js` or `src/lang/{module}/{locale}.js`
-13. **Detail page template** (`*Edit.vue` / `*Detail.vue`): outer `<Card>` → header (`flex justify-between p-4 border-b`) → `<Tabs v-model="activeTab" :items="tabItems">` (no `container-class` / `sticky`) → optional footer. See `RoleEdit.vue` / `UserEdit.vue`.
+11. **NO hardcoded business strings** (in new code) — user-visible labels / titles / placeholders / buttons / toasts must use `t()`, with translations placed in `src/lang/{locale}.js` or `src/lang/{module}/{locale}.js`
+12. **Detail page template** (`*Edit.vue` / `*Detail.vue`): outer `<Card>` → header (`flex justify-between p-4 border-b`) → `<Tabs v-model="activeTab" :items="tabItems">` (no `container-class` / `sticky`) → optional footer. See `RoleEdit.vue` / `UserEdit.vue`.
 
 ## System files vs business files — where do they go
 
@@ -43,7 +42,8 @@ This project is the admin frontend for **Access Matrix** (RBAC / permission matr
 
 | Type | Directory | Examples |
 |------|-----------|----------|
-| System admin | `src/views/system/{Feature}/` | `system/User/User.vue`, `system/Role/RoleEdit.vue`, `system/Menu/Menu.vue`, `system/Dept/Dept.vue`, `system/Permission/Permission.vue`, `system/OpLog/OpLog.vue` |
+| System admin | `src/views/system/{Feature}/` | `system/User/User.vue`, `system/Role/RoleEdit.vue`, `system/Dept/Dept.vue`, `system/OpLog/OpLog.vue`, `system/Profile/Profile.vue` |
+| Platform ops (tid=`system`) | `src/views/platform/{Feature}/` | `platform/Tenant/Tenant.vue`, `platform/Menu/Menu.vue`, `platform/Job/Job.vue` |
 | Business module | `src/views/{businessModule}/{Feature}/` | `{module}/{Feature}/{Feature}.vue`, `{module}/{Feature}/{Feature}Edit.vue` — `{module}` is chosen by each business (e.g. `pms` / `crm`) and created on demand |
 | Login / common | `src/views/login/`, `src/views/404.vue`, `_iframe.vue`, `_redirect.vue` | same |
 
@@ -51,17 +51,16 @@ This project is the admin frontend for **Access Matrix** (RBAC / permission matr
 
 ### Services (API wrappers)
 
-**All `.js` files sit flat under `services/`; no subdirectories.** File-name prefixes indicate ownership.
+**All `.js` files sit flat under `src/services/`; no subdirectories.** Import via the `@/services/*` alias. File-name prefixes indicate ownership.
 
 | Type | Filename | Examples |
 |------|----------|----------|
 | Foundation | `request.js` | The Axios instance (interceptors / token header / unified error handling) — no business file should bypass it and `import axios` directly |
-| System domain | No prefix, simple noun | `auth.js`, `user.js`, `role.js`, `permission.js`, `menu.js`, `dept.js`, `oplog.js`, `scope.js`, `dict.js` |
-| Common dropdown / helper | No prefix | `adminCommon.js` (placeholder) |
+| System domain | No prefix, simple noun | `auth.js`, `user.js`, `role.js`, `permission.js`, `menu.js`, `dept.js`, `oplog.js`, `scope.js` |
 | Business domain | **Prefixed by business module** + camelCase resource | `pmsReservation.js`, `pmsPayment.js`, `pmsListingProperty.js`, `crmCustomer.js` |
 
 Rules:
-- Only consider opening a `services/{module}/` subdirectory when a single business has more than ~15 service files; **flat by default**
+- Only consider opening a `src/services/{module}/` subdirectory when a single business has more than ~15 service files; **flat by default**
 - Do not stuff business endpoints into system-domain files
 - Do not `import axios` inside components; HTTP goes through the services layer
 
@@ -70,20 +69,18 @@ Rules:
 | Layer | Directory | Who can use it |
 |-------|-----------|----------------|
 | Foundation UI | `src/components/ui/` (Card / Input / Select / Drawer / Dialog / Checkbox / internal parts used by DataTable, etc.) | Anyone; itself depends on no other layer |
-| Shared business | `src/components/shared/` (DataTable / UserPicker / DictPicker / ConfirmDialog / IconPicker / LucideIcon / LoadingOverlay / FileDownloadLink / ExportFileButton / DateRangeSelector / SwitchField / AreaCascader / SingleImgManualUploader / ToastContainer) | Uses ui/; must not be depended on by ui/ in reverse |
+| Shared business | `src/components/shared/` (DataTable / UserPicker / ConfirmDialog / IconPicker / LucideIcon / LoadingOverlay / FileDownloadLink / ExportFileButton / DateRangeSelector / SwitchField / AreaCascader / SingleImgManualUploader / ToastContainer) | Uses ui/; must not be depended on by ui/ in reverse |
 | Layout | `src/components/layout/` (AppLayout / AppHeader / AppSidebar / AppTabBar / EmptyLayout / ChangePasswordDialog) | Uses ui + shared |
 | Pages | `src/views/` | Uses ui + shared + layout + composables + services |
 
 ### Others
 
-- `src/composables/` — logic reusable across pages (useDict / useConfirm / useTheme / useToast / usePopupFollowTrigger, etc.)
+- `src/composables/` — logic reusable across pages (useConfirm / useTheme / useToast / usePopupFollowTrigger, etc.)
 - `src/lib/` — pure-function utilities (cn / cva / date / download / validators)
 - `src/stores/` — Pinia stores
-- `src/dict/` — static dictionary data
 - `src/lang/` — vue-i18n translations
 - `src/router/` — **static routes only** (login / common / fallback); business routes are injected dynamically from the backend menu
 - `src/styles/` — global CSS / Tailwind tokens (`main.css`)
-- `ai/specs/` — spec files generated by AI Skills, organized by type (`components/`, `pages/`, `services/`, `stores/`, `composables/`)
 
 ## Routing (backend-menu-driven)
 
@@ -104,7 +101,6 @@ Rules:
 | Response wrapper | `{ code: 0, msg: "", data: ... }`; for pagination `data = { records, total, page, limit }` |
 | List / detail / CRUD | RESTful: `GET /admin/{module}/list`, `GET /admin/{module}/{id}`, `POST /admin/{module}`, `PUT /admin/{module}/{id}`, `DELETE /admin/{module}/{id}` |
 | Me-endpoints | `GET /api/menu/me` for the current user's menu tree; `GET /api/permission/me` for the current user's permission-code Set |
-| Dictionaries | **Static** (build-time bundle from `src/dict/storage.js`) — read directly via `useDict(code)`, **no HTTP** |
 | User permission codes | JWT scope claim: `*:*` (super admin) or `__compact__` (others, triggers backend cache lookup) — the frontend should not parse `scope`; use `/permission/me` uniformly |
 | Force logout | The backend `ForceLogoutFilter` checks globally; the axios 401 interceptor clears tokens and redirects to login |
 | Date format | The backend expects `yyyy-MM-dd HH:mm:ssZZ` (e.g. `2026-04-02 00:00:00+0900`); forced Asia/Tokyo; uniformly convert via `toBackendDate(val)` from `@/lib/date` |
@@ -137,7 +133,7 @@ function toggle(id) { ... }
 </template>
 ```
 
-See `views/system/Dept/Dept.vue` and `views/system/Menu/Menu.vue`.
+See `views/system/Dept/Dept.vue` and `views/platform/Menu/Menu.vue`.
 
 ## Internationalization (i18n)
 
@@ -148,44 +144,14 @@ See `views/system/Dept/Dept.vue` and `views/system/Menu/Menu.vue`.
   - `src/lang/{module}/{locale}.js` — module translations
 - Key naming: dot-separated, lowercase module name + camelCase fields, e.g. `user.company`, `reservation.checkInDate`, `common.button.search`
 - New code: use `t()` + translation keys; do not hardcode business copy
-- **Historical exception**: the six admin pages under `views/system/*` (User / UserEdit / Role / RoleEdit / Permission / Menu / Dept / OpLog) were ported from an old template and hand-tweaked, and still contain hardcoded Japanese. **Do not actively rewrite them for i18n's sake** — migrate them only when you happen to be modifying those specific pages.
-
-## AI Skills (Slash Commands)
-
-Invoked via `pnpm ai:*`; under the hood `Claude Code` runs them through `scripts/ai-cli.mjs`:
-
-| Skill | Command | Purpose |
-|-------|---------|---------|
-| create-component | `/create-component` | Create a component from a Spec / natural language |
-| create-page | `/create-page` | Create a page + route |
-| update-page | `/update-page` | Modify an existing page |
-| generate | `/generate` | Generate service / composable / store / utils |
-| inspect | `/inspect` | Audit duplicates / violations |
-| analyze | `/analyze` | Parse existing code → spec |
-
-Spec block example (any skill takes it directly):
-
-```yaml
-component:
-  name: UserAvatar
-  type: shared          # ui | shared | layout
-  props:
-    src: { type: String, default: "" }
-    size: { type: String, default: "md" }
-  variants:
-    size:
-      sm: "w-6 h-6 text-xs"
-      md: "w-10 h-10 text-sm"
-```
-
-Plain natural language also works: "create a user avatar component supporting sm/md/lg sizes".
+- **Historical exception**: the admin pages under `views/system/*` (User / UserEdit / Role / RoleEdit / Dept / OpLog) were ported from an old template and hand-tweaked, and still contain hardcoded Japanese. **Do not actively rewrite them for i18n's sake** — migrate them only when you happen to be modifying those specific pages.
 
 ## Registries (always check before creating)
 
 - Component registry: `docs/component-register.md`
 - Service registry: `docs/service-register.md`
 
-Every generated component / service must be registered to avoid reinventing the wheel.
+Check these before creating a component / service; when you add one, append it here to avoid reinventing the wheel.
 
 ---
 

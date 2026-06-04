@@ -35,8 +35,8 @@
 core-bootstrap        ─┐ bootstrap + Flyway + global config (application*.yml)
                        │
 core-system          ─┤ system domain: auth / rbac / menu / dept / oplog (controller/service/mapper/entity/dto)
-business-pms         ─┤ business domain: PMS (currently an empty package-info.java placeholder)
-business-{module}    ─┤ future businesses: one Maven module each
+business-demo        ─┤ business domain: reference module (Task CRUD — data-scope + domain-event showcase)
+business-{module}    ─┤ future businesses (pms / crm / ...): one Maven module each
                        │
 core-infrastructure  ─┤ cross-cutting: security aspects / audit / web filter / cache config / MybatisPlusConfig
                        │

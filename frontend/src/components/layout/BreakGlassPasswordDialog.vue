@@ -20,7 +20,7 @@ import { ShieldAlert, KeyRound, CheckCircle2, AlertCircle } from 'lucide-vue-nex
 import Dialog from '@/components/ui/Dialog.vue'
 import Input from '@/components/ui/Input.vue'
 import { toast } from '@/composables/useToast'
-import { getBreakGlassStatusApi, setBreakGlassPasswordApi } from '../../../services/breakGlass'
+import { getBreakGlassStatusApi, setBreakGlassPasswordApi } from '@/services/breakGlass'
 
 const { t } = useI18n()
 

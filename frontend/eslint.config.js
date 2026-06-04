@@ -26,7 +26,7 @@ const TZ_RULES = [
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', 'ai/specs/**', 'docs/**', 'scripts/**'],
+    ignores: ['dist/**', 'node_modules/**', 'docs/**', 'scripts/**'],
   },
   ...vue.configs['flat/recommended'],
   {

@@ -29,7 +29,7 @@ debug.log
 .trae
 *.swp
 
-# Claude Code per-user override (keep .claude/commands/* — committed AI skills)
+# Claude Code per-user override
 .claude/settings.local.json
 
 # Misc

@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Lock, CheckCircle2, XCircle } from 'lucide-vue-next'
-import { probeInviteApi, acceptInviteApi } from '../../../services/invite'
+import { probeInviteApi, acceptInviteApi } from '@/services/invite'
 
 /**
  * Invite-acceptance landing page. The user got here from the email link;

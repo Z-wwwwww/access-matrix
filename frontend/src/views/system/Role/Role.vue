@@ -8,7 +8,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { Plus, Search, RotateCcw, Pencil, Trash2 } from 'lucide-vue-next'
-import { getRoleListApi, deleteRoleApi } from '../../../../services/role'
+import { getRoleListApi, deleteRoleApi } from '@/services/role'
 import RoleEdit from './RoleEdit.vue'
 
 const { t } = useI18n()

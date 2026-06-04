@@ -14,7 +14,7 @@ import {
   suspendTenantApi, resumeTenantApi,
   startSupportSessionApi,
   resendInviteApi
-} from '../../../../services/tenant'
+} from '@/services/tenant'
 import TenantCreate from './TenantCreate.vue'
 import TenantEdit from './TenantEdit.vue'
 import TenantSupportSession from './TenantSupportSession.vue'

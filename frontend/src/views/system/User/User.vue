@@ -14,8 +14,8 @@ const { t } = useI18n()
 const { confirm } = useConfirm()
 import {
   getUserListApi, deleteUserApi, changeUserStatusApi, forceLogoutApi
-} from '../../../../services/user'
-import { getDeptTreeApi } from '../../../../services/dept'
+} from '@/services/user'
+import { getDeptTreeApi } from '@/services/dept'
 import UserEdit from './UserEdit.vue'
 import ResetPasswordDialog from './ResetPasswordDialog.vue'
 import { oidcConfig } from '@/utils/oidc'

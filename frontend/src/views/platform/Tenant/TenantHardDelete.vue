@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import Drawer from '@/components/ui/Drawer.vue'
 import Input from '@/components/ui/Input.vue'
 import { toast } from '@/composables/useToast'
-import { hardDeleteTenantApi } from '../../../../services/tenant'
+import { hardDeleteTenantApi } from '@/services/tenant'
 import { Trash2, AlertOctagon } from 'lucide-vue-next'
 
 /**

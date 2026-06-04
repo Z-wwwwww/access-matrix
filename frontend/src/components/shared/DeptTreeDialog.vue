@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import Dialog from '@/components/ui/Dialog.vue'
 import { Search, ChevronDown, X, Building2 } from 'lucide-vue-next'
 import OrgNode from './OrgNode.vue'
-import { getDeptTreeApi } from '../../../services/dept'
+import { getDeptTreeApi } from '@/services/dept'
 
 defineOptions({ name: 'DeptTreeDialog' })
 

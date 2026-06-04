@@ -10,7 +10,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import UserPicker from '@/components/shared/UserPicker.vue'
 import { toast } from '@/composables/useToast'
 import { Search, RotateCcw, Eye } from 'lucide-vue-next'
-import { getOpLogListApi, getOpLogApi } from '../../../../services/oplog'
+import { getOpLogListApi, getOpLogApi } from '@/services/oplog'
 
 const { t } = useI18n()
 

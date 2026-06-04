@@ -13,7 +13,7 @@ import { Search, RotateCcw, Pencil, Play, ScrollText } from 'lucide-vue-next'
 import {
   getJobListApi, getJobLogListApi, updateJobApi,
   enableJobApi, disableJobApi, runJobApi
-} from '../../../../services/job'
+} from '@/services/job'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()

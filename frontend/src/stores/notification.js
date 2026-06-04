@@ -12,7 +12,7 @@ import {
   getNotificationListApi,
   markReadApi,
   markAllReadApi,
-} from '../../services/notification'
+} from '@/services/notification'
 
 export const useNotificationStore = defineStore('notification', () => {
   const unread = ref(0)

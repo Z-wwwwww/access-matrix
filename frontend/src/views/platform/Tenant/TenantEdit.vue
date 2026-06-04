@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import Drawer from '@/components/ui/Drawer.vue'
 import Input from '@/components/ui/Input.vue'
 import { toast } from '@/composables/useToast'
-import { updateTenantApi } from '../../../../services/tenant'
+import { updateTenantApi } from '@/services/tenant'
 
 /**
  * Inline edit drawer for a tenant's mutable fields (displayName, contactEmail).

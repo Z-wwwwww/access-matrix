@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getMenuListApi } from '../../services/menu'
+import { getMenuListApi } from '@/services/menu'
 import { useAuthStore } from './auth'
 import { useTabsStore } from './tabs'
 import { formatMenus, menuToRoutes } from '@/utils/menu-to-routes'

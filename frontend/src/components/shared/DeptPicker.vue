@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { Building, Building2 } from 'lucide-vue-next'
 import TreePicker from './TreePicker.vue'
-import { getDeptTreeApi } from '../../../services/dept'
+import { getDeptTreeApi } from '@/services/dept'
 
 defineOptions({ name: 'DeptPicker' })
 

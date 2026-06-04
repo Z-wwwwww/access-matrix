@@ -4,8 +4,8 @@ import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Badge from '@/components/ui/Badge.vue'
 import { useAuthStore } from '@/stores/auth'
-import { getMeApi } from '../../../../services/auth'
-import { getDeptTreeApi } from '../../../../services/dept'
+import { getMeApi } from '@/services/auth'
+import { getDeptTreeApi } from '@/services/dept'
 
 const { t } = useI18n()
 const authStore = useAuthStore()

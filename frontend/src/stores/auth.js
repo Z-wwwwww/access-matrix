@@ -16,7 +16,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { loginApi, refreshApi, logoutApi, getMeApi } from '../../services/auth'
+import { loginApi, refreshApi, logoutApi, getMeApi } from '@/services/auth'
 import { decodeJwt } from '@/utils/jwt-decode'
 import { keycloakLogoutUrl, oidcConfig, isSsoReachable } from '@/utils/oidc'
 import { clearTenantCache } from '@/utils/tenant'

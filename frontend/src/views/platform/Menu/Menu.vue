@@ -17,8 +17,8 @@ import { useMenuTitle } from '@/composables/useMenuTitle'
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, HelpCircle, Pin } from 'lucide-vue-next'
 import {
   getMenuIndexApi, addMenuApi, editMenuApi, deleteMenuApi
-} from '../../../../services/menu'
-import { getPermissionsByModuleApi } from '../../../../services/permission'
+} from '@/services/menu'
+import { getPermissionsByModuleApi } from '@/services/permission'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()

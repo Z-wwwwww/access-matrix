@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Lock, CheckCircle2, XCircle } from 'lucide-vue-next'
-import { probeResetApi, acceptResetApi } from '../../../services/passwordReset'
+import { probeResetApi, acceptResetApi } from '@/services/passwordReset'
 
 /**
  * Password-reset landing page used by the SSO → password reverse migration.

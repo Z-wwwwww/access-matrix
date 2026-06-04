@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import Select from '@/components/ui/Select.vue'
-import { getUserListApi } from '../../../services/user'
+import { getUserListApi } from '@/services/user'
 
 defineOptions({ name: 'UserPicker' })
 

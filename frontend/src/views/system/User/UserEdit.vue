@@ -7,8 +7,8 @@ import Switch from '@/components/ui/Switch.vue'
 import DeptTreeDialog from '@/components/shared/DeptTreeDialog.vue'
 import { Check } from 'lucide-vue-next'
 import { toast } from '@/composables/useToast'
-import { addUserApi, updateUserApi, getUserRolesApi, assignUserRolesApi } from '../../../../services/user'
-import { getRoleListApi } from '../../../../services/role'
+import { addUserApi, updateUserApi, getUserRolesApi, assignUserRolesApi } from '@/services/user'
+import { getRoleListApi } from '@/services/role'
 
 const { t } = useI18n()
 

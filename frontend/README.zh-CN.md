@@ -21,33 +21,21 @@ npm run lint         # ESLint
 
 - 组件分层（`ui/` / `shared/` / `layout/` / `views/`）
 - 业务前缀的 services 命名（`pmsXxx.js` / `demoXxx.js`）
-- 必用共享组件：`DataTable` / `Drawer` / `Input` / `Select` / `Checkbox` / `DatePicker` / `UserPicker` / `DictPicker` / `ConfirmDialog`
+- 必用共享组件：`DataTable` / `Drawer` / `Input` / `Select` / `Checkbox` / `DatePicker` / `UserPicker` / `ConfirmDialog`
 - 禁手写 `<table>` / `<input type=date>` / `window.confirm()` / 内联 style
-
-## AI Skill 入口
-
-```bash
-npm run ai:create-page UserList
-npm run ai:create-component UserAvatar
-npm run ai:generate userService
-npm run ai:inspect compliance
-npm run ai:analyze src/views/system/User/User.vue
-```
-
-底层走 `scripts/ai-cli.mjs` 调 Claude Code。
 
 ## 主要目录
 
 ```
-services/         API 封装（平铺、前缀区分）
+src/services/     API 封装（平铺、前缀区分）
 src/components/
   ├── ui/         基础 UI
   ├── shared/     通用业务组件
   └── layout/     AppLayout 等
 src/views/
-  ├── system/     系统管理（User/Role/Permission/Menu/Dept/OpLog/Profile）
+  ├── system/     系统管理（User/Role/Dept/OpLog/Profile）
+  ├── platform/   平台运维 tid=system（Tenant/Menu/Job）
   └── demo/       业务示例（Task —— 数据范围演示）
-src/composables/  useDict / useConfirm / useTheme ...
-src/dict/storage.js   静态字典
+src/composables/  useConfirm / useTheme / useToast ...
 src/lang/         vue-i18n 翻译
 ```
