@@ -2,6 +2,7 @@ package com.platform.business.demo.task.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.platform.business.demo.task.TaskStatus;
 import com.platform.business.demo.task.dto.TaskDto;
 import com.platform.business.demo.task.entity.TaskEntity;
 import com.platform.business.demo.task.mapper.TaskMapper;
@@ -15,6 +16,7 @@ import com.platform.core.common.result.PageResult;
 import com.platform.core.infrastructure.security.rbac.DataScopeDecision;
 import com.platform.core.infrastructure.security.rbac.DataScopeHelper;
 import com.platform.core.infrastructure.security.rbac.DataScopeResolver;
+import com.platform.system.dict.service.DictQueryService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,12 +29,25 @@ public class TaskService {
     private final TaskMapper taskMapper;
     private final DataScopeResolver dataScopeResolver;
     private final ApplicationEventPublisher publisher;
+    private final DictQueryService dictQueryService;
 
     public TaskService(TaskMapper taskMapper, DataScopeResolver dataScopeResolver,
-                       ApplicationEventPublisher publisher) {
+                       ApplicationEventPublisher publisher, DictQueryService dictQueryService) {
         this.taskMapper = taskMapper;
         this.dataScopeResolver = dataScopeResolver;
         this.publisher = publisher;
+        this.dictQueryService = dictQueryService;
+    }
+
+    /**
+     * Form-3 validation: status / priority are managed dicts (open set, ops can add),
+     * so validate against the live dict — NOT the {@link TaskStatus} enum (which only
+     * covers the code-branched subset). Unknown values are rejected; ops-added ones pass.
+     */
+    private void validateDictValue(String code, Integer value, String field) {
+        if (value != null && !dictQueryService.isValidValue(code, value)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.dict.invalidValue");
+        }
     }
 
     /**
@@ -99,6 +114,8 @@ public class TaskService {
         t.setDeptId(req.deptId());
         t.setTitle(req.title());
         t.setContent(req.content());
+        validateDictValue("task_status", req.status(), "status");
+        validateDictValue("task_priority", req.priority(), "priority");
         t.setStatus(req.status());
         t.setPriority(req.priority());
         t.setAssigneeUserId(req.assigneeUserId());
@@ -117,16 +134,23 @@ public class TaskService {
         if (req.deptId() != null && !req.deptId().isBlank()) t.setDeptId(req.deptId());
         if (req.title() != null) t.setTitle(req.title());
         if (req.content() != null) t.setContent(req.content());
-        if (req.status() != null) t.setStatus(req.status());
-        if (req.priority() != null) t.setPriority(req.priority());
+        if (req.status() != null) {
+            validateDictValue("task_status", req.status(), "status");
+            t.setStatus(req.status());
+        }
+        if (req.priority() != null) {
+            validateDictValue("task_priority", req.priority(), "priority");
+            t.setPriority(req.priority());
+        }
         boolean assigneeChanged = req.assigneeUserId() != null
                 && !req.assigneeUserId().equals(t.getAssigneeUserId());
         if (req.assigneeUserId() != null) t.setAssigneeUserId(req.assigneeUserId());
         if (req.dueDate() != null) t.setDueDate(req.dueDate());
         taskMapper.updateById(t);
         if (assigneeChanged) notifyAssignee(t);
-        // 「処理完了」= 完了(3)/取消(4)。この時点で該当タスクの action 通知を既読化する。
-        if (req.status() != null && (req.status() == 3 || req.status() == 4)) {
+        // 「処理完了」= 完了/取消。この時点で該当タスクの action 通知を既読化する。
+        if (req.status() != null
+                && (req.status() == TaskStatus.DONE.code() || req.status() == TaskStatus.CANCELLED.code())) {
             publisher.publishEvent(new NotificationResolvedEvent(
                     RequestContext.tenantIdOrDefault(), "demo_task", id));
         }

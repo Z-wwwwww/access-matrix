@@ -4,9 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.platform.core.common.context.RequestContext;
+import com.platform.core.common.dict.CommonStatus;
+import com.platform.core.common.dict.DictEnum;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
+import com.platform.system.dict.builtin.DataScopeDict;
 import com.platform.system.rbac.dto.RoleDto;
 import com.platform.system.rbac.entity.DeptEntity;
 import com.platform.system.rbac.entity.MenuEntity;
@@ -95,9 +98,13 @@ public class RoleAdminService {
         r.setId(IdGenerator.ulid());
         r.setName(req.name());
         r.setDescription(req.description());
-        r.setDataScope(req.dataScope() == null ? 4 : req.dataScope());
+        Integer dataScope = req.dataScope() == null ? DataScopeDict.SELF.code() : req.dataScope();
+        Integer status = req.status() == null ? CommonStatus.ENABLED.code() : req.status();
+        DictEnum.requireValid(DataScopeDict.class, dataScope, "dataScope");
+        DictEnum.requireValid(CommonStatus.class, status, "status");
+        r.setDataScope(dataScope);
         r.setIsBuiltIn(0);
-        r.setStatus(req.status() == null ? 1 : req.status());
+        r.setStatus(status);
         r.setSortOrder(req.sortOrder() == null ? 0 : req.sortOrder());
         roleMapper.insert(r);
         return r.getId();
@@ -112,9 +119,15 @@ public class RoleAdminService {
             r.setName(req.name());
         }
         if (req.description() != null) r.setDescription(req.description());
-        if (req.dataScope() != null) r.setDataScope(req.dataScope());
+        if (req.dataScope() != null) {
+            DictEnum.requireValid(DataScopeDict.class, req.dataScope(), "dataScope");
+            r.setDataScope(req.dataScope());
+        }
         if (req.sortOrder() != null) r.setSortOrder(req.sortOrder());
-        if (req.status() != null) r.setStatus(req.status());
+        if (req.status() != null) {
+            DictEnum.requireValid(CommonStatus.class, req.status(), "status");
+            r.setStatus(req.status());
+        }
         roleMapper.updateById(r);
         cacheService.evictRole(id);
     }

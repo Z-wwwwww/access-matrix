@@ -58,7 +58,13 @@ public class MybatisPlusConfig {
             // so it must be excluded: the interceptor never injects a tenant
             // predicate, and TenantSchemaGuard sees "no tenant_id column + excluded"
             // = the correct config (no leak, no warning).
-            "core_rbac_menu"
+            "core_rbac_menu",
+            // Managed dictionaries (V44) are a single GLOBAL set with NO tenant_id
+            // (one shared lookup-data set for the whole installation, managed by
+            // platform-ops, filtered/used per page). Same shape as core_rbac_menu:
+            // excluded so the tenant interceptor never injects a predicate.
+            "core_dict",
+            "core_dict_item"
     );
 
     /**

@@ -3,6 +3,8 @@ package com.platform.system.rbac.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.platform.core.common.context.RequestContext;
+import com.platform.core.common.dict.CommonStatus;
+import com.platform.core.common.dict.DictEnum;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
@@ -56,7 +58,9 @@ public class DeptAdminService {
                 : parent.getPath() + "/" + d.getId());
         d.setSortOrder(req.sortOrder() == null ? 0 : req.sortOrder());
         d.setLeaderUserId(normalizeLeader(req.leaderUserId()));
-        d.setStatus(req.status() == null ? 1 : req.status());
+        Integer status = req.status() == null ? CommonStatus.ENABLED.code() : req.status();
+        DictEnum.requireValid(CommonStatus.class, status, "status");
+        d.setStatus(status);
         deptMapper.insert(d);
         cacheService.evictAllDepts();
         return d.getId();
@@ -92,7 +96,10 @@ public class DeptAdminService {
             if (normalized != null) validateLeaderUserId(normalized);
             d.setLeaderUserId(normalized);
         }
-        if (req.status() != null) d.setStatus(req.status());
+        if (req.status() != null) {
+            DictEnum.requireValid(CommonStatus.class, req.status(), "status");
+            d.setStatus(req.status());
+        }
         deptMapper.updateById(d);
         cacheService.evictAllDepts();
     }

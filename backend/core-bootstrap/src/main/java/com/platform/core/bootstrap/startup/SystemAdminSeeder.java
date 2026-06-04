@@ -2,6 +2,7 @@ package com.platform.core.bootstrap.startup;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.platform.core.common.context.RequestContext;
+import com.platform.core.common.dict.CommonStatus;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.core.common.security.BuiltInRoles;
 import com.platform.system.auth.entity.UserEntity;
@@ -111,7 +112,7 @@ public class SystemAdminSeeder {
             u.setUserNo("U00000001");
             u.setDisplayName(OPS_DISPLAY);
             u.setPasswordHash(opsHash);
-            u.setStatus(1);
+            u.setStatus(CommonStatus.ENABLED.code());
             u.setMark(1);
             u.setCreateUser("system");
             u.setUpdateUser("system");
@@ -131,8 +132,8 @@ public class SystemAdminSeeder {
             dirty = true;
             log.info("SystemAdminSeeder: reset ops password to default");
         }
-        if (existing.getStatus() == null || existing.getStatus() != 1) {
-            existing.setStatus(1);
+        if (existing.getStatus() == null || existing.getStatus() != CommonStatus.ENABLED.code()) {
+            existing.setStatus(CommonStatus.ENABLED.code());
             dirty = true;
         }
         if (dirty) {

@@ -50,6 +50,14 @@ public final class PlatformPermissions {
     public static final String MENU_UPDATE = "platform:menu:update";
     public static final String MENU_DELETE = "platform:menu:delete";
 
+    // ---- dict（managed dictionaries — グローバル設定、platform 運維の職責。Menu と同性質） ----
+    // 読み取り（GET /dict/{code}）は権限不要（ログインユーザー全員の下拉に必要）。
+    // 管理（/admin/dict/**）はここの platform:dict:* で PLATFORM_ADMIN 専用。
+    public static final String DICT_READ   = "platform:dict:read";
+    public static final String DICT_CREATE = "platform:dict:create";
+    public static final String DICT_UPDATE = "platform:dict:update";
+    public static final String DICT_DELETE = "platform:dict:delete";
+
     static {
         PermissionCode.registerAll(PlatformPermissions.class, "platform");
     }

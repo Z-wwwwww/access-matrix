@@ -2,6 +2,7 @@ package com.platform.business.demo.startup;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.platform.core.common.context.RequestContext;
+import com.platform.core.common.dict.CommonStatus;
 import com.platform.business.demo.task.entity.TaskEntity;
 import com.platform.business.demo.task.mapper.TaskMapper;
 import com.platform.core.infrastructure.security.rbac.DataScopeContext;
@@ -140,7 +141,7 @@ public class DemoSeeder {
         u.setDisplayName(displayName);
         u.setDeptId(deptId);
         u.setPasswordHash(encoder.encode(DEMO_PASSWORD));
-        u.setStatus(1);
+        u.setStatus(CommonStatus.ENABLED.code());
         u.setMark(1);
         u.setCreateUser("system");
         u.setUpdateUser("system");

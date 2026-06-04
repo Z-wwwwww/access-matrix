@@ -56,7 +56,9 @@ public class ArchitectureTest {
             "UserInviteEntity",          // single-use token; token IS the auth, no tenant_id needed
             "PasswordResetTokenEntity",  // same single-use token shape
             "DomainEventEntity",         // append-only event store / outbox (V36); no soft-delete, like OpLogEntity
-            "MenuEntity"                 // single GLOBAL menu set (V41/V43); no tenant_id by design (declares its own mark+audit)
+            "MenuEntity",                // single GLOBAL menu set (V41/V43); no tenant_id by design (declares its own mark+audit)
+            "DictEntity",                // single GLOBAL managed-dict set (V44); no tenant_id by design, like MenuEntity
+            "DictItemEntity"             // dict items, same GLOBAL shape as DictEntity
     );
 
     /** Controllers where every HTTP method is a public/pre-auth endpoint by design. */
@@ -70,7 +72,8 @@ public class ArchitectureTest {
             "MePermissionController",    // /me/permissions — same
             "UserController",            // /user/me — same
             "ScopeMeController",         // /scope/me — same
-            "NotificationController"     // /notification/* — personal inbox, JWT-is-auth like /menu/me
+            "NotificationController",    // /notification/* — personal inbox, JWT-is-auth like /menu/me
+            "DictController"             // /dict/{code} — dropdown data for any logged-in user, JWT-is-auth like /menu/me
     );
 
     private static List<Class<?>> entities;

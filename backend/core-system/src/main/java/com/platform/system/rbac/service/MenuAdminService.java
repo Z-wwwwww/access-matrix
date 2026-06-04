@@ -2,9 +2,12 @@ package com.platform.system.rbac.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.platform.core.common.dict.CommonStatus;
+import com.platform.core.common.dict.DictEnum;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
+import com.platform.system.dict.builtin.MenuType;
 import com.platform.system.rbac.dto.MenuAdminDto;
 import com.platform.system.rbac.entity.MenuEntity;
 import com.platform.system.rbac.entity.RoleMenuEntity;
@@ -59,6 +62,7 @@ public class MenuAdminService {
         m.setCode(req.code());
         m.setTitle(req.title());
         m.setTitleI18n(serializeI18n(req.titleI18n()));
+        DictEnum.requireValid(MenuType.class, req.menuType(), "menuType");
         m.setMenuType(req.menuType());
         m.setPath(req.path());
         m.setComponent(req.component());
@@ -71,7 +75,9 @@ public class MenuAdminService {
         m.setTabUnique(req.tabUnique());
         m.setRedirect(req.redirect());
         m.setPermissionCode(req.permissionCode());
-        m.setStatus(req.status() == null ? 1 : req.status());
+        Integer status = req.status() == null ? CommonStatus.ENABLED.code() : req.status();
+        DictEnum.requireValid(CommonStatus.class, status, "status");
+        m.setStatus(status);
         menuMapper.insert(m);
         cacheService.evictAllMenus();
         return m.getId();
@@ -83,7 +89,10 @@ public class MenuAdminService {
         if (req.parentId() != null) m.setParentId(req.parentId());
         if (req.title() != null) m.setTitle(req.title());
         if (req.titleI18n() != null) m.setTitleI18n(serializeI18n(req.titleI18n()));
-        if (req.menuType() != null) m.setMenuType(req.menuType());
+        if (req.menuType() != null) {
+            DictEnum.requireValid(MenuType.class, req.menuType(), "menuType");
+            m.setMenuType(req.menuType());
+        }
         if (req.path() != null) m.setPath(req.path());
         if (req.component() != null) m.setComponent(req.component());
         if (req.icon() != null) m.setIcon(req.icon());
@@ -95,7 +104,10 @@ public class MenuAdminService {
         if (req.tabUnique() != null) m.setTabUnique(req.tabUnique());
         if (req.redirect() != null) m.setRedirect(req.redirect());
         if (req.permissionCode() != null) m.setPermissionCode(req.permissionCode());
-        if (req.status() != null) m.setStatus(req.status());
+        if (req.status() != null) {
+            DictEnum.requireValid(CommonStatus.class, req.status(), "status");
+            m.setStatus(req.status());
+        }
         menuMapper.updateById(m);
         cacheService.evictAllMenus();
     }

@@ -1,6 +1,8 @@
 package com.platform.system.rbac.service;
 
+import com.platform.core.common.dict.DictEnum;
 import com.platform.core.common.security.PermissionMatcher;
+import com.platform.system.dict.builtin.MenuType;
 import com.platform.system.rbac.dto.MenuNode;
 import com.platform.system.rbac.entity.MenuEntity;
 import com.platform.system.rbac.mapper.MenuMapper;
@@ -185,7 +187,7 @@ public class MenuQueryService {
         if (nodes == null || nodes.isEmpty()) return;
         nodes.removeIf(n -> {
             pruneEmptyDirectories(n.getChildren());
-            boolean isDirectory = n.getMenuType() != null && n.getMenuType() == 1;
+            boolean isDirectory = DictEnum.fromCode(MenuType.class, n.getMenuType()) == MenuType.DIRECTORY;
             boolean hasNoChildren = n.getChildren() == null || n.getChildren().isEmpty();
             return isDirectory && hasNoChildren;
         });

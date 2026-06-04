@@ -216,6 +216,7 @@ If you prefer (or need) to do it by hand, the DO / DON'T below is the spec.
 - **Permission codes** register through a constants class: `public static final String XXX_READ = "xxx:read"` + `static { PermissionCode.registerAll(XxxPermissions.class, "xxx"); }`. `PermissionConsistencyGuard` will fail-fast on startup if a `@RequiresPermission` references an unregistered string.
 - **Service does the work**: controller delegates to a `@Service` class. Controllers don't access mappers directly, services don't access controllers.
 - **Emit a domain event on every state change**: inside the `@Service`, in the same `@Transactional` method as the write, inject `EventPublisher` and call `publish(DomainEvent.of("<AggregateType>", id, "<aggregate>.<verb>", payloadDto))` (e.g. `"Reservation"`, `"reservation.created"`). For revenue-relevant fields (price / status / availability) also keep append-only history, never a current-value-only column. See "Domain events & state-change conventions" + Hard Rules 12–13.
+- **Status / type / state columns go through a dictionary** — define an `enum implements DictEnum` (code + i18n labelKey), register it in your module's `@Component` registrar (`DictRegistry.register("xxx_status", XxxStatus.class)`), and at the service boundary validate the input with `DictEnum.requireValid(XxxStatus.class, req.status(), "status")`. Branch on the enum constant (`TaskStatus.DONE.code()`), never a magic number. See "Dictionaries".
 
 ### DON'T
 
@@ -427,12 +428,37 @@ Notes that keep it correct:
 - Use `DomainEvent.system(...)` instead of `.of(...)` when the change comes from a background job (no end user on the thread); it stamps `actor_type=3`.
 - Nothing extra to register: `core_domain_event` already exists (V36) and `EventPublisher` is an injectable bean. You only write the two lines above.
 
+## Dictionaries (status / type / state / scope enums)
+
+Coded values (status / type / state / scope / lookups) are served read-only to the frontend at `GET /dict/{code}` so dropdowns/labels never hardcode them. **Three forms** — pick by "does code branch on it?" and "who owns the value set?":
+
+| | **① Business · pure DB** | **② System · pure enum** | **③ Business · DB + enum** |
+|---|---|---|---|
+| Value set owner | ops (runtime) | code (closed) | ops (runtime), code branches a subset |
+| Source of truth | `core_dict_item` (DB) | `enum` in `DictRegistry` | DB for display; `enum` for the branched subset |
+| In `DictRegistry`? | no | **yes** | **no** (enum used only for branching) |
+| `GET /dict/{code}` reads | DB items | enum items | **DB items** |
+| Code branches on it? | no | yes | yes (a subset) |
+| Input validation | vs DB (`DictQueryService.isValidValue`) | vs enum (`DictEnum.requireValid`) | vs DB (open set) |
+| Examples | `gender` | `common_status`, `menu_type`, `data_scope`, `tenant_status`, `job_*` | `task_status` |
+
+Resolution: `DictQueryService.read()` checks `DictRegistry` first (→ ②), else reads the DB (→ ① / ③).
+
+**Adding a form ② (built-in enum):** `enum Xxx implements DictEnum` — `code()` (stored int) + `labelKey()` (frontend i18n key) + optional `cssClass()`; register in a `@Component` registrar via `DictRegistry.register("code", Xxx.class)` (force-load like `*Permissions`, one per module). Validate writes with `DictEnum.requireValid(Xxx.class, v, "field")` (→ 400). Branch/default on the constant (`if (s == Xxx.DONE.code())`, `setStatus(CommonStatus.ENABLED.code())`); reverse lookup `DictEnum.fromCode(Xxx.class, n)`. Generic enabled/disabled = `CommonStatus` (core-common).
+
+**Adding a form ③ (DB + branch enum):** seed the options into `core_dict`/`core_dict_item` (a migration), keep an `enum implements DictEnum` for the branched subset **but do NOT register it in `DictRegistry`** (so reads hit the DB / stay runtime-editable). Validate input vs the DB (`dictQueryService.isValidValue("code", v)`, open set), branch on the enum (`fromCode` → unknown ops-added values simply don't branch).
+
+**Delete-protection** (`DictGuards`, for ① / ③): a managed item is **not hard-deletable** when it's a branch value (enum) OR still referenced by data — only disable (`status=0`). Declare per dict in a module registrar: `DictGuards.register("task_status").branchEnum(TaskStatus.class).usedBy("demo_task","status")`. Protection is computed (enum membership + live `DictUsageMapper` count), not a stored flag. Reference reads are cross-tenant by design (global dict, platform-ops).
+
+**Backend does NOT localize** — it stores/branches on the value and exposes `labelKey` (built-in) or `label_i18n` (managed); the frontend resolves the label. For a backend-originated message, put `{value, labelKey}` in the payload and let the frontend render it. Reference impl: `TaskStatus` + `DemoDictGuardRegistrar` (business-demo, form ③), `CommonStatus`/`TriggerType` (core-common), `com.platform.system.dict.builtin.*` (core-system, form ②).
+
 ## Error codes & exceptions
 
 - Business exception: `throw new BusinessException(ErrorCode.X, "msg")`
 - The global exception handler (in `core-infrastructure.web` or `core-common`) converts `BusinessException` to `JsonResult.error(code, msg)`, HTTP 400/401/403
 - Do not `throw new RuntimeException(...)`; do not catch + wrap + rethrow
 - Validation: `@Valid` + `@NotBlank` / `@Size` / `@Email`; DTOs use Java records
+- **User-facing error messages are localized on the FRONTEND, not the backend.** For a business error the user will see, pass a stable **i18n key** as the message — e.g. `throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.dict.itemInUse")` — defined in `frontend/src/lang/*.js` under the `error.*` namespace. The axios interceptor runs every error message through `t()` (key → localized; legacy prose → passed through unchanged), so keys localize and old prose still works. Keep these messages **parameter-free** (don't append ids/values — the dynamic part can't survive the key). Internal/never-shown errors may keep prose.
 
 ## Tests
 

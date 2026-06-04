@@ -7,6 +7,7 @@ import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
+import com.platform.system.dict.builtin.TenantStatus;
 import com.platform.core.common.result.PageResult;
 import com.platform.core.infrastructure.config.properties.AppMailProperties;
 import com.platform.core.infrastructure.mail.MailService;
@@ -285,7 +286,7 @@ public class TenantAdminService {
         row.setTenantCode(req.tenantCode());
         row.setDisplayName(req.displayName());
         row.setContactEmail(req.contactEmail());
-        row.setStatus(1);
+        row.setStatus(TenantStatus.ACTIVE.code());
         row.setMark(1);
         row.setCreateUser("platform-admin");
         row.setUpdateUser("platform-admin");
@@ -566,7 +567,7 @@ public class TenantAdminService {
                 new UpdateWrapper<TenantEntity>()
                         .eq("id", id)
                         .eq("mark", 1)
-                        .set("status", 0)
+                        .set("status", TenantStatus.SUSPENDED.code())
                         .set("update_user", "platform-admin")
                         .set("update_time", LocalDateTime.now()));
         log.info("[tenant] suspended tenant '{}' (id={})", row.getTenantCode(), id);
@@ -595,7 +596,7 @@ public class TenantAdminService {
                 new UpdateWrapper<TenantEntity>()
                         .eq("id", id)
                         .eq("mark", 1)
-                        .set("status", 1)
+                        .set("status", TenantStatus.ACTIVE.code())
                         .set("update_user", "platform-admin")
                         .set("update_time", LocalDateTime.now()));
         log.info("[tenant] resumed tenant '{}' (id={})", row.getTenantCode(), id);

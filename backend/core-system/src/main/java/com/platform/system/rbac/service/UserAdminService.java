@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.platform.core.common.context.RequestContext;
+import com.platform.core.common.dict.CommonStatus;
+import com.platform.core.common.dict.DictEnum;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
@@ -135,7 +137,9 @@ public class UserAdminService {
         u.setUserNo(numberingService.next(USER_NO_KBN, tenantId));
         u.setDisplayName(req.displayName());
         u.setDeptId(req.deptId());
-        u.setStatus(req.status() == null ? 1 : req.status());
+        Integer status = req.status() == null ? CommonStatus.ENABLED.code() : req.status();
+        DictEnum.requireValid(CommonStatus.class, status, "status");
+        u.setStatus(status);
 
         // Side-effect: provision in Keycloak first when oidc is on, so we can
         // store keycloak_id on the row we insert. On Keycloak failure we never
@@ -249,7 +253,10 @@ public class UserAdminService {
         if (req.displayName() != null) u.setDisplayName(req.displayName());
         if (!isBuiltIn) {
             if (req.deptId() != null) u.setDeptId(req.deptId());
-            if (req.status() != null) u.setStatus(req.status());
+            if (req.status() != null) {
+                DictEnum.requireValid(CommonStatus.class, req.status(), "status");
+                u.setStatus(req.status());
+            }
         }
         userMapper.updateById(u);
         cacheService.evictUser(id);
@@ -320,11 +327,12 @@ public class UserAdminService {
 
     @Transactional
     public void changeStatus(String userId, int status) {
+        DictEnum.requireValid(CommonStatus.class, status, "status");
         UserEntity u = require(userId);
         assertNotBuiltInAdmin(u, "change status");
         // Only the "disable" direction can strand the platform without a super
         // admin; enabling a previously-disabled super-admin is always safe.
-        if (status != 1) {
+        if (status != CommonStatus.ENABLED.code()) {
             assertNotLastSuperAdmin(userId, "disable");
         }
         u.setStatus(status);
@@ -334,7 +342,7 @@ public class UserAdminService {
         // not just on endpoints that happen to be @RequiresPermission-annotated.
         // The kick combined with the global ForceLogoutFilter shuts down all
         // in-flight sessions on the next API call.
-        if (status != 1) {
+        if (status != CommonStatus.ENABLED.code()) {
             forceLogoutService.kickOut(userId);
         }
     }

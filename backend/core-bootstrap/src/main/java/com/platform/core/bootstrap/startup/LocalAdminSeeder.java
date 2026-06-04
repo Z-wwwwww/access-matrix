@@ -9,6 +9,7 @@ import com.platform.system.rbac.entity.UserRoleEntity;
 import com.platform.system.rbac.mapper.RoleMapper;
 import com.platform.system.rbac.mapper.UserRoleMapper;
 import com.platform.core.common.id.IdGenerator;
+import com.platform.core.common.dict.CommonStatus;
 import com.platform.core.common.security.BuiltInRoles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,7 +88,7 @@ public class LocalAdminSeeder {
             u.setUserNo("U00000001");
             u.setDisplayName("Demo Admin");
             u.setPasswordHash(adminHash);
-            u.setStatus(1);
+            u.setStatus(CommonStatus.ENABLED.code());
             u.setMark(1);
             u.setCreateUser("system");
             u.setUpdateUser("system");
@@ -104,8 +105,8 @@ public class LocalAdminSeeder {
             dirty = true;
             log.info("LocalAdminSeeder: reset demo-admin password to default");
         }
-        if (existing.getStatus() == null || existing.getStatus() != 1) {
-            existing.setStatus(1);
+        if (existing.getStatus() == null || existing.getStatus() != CommonStatus.ENABLED.code()) {
+            existing.setStatus(CommonStatus.ENABLED.code());
             dirty = true;
         }
         if (existing.getUserNo() == null || existing.getUserNo().isBlank()) {
