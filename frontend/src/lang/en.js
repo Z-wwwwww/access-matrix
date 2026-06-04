@@ -212,6 +212,33 @@ export default {
       },
       status: { active: 'Active', suspended: 'Suspended' },
       search: { placeholder: 'Search by code or name' },
+      dashboard: {
+        total: 'Total tenants',
+        newThisMonth: 'New this month',
+        statusTitle: 'Status breakdown',
+        trendTitle: 'New tenants (monthly)',
+        trendSeries: 'New tenants'
+      },
+      ops: {
+        empty: 'Nothing to show',
+        activation: {
+          title: 'Onboarding / activation funnel', pending: 'Pending', expired: 'Expired', rate: 'Activation rate',
+          median: 'Median onboarding', listTitle: 'Tenants awaiting activation', expiredBadge: 'Expired'
+        },
+        engagement: {
+          title: 'Engagement', active7d: 'Active (7d)', active30d: 'Active (30d)', dau: 'DAU', mau: 'MAU',
+          silent: 'Silent', trendTitle: 'Logins (14d)', silentListTitle: 'Silent tenants (no login 30d)', never: 'Never'
+        },
+        reliability: {
+          title: 'Platform health', jobFailures: 'Job failures (24h)', eventBacklog: 'Event backlog',
+          backlogAge: 'Oldest backlog', oplogErrors: 'API errors (24h)', failuresListTitle: 'Recent job failures'
+        },
+        security: {
+          title: 'Security & privileged access', activeSupport: 'Support live', support7d: 'Support (7d)',
+          loginFailures: 'Login failures (24h)', passwordResets: 'PW resets (7d)', supportListTitle: 'Recent support sessions',
+          breakGlass: 'Break-glass (7d)', breakGlassListTitle: 'Recent break-glass (SSO bypass)'
+        }
+      },
       recycleBinHint: {
         title: 'Deletion is a recycle-bin flow:',
         body: 'Suspend first (the KC realm is disabled and sign-in is blocked, but data is kept). To truly delete, use the red trash icon that appears on a suspended row — after confirming by typing the tenant code, the business data, KC realm and registry row are all permanently removed. This cannot be undone.'

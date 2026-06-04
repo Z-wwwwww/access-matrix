@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * DTO container for the platform tenant management API. All records are
@@ -15,6 +16,27 @@ import java.time.LocalDateTime;
 public final class TenantDto {
 
     private TenantDto() {}
+
+    /**
+     * Aggregate counts for the platform tenant dashboard
+     * ({@code GET /platform/tenants/stats}). Computed across ALL registry rows
+     * (mark=1), built-in system/demo tenants included, so the KPI totals match
+     * what the list shows. {@code monthly} is a dense 12-month window (current
+     * month back 11), gaps filled with 0 — ready to plot.
+     */
+    public record Stats(
+            long total,
+            long active,
+            long suspended,
+            long newThisMonth,
+            List<MonthlyCount> monthly
+    ) {}
+
+    /** One point on the "new tenants per month" trend. {@code month} is 'YYYY-MM'. */
+    public record MonthlyCount(
+            String month,
+            long count
+    ) {}
 
     /** Read shape returned by {@code GET /platform/tenants}. */
     public record View(

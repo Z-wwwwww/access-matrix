@@ -222,6 +222,33 @@ export default {
         suspended: '停止'
       },
       search: { placeholder: 'コードまたは名前で検索' },
+      dashboard: {
+        total: '総テナント',
+        newThisMonth: '今月の新規',
+        statusTitle: '状態の内訳',
+        trendTitle: '新規テナント推移（月次）',
+        trendSeries: '新規テナント'
+      },
+      ops: {
+        empty: '対象なし',
+        activation: {
+          title: '入居・有効化ファネル', pending: '未有効化', expired: '期限切れ', rate: '有効化率',
+          median: '入居所要(中央値)', listTitle: '招待保留中のテナント', expiredBadge: '期限切れ'
+        },
+        engagement: {
+          title: '活性・エンゲージメント', active7d: '活性(7日)', active30d: '活性(30日)', dau: 'DAU', mau: 'MAU',
+          silent: '休眠', trendTitle: 'ログイン推移(14日)', silentListTitle: '休眠テナント(30日無ログイン)', never: '未ログイン'
+        },
+        reliability: {
+          title: 'プラットフォーム健全性', jobFailures: 'ジョブ失敗(24h)', eventBacklog: 'イベント滞留',
+          backlogAge: '最古滞留', oplogErrors: 'APIエラー(24h)', failuresListTitle: '直近のジョブ失敗'
+        },
+        security: {
+          title: 'セキュリティ・高権限監視', activeSupport: 'サポート進行中', support7d: 'サポート(7日)',
+          loginFailures: 'ログイン失敗(24h)', passwordResets: 'PW再設定(7日)', supportListTitle: '直近のサポートセッション',
+          breakGlass: '緊急アクセス(7日)', breakGlassListTitle: '直近の緊急アクセス(SSOバイパス)'
+        }
+      },
       recycleBinHint: {
         title: '削除はゴミ箱方式：',
         body: 'まず「停止」してください（KC realm が無効化され、サインイン不可になりますがデータは残ります）。本当に削除する場合は停止後の行に出る赤いゴミ箱アイコンから実行 — テナントコード入力での確認後、業務データ・KC realm・レジストリ行すべて物理削除されます。元に戻せません。'

@@ -75,6 +75,7 @@ class AuthServiceTest {
     @Mock ForceLogoutService forceLogoutService;
     @Mock MailService mailService;
     @Mock AppMailProperties mailProps;
+    @Mock com.platform.core.infrastructure.audit.OpLogSink opLogSink;
 
     @InjectMocks AuthService service;
 

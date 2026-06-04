@@ -27,6 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -159,6 +161,49 @@ public class TenantAdminService {
         Page<TenantEntity> result = tenantMapper.selectPage(p, w);
         List<TenantDto.View> records = result.getRecords().stream().map(this::toView).toList();
         return PageResult.of(records, result.getTotal(), page, size);
+    }
+
+    /**
+     * Aggregate counts for the platform tenant dashboard. Read-only — no state
+     * change, so no domain event. Counts every registry row (mark=1), built-in
+     * tenants included, so the KPI totals line up with {@link #list}. The monthly
+     * series is a dense 12-month window (current month back 11) with gaps filled
+     * to 0, built here so the frontend can plot it without back-filling.
+     *
+     * <p>Raw JdbcTemplate (not the mapper) so the MyBatis tenant interceptor stays
+     * out of the way — same reasoning as {@link TenantMapper#findActiveByCode}.
+     */
+    public TenantDto.Stats stats() {
+        long total        = count("SELECT COUNT(*) FROM core_tenant WHERE mark = 1");
+        long active       = count("SELECT COUNT(*) FROM core_tenant WHERE mark = 1 AND status = 1");
+        long suspended    = count("SELECT COUNT(*) FROM core_tenant WHERE mark = 1 AND status = 0");
+        long newThisMonth = count("SELECT COUNT(*) FROM core_tenant WHERE mark = 1 "
+                + "AND create_time >= date_trunc('month', CURRENT_DATE)");
+
+        // Sparse {month -> count} straight from PG, then densify into a fixed
+        // 12-month window so months with zero signups still get a point.
+        Map<String, Long> byMonth = new HashMap<>();
+        jdbc.queryForList(
+                "SELECT to_char(date_trunc('month', create_time), 'YYYY-MM') AS m, COUNT(*) AS c "
+                        + "FROM core_tenant "
+                        + "WHERE mark = 1 "
+                        + "  AND create_time >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months' "
+                        + "GROUP BY 1")
+                .forEach(r -> byMonth.put((String) r.get("m"), ((Number) r.get("c")).longValue()));
+
+        List<TenantDto.MonthlyCount> monthly = new ArrayList<>(12);
+        YearMonth cursor = YearMonth.now().minusMonths(11);
+        for (int i = 0; i < 12; i++) {
+            String label = cursor.toString();   // 'YYYY-MM', matches the to_char above
+            monthly.add(new TenantDto.MonthlyCount(label, byMonth.getOrDefault(label, 0L)));
+            cursor = cursor.plusMonths(1);
+        }
+        return new TenantDto.Stats(total, active, suspended, newThisMonth, monthly);
+    }
+
+    private long count(String sql) {
+        Long n = jdbc.queryForObject(sql, Long.class);
+        return n == null ? 0L : n;
     }
 
     public TenantDto.View get(String id) {

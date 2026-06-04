@@ -9,6 +9,8 @@ import request from './request'
  */
 
 export const listTenantsApi          = (params)         => request.get('/platform/tenants', { params })
+export const getTenantStatsApi       = ()              => request.get('/platform/tenants/stats')
+export const getPlatformDashboardApi = ()              => request.get('/platform/dashboard')
 export const getTenantApi            = (id)             => request.get(`/platform/tenants/${id}`)
 export const createTenantApi         = (body)           => request.post('/platform/tenants', body)
 export const updateTenantApi         = (id, body)       => request.patch(`/platform/tenants/${id}`, body)

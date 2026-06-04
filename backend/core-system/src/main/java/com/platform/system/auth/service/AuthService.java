@@ -10,6 +10,8 @@ import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.security.PermissionMatcher;
+import com.platform.core.infrastructure.audit.OpLogRecord;
+import com.platform.core.infrastructure.audit.OpLogSink;
 import com.platform.core.infrastructure.config.properties.AppMailProperties;
 import com.platform.core.infrastructure.mail.MailService;
 import com.platform.core.infrastructure.security.AccountLockoutService;
@@ -56,6 +58,8 @@ public class AuthService {
     private final ForceLogoutService forceLogoutService;
     private final MailService mailService;
     private final AppMailProperties mailProps;
+    /** Async best-effort audit sink — used to record break-glass logins (see {@link #recordBreakGlassUse}). */
+    private final OpLogSink opLogSink;
 
     /**
      * Active security mode. Drives the break-glass alert below: a
@@ -75,7 +79,8 @@ public class AuthService {
                        BuiltInRoleLookup roleLookup,
                        ForceLogoutService forceLogoutService,
                        MailService mailService,
-                       AppMailProperties mailProps) {
+                       AppMailProperties mailProps,
+                       OpLogSink opLogSink) {
         this.userMapper = userMapper;
         this.encoder = encoder;
         this.jwtIssuer = jwtIssuer;
@@ -88,6 +93,7 @@ public class AuthService {
         this.forceLogoutService = forceLogoutService;
         this.mailService = mailService;
         this.mailProps = mailProps;
+        this.opLogSink = opLogSink;
     }
 
     public LoginResult login(String identifier, String password, HttpServletRequest req) {
@@ -152,6 +158,11 @@ public class AuthService {
             if (!"oidc".equalsIgnoreCase(securityMode)) {
                 return;   // password / permit-all: /auth/login is the daily path
             }
+            // Break-glass confirmed: a successful /auth/login under OIDC means SSO was
+            // bypassed with the emergency credential. Record a queryable audit row so the
+            // platform security dashboard can surface it. Done before the email-null guard
+            // below so even an emailless account is still audited.
+            recordBreakGlassUse(user, clientIp, userAgent);
             if (user.getEmail() == null || user.getEmail().isBlank()) {
                 log.warn("[break-glass] user {} (tenant {}) used break-glass but has no email — alert skipped",
                         user.getId(), user.getTenantId());
@@ -210,6 +221,28 @@ public class AuthService {
         } catch (Exception e) {
             // Best-effort: NEVER let a mail hiccup block the recovery flow.
             log.warn("[break-glass] could not dispatch alert email for user {} ({}): {}",
+                    user.getId(), user.getTenantId(), e.toString());
+        }
+    }
+
+    /**
+     * Record a break-glass login to {@code core_oplog} ({@code system /
+     * auth.breakGlass}) so the platform security dashboard can count and list
+     * "SSO bypassed" events. Best-effort: the sink is already {@code @Async} and
+     * swallows its own errors, but we also guard here so a misconfigured sink can
+     * never break the emergency login the operator is relying on. Fields are set
+     * explicitly (not from RequestContext) since this runs pre-auth and the sink
+     * persists on a separate thread.
+     */
+    private void recordBreakGlassUse(UserEntity user, String clientIp, String userAgent) {
+        try {
+            opLogSink.record(new OpLogRecord(
+                    user.getTenantId(), user.getId(), user.getUsername(),
+                    "system", "auth.breakGlass", "user", user.getId(),
+                    "/auth/login", "POST", clientIp, userAgent, null,
+                    true, null, 0));
+        } catch (Exception e) {
+            log.warn("[break-glass] could not record audit oplog for user {} ({}): {}",
                     user.getId(), user.getTenantId(), e.toString());
         }
     }

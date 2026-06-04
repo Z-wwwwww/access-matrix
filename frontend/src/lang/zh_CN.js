@@ -212,6 +212,33 @@ export default {
       },
       status: { active: '运行中', suspended: '已停用' },
       search: { placeholder: '按代码或名称搜索' },
+      dashboard: {
+        total: '总租户',
+        newThisMonth: '本月新增',
+        statusTitle: '状态分布',
+        trendTitle: '新增趋势（按月）',
+        trendSeries: '新增租户'
+      },
+      ops: {
+        empty: '暂无',
+        activation: {
+          title: '入驻 / 激活漏斗', pending: '待激活', expired: '已过期', rate: '激活率',
+          median: '入驻时长(中位)', listTitle: '待激活租户(邀请未使用)', expiredBadge: '已过期'
+        },
+        engagement: {
+          title: '活跃与参与', active7d: '活跃(7天)', active30d: '活跃(30天)', dau: 'DAU', mau: 'MAU',
+          silent: '沉默', trendTitle: '登录趋势(14天)', silentListTitle: '沉默租户(30天无登录)', never: '从未登录'
+        },
+        reliability: {
+          title: '平台健康', jobFailures: '任务失败(24h)', eventBacklog: '事件积压',
+          backlogAge: '最久积压', oplogErrors: '接口错误(24h)', failuresListTitle: '最近任务失败'
+        },
+        security: {
+          title: '安全与高权限监视', activeSupport: '支持会话进行中', support7d: '支持会话(7天)',
+          loginFailures: '登录失败(24h)', passwordResets: '密码重置(7天)', supportListTitle: '最近支持会话',
+          breakGlass: '应急访问(7天)', breakGlassListTitle: '最近应急访问(绕过SSO)'
+        }
+      },
       recycleBinHint: {
         title: '删除采用回收站方式：',
         body: '请先「停用」（Keycloak realm 将被禁用、无法登录，但数据保留）。如需彻底删除，请在停用后的行中点击红色垃圾桶图标 —— 输入租户代码确认后，业务数据、KC realm、注册表条目将全部物理删除，且无法恢复。'

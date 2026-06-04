@@ -212,6 +212,33 @@ export default {
       },
       status: { active: '활성', suspended: '중단' },
       search: { placeholder: '코드 또는 이름으로 검색' },
+      dashboard: {
+        total: '전체 테넌트',
+        newThisMonth: '이번 달 신규',
+        statusTitle: '상태 분포',
+        trendTitle: '신규 테넌트 추이 (월별)',
+        trendSeries: '신규 테넌트'
+      },
+      ops: {
+        empty: '없음',
+        activation: {
+          title: '온보딩 / 활성화 퍼널', pending: '미활성', expired: '만료', rate: '활성화율',
+          median: '온보딩 소요(중앙값)', listTitle: '활성화 대기 테넌트', expiredBadge: '만료'
+        },
+        engagement: {
+          title: '활성도 / 참여', active7d: '활성(7일)', active30d: '활성(30일)', dau: 'DAU', mau: 'MAU',
+          silent: '휴면', trendTitle: '로그인 추이(14일)', silentListTitle: '휴면 테넌트(30일 무로그인)', never: '로그인 없음'
+        },
+        reliability: {
+          title: '플랫폼 상태', jobFailures: '작업 실패(24h)', eventBacklog: '이벤트 적체',
+          backlogAge: '최장 적체', oplogErrors: 'API 오류(24h)', failuresListTitle: '최근 작업 실패'
+        },
+        security: {
+          title: '보안 / 권한 모니터링', activeSupport: '지원 세션 진행중', support7d: '지원(7일)',
+          loginFailures: '로그인 실패(24h)', passwordResets: 'PW 재설정(7일)', supportListTitle: '최근 지원 세션',
+          breakGlass: '비상 접근(7일)', breakGlassListTitle: '최근 비상 접근(SSO 우회)'
+        }
+      },
       recycleBinHint: {
         title: '삭제는 휴지통 방식입니다:',
         body: '먼저 "중단"하세요(Keycloak realm 이 비활성화되어 로그인할 수 없게 되지만 데이터는 유지됩니다). 정말로 삭제하려면 중단된 행에 나타나는 빨간 휴지통 아이콘을 사용하세요 — 테넌트 코드를 입력해 확인하면 비즈니스 데이터·KC realm·레지스트리 항목이 모두 물리적으로 삭제되며, 되돌릴 수 없습니다.'

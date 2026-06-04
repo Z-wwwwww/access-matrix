@@ -54,6 +54,18 @@ public class PlatformTenantController {
         return JsonResult.ok(tenantService.list(page, size, keyword));
     }
 
+    /**
+     * Aggregate counts for the tenant dashboard (KPI cards + status donut +
+     * monthly-signup trend). Read-only; gated by the same read permission as the
+     * list. Declared before {@link #get} so the literal {@code /stats} segment is
+     * matched ahead of the {@code /{id}} path variable.
+     */
+    @GetMapping("/stats")
+    @RequiresPermission(PlatformPermissions.TENANT_READ)
+    public JsonResult<TenantDto.Stats> stats() {
+        return JsonResult.ok(tenantService.stats());
+    }
+
     @GetMapping("/{id}")
     @RequiresPermission(PlatformPermissions.TENANT_READ)
     public JsonResult<TenantDto.View> get(@PathVariable String id) {
