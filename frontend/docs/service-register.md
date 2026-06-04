@@ -31,3 +31,4 @@
 | oplog | src/services/oplog.js | 操作ログ 一覧・詳細 | AI | 2026-05-21 |
 | notification | src/services/notification.js | 站内通知：未読数 / 一覧 / 既読 / 全既読 + SSE ticket（即時赤ドット。stream は EventSource で `useNotificationStream` が接続） | AI | 2026-06-02 |
 | job | src/services/job.js | 定時タスク管理：一覧 + 実行ログ + cron 設定変更 / 起停 / 即時実行（作成・削除なし — ジョブはコード定義） | AI | 2026-06-03 |
+| dict | src/services/dict.js | 辞書：GET /dict/{code}（下拉データ、内蔵 enum + managed 統一）+ managed 辞書 type/item CRUD（/admin/dict、platform:dict:*）。useDict composable + dictStore が消費 | AI | 2026-06-04 |

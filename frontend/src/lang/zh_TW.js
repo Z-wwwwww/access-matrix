@@ -6,6 +6,48 @@
 import permissions from './generated/permissions.zh_TW.json'
 
 export default {
+  error: {
+    dict: {
+      codeExists: '字典編碼已存在',
+      codeIsBuiltin: '該編碼是內建（列舉）字典，不可管理',
+      typeBuiltinProtected: '內建字典類型不可刪除',
+      typeHasItems: '字典下仍有字典項，請先刪除',
+      itemsNotEditable: '內建字典項不可編輯',
+      itemValueExists: '字典項值已存在',
+      itemBranchProtected: '該值由程式（列舉）定義，不可刪除，請改為停用',
+      itemInUse: '該值已被現有資料引用，不可刪除，請改為停用',
+      notFound: '字典或字典項不存在',
+      invalidValue: '無效的字典值'
+    }
+  },
+  dict: {
+    title: '字典管理',
+    description: '統一管理程式內建字典（status 等）與執行時可編輯的管理字典。',
+    type: {
+      columnCode: '編碼', columnName: '名稱', columnItems: '項數', columnActions: '操作',
+      new: '新增字典', edit: '編輯字典', create: '建立字典',
+      builtin: '內建', selectHint: '選擇左側字典以檢視其字典項', empty: '尚無字典',
+      codeFrozen: '編碼建立後不可修改'
+    },
+    item: {
+      columnValue: '值', columnLabel: '標籤', columnSort: '排序', columnStatus: '狀態', columnActions: '操作',
+      new: '新增項', edit: '編輯項', create: '建立項',
+      enabled: '啟用', disabled: '停用', empty: '尚無字典項',
+      valueFrozen: '值建立後不可修改（歷史資料會參照）'
+    },
+    label: {
+      code: '編碼', name: '名稱', remark: '備註', value: '值', label: '標籤',
+      sort: '排序', status: '狀態', cssClass: '顏色'
+    },
+    message: {
+      saveSuccess: '儲存成功', saveFailed: '儲存失敗',
+      deleteSuccess: '刪除成功', deleteFailed: '刪除失敗', loadFailed: '載入失敗'
+    },
+    confirm: {
+      deleteTypeTitle: '刪除字典', deleteTypeMessage: '確認刪除字典「{code}」？',
+      deleteItemTitle: '刪除字典項', deleteItemMessage: '確認刪除字典項「{value}」？通常停用更安全。'
+    }
+  },
   job: {
     search: { placeholder: { keyword: '依任務名 / 代碼搜尋' } },
     triggerType: { cron: '定時', manual: '手動', startup: '啟動' },

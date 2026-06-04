@@ -8,10 +8,12 @@ import DeptPicker from '@/components/shared/DeptPicker.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useDict } from '@/composables/useDict'
 import { Plus, Search, RotateCcw, Pencil, Trash2, Power, Key, LogOut } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
+const commonStatus = useDict('common_status')
 import {
   getUserListApi, deleteUserApi, changeUserStatusApi, forceLogoutApi
 } from '@/services/user'
@@ -206,8 +208,8 @@ onMounted(() => {
           <span>{{ deptName(row.deptId) }}</span>
         </template>
         <template #cell-status="{ row }">
-          <Badge :variant="row.status === 1 ? 'default' : 'outline'">
-            {{ row.status === 1 ? t('common.status.active') : t('common.status.inactive') }}
+          <Badge :variant="commonStatus.cssClass(row.status) || 'outline'">
+            {{ commonStatus.label(row.status) }}
           </Badge>
         </template>
         <template #cell-actions="{ row }">

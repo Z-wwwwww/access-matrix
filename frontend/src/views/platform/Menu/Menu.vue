@@ -14,6 +14,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useMenuTitle } from '@/composables/useMenuTitle'
+import { useDict } from '@/composables/useDict'
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, HelpCircle, Pin } from 'lucide-vue-next'
 import {
   getMenuIndexApi, addMenuApi, editMenuApi, deleteMenuApi
@@ -46,16 +47,7 @@ const editForm = reactive({
   permissionCode: '', status: 1
 })
 
-const TYPE_LABEL = computed(() => ({
-  1: t('menu.option.type.directory'),
-  2: t('menu.option.type.menu'),
-  3: t('menu.option.type.button')
-}))
-const menuTypeOptions = computed(() => [
-  { label: t('menu.option.type.directory'), value: 1 },
-  { label: t('menu.option.type.menu'), value: 2 },
-  { label: t('menu.option.type.button'), value: 3 }
-])
+const menuType = useDict('menu_type')
 
 // 只允许 menuType=2（页面/菜单）置顶 —— 目录和按钮置顶在 UI 上没意义
 const canPin = computed(() => editForm.menuType === 2)
@@ -282,7 +274,7 @@ onMounted(() => {
           </div>
         </template>
         <template #cell-menuType="{ row }">
-          <Badge variant="outline">{{ TYPE_LABEL[row.menuType] }}</Badge>
+          <Badge variant="outline">{{ menuType.label(row.menuType) }}</Badge>
         </template>
         <template #cell-component="{ row }">
           <span class="text-xs text-muted-foreground font-mono">{{ row.component || '-' }}</span>
@@ -343,7 +335,7 @@ onMounted(() => {
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.type') }}</label>
-            <Select v-model="editForm.menuType" :options="menuTypeOptions" />
+            <Select v-model="editForm.menuType" :options="menuType.options.value" />
           </div>
           <div>
             <label class="text-xs text-muted-foreground block mb-1">{{ t('menu.edit.label.sortOrder') }}</label>

@@ -9,6 +9,7 @@ import Drawer from '@/components/ui/Drawer.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useDict } from '@/composables/useDict'
 import { Search, RotateCcw, Pencil, Play, ScrollText } from 'lucide-vue-next'
 import {
   getJobListApi, getJobLogListApi, updateJobApi,
@@ -137,9 +138,12 @@ const logColumns = computed(() => [
   { key: 'error', title: t('job.log.column.error'), minWidth: '200px' }
 ])
 
-const triggerLabel = (v) => ({ 1: t('job.triggerType.cron'), 2: t('job.triggerType.manual'), 3: t('job.triggerType.startup') }[v] || v)
-const runStatusLabel = (v) => ({ 1: t('job.runStatus.running'), 2: t('job.runStatus.success'), 3: t('job.runStatus.fail'), 4: t('job.runStatus.skipped') }[v] || t('job.runStatus.none'))
-const runStatusClass = (v) => ({ 1: 'text-amber-600', 2: 'text-emerald-600', 3: 'text-destructive', 4: 'text-muted-foreground' }[v] || 'text-muted-foreground')
+// 触发类型 / 运行状态走字典（内置枚举 job_trigger_type / job_run_status）
+const jobTriggerType = useDict('job_trigger_type')
+const jobRunStatus = useDict('job_run_status')
+const triggerLabel = (v) => jobTriggerType.label(v)
+const runStatusLabel = (v) => (v ? jobRunStatus.label(v) : t('job.runStatus.none'))
+const runStatusClass = (v) => jobRunStatus.cssClass(v) || 'text-muted-foreground'
 
 async function fetchLogs() {
   logLoading.value = true

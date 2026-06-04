@@ -6,6 +6,48 @@
 import permissions from './generated/permissions.zh_CN.json'
 
 export default {
+  error: {
+    dict: {
+      codeExists: '字典编码已存在',
+      codeIsBuiltin: '该编码是内置（枚举）字典，不可管理',
+      typeBuiltinProtected: '内置字典类型不可删除',
+      typeHasItems: '字典下仍有字典项，请先删除',
+      itemsNotEditable: '内置字典项不可编辑',
+      itemValueExists: '字典项值已存在',
+      itemBranchProtected: '该值由代码（枚举）定义，不可删除，请改为停用',
+      itemInUse: '该值已被现有数据引用，不可删除，请改为停用',
+      notFound: '字典或字典项不存在',
+      invalidValue: '无效的字典值'
+    }
+  },
+  dict: {
+    title: '字典管理',
+    description: '统一管理代码内置字典（status 等）与运行时可编辑的管理字典。',
+    type: {
+      columnCode: '编码', columnName: '名称', columnItems: '项数', columnActions: '操作',
+      new: '新增字典', edit: '编辑字典', create: '创建字典',
+      builtin: '内置', selectHint: '选择左侧字典查看其字典项', empty: '暂无字典',
+      codeFrozen: '编码创建后不可修改'
+    },
+    item: {
+      columnValue: '值', columnLabel: '标签', columnSort: '排序', columnStatus: '状态', columnActions: '操作',
+      new: '新增项', edit: '编辑项', create: '创建项',
+      enabled: '启用', disabled: '停用', empty: '暂无字典项',
+      valueFrozen: '值创建后不可修改（历史数据会引用）'
+    },
+    label: {
+      code: '编码', name: '名称', remark: '备注', value: '值', label: '标签',
+      sort: '排序', status: '状态', cssClass: '颜色'
+    },
+    message: {
+      saveSuccess: '保存成功', saveFailed: '保存失败',
+      deleteSuccess: '删除成功', deleteFailed: '删除失败', loadFailed: '加载失败'
+    },
+    confirm: {
+      deleteTypeTitle: '删除字典', deleteTypeMessage: '确认删除字典「{code}」？',
+      deleteItemTitle: '删除字典项', deleteItemMessage: '确认删除字典项「{value}」？通常停用更安全。'
+    }
+  },
   job: {
     search: { placeholder: { keyword: '按任务名 / 编码搜索' } },
     triggerType: { cron: '定时', manual: '手动', startup: '启动' },

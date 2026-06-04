@@ -7,10 +7,12 @@ import Switch from '@/components/ui/Switch.vue'
 import DeptTreeDialog from '@/components/shared/DeptTreeDialog.vue'
 import { Check } from 'lucide-vue-next'
 import { toast } from '@/composables/useToast'
+import { useDict } from '@/composables/useDict'
 import { addUserApi, updateUserApi, getUserRolesApi, assignUserRolesApi } from '@/services/user'
 import { getRoleListApi } from '@/services/role'
 
 const { t } = useI18n()
+const commonStatus = useDict('common_status')
 
 const props = defineProps({
   open: Boolean,
@@ -204,7 +206,7 @@ async function save() {
           <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.status') }}</label>
           <div class="h-9 flex items-center gap-2">
             <Switch v-model="form.status" :checked-value="1" :unchecked-value="0" :disabled="isStructuralLocked" />
-            <span class="text-sm">{{ form.status === 1 ? t('common.status.active') : t('common.status.inactive') }}</span>
+            <span class="text-sm">{{ commonStatus.label(form.status) }}</span>
           </div>
         </div>
       </div>

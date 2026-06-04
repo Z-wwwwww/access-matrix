@@ -11,6 +11,7 @@ import UserPicker from '@/components/shared/UserPicker.vue'
 import DeptPicker from '@/components/shared/DeptPicker.vue'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useDict } from '@/composables/useDict'
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Info } from 'lucide-vue-next'
 import {
   getDeptTreeApi, addDeptApi, updateDeptApi, deleteDeptApi
@@ -18,6 +19,7 @@ import {
 import { getUserListApi } from '@/services/user'
 
 const { t } = useI18n()
+const commonStatus = useDict('common_status')
 
 const loading = ref(false)
 const tree = ref([])
@@ -266,8 +268,8 @@ onMounted(() => {
           <span class="text-xs">{{ leaderLabel(row.leaderUserId) }}</span>
         </template>
         <template #cell-status="{ row }">
-          <Badge :variant="row.status === 1 ? 'default' : 'outline'">
-            {{ row.status === 1 ? t('common.status.active') : t('common.status.inactive') }}
+          <Badge :variant="commonStatus.cssClass(row.status) || 'outline'">
+            {{ commonStatus.label(row.status) }}
           </Badge>
         </template>
         <template #cell-actions="{ row }">
@@ -313,7 +315,7 @@ onMounted(() => {
             <label class="text-xs text-muted-foreground block mb-1">{{ t('dept.edit.label.status') }}</label>
             <div class="h-9 flex items-center gap-2">
               <Switch v-model="editForm.status" :checked-value="1" :unchecked-value="0" />
-              <span class="text-sm">{{ editForm.status === 1 ? t('common.status.active') : t('common.status.inactive') }}</span>
+              <span class="text-sm">{{ commonStatus.label(editForm.status) }}</span>
             </div>
           </div>
         </div>

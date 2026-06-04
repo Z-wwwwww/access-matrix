@@ -12,7 +12,18 @@ import axios from 'axios'
 import qs from 'qs'
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
+import i18n from '@/lang'
 import { currentTenant } from '@/utils/tenant'
+
+/**
+ * Localize a backend error message. By convention the backend sends a stable i18n
+ * KEY (e.g. `error.dict.itemInUse`) for user-facing business errors; we translate
+ * it here. Legacy prose messages aren't keys → `te()` is false → passed through
+ * unchanged. So this is safe to apply to every error message.
+ */
+function localizeError(msg) {
+  return msg && i18n.global.te(msg) ? i18n.global.t(msg) : msg
+}
 
 const request = axios.create({
   baseURL: '/proxy_url',
@@ -53,7 +64,12 @@ request.interceptors.request.use((config) => {
 // ─── Response Interceptor ───
 request.interceptors.response.use(
   (res) => {
-    const { code, msg } = res.data || {}
+    const data = res.data || {}
+    const { code } = data
+    // Localize any error message in place (key → localized; prose → unchanged), so
+    // both the interceptor-reject path and the page's `res.data.msg` path are i18n'd.
+    if (code && code !== 0 && data.msg) data.msg = localizeError(data.msg)
+    const msg = data.msg
 
     // 401 returned via JsonResult body (e.g., business-level unauthenticated)
     if (code === 401) {
@@ -95,7 +111,7 @@ request.interceptors.response.use(
     }
 
     if (status === 500) {
-      const msg = error.response?.data?.msg
+      const msg = localizeError(error.response?.data?.msg)
       return Promise.reject(new Error(msg || 'サーバーエラー'))
     }
     return Promise.reject(error)

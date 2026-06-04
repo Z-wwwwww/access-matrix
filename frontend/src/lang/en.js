@@ -6,6 +6,48 @@
 import permissions from './generated/permissions.en.json'
 
 export default {
+  error: {
+    dict: {
+      codeExists: 'Dictionary code already exists',
+      codeIsBuiltin: 'This code is a built-in (enum) dictionary and is not manageable',
+      typeBuiltinProtected: 'Built-in dictionary type cannot be deleted',
+      typeHasItems: 'Dictionary still has items; remove them first',
+      itemsNotEditable: 'Built-in dictionary items are not editable',
+      itemValueExists: 'Item value already exists',
+      itemBranchProtected: 'This value is code-defined (enum) and cannot be deleted; disable it instead',
+      itemInUse: 'This value is in use by existing data and cannot be deleted; disable it instead',
+      notFound: 'Dictionary or item not found',
+      invalidValue: 'Invalid dictionary value'
+    }
+  },
+  dict: {
+    title: 'Dictionaries',
+    description: 'Manage built-in code dictionaries (status, etc.) and runtime-editable managed dictionaries in one place.',
+    type: {
+      columnCode: 'Code', columnName: 'Name', columnItems: 'Items', columnActions: 'Actions',
+      new: 'New dictionary', edit: 'Edit dictionary', create: 'Create dictionary',
+      builtin: 'built-in', selectHint: 'Select a dictionary on the left to view its items', empty: 'No dictionaries',
+      codeFrozen: 'Code cannot be changed after creation'
+    },
+    item: {
+      columnValue: 'Value', columnLabel: 'Label', columnSort: 'Sort', columnStatus: 'Status', columnActions: 'Actions',
+      new: 'New item', edit: 'Edit item', create: 'Create item',
+      enabled: 'Enabled', disabled: 'Disabled', empty: 'No items',
+      valueFrozen: 'Value cannot be changed after creation (historical rows reference it)'
+    },
+    label: {
+      code: 'Code', name: 'Name', remark: 'Remark', value: 'Value', label: 'Label',
+      sort: 'Sort', status: 'Status', cssClass: 'Color'
+    },
+    message: {
+      saveSuccess: 'Saved', saveFailed: 'Save failed',
+      deleteSuccess: 'Deleted', deleteFailed: 'Delete failed', loadFailed: 'Load failed'
+    },
+    confirm: {
+      deleteTypeTitle: 'Delete dictionary', deleteTypeMessage: 'Delete dictionary "{code}"?',
+      deleteItemTitle: 'Delete item', deleteItemMessage: 'Delete item "{value}"? Disabling it is usually safer.'
+    }
+  },
   job: {
     search: { placeholder: { keyword: 'Search by name / code' } },
     triggerType: { cron: 'Cron', manual: 'Manual', startup: 'Startup' },

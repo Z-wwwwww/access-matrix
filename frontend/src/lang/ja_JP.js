@@ -13,6 +13,48 @@
 import permissions from './generated/permissions.ja_JP.json'
 
 export default {
+  error: {
+    dict: {
+      codeExists: '辞書コードは既に存在します',
+      codeIsBuiltin: 'このコードは内蔵（enum）辞書のため管理できません',
+      typeBuiltinProtected: '内蔵辞書タイプは削除できません',
+      typeHasItems: '辞書に項目が残っています。先に削除してください',
+      itemsNotEditable: '内蔵辞書の項目は編集できません',
+      itemValueExists: '辞書項目の値が既に存在します',
+      itemBranchProtected: 'この値はコード（enum）で定義されているため削除できません。無効化してください',
+      itemInUse: 'この値は既存データに使用されているため削除できません。無効化してください',
+      notFound: '辞書または辞書項目が見つかりません',
+      invalidValue: '不正な辞書値です'
+    }
+  },
+  dict: {
+    title: '辞書管理',
+    description: 'コードに紐づく内蔵辞書（status 等）と、運用で編集できる管理辞書を一元管理します。',
+    type: {
+      columnCode: 'コード', columnName: '名称', columnItems: '項目数', columnActions: '操作',
+      new: '辞書を追加', edit: '辞書を編集', create: '辞書を作成',
+      builtin: '内蔵', selectHint: '左の辞書を選択すると項目が表示されます', empty: '辞書がありません',
+      codeFrozen: 'コードは作成後変更できません'
+    },
+    item: {
+      columnValue: '値', columnLabel: 'ラベル', columnSort: '並び順', columnStatus: '状態', columnActions: '操作',
+      new: '項目を追加', edit: '項目を編集', create: '項目を作成',
+      enabled: '有効', disabled: '無効', empty: '項目がありません',
+      valueFrozen: '値は作成後変更できません（履歴データが参照するため）'
+    },
+    label: {
+      code: 'コード', name: '名称', remark: '備考', value: '値', label: 'ラベル',
+      sort: '並び順', status: '状態', cssClass: '表示色'
+    },
+    message: {
+      saveSuccess: '保存しました', saveFailed: '保存に失敗しました',
+      deleteSuccess: '削除しました', deleteFailed: '削除に失敗しました', loadFailed: '読み込みに失敗しました'
+    },
+    confirm: {
+      deleteTypeTitle: '辞書を削除', deleteTypeMessage: '辞書「{code}」を削除しますか？',
+      deleteItemTitle: '項目を削除', deleteItemMessage: '項目「{value}」を削除しますか？無効化の方が安全です。'
+    }
+  },
   job: {
     search: { placeholder: { keyword: 'タスク名 / コードで検索' } },
     triggerType: { cron: '定時', manual: '手動', startup: '起動' },

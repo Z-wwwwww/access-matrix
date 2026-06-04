@@ -6,6 +6,48 @@
 import permissions from './generated/permissions.ko_KR.json'
 
 export default {
+  error: {
+    dict: {
+      codeExists: '사전 코드가 이미 존재합니다',
+      codeIsBuiltin: '이 코드는 내장(enum) 사전이라 관리할 수 없습니다',
+      typeBuiltinProtected: '내장 사전 유형은 삭제할 수 없습니다',
+      typeHasItems: '사전에 항목이 남아 있습니다. 먼저 삭제하세요',
+      itemsNotEditable: '내장 사전 항목은 편집할 수 없습니다',
+      itemValueExists: '사전 항목 값이 이미 존재합니다',
+      itemBranchProtected: '이 값은 코드(enum)로 정의되어 삭제할 수 없습니다. 비활성화하세요',
+      itemInUse: '이 값은 기존 데이터가 사용 중이라 삭제할 수 없습니다. 비활성화하세요',
+      notFound: '사전 또는 항목을 찾을 수 없습니다',
+      invalidValue: '잘못된 사전 값입니다'
+    }
+  },
+  dict: {
+    title: '사전 관리',
+    description: '코드 내장 사전(status 등)과 런타임 편집 가능한 관리 사전을 한 곳에서 관리합니다.',
+    type: {
+      columnCode: '코드', columnName: '이름', columnItems: '항목 수', columnActions: '작업',
+      new: '사전 추가', edit: '사전 편집', create: '사전 생성',
+      builtin: '내장', selectHint: '왼쪽 사전을 선택하면 항목이 표시됩니다', empty: '사전이 없습니다',
+      codeFrozen: '코드는 생성 후 변경할 수 없습니다'
+    },
+    item: {
+      columnValue: '값', columnLabel: '라벨', columnSort: '정렬', columnStatus: '상태', columnActions: '작업',
+      new: '항목 추가', edit: '항목 편집', create: '항목 생성',
+      enabled: '사용', disabled: '미사용', empty: '항목이 없습니다',
+      valueFrozen: '값은 생성 후 변경할 수 없습니다(이력 데이터가 참조)'
+    },
+    label: {
+      code: '코드', name: '이름', remark: '비고', value: '값', label: '라벨',
+      sort: '정렬', status: '상태', cssClass: '색상'
+    },
+    message: {
+      saveSuccess: '저장했습니다', saveFailed: '저장 실패',
+      deleteSuccess: '삭제했습니다', deleteFailed: '삭제 실패', loadFailed: '불러오기 실패'
+    },
+    confirm: {
+      deleteTypeTitle: '사전 삭제', deleteTypeMessage: '사전 "{code}"을(를) 삭제하시겠습니까?',
+      deleteItemTitle: '항목 삭제', deleteItemMessage: '항목 "{value}"을(를) 삭제하시겠습니까? 비활성화가 더 안전합니다.'
+    }
+  },
   job: {
     search: { placeholder: { keyword: '작업명 / 코드로 검색' } },
     triggerType: { cron: '예약', manual: '수동', startup: '시작' },

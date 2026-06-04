@@ -13,6 +13,7 @@ import { deptIconFor as deptIcon } from '@/utils/dept-icons'
 import LucideIcon from '@/components/shared/LucideIcon.vue'
 import { toast } from '@/composables/useToast'
 import { useMenuTitle } from '@/composables/useMenuTitle'
+import { useDict } from '@/composables/useDict'
 import {
   addRoleApi, updateRoleApi,
   getRolePermissionsApi, bindRolePermissionsApi,
@@ -44,13 +45,8 @@ const form = reactive({
   status: 1
 })
 
-const scopeOptions = computed(() => [
-  { label: t('role.edit.option.scope.all'), value: 1 },
-  { label: t('role.edit.option.scope.deptAndSub'), value: 2 },
-  { label: t('role.edit.option.scope.deptOnly'), value: 3 },
-  { label: t('role.edit.option.scope.self'), value: 4 },
-  { label: t('role.edit.option.scope.custom'), value: 5 }
-])
+const dataScope = useDict('data_scope')
+const commonStatus = useDict('common_status')
 
 const permsByModule = ref({})
 const selectedPermIds = ref([])
@@ -417,13 +413,13 @@ async function save() {
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.dataScope') }}</label>
-          <Select v-model="form.dataScope" :options="scopeOptions" :disabled="isLocked" />
+          <Select v-model="form.dataScope" :options="dataScope.options.value" :disabled="isLocked" />
         </div>
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('role.edit.label.status') }}</label>
           <div class="h-9 flex items-center gap-2">
             <Switch v-model="form.status" :checked-value="1" :unchecked-value="0" :disabled="isLocked" />
-            <span class="text-sm">{{ form.status === 1 ? t('common.status.active') : t('common.status.inactive') }}</span>
+            <span class="text-sm">{{ commonStatus.label(form.status) }}</span>
           </div>
         </div>
       </div>

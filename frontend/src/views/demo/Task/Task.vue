@@ -12,6 +12,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import UserPicker from '@/components/shared/UserPicker.vue'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useDict } from '@/composables/useDict'
 import { Plus, Search, RotateCcw, Pencil, Trash2 } from 'lucide-vue-next'
 import {
   getDemoTaskListApi, getDemoTaskApi, addDemoTaskApi, updateDemoTaskApi, deleteDemoTaskApi
@@ -38,32 +39,14 @@ const deptOptions = ref([])
 // user list → flat lookup for creator column rendering
 const userMap = ref(new Map())
 
-const STATUS_LABEL = computed(() => ({
-  1: t('task.status.todo'),
-  2: t('task.status.doing'),
-  3: t('task.status.done'),
-  4: t('task.status.cancelled')
-}))
-const STATUS_VARIANT = { 1: 'outline', 2: 'default', 3: 'default', 4: 'destructive' }
-const PRIORITY_LABEL = computed(() => ({
-  1: t('task.priority.low'),
-  2: t('task.priority.medium'),
-  3: t('task.priority.high')
-}))
-const PRIORITY_VARIANT = { 1: 'outline', 2: 'default', 3: 'destructive' }
+// 状态/优先级下拉与标签全部走字典（来源：后端内置枚举 task_status / task_priority）
+const taskStatus = useDict('task_status')
+const taskPriority = useDict('task_priority')
 
-const statusOptions = computed(() => [
+// 搜索框需要额外的「全て」选项；表单/徽章直接用字典
+const statusSearchOptions = computed(() => [
   { label: t('task.option.statusAll'), value: '' },
-  { label: t('task.status.todo'), value: 1 },
-  { label: t('task.status.doing'), value: 2 },
-  { label: t('task.status.done'), value: 3 },
-  { label: t('task.status.cancelled'), value: 4 }
-])
-const statusFormOptions = computed(() => statusOptions.value.filter(o => o.value !== ''))
-const priorityOptions = computed(() => [
-  { label: t('task.priority.low'), value: 1 },
-  { label: t('task.priority.medium'), value: 2 },
-  { label: t('task.priority.high'), value: 3 }
+  ...taskStatus.options.value
 ])
 
 const showEdit = ref(false)
@@ -267,7 +250,7 @@ watch(() => notificationStore.pendingNav, () => { if (drawerNavActive) consumeDr
         </div>
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('task.search.label.status') }}</label>
-          <Select v-model="search.status" :options="statusOptions" />
+          <Select v-model="search.status" :options="statusSearchOptions" />
         </div>
         <div class="flex gap-2">
           <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
@@ -299,10 +282,10 @@ watch(() => notificationStore.pendingNav, () => { if (drawerNavActive) consumeDr
         </template>
         <template #cell-deptId="{ row }">{{ deptLabel(row.deptId) }}</template>
         <template #cell-status="{ row }">
-          <Badge :variant="STATUS_VARIANT[row.status] || 'outline'">{{ STATUS_LABEL[row.status] || row.status }}</Badge>
+          <Badge :variant="taskStatus.cssClass(row.status) || 'outline'">{{ taskStatus.label(row.status) }}</Badge>
         </template>
         <template #cell-priority="{ row }">
-          <Badge :variant="PRIORITY_VARIANT[row.priority] || 'outline'">{{ PRIORITY_LABEL[row.priority] || row.priority }}</Badge>
+          <Badge :variant="taskPriority.cssClass(row.priority) || 'outline'">{{ taskPriority.label(row.priority) }}</Badge>
         </template>
         <template #cell-assigneeUserId="{ row }">{{ userLabel(row.assigneeUserId) }}</template>
         <template #cell-createUser="{ row }">{{ userLabel(row.createUser) }}</template>
@@ -337,11 +320,11 @@ watch(() => notificationStore.pendingNav, () => { if (drawerNavActive) consumeDr
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="text-xs text-muted-foreground block mb-1">{{ t('task.column.status') }}</label>
-            <Select v-model="editForm.status" :options="statusFormOptions" />
+            <Select v-model="editForm.status" :options="taskStatus.options.value" />
           </div>
           <div>
             <label class="text-xs text-muted-foreground block mb-1">{{ t('task.column.priority') }}</label>
-            <Select v-model="editForm.priority" :options="priorityOptions" />
+            <Select v-model="editForm.priority" :options="taskPriority.options.value" />
           </div>
         </div>
         <div>

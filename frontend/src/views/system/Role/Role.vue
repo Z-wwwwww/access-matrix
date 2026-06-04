@@ -7,20 +7,15 @@ import Badge from '@/components/ui/Badge.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useDict } from '@/composables/useDict'
 import { Plus, Search, RotateCcw, Pencil, Trash2 } from 'lucide-vue-next'
 import { getRoleListApi, deleteRoleApi } from '@/services/role'
 import RoleEdit from './RoleEdit.vue'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
-
-const SCOPE_LABEL = computed(() => ({
-  1: t('role.option.scope.all'),
-  2: t('role.option.scope.deptAndSub'),
-  3: t('role.option.scope.dept'),
-  4: t('role.option.scope.self'),
-  5: t('role.option.scope.custom')
-}))
+const dataScope = useDict('data_scope')
+const commonStatus = useDict('common_status')
 
 const loading = ref(false)
 const list = ref([])
@@ -136,10 +131,10 @@ onMounted(fetchData)
           <span class="text-sm text-muted-foreground">{{ row.description || '-' }}</span>
         </template>
         <template #cell-dataScope="{ row }">
-          <Badge variant="outline">{{ SCOPE_LABEL[row.dataScope] || '-' }}</Badge>
+          <Badge variant="outline">{{ dataScope.label(row.dataScope) || '-' }}</Badge>
         </template>
         <template #cell-status="{ row }">
-          <Badge :variant="row.status === 1 ? 'default' : 'outline'">{{ row.status === 1 ? t('common.status.active') : t('common.status.inactive') }}</Badge>
+          <Badge :variant="commonStatus.cssClass(row.status) || 'outline'">{{ commonStatus.label(row.status) }}</Badge>
         </template>
         <template #cell-actions="{ row }">
           <div class="inline-flex items-center gap-1">

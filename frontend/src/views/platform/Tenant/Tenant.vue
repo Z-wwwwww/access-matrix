@@ -7,6 +7,7 @@ import Badge from '@/components/ui/Badge.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useDict } from '@/composables/useDict'
 import { useAuthStore } from '@/stores/auth'
 import { Plus, Search, RotateCcw, Trash2, Pause, Play, Pencil, LifeBuoy, Send } from 'lucide-vue-next'
 import {
@@ -24,6 +25,7 @@ import TenantResendInvite from './TenantResendInvite.vue'
 const { t } = useI18n()
 const { confirm } = useConfirm()
 const auth = useAuthStore()
+const tenantStatus = useDict('tenant_status')
 
 const loading = ref(false)
 const list = ref([])
@@ -245,8 +247,8 @@ onMounted(() => {
           <span class="text-sm">{{ row.contactEmail || '—' }}</span>
         </template>
         <template #cell-status="{ row }">
-          <Badge :variant="row.status === 1 ? 'default' : 'outline'">
-            {{ row.status === 1 ? t('platform.tenant.status.active') : t('platform.tenant.status.suspended') }}
+          <Badge :variant="tenantStatus.cssClass(row.status) || 'outline'">
+            {{ tenantStatus.label(row.status) }}
           </Badge>
         </template>
         <template #cell-actions="{ row }">

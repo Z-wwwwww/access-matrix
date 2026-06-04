@@ -33,6 +33,7 @@ This project is the admin frontend for **Access Matrix** (RBAC / permission matr
 10. All props must have a `default`
 11. **NO hardcoded business strings** (in new code) — user-visible labels / titles / placeholders / buttons / toasts must use `t()`, with translations placed in `src/lang/{locale}.js` or `src/lang/{module}/{locale}.js`
 12. **Detail page template** (`*Edit.vue` / `*Detail.vue`): outer `<Card>` → header (`flex justify-between p-4 border-b`) → `<Tabs v-model="activeTab" :items="tabItems">` (no `container-class` / `sticky`) → optional footer. See `RoleEdit.vue` / `UserEdit.vue`.
+13. **NO hardcoded enum dropdowns / labels** — for any status / type / state / scope value, the `<Select>` options, the displayed label, and the `<Badge>` variant all come from `useDict(code)`. Never hand-write a `{1:'…',2:'…'}` label map, an inline `options` array of enum literals, or a `row.status === 1 ? … : …` label ternary. The value (number) is the contract you compare on; the **label/options/variant are always the dict's**. See `views/demo/Task/Task.vue` + the "Dictionaries" section.
 
 ## System files vs business files — where do they go
 
@@ -135,6 +136,19 @@ function toggle(id) { ... }
 
 See `views/system/Dept/Dept.vue` and `views/platform/Menu/Menu.vue`.
 
+## Dictionaries (dropdown / label data)
+
+Status / type / state / scope enums are served by the backend dict API and consumed via `useDict` — **never** hardcoded in pages (Hard Rule 13).
+
+- **Read**: `const d = useDict('common_status')` →
+  - `d.options` — computed, **enabled-only**, for `<Select :options="d.options.value" />`
+  - `d.label(v)` — localized label; resolves disabled items too; unknown value → raw value (never throws)
+  - `d.cssClass(v)` — `<Badge>` variant (or undefined): `<Badge :variant="d.cssClass(row.status) || 'outline'">{{ d.label(row.status) }}</Badge>`
+- Several at once: `useDicts(['a','b'])`. **Outside** a component (store/util/interceptor): `await resolveDictLabel(code, value)`.
+- **Two sources, one contract** (the page doesn't care which): built-in enums (status/type the backend branches on) + managed dicts (runtime-editable lookups, admin UI at `/platform/dicts`). Both yield `{ value, label, cssClass, enabled }`.
+- Search filter needing an "all" entry: prepend `{ label: t('…'), value: '' }` to `d.options.value`.
+- Cached per session in `stores/dict.js` (one HTTP per code). Common codes: `common_status` (1/0 enabled), `tenant_status`, `menu_type`, `data_scope`, `job_trigger_type`, `job_run_status`, `task_status`, `task_priority`. Add new codes backend-side (see backend/AGENTS.md "Dictionaries").
+
 ## Internationalization (i18n)
 
 - Library: vue-i18n v9 (`legacy: false`); entry `src/lang/index.js`, registered in main.js via `app.use(i18n)`
@@ -144,6 +158,7 @@ See `views/system/Dept/Dept.vue` and `views/platform/Menu/Menu.vue`.
   - `src/lang/{module}/{locale}.js` — module translations
 - Key naming: dot-separated, lowercase module name + camelCase fields, e.g. `user.company`, `reservation.checkInDate`, `common.button.search`
 - New code: use `t()` + translation keys; do not hardcode business copy
+- **Backend error messages are localized centrally**: `services/request.js` runs every error `msg` through `t()` (the backend sends a stable i18n key like `error.dict.itemInUse` for user-facing business errors — see backend/AGENTS.md; legacy prose passes through unchanged). So define backend error copy under the `error.*` namespace in `src/lang/*.js`; pages don't need to special-case it.
 - **Historical exception**: the admin pages under `views/system/*` (User / UserEdit / Role / RoleEdit / Dept / OpLog) were ported from an old template and hand-tweaked, and still contain hardcoded Japanese. **Do not actively rewrite them for i18n's sake** — migrate them only when you happen to be modifying those specific pages.
 
 ## Registries (always check before creating)
