@@ -302,9 +302,26 @@ If you prefer (or need) to do it by hand, the DO / DON'T below is the spec.
   - Authenticated requests: `CoreRequestContextFilter` reads from the JWT `tid` claim → writes to `RequestContext`
   - Unauthenticated requests: fall back to the `X-Tenant-Id` header, then to `default`
 - Interceptor: `TenantLineInnerInterceptor` automatically appends `tenant_id = ?` to MyBatis-Plus-generated SQL
-- Exception tables: `MybatisPlusConfig.TENANT_EXCLUDED_TABLES` — flyway_*, core_meta, core_numbering_*
+- Exception tables: `MybatisPlusConfig.TENANT_EXCLUDED_TABLES` — `flyway_schema_history`, `core_meta`, `core_job_lock`, `core_rbac_menu`
 - Hand-written SQL (`@Select` / `@Update`) is **not affected by the interceptor** and must include an explicit `tenant_id` predicate
 - Cross-tenant operations (e.g. platform super admin) — not supported yet; if needed, add an `app.mybatis.tenant.bypass-role` config + aspect
+- Platform-ops bypass: a caller with `RequestContext.tenantId() == "system"` (PLATFORM_ADMIN's JWT `tid='system'`) makes `ignoreTable` skip scoping for **every** table — that's how platform consoles read/write across tenants without `@InterceptorIgnore`
+
+### Table storage forms (pick one when adding a table)
+
+Structurally there are only **two** forms, separated by one switch — whether the table is in `TENANT_EXCLUDED_TABLES`. Both are **enforced at startup by `TenantSchemaGuard`** (has-`tenant_id`→must-NOT-be-excluded; no-`tenant_id`→MUST-be-excluded) and at compile time by `ArchitectureTest` (every `@TableName` extends `BaseEntity` unless allowlisted), so a wrong combination fails the build/boot.
+
+| | **① Tenant-managed** (default) | **② Global** |
+|---|---|---|
+| In `TENANT_EXCLUDED_TABLES` | no | yes |
+| `tenant_id` column | yes | **none** |
+| Entity | `extends BaseEntity` | standalone (declare own `id`/`mark`/audit; add simple name to `ArchitectureTest.ENTITIES_WITHOUT_BASE_ENTITY_OK`) |
+| Examples | every business table; also `core_job` / `core_tenant` | `core_meta`, `core_job_lock`, `core_rbac_menu` |
+
+**Decision rule** — ask: *do business-tenant users (JWT `tid` ≠ `system`) need to read this table?*
+- **Yes, and each tenant's rows differ** → ① (the scaffold tool's default).
+- **Yes, but it's one shared set for the whole installation** → ② (e.g. `core_rbac_menu`: global nav, filtered per user by `permission_code`). A shared set can't be tenant-scoped, so it must be excluded; keeping a constant `tenant_id` column would be dead weight + a `TenantSchemaGuard` "wasted exclusion" warning, so drop it.
+- **No — only platform-ops (`tid='system'`) touch it** → ① with every row `tenant_id='system'` (e.g. `core_job`, `core_tenant`). The platform-ops bypass handles cross-tenant reads; keeping `BaseEntity` keeps the entity uniform. (`tenant_id='system'` here is just form ① holding mono-tenant data — **not** a third pattern.)
 
 ## Data scope (@DataScope)
 
