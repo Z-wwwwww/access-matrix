@@ -63,6 +63,16 @@ public final class PlatformPermissions {
     public static final String EVENT_READ    = "platform:event:read";
     public static final String EVENT_REDRIVE = "platform:event:redrive";
 
+    // ---- platform-ops staff 管理（system 租户の運維アカウント管理） ----
+    // 意図的に platform: 名前空間の外（opsuser:*）に置く：常規運維ロール(platform:* のみ)
+    // はこれを「持たない」ので運維ユーザー管理画面に到達できない。ops(超級)だけが
+    // opsuser:* を保持し、停止/削除/パスワード再設定まで行える。matcher 上 platform:* も
+    // *:*(platform super) も opsuser: 名前空間を一切カバーしない（PermissionMatcher 参照）。
+    public static final String OPSUSER_READ   = "opsuser:read";
+    public static final String OPSUSER_CREATE = "opsuser:create";
+    public static final String OPSUSER_UPDATE = "opsuser:update";   // 停止/再開/パスワード再設定
+    public static final String OPSUSER_DELETE = "opsuser:delete";
+
     static {
         PermissionCode.registerAll(PlatformPermissions.class, "platform");
     }

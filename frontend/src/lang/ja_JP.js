@@ -223,6 +223,40 @@ export default {
       },
       message: { redriveSuccess: '再投をリクエストしました', redriveFailed: '再投に失敗しました', redriveAllSuccess: '{count} 件を再投しました', loadFailed: 'イベントの取得に失敗しました' }
     },
+    user: {
+      title: '運用ユーザー',
+      column: { username: 'ユーザー名', displayName: '表示名', email: 'メール', role: 'ロール', status: '状態', createTime: '作成日時', actions: '操作' },
+      role: { admin: '管理者', operator: '運用' },
+      action: { disable: '停止', enable: '再開', reset: 'パスワード再設定', delete: '削除' },
+      confirm: {
+        disableTitle: 'ユーザー停止', disableMessage: '「{username}」を停止しますか？Keycloak でも無効化され、サインインできなくなります。',
+        resetTitle: 'パスワード再設定', resetMessage: '「{username}」のパスワードを再設定しますか？一時パスワードが発行されます。',
+        deleteTitle: 'ユーザー削除', deleteMessage: '「{username}」を削除しますか？元に戻せません（Keycloak ユーザーも削除）。'
+      },
+      secret: { titleNew: '運用ユーザーを作成しました', titleReset: 'パスワードを再設定しました' },
+      search: { placeholder: 'ユーザー名 / メールで検索' },
+      button: { new: '新規ユーザー' },
+      create: {
+        title: '運用ユーザーを追加',
+        intro: 'system テナントに運用スタッフを開通します。Keycloak の system realm にユーザーを作成し、Platform Admin 権限を付与します。',
+        usernamePlaceholder: 'ops2',
+        usernameHint: '小文字英数字・ハイフン・アンダースコア。作成後は変更不可。',
+        displayNamePlaceholder: '運用 太郎',
+        emailPlaceholder: 'ops2@example.com',
+        creating: '作成中...',
+        doneIntro: '「{username}」を作成しました。下の一時パスワードを本人に安全に渡してください（初回ログイン時に変更が必要）。',
+        tempPassword: '一時パスワード',
+        tempPasswordHint: 'この画面を閉じると二度と表示されません。',
+        copy: 'コピー'
+      },
+      message: {
+        loadFailed: 'ユーザー一覧の取得に失敗しました', required: 'ユーザー名と表示名は必須です',
+        createSuccess: '運用ユーザーを作成しました', createFailed: 'ユーザー作成に失敗しました',
+        copied: 'コピーしました', copyFailed: 'コピーに失敗しました',
+        disableSuccess: '停止しました', enableSuccess: '再開しました', resetSuccess: 'パスワードを再設定しました',
+        deleteSuccess: '削除しました', opFailed: '操作に失敗しました'
+      }
+    },
     tenant: {
       column: {
         tenantCode: 'テナントコード',

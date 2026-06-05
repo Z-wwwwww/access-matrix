@@ -216,6 +216,40 @@ export default {
       },
       message: { redriveSuccess: 'Redrive requested', redriveFailed: 'Redrive failed', redriveAllSuccess: 'Redrove {count} event(s)', loadFailed: 'Failed to load events' }
     },
+    user: {
+      title: 'Platform users',
+      column: { username: 'Username', displayName: 'Display name', email: 'Email', role: 'Role', status: 'Status', createTime: 'Created', actions: 'Actions' },
+      role: { admin: 'Admin', operator: 'Operator' },
+      action: { disable: 'Disable', enable: 'Enable', reset: 'Reset password', delete: 'Delete' },
+      confirm: {
+        disableTitle: 'Disable user', disableMessage: 'Disable "{username}"? They will be disabled in Keycloak too and cannot sign in.',
+        resetTitle: 'Reset password', resetMessage: 'Reset the password for "{username}"? A temporary password will be issued.',
+        deleteTitle: 'Delete user', deleteMessage: 'Delete "{username}"? This cannot be undone (the Keycloak user is removed too).'
+      },
+      secret: { titleNew: 'Platform user created', titleReset: 'Password reset' },
+      search: { placeholder: 'Search by username / email' },
+      button: { new: 'New user' },
+      create: {
+        title: 'Add platform user',
+        intro: 'Provision an ops staff account in the system tenant: creates a Keycloak user in the system realm and grants Platform Admin.',
+        usernamePlaceholder: 'ops2',
+        usernameHint: 'Lowercase alphanumeric / dash / underscore. Immutable after creation.',
+        displayNamePlaceholder: 'Jane Ops',
+        emailPlaceholder: 'ops2@example.com',
+        creating: 'Creating...',
+        doneIntro: 'Created "{username}". Hand the temporary password below to them securely (they must change it on first login).',
+        tempPassword: 'Temporary password',
+        tempPasswordHint: 'It will not be shown again once you close this panel.',
+        copy: 'Copy'
+      },
+      message: {
+        loadFailed: 'Failed to load users', required: 'Username and display name are required',
+        createSuccess: 'Platform user created', createFailed: 'Failed to create user',
+        copied: 'Copied', copyFailed: 'Copy failed',
+        disableSuccess: 'Disabled', enableSuccess: 'Enabled', resetSuccess: 'Password reset',
+        deleteSuccess: 'Deleted', opFailed: 'Operation failed'
+      }
+    },
     tenant: {
       column: {
         tenantCode: 'Tenant code',

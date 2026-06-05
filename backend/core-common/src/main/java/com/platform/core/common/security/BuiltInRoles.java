@@ -48,4 +48,14 @@ public final class BuiltInRoles {
      * what enables cross-tenant operations.
      */
     public static final String PLATFORM_ADMIN_ID = "00000000000000000000ROLE50";
+
+    /**
+     * PLATFORM_OPERATOR role — regular platform-ops staff, one notch below
+     * PLATFORM_ADMIN. Seeded by V55 under the 'system' tenant. Holds
+     * {@code platform:*} (manage tenants / jobs / menus / dicts / events) but
+     * NOT {@code opsuser:*}, so operators provisioned through the platform-user
+     * console cannot themselves see or manage that console — only PLATFORM_ADMIN
+     * ('ops') can. Users created via PlatformUserAdminService get this role.
+     */
+    public static final String PLATFORM_OPERATOR_ID = "00000000000000000000ROLE51";
 }

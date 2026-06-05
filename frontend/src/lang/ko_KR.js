@@ -216,6 +216,40 @@ export default {
       },
       message: { redriveSuccess: '재전송을 요청했습니다', redriveFailed: '재전송 실패', redriveAllSuccess: '{count}건 재전송했습니다', loadFailed: '이벤트 로드 실패' }
     },
+    user: {
+      title: '플랫폼 사용자',
+      column: { username: '사용자명', displayName: '표시 이름', email: '이메일', role: '역할', status: '상태', createTime: '생성 시각', actions: '작업' },
+      role: { admin: '관리자', operator: '운영' },
+      action: { disable: '비활성', enable: '활성', reset: '비밀번호 재설정', delete: '삭제' },
+      confirm: {
+        disableTitle: '사용자 비활성', disableMessage: '"{username}"을(를) 비활성하시겠습니까? Keycloak에서도 비활성되어 로그인할 수 없습니다.',
+        resetTitle: '비밀번호 재설정', resetMessage: '"{username}"의 비밀번호를 재설정하시겠습니까? 임시 비밀번호가 발급됩니다.',
+        deleteTitle: '사용자 삭제', deleteMessage: '"{username}"을(를) 삭제하시겠습니까? 되돌릴 수 없습니다(Keycloak 사용자도 삭제).'
+      },
+      secret: { titleNew: '플랫폼 사용자 생성됨', titleReset: '비밀번호 재설정됨' },
+      search: { placeholder: '사용자명 / 이메일로 검색' },
+      button: { new: '새 사용자' },
+      create: {
+        title: '플랫폼 사용자 추가',
+        intro: 'system 테넌트에 운영 담당자를 추가합니다: Keycloak system realm에 사용자를 만들고 Platform Admin 권한을 부여합니다.',
+        usernamePlaceholder: 'ops2',
+        usernameHint: '소문자 영숫자 / 하이픈 / 밑줄. 생성 후 변경 불가.',
+        displayNamePlaceholder: '운영 담당',
+        emailPlaceholder: 'ops2@example.com',
+        creating: '생성 중...',
+        doneIntro: '"{username}" 생성됨. 아래 임시 비밀번호를 본인에게 안전하게 전달하세요(첫 로그인 시 변경 필요).',
+        tempPassword: '임시 비밀번호',
+        tempPasswordHint: '이 창을 닫으면 다시 표시되지 않습니다.',
+        copy: '복사'
+      },
+      message: {
+        loadFailed: '사용자 목록 로드 실패', required: '사용자명과 표시 이름은 필수입니다',
+        createSuccess: '플랫폼 사용자 생성됨', createFailed: '사용자 생성 실패',
+        copied: '복사됨', copyFailed: '복사 실패',
+        disableSuccess: '비활성화됨', enableSuccess: '활성화됨', resetSuccess: '비밀번호 재설정됨',
+        deleteSuccess: '삭제됨', opFailed: '작업 실패'
+      }
+    },
     tenant: {
       column: {
         tenantCode: '테넌트 코드',

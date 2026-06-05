@@ -216,6 +216,40 @@ export default {
       },
       message: { redriveSuccess: '已请求重发', redriveFailed: '重发失败', redriveAllSuccess: '已重发 {count} 条', loadFailed: '加载事件失败' }
     },
+    user: {
+      title: '平台用户',
+      column: { username: '用户名', displayName: '显示名', email: '邮箱', role: '角色', status: '状态', createTime: '创建时间', actions: '操作' },
+      role: { admin: '管理员', operator: '运维' },
+      action: { disable: '停用', enable: '启用', reset: '重置密码', delete: '删除' },
+      confirm: {
+        disableTitle: '停用用户', disableMessage: '确认停用「{username}」？Keycloak 也会被禁用，无法登录。',
+        resetTitle: '重置密码', resetMessage: '确认重置「{username}」的密码？将生成一个临时密码。',
+        deleteTitle: '删除用户', deleteMessage: '确认删除「{username}」？不可恢复（同时删除 Keycloak 用户）。'
+      },
+      secret: { titleNew: '已创建平台用户', titleReset: '已重置密码' },
+      search: { placeholder: '按用户名 / 邮箱搜索' },
+      button: { new: '新建用户' },
+      create: {
+        title: '添加平台用户',
+        intro: '在 system 租户开通运维人员：在 Keycloak 的 system realm 创建用户，并授予 Platform Admin 权限。',
+        usernamePlaceholder: 'ops2',
+        usernameHint: '小写字母数字、连字符、下划线；创建后不可修改。',
+        displayNamePlaceholder: '运维张三',
+        emailPlaceholder: 'ops2@example.com',
+        creating: '创建中...',
+        doneIntro: '已创建「{username}」。请把下面的临时密码安全地交给本人（首次登录需修改）。',
+        tempPassword: '临时密码',
+        tempPasswordHint: '关闭此页后将无法再次查看。',
+        copy: '复制'
+      },
+      message: {
+        loadFailed: '加载用户列表失败', required: '用户名和显示名必填',
+        createSuccess: '已创建平台用户', createFailed: '创建用户失败',
+        copied: '已复制', copyFailed: '复制失败',
+        disableSuccess: '已停用', enableSuccess: '已启用', resetSuccess: '已重置密码',
+        deleteSuccess: '已删除', opFailed: '操作失败'
+      }
+    },
     tenant: {
       column: {
         tenantCode: '租户代码',

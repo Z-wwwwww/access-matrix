@@ -216,6 +216,40 @@ export default {
       },
       message: { redriveSuccess: '已請求重發', redriveFailed: '重發失敗', redriveAllSuccess: '已重發 {count} 筆', loadFailed: '載入事件失敗' }
     },
+    user: {
+      title: '平台使用者',
+      column: { username: '使用者名稱', displayName: '顯示名稱', email: '電子郵件', role: '角色', status: '狀態', createTime: '建立時間', actions: '操作' },
+      role: { admin: '管理員', operator: '維運' },
+      action: { disable: '停用', enable: '啟用', reset: '重設密碼', delete: '刪除' },
+      confirm: {
+        disableTitle: '停用使用者', disableMessage: '確認停用「{username}」？Keycloak 也會被停用，無法登入。',
+        resetTitle: '重設密碼', resetMessage: '確認重設「{username}」的密碼？將產生一個臨時密碼。',
+        deleteTitle: '刪除使用者', deleteMessage: '確認刪除「{username}」？無法復原（同時刪除 Keycloak 使用者）。'
+      },
+      secret: { titleNew: '已建立平台使用者', titleReset: '已重設密碼' },
+      search: { placeholder: '依使用者名稱 / 電郵搜尋' },
+      button: { new: '新增使用者' },
+      create: {
+        title: '新增平台使用者',
+        intro: '在 system 租戶開通維運人員：在 Keycloak 的 system realm 建立使用者，並授予 Platform Admin 權限。',
+        usernamePlaceholder: 'ops2',
+        usernameHint: '小寫英數字、連字號、底線；建立後不可修改。',
+        displayNamePlaceholder: '維運張三',
+        emailPlaceholder: 'ops2@example.com',
+        creating: '建立中...',
+        doneIntro: '已建立「{username}」。請將下方臨時密碼安全地交給本人（首次登入需變更）。',
+        tempPassword: '臨時密碼',
+        tempPasswordHint: '關閉此頁後將無法再次檢視。',
+        copy: '複製'
+      },
+      message: {
+        loadFailed: '載入使用者清單失敗', required: '使用者名稱與顯示名稱為必填',
+        createSuccess: '已建立平台使用者', createFailed: '建立使用者失敗',
+        copied: '已複製', copyFailed: '複製失敗',
+        disableSuccess: '已停用', enableSuccess: '已啟用', resetSuccess: '已重設密碼',
+        deleteSuccess: '已刪除', opFailed: '操作失敗'
+      }
+    },
     tenant: {
       column: {
         tenantCode: '租戶代碼',

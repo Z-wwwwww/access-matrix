@@ -182,14 +182,19 @@ public class KeycloakUserService {
     }
 
     public void disableUser(String realm, String keycloakUserId) {
+        setEnabled(realm, keycloakUserId, false);
+    }
+
+    /** Enable or disable a Keycloak user (disabled users cannot obtain tokens). */
+    public void setEnabled(String realm, String keycloakUserId, boolean enabled) {
         try (Keycloak kc = newAdminClient()) {
             UserResource ur = kc.realm(realm).users().get(keycloakUserId);
             UserRepresentation u = ur.toRepresentation();
-            u.setEnabled(false);
+            u.setEnabled(enabled);
             ur.update(u);
-            log.info("[kc] disabled user {} in realm {}", keycloakUserId, realm);
+            log.info("[kc] {} user {} in realm {}", enabled ? "enabled" : "disabled", keycloakUserId, realm);
         } catch (WebApplicationException e) {
-            throw new KeycloakOperationException("Keycloak disable-user failed: realm=%s userId=%s %s"
+            throw new KeycloakOperationException("Keycloak set-enabled failed: realm=%s userId=%s %s"
                     .formatted(realm, keycloakUserId, responseDetail(e.getResponse())), e);
         }
     }
