@@ -275,10 +275,7 @@ export default {
         fieldRealm: 'KC realm',
         fieldUpdated: '更新时间',
         actSupport: '支持会话',
-        actResend: '重发邀请',
-        noteMore: '彻底删除如何运作',
-        noteLess: '收起',
-        noteDismiss: '关闭'
+        actResend: '重发邀请'
       },
       dashboard: {
         total: '总租户',

@@ -275,10 +275,7 @@ export default {
         fieldRealm: 'KC realm',
         fieldUpdated: 'Updated',
         actSupport: 'Support session',
-        actResend: 'Resend invite',
-        noteMore: 'How permanent deletion works',
-        noteLess: 'Show less',
-        noteDismiss: 'Dismiss'
+        actResend: 'Resend invite'
       },
       dashboard: {
         total: 'Total tenants',

@@ -285,10 +285,7 @@ export default {
         fieldRealm: 'KC realm',
         fieldUpdated: '更新日時',
         actSupport: 'サポートセッション',
-        actResend: '招待を再送',
-        noteMore: '完全削除の仕組み',
-        noteLess: '閉じる',
-        noteDismiss: '閉じる'
+        actResend: '招待を再送'
       },
       dashboard: {
         total: '総テナント',

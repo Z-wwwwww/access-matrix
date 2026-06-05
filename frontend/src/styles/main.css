@@ -237,6 +237,19 @@ html:lang(zh-Hant) {
   /* Raise the app above the backdrop glow so content is never tinted. */
   #app { position: relative; z-index: 1; }
 
+  /* Extend the glow across the sticky tab bar: it must stay opaque to mask
+     content scrolling beneath it, so instead of going transparent it paints
+     the SAME gradients on top of its base color with background-attachment:
+     fixed — viewport-anchored, so it lines up seamlessly with the body::before
+     glow above/below. Dropped in dark mode. */
+  [data-tabbar-root] {
+    background-image:
+      radial-gradient(1600px 850px at 82% -12%, rgba(var(--accent-rgb), 0.06), transparent 62%),
+      radial-gradient(1300px 750px at -12% 112%, rgba(var(--accent-rgb), 0.05), transparent 60%);
+    background-attachment: fixed;
+  }
+  .dark [data-tabbar-root] { background-image: none; }
+
   /* ── Universal button feedback ──
      Tailwind v4 dropped the implicit `cursor: pointer` on <button>, and
      most CTA buttons in this project (e.g. `bg-primary text-primary-foreground`)

@@ -174,10 +174,6 @@ function resetSearch() {
   fetchData()
 }
 
-// ── Info note (recycle-bin) ──────────────────────────────────────────────
-const noteOpen = ref(false)
-const noteShown = ref(true)
-
 // ── Action handlers (unchanged behaviour) ─────────────────────────────────
 function openCreate() { showCreate.value = true }
 function openEdit(row) { editTarget.value = row }
@@ -325,23 +321,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       </div>
     </div>
 
-    <!-- ── Recycle-bin info note ─────────────────────────────────────── -->
-    <div v-if="noteShown"
-         class="flex gap-3 items-start rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-[13px] leading-relaxed">
-      <Info class="size-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-      <div class="flex-1 text-muted-foreground">
-        <span class="font-semibold text-foreground">{{ t('platform.tenant.recycleBinHint.title') }}</span>
-        <span v-if="noteOpen"> {{ t('platform.tenant.recycleBinHint.body') }}</span>
-        <div>
-          <button type="button" class="mt-1.5 text-primary font-semibold hover:underline" @click="noteOpen = !noteOpen">
-            {{ noteOpen ? t('platform.tenant.list.noteLess') : t('platform.tenant.list.noteMore') }}
-          </button>
-        </div>
-      </div>
-      <button type="button" class="shrink-0 p-1 rounded-md text-muted-foreground hover:bg-muted"
-              :title="t('platform.tenant.list.noteDismiss')" @click="noteShown = false">
-        <X class="size-4" />
-      </button>
+    <!-- ── Recycle-bin hint (static small note) ──────────────────────── -->
+    <div class="flex gap-2 items-start text-xs text-muted-foreground leading-relaxed px-1">
+      <Info class="size-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+      <p>
+        <span class="font-medium text-foreground">{{ t('platform.tenant.recycleBinHint.title') }}</span>
+        {{ t('platform.tenant.recycleBinHint.body') }}
+      </p>
     </div>
 
     <!-- ── Panel ─────────────────────────────────────────────────────── -->

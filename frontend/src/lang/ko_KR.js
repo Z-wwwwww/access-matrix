@@ -275,10 +275,7 @@ export default {
         fieldRealm: 'KC realm',
         fieldUpdated: '수정 시간',
         actSupport: '지원 세션',
-        actResend: '초대 재전송',
-        noteMore: '완전 삭제 작동 방식',
-        noteLess: '접기',
-        noteDismiss: '닫기'
+        actResend: '초대 재전송'
       },
       dashboard: {
         total: '전체 테넌트',
