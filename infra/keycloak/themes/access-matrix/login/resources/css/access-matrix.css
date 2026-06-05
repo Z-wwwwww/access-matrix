@@ -441,10 +441,9 @@ html[lang="ja"] #kc-form-wrapper::before {
 label,
 .pf-c-form__label,
 .pf-v5-c-form__label,
-.pf-v5-c-form__label-text,
 .control-label {
   display: block !important;
-  margin: 0 0 8px !important;
+  margin: 0 0 6px !important;
   padding: 0 !important;
   font-family: var(--am-sans) !important;
   font-size: 11px !important;
@@ -454,15 +453,35 @@ label,
   text-transform: uppercase !important;
 }
 
+/* Keep the label text and its required (*) marker on ONE line. PF wraps them
+   as sibling spans inside the <label>; the generic block rule above must NOT
+   turn the text into its own block, or the * drops to the next line (and the
+   text's margin adds a gap). Text inherits the label styling above. */
+.pf-c-form__label-text,
+.pf-v5-c-form__label-text {
+  display: inline !important;
+  margin: 0 !important;
+}
+.pf-c-form__label-required,
+.pf-v5-c-form__label-required,
+.pf-c-form__label .required,
+.pf-v5-c-form__label .required {
+  display: inline !important;
+  margin: 0 0 0 4px !important;
+  color: #c9190b !important;
+}
+
 .pf-c-form__group,
 .pf-v5-c-form__group {
   position: relative !important;
-  margin-bottom: 16px !important;
+  margin-bottom: 14px !important;
 }
 
 .pf-v5-c-form__group-label,
 .pf-c-form__group-label {
-  margin-bottom: 8px !important;
+  /* label→input gap comes from the label's own 6px margin-bottom; keep this 0
+     so the two don't stack into an oversized gap. */
+  margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
