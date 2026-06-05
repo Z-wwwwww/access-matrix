@@ -287,6 +287,11 @@ export default {
         actSupport: 'サポートセッション',
         actResend: '招待を再送'
       },
+      overview: {
+        updated: '最終更新', refresh: '更新',
+        allRealms: '全レルム', uptime: '稼働', recycleBin: 'ゴミ箱', thisMonth: '今月',
+        healthOk: 'すべて正常 · 障害なし', healthIssues: '要確認あり'
+      },
       dashboard: {
         total: '総テナント',
         newThisMonth: '今月の新規',

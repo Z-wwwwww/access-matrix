@@ -67,15 +67,16 @@
 - [ ] 切换调色板 + 深色模式:徽标、状态点、抽屉、分页样式随主题正常显示。
 
 ### 2.2 平台总览(Platform overview / Ops dashboard)
-独立菜单页 `/platform/overview`(菜单 `platform.overview`,门控 `platform:tenant:read`,排在租户管理之前)。租户 KPI 卡 + 状态环形图 + 按月新增趋势(`/platform/tenants/stats`);4 个监控面板(`/platform/dashboard`):入驻激活、活跃参与、平台健康、安全。可选卡片点击切换明细;默认选中第一个有值的卡。**与 2.1 租户管理分页**:dashboard 从租户管理页拆出独立成页,使租户表格首屏即可见。
+独立菜单页 `/platform/overview`(菜单 `platform.overview`,门控 `platform:tenant:read`,排在租户管理之前)。按 Claude Design 稿重做成 **bento 网格仪表盘**:顶部「最后更新 + 刷新」;4 张 KPI 卡(图标在左 + 大数字 + delta:总租户/运行中/已停用/本月新增,数据 `/platform/tenants/stats`);状态环形图(圆心放总数,图例运行中/已停用 + 占比);按月新增趋势(**手绘 SVG 面积线,直线段不过冲**);入驻漏斗(tiles + 激活率条);活跃与参与(tiles + 14天登录趋势 + 沉默租户列表);平台健康(tiles + 全部正常/需关注 pill);安全与高权限监视(tiles + 审计列表:支持会话/应急访问,严重度色点 + 字母徽标 + actor→target + 相对时间),数据 `/platform/dashboard`。**保留原有点选切换明细功能**:入驻(待激活/已过期)、平台健康(任务失败/事件积压/最久积压/接口错误)、安全(支持会话/应急访问)的 tile 可点击,切换其下明细列表,默认选中第一个有值的 tile。颜色走 app 主题令牌(适配强调色+深色);图表为自建组件 `AreaChart.vue`(已移除 echarts 与旧 `DashboardPanels.vue`)。**与 2.1 租户管理分页**:dashboard 独立成页,租户表格首屏即可见。
 **测试点**
 - [ ] 「平台总览」作为独立菜单出现(在「租户管理」之前);ops 与 operator 都能看到。
-- [ ] KPI/图表显示真实聚合(非 mock);主题切换图表重新着色。
-- [ ] 入驻/平台健康/安全三个面板:点卡片切换明细列表,默认选中第一个有值卡。
-- [ ] 指标 hover 有简短解释。
-- [ ] 各明细列表上限 8 行(不会无限拉长)。
-- [ ] 「接口错误(24h)」只计真正 500(业务拒绝 4xx/7xx 不算)。
-- [ ] 「租户管理」页不再显示 dashboard,搜索栏 + 表格首屏即可见。
+- [ ] KPI/图表/tiles 显示真实聚合(非 mock);切换强调色+深色模式整页配色正常。
+- [ ] 环形图圆心显示总租户数;趋势/登录折线为**直线段**,近 0 数据不出现假驼峰、不下探基线。
+- [ ] 平台健康全为 0 → 绿色「一切正常」pill;有任一 >0 → 黄色「需关注」pill。
+- [ ] 安全审计列表:支持会话(进行中=红点/历史=黄点)+ 应急访问(火苗图标),相对时间,空时显示「暂无」。
+- [ ] **点选切换明细**:入驻/平台健康/安全的 tile 点击切换其下明细列表(待激活↔已过期、任务失败↔积压↔接口错误、支持会话↔应急访问),默认选中第一个有值 tile,选中 tile 高亮主色边框。
+- [ ] 活跃与参与卡显示沉默租户列表;明细列表为空显示「暂无」。
+- [ ] 点「刷新」重新拉取 stats + dashboard 并更新「最后更新」时间。
 
 ### 2.3 领域事件控制台(Domain events)
 `/platform/events`:分页列表(按分发状态/类型/关键字筛)、详情(payload)、失败事件**重发**(单条/批量,仅 `dispatch_state=2`)。
@@ -148,6 +149,8 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 ---
 
 ## 変更履歴 / 变更记录(追加在最上)
+
+- 2026-06-05 — 平台总览按 Claude Design 稿重做为 bento 仪表盘:4 KPI 卡(图标在左)+ 状态环形(圆心总数)+ 手绘 SVG 面积趋势(直线段不过冲)+ 入驻漏斗/活跃/健康/安全四卡(tiles + 健康 pill + 安全审计列表)。新增 `AreaChart.vue`、`platform.tenant.overview.*`(5 语言);移除 echarts 依赖与旧 `DashboardPanels.vue`,颜色走主题令牌。
 
 - 2026-06-05 — 徽标着色区分:平台用户状态徽标启用=绿(success)/禁用=红(danger)(原 `destructive` 非法变体,实际无色);菜单管理类型徽标由 `MenuType` enum 新增 `css_class`(目录=info/菜单=success/按钮=violet)驱动,前端 `menuType.cssClass(row.menuType) || 'outline'`(后端重启后生效)。
 

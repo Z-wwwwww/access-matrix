@@ -277,6 +277,11 @@ export default {
         actSupport: '支持会话',
         actResend: '重发邀请'
       },
+      overview: {
+        updated: '最后更新', refresh: '刷新',
+        allRealms: '全部租户', uptime: '运行中', recycleBin: '回收站', thisMonth: '本月',
+        healthOk: '一切正常 · 无故障', healthIssues: '有需关注项'
+      },
       dashboard: {
         total: '总租户',
         newThisMonth: '本月新增',

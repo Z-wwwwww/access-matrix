@@ -277,6 +277,11 @@ export default {
         actSupport: 'Support session',
         actResend: 'Resend invite'
       },
+      overview: {
+        updated: 'Updated', refresh: 'Refresh',
+        allRealms: 'all realms', uptime: 'uptime', recycleBin: 'recycle bin', thisMonth: 'this month',
+        healthOk: 'All systems normal', healthIssues: 'Needs attention'
+      },
       dashboard: {
         total: 'Total tenants',
         newThisMonth: 'New this month',

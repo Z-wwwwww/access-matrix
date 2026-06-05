@@ -277,6 +277,11 @@ export default {
         actSupport: '지원 세션',
         actResend: '초대 재전송'
       },
+      overview: {
+        updated: '마지막 업데이트', refresh: '새로고침',
+        allRealms: '전체 realm', uptime: '가동', recycleBin: '휴지통', thisMonth: '이번 달',
+        healthOk: '모두 정상 · 장애 없음', healthIssues: '확인 필요'
+      },
       dashboard: {
         total: '전체 테넌트',
         newThisMonth: '이번 달 신규',
