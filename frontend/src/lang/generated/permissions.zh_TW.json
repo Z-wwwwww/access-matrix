@@ -12,6 +12,8 @@
   "platform:dict:delete": "刪除字典",
   "platform:dict:read": "查看字典",
   "platform:dict:update": "更新字典",
+  "platform:event:read": "查看領域事件",
+  "platform:event:redrive": "重發事件",
   "platform:job:config": "設定定時任務",
   "platform:job:read": "檢視定時任務",
   "platform:job:run": "立即執行定時任務",

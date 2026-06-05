@@ -201,6 +201,21 @@ export default {
   },
 
   platform: {
+    event: {
+      title: '領域事件',
+      column: { occurredAt: '發生時間', eventType: '事件類型', aggregate: '聚合', status: '分發狀態', attempts: '嘗試', actions: '操作' },
+      state: { all: '全部', pending: '待分發', dispatched: '已分發', failed: '失敗' },
+      actorType: { human: '人', ai: 'AI', system: '系統' },
+      search: { eventTypePlaceholder: '依事件類型篩選', keywordPlaceholder: '聚合ID / 類型 / traceId' },
+      button: { redriveAll: '批次重發失敗' },
+      tooltip: { view: '查看詳情 / payload', redrive: '重發（重設為待分發）', redriveOnlyFailed: '僅失敗事件可重發' },
+      drawer: { title: '事件詳情', payload: '負載', actor: '執行者', dispatchedAt: '分發時間', traceId: '追蹤ID' },
+      confirm: {
+        redriveTitle: '重發事件', redriveMessage: '將「{eventType}」重設為待分發並重新投遞嗎？', redriveConfirm: '重發',
+        redriveAllTitle: '批次重發失敗事件', redriveAllMessage: '將所有失敗事件重設為待分發並重新投遞嗎？', redriveAllConfirm: '批次重發'
+      },
+      message: { redriveSuccess: '已請求重發', redriveFailed: '重發失敗', redriveAllSuccess: '已重發 {count} 筆', loadFailed: '載入事件失敗' }
+    },
     tenant: {
       column: {
         tenantCode: '租戶代碼',

@@ -201,6 +201,21 @@ export default {
   },
 
   platform: {
+    event: {
+      title: 'Domain events',
+      column: { occurredAt: 'Occurred', eventType: 'Event type', aggregate: 'Aggregate', status: 'Dispatch', attempts: 'Attempts', actions: 'Actions' },
+      state: { all: 'All', pending: 'Pending', dispatched: 'Dispatched', failed: 'Failed' },
+      actorType: { human: 'Human', ai: 'AI', system: 'System' },
+      search: { eventTypePlaceholder: 'Filter by event type', keywordPlaceholder: 'Aggregate id / type / traceId' },
+      button: { redriveAll: 'Redrive all failed' },
+      tooltip: { view: 'View details / payload', redrive: 'Redrive (reset to pending)', redriveOnlyFailed: 'Only failed events can be redriven' },
+      drawer: { title: 'Event detail', payload: 'Payload', actor: 'Actor', dispatchedAt: 'Dispatched at', traceId: 'Trace id' },
+      confirm: {
+        redriveTitle: 'Redrive event', redriveMessage: 'Reset "{eventType}" to pending and re-dispatch?', redriveConfirm: 'Redrive',
+        redriveAllTitle: 'Redrive all failed events', redriveAllMessage: 'Reset all failed events to pending and re-dispatch?', redriveAllConfirm: 'Redrive all'
+      },
+      message: { redriveSuccess: 'Redrive requested', redriveFailed: 'Redrive failed', redriveAllSuccess: 'Redrove {count} event(s)', loadFailed: 'Failed to load events' }
+    },
     tenant: {
       column: {
         tenantCode: 'Tenant code',

@@ -201,6 +201,21 @@ export default {
   },
 
   platform: {
+    event: {
+      title: '도메인 이벤트',
+      column: { occurredAt: '발생 시각', eventType: '이벤트 유형', aggregate: '애그리거트', status: '전송 상태', attempts: '시도', actions: '작업' },
+      state: { all: '전체', pending: '대기', dispatched: '전송 완료', failed: '실패' },
+      actorType: { human: '사람', ai: 'AI', system: '시스템' },
+      search: { eventTypePlaceholder: '이벤트 유형으로 필터', keywordPlaceholder: '애그리거트ID / 유형 / traceId' },
+      button: { redriveAll: '실패 일괄 재전송' },
+      tooltip: { view: '상세 / payload 보기', redrive: '재전송(대기로 되돌림)', redriveOnlyFailed: '실패 이벤트만 재전송할 수 있습니다' },
+      drawer: { title: '이벤트 상세', payload: '페이로드', actor: '수행자', dispatchedAt: '전송 시각', traceId: '추적 ID' },
+      confirm: {
+        redriveTitle: '이벤트 재전송', redriveMessage: '"{eventType}"을(를) 대기로 되돌려 재전송하시겠습니까?', redriveConfirm: '재전송',
+        redriveAllTitle: '실패 이벤트 일괄 재전송', redriveAllMessage: '모든 실패 이벤트를 대기로 되돌려 재전송하시겠습니까?', redriveAllConfirm: '일괄 재전송'
+      },
+      message: { redriveSuccess: '재전송을 요청했습니다', redriveFailed: '재전송 실패', redriveAllSuccess: '{count}건 재전송했습니다', loadFailed: '이벤트 로드 실패' }
+    },
     tenant: {
       column: {
         tenantCode: '테넌트 코드',

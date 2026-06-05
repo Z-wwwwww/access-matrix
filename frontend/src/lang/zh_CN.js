@@ -201,6 +201,21 @@ export default {
   },
 
   platform: {
+    event: {
+      title: '领域事件',
+      column: { occurredAt: '发生时间', eventType: '事件类型', aggregate: '聚合', status: '分发状态', attempts: '尝试', actions: '操作' },
+      state: { all: '全部', pending: '待分发', dispatched: '已分发', failed: '失败' },
+      actorType: { human: '人', ai: 'AI', system: '系统' },
+      search: { eventTypePlaceholder: '按事件类型筛选', keywordPlaceholder: '聚合ID / 类型 / traceId' },
+      button: { redriveAll: '批量重发失败' },
+      tooltip: { view: '查看详情 / payload', redrive: '重发（重置为待分发）', redriveOnlyFailed: '仅失败事件可重发' },
+      drawer: { title: '事件详情', payload: '负载', actor: '执行者', dispatchedAt: '分发时间', traceId: '追踪ID' },
+      confirm: {
+        redriveTitle: '重发事件', redriveMessage: '将「{eventType}」重置为待分发并重新投递吗？', redriveConfirm: '重发',
+        redriveAllTitle: '批量重发失败事件', redriveAllMessage: '将所有失败事件重置为待分发并重新投递吗？', redriveAllConfirm: '批量重发'
+      },
+      message: { redriveSuccess: '已请求重发', redriveFailed: '重发失败', redriveAllSuccess: '已重发 {count} 条', loadFailed: '加载事件失败' }
+    },
     tenant: {
       column: {
         tenantCode: '租户代码',

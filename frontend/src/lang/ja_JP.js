@@ -208,6 +208,21 @@ export default {
   },
 
   platform: {
+    event: {
+      title: 'ドメインイベント',
+      column: { occurredAt: '発生日時', eventType: 'イベント種別', aggregate: '集約', status: '配信状態', attempts: '試行', actions: '操作' },
+      state: { all: 'すべて', pending: '保留', dispatched: '配信済み', failed: '失敗' },
+      actorType: { human: '人間', ai: 'AI', system: 'システム' },
+      search: { eventTypePlaceholder: 'イベント種別で絞込', keywordPlaceholder: '集約ID / 種別 / traceId' },
+      button: { redriveAll: '失敗を一括再投' },
+      tooltip: { view: '詳細・payload を表示', redrive: '再投（保留に戻して再配信）', redriveOnlyFailed: '失敗イベントのみ再投できます' },
+      drawer: { title: 'イベント詳細', payload: 'ペイロード', actor: '実行者', dispatchedAt: '配信日時', traceId: 'トレースID' },
+      confirm: {
+        redriveTitle: 'イベント再投', redriveMessage: '「{eventType}」を保留に戻して再配信しますか？', redriveConfirm: '再投する',
+        redriveAllTitle: '失敗イベントを一括再投', redriveAllMessage: 'すべての失敗イベントを保留に戻して再配信しますか？', redriveAllConfirm: '一括再投'
+      },
+      message: { redriveSuccess: '再投をリクエストしました', redriveFailed: '再投に失敗しました', redriveAllSuccess: '{count} 件を再投しました', loadFailed: 'イベントの取得に失敗しました' }
+    },
     tenant: {
       column: {
         tenantCode: 'テナントコード',

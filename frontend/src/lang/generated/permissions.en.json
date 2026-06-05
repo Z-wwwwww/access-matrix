@@ -12,6 +12,8 @@
   "platform:dict:delete": "Delete Dictionary",
   "platform:dict:read": "View Dictionaries",
   "platform:dict:update": "Update Dictionary",
+  "platform:event:read": "View Domain Events",
+  "platform:event:redrive": "Redrive Event",
   "platform:job:config": "Configure Scheduled Task",
   "platform:job:read": "View Scheduled Tasks",
   "platform:job:run": "Run Scheduled Task",

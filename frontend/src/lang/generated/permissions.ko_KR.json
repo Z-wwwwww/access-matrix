@@ -12,6 +12,8 @@
   "platform:dict:delete": "사전 삭제",
   "platform:dict:read": "사전 조회",
   "platform:dict:update": "사전 수정",
+  "platform:event:read": "도메인 이벤트 조회",
+  "platform:event:redrive": "이벤트 재전송",
   "platform:job:config": "예약 작업 설정",
   "platform:job:read": "예약 작업 조회",
   "platform:job:run": "예약 작업 즉시 실행",

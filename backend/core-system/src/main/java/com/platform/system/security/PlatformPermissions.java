@@ -58,6 +58,11 @@ public final class PlatformPermissions {
     public static final String DICT_UPDATE = "platform:dict:update";
     public static final String DICT_DELETE = "platform:dict:delete";
 
+    // ---- domain event outbox（platform 運維の監視・排障：一覧 + 失敗イベントの再投） ----
+    // READ: 一覧/詳細(payload)閲覧。REDRIVE: dispatch_state=2(失敗)を 0 に戻して再配信させる。
+    public static final String EVENT_READ    = "platform:event:read";
+    public static final String EVENT_REDRIVE = "platform:event:redrive";
+
     static {
         PermissionCode.registerAll(PlatformPermissions.class, "platform");
     }
