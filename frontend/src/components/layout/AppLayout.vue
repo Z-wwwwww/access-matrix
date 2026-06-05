@@ -14,7 +14,11 @@ const { t } = useI18n()
 const route = useRoute()
 const tabsStore = useTabsStore()
 
-const collapsed = ref(false)
+// Sidebar starts collapsed by default; the user's toggle is remembered so an
+// explicit expand sticks across visits.
+const SIDEBAR_KEY = 'sidebar.collapsed'
+const collapsed = ref(localStorage.getItem(SIDEBAR_KEY) !== 'false')
+watch(collapsed, (v) => localStorage.setItem(SIDEBAR_KEY, String(v)))
 const mobileOpen = ref(false)
 
 function toggleSidebar() {

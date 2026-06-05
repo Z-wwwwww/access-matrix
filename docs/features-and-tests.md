@@ -44,6 +44,7 @@
 - [ ] 平台 ops(`*:*`)能管租户但不能模拟业务用户(无 `tenant:*`)。
 - [ ] 改某角色权限后,持有该角色的用户**下次请求**即生效(权限缓存按角色失效)。
 - [ ] 菜单按权限显隐;无权限的路由直接访问被拦/404。
+- [ ] 菜单管理列表的类型徽标按 `menu_type` dict 的 css_class 着色:目录=info(蓝)、菜单=success(绿)、按钮=violet(紫)。
 - [ ] 数据范围:不同 data_scope 的用户看到的 task 行集不同。
 
 ---
@@ -111,6 +112,7 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 - [ ] 停用/删除会**立即踢下线**(ForceLogout):被停用用户**当前已登录的会话**下次请求即被拒(不只是阻止再次登录);启用会清除踢出标记。
 - [ ] 新建表单必填项 `*` 为红色;邮箱有格式校验(前端正则 + 后端 `@Email`),格式不对被拦。
 - [ ] 新建用户邮箱**必填**;首登**不**经过"更新账户信息"页(不报"请指定此字段"),直接进设置密码——KC 用户的 email/firstName/lastName 创建时已补全(单段名 lastName 也填)。
+- [ ] 状态徽标有颜色区分:启用=绿(success)、禁用=红(danger)。
 
 ---
 
@@ -146,6 +148,8 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 ---
 
 ## 変更履歴 / 变更记录(追加在最上)
+
+- 2026-06-05 — 徽标着色区分:平台用户状态徽标启用=绿(success)/禁用=红(danger)(原 `destructive` 非法变体,实际无色);菜单管理类型徽标由 `MenuType` enum 新增 `css_class`(目录=info/菜单=success/按钮=violet)驱动,前端 `menuType.cssClass(row.menuType) || 'outline'`(后端重启后生效)。
 
 - 2026-06-05 — 主题系统精简为单一暖色主题:背景改暖米白 `#f4efe9` + 纯白卡片 + 页面两团极淡品牌径向光晕(深色去掉);删除其余 12 套调色板,只保留 5 个品牌强调色(陶土铁锈默认 / 砖红 / 赭黄 / 暗松绿 / 灰紫,共用 surfaces)。`useTheme.js` PALETTES 缩为 5、默认 `warm`(旧 localStorage 失效值自动回落);`main.css` 重写 `:root`/`.dark` + 强调色变体 + body 光晕。
 

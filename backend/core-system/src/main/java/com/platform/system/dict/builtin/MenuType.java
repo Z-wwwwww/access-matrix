@@ -8,18 +8,23 @@ import com.platform.core.common.dict.DictEnum;
  */
 public enum MenuType implements DictEnum {
 
-    DIRECTORY(1, "menu.option.type.directory"),
-    MENU(2, "menu.option.type.menu"),
-    BUTTON(3, "menu.option.type.button");
+    // Distinct Badge variants per type so the menu list reads at a glance:
+    // directory = info (blue), menu/page = success (green), button = violet.
+    DIRECTORY(1, "menu.option.type.directory", "info"),
+    MENU(2, "menu.option.type.menu", "success"),
+    BUTTON(3, "menu.option.type.button", "violet");
 
     private final int code;
     private final String labelKey;
+    private final String cssClass;
 
-    MenuType(int code, String labelKey) {
+    MenuType(int code, String labelKey, String cssClass) {
         this.code = code;
         this.labelKey = labelKey;
+        this.cssClass = cssClass;
     }
 
     @Override public int code() { return code; }
     @Override public String labelKey() { return labelKey; }
+    @Override public String cssClass() { return cssClass; }
 }

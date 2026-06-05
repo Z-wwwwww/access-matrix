@@ -274,7 +274,7 @@ onMounted(() => {
           </div>
         </template>
         <template #cell-menuType="{ row }">
-          <Badge variant="outline">{{ menuType.label(row.menuType) }}</Badge>
+          <Badge :variant="menuType.cssClass(row.menuType) || 'outline'">{{ menuType.label(row.menuType) }}</Badge>
         </template>
         <template #cell-component="{ row }">
           <span class="text-xs text-muted-foreground font-mono">{{ row.component || '-' }}</span>

@@ -234,7 +234,7 @@ onMounted(fetchData)
           <span v-else class="text-xs text-muted-foreground">{{ t('platform.user.role.operator') }}</span>
         </template>
         <template #cell-status="{ row }">
-          <Badge :variant="row.status === 1 ? 'outline' : 'destructive'">
+          <Badge :variant="row.status === 1 ? 'success' : 'danger'">
             {{ row.status === 1 ? t('common.status.enabled') : t('common.status.disabled') }}
           </Badge>
         </template>
