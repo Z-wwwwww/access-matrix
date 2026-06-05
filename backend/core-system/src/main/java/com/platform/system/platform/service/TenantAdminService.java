@@ -150,13 +150,17 @@ public class TenantAdminService {
         this.self = self;
     }
 
-    public PageResult<TenantDto.View> list(long page, long size, String keyword) {
+    public PageResult<TenantDto.View> list(long page, long size, String keyword, Integer status) {
         Page<TenantEntity> p = new Page<>(page, size);
         QueryWrapper<TenantEntity> w = new QueryWrapper<TenantEntity>()
                 .eq("mark", 1)
                 .orderByDesc("create_time");
         if (keyword != null && !keyword.isBlank()) {
             w.and(q -> q.like("tenant_code", keyword).or().like("display_name", keyword));
+        }
+        // Optional status segment (1=active / 0=suspended; TenantStatus). null = all.
+        if (status != null) {
+            w.eq("status", status);
         }
         Page<TenantEntity> result = tenantMapper.selectPage(p, w);
         List<TenantDto.View> records = result.getRecords().stream().map(this::toView).toList();

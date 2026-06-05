@@ -50,8 +50,9 @@ public class PlatformTenantController {
     public JsonResult<PageResult<TenantDto.View>> list(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "20") long size,
-            @RequestParam(required = false) String keyword) {
-        return JsonResult.ok(tenantService.list(page, size, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer status) {
+        return JsonResult.ok(tenantService.list(page, size, keyword, status));
     }
 
     /**

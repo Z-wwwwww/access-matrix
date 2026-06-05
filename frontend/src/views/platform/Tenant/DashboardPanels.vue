@@ -254,6 +254,7 @@ onMounted(fetchDashboard)
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.engagement.silent') }}</div>
         </div>
       </div>
+      <div class="text-[11px] text-muted-foreground mb-1">{{ t('platform.tenant.ops.engagement.trendTitle') }}</div>
       <VChart :option="loginTrendOption" autoresize style="height: 120px" class="mb-2" />
       <div class="text-[11px] text-muted-foreground mb-1 flex items-center gap-1">
         <AlarmClockOff class="size-3.5" /> {{ t('platform.tenant.ops.engagement.silentListTitle') }}

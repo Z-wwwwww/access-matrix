@@ -77,7 +77,10 @@ const hideFooter = computed(() => route.meta?.hideFooter === true)
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col bg-background">
+  <!-- Transparent root so the fixed body::before brand glow shows through the
+       content area. Header / sidebar / tab bar / footer carry their own bg;
+       body provides the #f4efe9 base elsewhere. -->
+  <div class="min-h-screen flex flex-col">
     <!-- Platform-ops support session banner — only renders when the auth
          store's support-mode flag is on. Sits above the header so it's the
          first thing the operator sees on every page. -->

@@ -272,6 +272,24 @@ export default {
         suspended: '停止'
       },
       search: { placeholder: 'コードまたは名前で検索' },
+      list: {
+        viewTable: 'テーブル表示', viewCards: 'カード表示',
+        segAll: 'すべて',
+        showing: '{total} 件中 {shown} 件を表示',
+        perPage: '{n} 件 / ページ',
+        noMatch: '「{q}」に一致するテナントはありません。',
+        clearFilters: 'フィルターをクリア',
+        noAdmin: '管理者未設定',
+        builtIn: '組込み',
+        overview: '概要',
+        fieldRealm: 'KC realm',
+        fieldUpdated: '更新日時',
+        actSupport: 'サポートセッション',
+        actResend: '招待を再送',
+        noteMore: '完全削除の仕組み',
+        noteLess: '閉じる',
+        noteDismiss: '閉じる'
+      },
       dashboard: {
         total: '総テナント',
         newThisMonth: '今月の新規',

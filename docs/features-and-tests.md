@@ -54,20 +54,27 @@
 
 ### 2.1 租户管理(Tenant management)
 新建(KC realm + 注册行 + 管理员邀请)、停用/恢复、硬删除(回收站式:先停用→输入 code 确认)、重发邀请、发起支持会话。
+**列表 UI(重设计)**:页头(eyebrow/标题/副标题)+ 工具栏(实时搜索 + 状态分段筛选 All/运行中/已停用,计数来自 stats + 表格/卡片视图切换,记忆于 localStorage)+ 可折叠/可关闭的回收站提示 + 列表面板 + 分页页脚。每行:字母徽标(按 code 取色,基于 `--card/--foreground` 适配调色板+深色)、双行单元格(显示名 + 等宽 code)、语义状态点(运行中=绿/已停用=琥珀)、相对时间(hover 显示绝对值)、**悬停才出现**的操作图标簇;已停用行有斜纹底纹;内置租户(system/demo)禁用破坏性操作。点击行 → 右侧**详情抽屉**(联系邮箱、KC realm=tenantCode、创建/更新时间 + 操作按钮)。颜色/字体走 app 主题令牌(非设计稿硬编码),设计稿中后端没有的字段(plan/users/region/owner)已省略。状态分段筛选走**后端** `GET /platform/tenants?status=0|1`(新增可选参数)。
 **测试点**
 - [ ] 新建租户:KC realm 建好、管理员收到邀请、列表出现该租户。
 - [ ] 停用→登录被拒;恢复→可登录。
 - [ ] 硬删除需先停用 + 输入正确 tenantCode;内置租户(system/demo)不可改/删。
 - [ ] 重发邀请(可改邮箱)。
+- [ ] 状态分段(运行中/已停用)服务端过滤正确、跨分页一致;计数与列表吻合。
+- [ ] 实时搜索(去抖)、表格/卡片切换(刷新后记忆)、详情抽屉(Esc/遮罩/X 关闭)。
+- [ ] 行操作权限门控与原表一致;悬停显示;内置租户禁用编辑/停用/删除/重发。
+- [ ] 切换调色板 + 深色模式:徽标、状态点、抽屉、分页样式随主题正常显示。
 
-### 2.2 平台运维仪表盘(Ops dashboard)
-租户 KPI 卡 + 状态环形图 + 按月新增趋势(`/platform/tenants/stats`);4 个监控面板(`/platform/dashboard`):入驻激活、活跃参与、平台健康、安全。可选卡片点击切换明细;默认选中第一个有值的卡。
+### 2.2 平台总览(Platform overview / Ops dashboard)
+独立菜单页 `/platform/overview`(菜单 `platform.overview`,门控 `platform:tenant:read`,排在租户管理之前)。租户 KPI 卡 + 状态环形图 + 按月新增趋势(`/platform/tenants/stats`);4 个监控面板(`/platform/dashboard`):入驻激活、活跃参与、平台健康、安全。可选卡片点击切换明细;默认选中第一个有值的卡。**与 2.1 租户管理分页**:dashboard 从租户管理页拆出独立成页,使租户表格首屏即可见。
 **测试点**
+- [ ] 「平台总览」作为独立菜单出现(在「租户管理」之前);ops 与 operator 都能看到。
 - [ ] KPI/图表显示真实聚合(非 mock);主题切换图表重新着色。
 - [ ] 入驻/平台健康/安全三个面板:点卡片切换明细列表,默认选中第一个有值卡。
 - [ ] 指标 hover 有简短解释。
 - [ ] 各明细列表上限 8 行(不会无限拉长)。
 - [ ] 「接口错误(24h)」只计真正 500(业务拒绝 4xx/7xx 不算)。
+- [ ] 「租户管理」页不再显示 dashboard,搜索栏 + 表格首屏即可见。
 
 ### 2.3 领域事件控制台(Domain events)
 `/platform/events`:分页列表(按分发状态/类型/关键字筛)、详情(payload)、失败事件**重发**(单条/批量,仅 `dispatch_state=2`)。
@@ -128,7 +135,7 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 
 - **多 Tab + keep-alive**:目录占位 `EmptyLayout` 单实例复用(修复了"多 tab 后新 tab 发重复请求")。
 - **侧边栏**:收藏 / 置顶 / 顶层叶子菜单提升 / 折叠 flyout。
-- **主题 / 调色板**:CSS 变量;`.dark` + `data-palette`。
+- **主题 / 调色板**:CSS 变量;`.dark` + `data-palette`。单一暖色主题(暖米白 `#f4efe9` 背景 + 纯白卡片 + 页面背景两团极淡品牌径向光晕,深色模式去掉光晕),仅**品牌强调色**可切:陶土铁锈(默认)/ 砖红 / 赭黄 / 暗松绿 / 灰紫;surfaces 五色共用,只换 `--primary/--accent/--ring/--brand-orange`。
 
 **测试点**
 - [ ] 打开多个 tab,再开新 tab:每个接口**只发一次**(无重复请求)。
@@ -139,6 +146,12 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 ---
 
 ## 変更履歴 / 变更记录(追加在最上)
+
+- 2026-06-05 — 主题系统精简为单一暖色主题:背景改暖米白 `#f4efe9` + 纯白卡片 + 页面两团极淡品牌径向光晕(深色去掉);删除其余 12 套调色板,只保留 5 个品牌强调色(陶土铁锈默认 / 砖红 / 赭黄 / 暗松绿 / 灰紫,共用 surfaces)。`useTheme.js` PALETTES 缩为 5、默认 `warm`(旧 localStorage 失效值自动回落);`main.css` 重写 `:root`/`.dark` + 强调色变体 + body 光晕。
+
+- 2026-06-05 — 租户管理列表按 Claude Design 稿重构:字母徽标 + 双行单元格 + 语义状态点 + 相对时间 + 悬停操作 + 表格/卡片切换 + 状态分段筛选(后端新增可选 `status` 参数)+ 详情抽屉 + 可折叠回收站提示。颜色/字体走 app 主题令牌(适配主题强调色+深色),设计稿中后端无的字段(plan/users/region/owner)省略。新增 `TenantRowActions.vue`、5 语言 `platform.tenant.list.*` 文案、`list_statusFilter_addsStatusPredicate` 单测。
+
+- 2026-06-05 — 平台 dashboard 拆出独立「平台总览」页(`/platform/overview`,菜单 `platform.overview`,门控 `platform:tenant:read`,V56):KPI/图表/4 监控面板从租户管理页移出,租户表格首屏即可见。另:活跃与参与卡曲线图上方加「登录趋势(14天)」小标题。
 
 - 2026-06-05 — 停用/删除运维用户时同时 ForceLogout 踢下线(在飞 token 立即失效);启用清除踢出标记。
 

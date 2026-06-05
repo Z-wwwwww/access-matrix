@@ -4,142 +4,21 @@ const STORAGE_KEY_MODE = 'theme'
 const STORAGE_KEY_PALETTE = 'theme-palette'
 
 /**
- * Palette catalog. The `warm` palette is rendered by the base `:root` /
- * `.dark` rules in main.css — no `data-palette` attribute is set for it.
- * Each entry exposes a 3-color swatch (background, card surface, primary
- * accent). Most palettes preview using light-mode tokens, but dark-by-
- * personality palettes (Black, Midnight) preview with their dark-mode
- * tokens so the picker conveys their identity at a glance.
+ * Accent catalog for the single warm theme. All variants share the warm
+ * off-white surfaces (#f4efe9 bg + #ffffff cards) defined by the base `:root`
+ * / `.dark` rules in main.css — only the brand accent differs. `warm`
+ * (terracotta) is the default and sets no `data-palette` attribute; the others
+ * are applied as `data-palette="brick|ochre|pine|slate"`. Each entry exposes a
+ * 3-color swatch (background, card surface, accent) for the picker.
  */
+const WARM_BG = '#f4efe9'
+const WARM_CARD = '#ffffff'
 export const PALETTES = [
-  // Warm Classic is the project's original design system. No data-palette
-  // attribute is set when this palette is active. (Default is now 'clay' —
-  // see getInitialPalette.)
-  {
-    value: 'warm',
-    label: 'Warm Classic',
-    swatch: {
-      bg: 'hsl(30, 15%, 94%)',
-      card: 'hsl(30, 20%, 99%)',
-      primary: 'hsl(16, 85%, 38%)'
-    }
-  },
-  // Black previews using its dark-mode tokens (monochrome surfaces +
-  // electric blue accent) so users can tell it apart from the chromatic-
-  // light palettes at a glance.
-  {
-    value: 'black',
-    label: 'Black',
-    swatch: {
-      bg: 'hsl(0, 0%, 4%)',
-      card: 'hsl(0, 0%, 8%)',
-      primary: 'hsl(217, 91%, 65%)'
-    }
-  },
-  // Champagne — brand pair #f6f1e8 (warm cream) + #c9a875 (champagne gold).
-  {
-    value: 'champagne',
-    label: 'Champagne',
-    swatch: {
-      bg: 'hsl(39, 44%, 94%)',
-      card: 'hsl(0, 0%, 100%)',
-      primary: 'hsl(36, 44%, 62%)'
-    }
-  },
-  // Iris — cool slate neutrals + violet accent (Linear / modern SaaS).
-  {
-    value: 'iris',
-    label: 'Iris',
-    swatch: {
-      bg: 'hsl(264, 40%, 99%)',
-      card: 'hsl(0, 0%, 100%)',
-      primary: 'hsl(262, 83%, 58%)'
-    }
-  },
-  // Teal — cool neutrals + deep teal accent (clean, professional).
-  {
-    value: 'teal',
-    label: 'Teal',
-    swatch: {
-      bg: 'hsl(170, 40%, 97%)',
-      card: 'hsl(0, 0%, 100%)',
-      primary: 'hsl(175, 77%, 26%)'
-    }
-  },
-  // Clay — warm neutrals + terracotta accent (warm, but not yellow).
-  {
-    value: 'clay',
-    label: 'Clay',
-    swatch: {
-      bg: 'hsl(24, 33%, 97%)',
-      card: 'hsl(0, 0%, 100%)',
-      primary: 'hsl(12, 52%, 49%)'
-    }
-  },
-  // Rose — neutral grays + rose-red accent (elegant, brand-y).
-  {
-    value: 'rose',
-    label: 'Rose',
-    swatch: {
-      bg: 'hsl(340, 40%, 99%)',
-      card: 'hsl(0, 0%, 100%)',
-      primary: 'hsl(346, 83%, 41%)'
-    }
-  },
-  {
-    value: 'indigo',
-    label: 'Indigo',
-    swatch: {
-      bg: 'hsl(210, 40%, 98%)',
-      card: 'hsl(0, 0%, 100%)',
-      primary: 'hsl(244, 76%, 58%)'
-    }
-  },
-  {
-    value: 'sand',
-    label: 'Sand',
-    swatch: {
-      bg: 'hsl(60, 9%, 98%)',
-      card: 'hsl(0, 0%, 100%)',
-      primary: 'hsl(28, 86%, 35%)'
-    }
-  },
-  {
-    value: 'mist',
-    label: 'Mist',
-    swatch: {
-      bg: 'hsl(210, 40%, 98%)',
-      card: 'hsl(0, 0%, 100%)',
-      primary: 'hsl(200, 98%, 39%)'
-    }
-  },
-  {
-    value: 'sage',
-    label: 'Sage',
-    swatch: {
-      bg: 'hsl(0, 0%, 98%)',
-      card: 'hsl(0, 0%, 100%)',
-      primary: 'hsl(160, 84%, 30%)'
-    }
-  },
-  {
-    value: 'graphite',
-    label: 'Graphite',
-    swatch: {
-      bg: 'hsl(0, 0%, 98%)',
-      card: 'hsl(0, 0%, 100%)',
-      primary: 'hsl(346, 77%, 50%)'
-    }
-  },
-  {
-    value: 'midnight',
-    label: 'Midnight',
-    swatch: {
-      bg: 'hsl(220, 30%, 4%)',
-      card: 'hsl(220, 25%, 8%)',
-      primary: 'hsl(189, 94%, 55%)'
-    }
-  }
+  { value: 'warm',  label: '陶土铁锈', swatch: { bg: WARM_BG, card: WARM_CARD, primary: '#b5532f' } },
+  { value: 'brick', label: '砖红',     swatch: { bg: WARM_BG, card: WARM_CARD, primary: '#a8392f' } },
+  { value: 'ochre', label: '赭黄',     swatch: { bg: WARM_BG, card: WARM_CARD, primary: '#9a6b2a' } },
+  { value: 'pine',  label: '暗松绿',   swatch: { bg: WARM_BG, card: WARM_CARD, primary: '#3f6f5e' } },
+  { value: 'slate', label: '灰紫',     swatch: { bg: WARM_BG, card: WARM_CARD, primary: '#5a5470' } }
 ]
 
 const PALETTE_VALUES = PALETTES.map(p => p.value)
@@ -152,7 +31,7 @@ function getInitialMode() {
 
 function getInitialPalette() {
   const stored = localStorage.getItem(STORAGE_KEY_PALETTE)
-  return PALETTE_VALUES.includes(stored) ? stored : 'clay'
+  return PALETTE_VALUES.includes(stored) ? stored : 'warm'
 }
 
 const mode = ref(getInitialMode())

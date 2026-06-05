@@ -573,11 +573,32 @@ class TenantAdminServiceTest {
         page.setTotal(2L);
         when(tenantMapper.selectPage(any(Page.class), any(Wrapper.class))).thenReturn(page);
 
-        var result = service.list(1, 20, null);
+        var result = service.list(1, 20, null, null);
 
         assertThat(result.total()).isEqualTo(2);
         assertThat(result.records()).hasSize(2);
         assertThat(result.records().get(0).tenantCode()).isEqualTo("acme");
         assertThat(result.records().get(1).tenantCode()).isEqualTo("beta");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void list_statusFilter_addsStatusPredicate() {
+        Page<TenantEntity> page = new Page<>(1, 20);
+        page.setRecords(List.of());
+        page.setTotal(0L);
+        when(tenantMapper.selectPage(any(Page.class), any(Wrapper.class))).thenReturn(page);
+
+        ArgumentCaptor<Wrapper<TenantEntity>> cap = ArgumentCaptor.forClass(Wrapper.class);
+
+        // null status → no status predicate in the generated SQL
+        service.list(1, 20, null, null);
+        verify(tenantMapper).selectPage(any(Page.class), cap.capture());
+        assertThat(cap.getValue().getTargetSql()).doesNotContain("status");
+
+        // explicit status (0=suspended) → status predicate is added
+        service.list(1, 20, null, 0);
+        verify(tenantMapper, org.mockito.Mockito.times(2)).selectPage(any(Page.class), cap.capture());
+        assertThat(cap.getValue().getTargetSql()).contains("status");
     }
 }
