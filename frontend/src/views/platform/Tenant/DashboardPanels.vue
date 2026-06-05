@@ -394,7 +394,7 @@ onMounted(fetchDashboard)
             <span class="shrink-0 font-medium">{{ s.operator }}</span>
             <span class="text-muted-foreground shrink-0">→</span>
             <span class="font-mono text-xs shrink-0">{{ s.targetTenantCode || '—' }}</span>
-            <span class="truncate text-muted-foreground italic">{{ reasonOf(s.reason) }}</span>
+            <span class="truncate text-muted-foreground italic pr-1">{{ reasonOf(s.reason) }}</span>
             <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ fmtDate(s.startedAt) }}</span>
           </div>
         </div>
