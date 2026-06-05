@@ -13,6 +13,8 @@ import com.platform.core.common.id.IdGenerator;
 import com.platform.core.common.notification.NotificationEvent;
 import com.platform.core.common.notification.NotificationResolvedEvent;
 import com.platform.core.common.result.PageResult;
+import com.platform.core.infrastructure.event.DomainEvent;
+import com.platform.core.infrastructure.event.EventPublisher;
 import com.platform.core.infrastructure.security.rbac.DataScopeDecision;
 import com.platform.core.infrastructure.security.rbac.DataScopeHelper;
 import com.platform.core.infrastructure.security.rbac.DataScopeResolver;
@@ -21,7 +23,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class TaskService {
@@ -30,13 +34,37 @@ public class TaskService {
     private final DataScopeResolver dataScopeResolver;
     private final ApplicationEventPublisher publisher;
     private final DictQueryService dictQueryService;
+    /** Outbox publisher — writes a domain-event row into core_domain_event in the same tx. */
+    private final EventPublisher events;
 
     public TaskService(TaskMapper taskMapper, DataScopeResolver dataScopeResolver,
-                       ApplicationEventPublisher publisher, DictQueryService dictQueryService) {
+                       ApplicationEventPublisher publisher, DictQueryService dictQueryService,
+                       EventPublisher events) {
         this.taskMapper = taskMapper;
         this.dataScopeResolver = dataScopeResolver;
         this.publisher = publisher;
         this.dictQueryService = dictQueryService;
+        this.events = events;
+    }
+
+    /**
+     * Emit a {@code demo.task.*} domain event to the outbox. Demonstrates the
+     * core_domain_event substrate end-to-end (publish → outbox → dispatcher →
+     * platform event console). Called inside the @Transactional write so the
+     * event commits atomically with the change — no event without the write.
+     *
+     * <p>This is demo-grade emission on plain CRUD; a real revenue-management
+     * module should be more selective about what's event-worthy and register an
+     * Events constants class + guard (mirrors the permission-code pattern).
+     */
+    private void emit(String eventType, TaskEntity t) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("title", t.getTitle());
+        payload.put("status", t.getStatus());
+        payload.put("priority", t.getPriority());
+        payload.put("deptId", t.getDeptId());
+        payload.put("assigneeUserId", t.getAssigneeUserId());
+        events.publish(DomainEvent.of("DemoTask", t.getId(), eventType, payload));
     }
 
     /**
@@ -122,6 +150,7 @@ public class TaskService {
         t.setDueDate(req.dueDate());
         taskMapper.insert(t);
         notifyAssignee(t);
+        emit("demo.task.created", t);
         return t.getId();
     }
 
@@ -147,6 +176,7 @@ public class TaskService {
         if (req.assigneeUserId() != null) t.setAssigneeUserId(req.assigneeUserId());
         if (req.dueDate() != null) t.setDueDate(req.dueDate());
         taskMapper.updateById(t);
+        emit("demo.task.updated", t);
         if (assigneeChanged) notifyAssignee(t);
         // 「処理完了」= 完了/取消。この時点で該当タスクの action 通知を既読化する。
         if (req.status() != null
@@ -167,6 +197,7 @@ public class TaskService {
                 new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<TaskEntity>()
                         .eq("id", id).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));
+        emit("demo.task.deleted", t);
     }
 
     private TaskDto.View toView(TaskEntity t) {
