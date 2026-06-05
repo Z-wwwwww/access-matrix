@@ -6,6 +6,10 @@ This file is intentionally thin. The **`AGENTS.md` files are the single source o
 - Backend (Spring Boot 4 / Java 25 / MyBatis-Plus / Flyway) → [`backend/AGENTS.md`](backend/AGENTS.md)
 - Frontend (Vue 3 / Vite / Tailwind v4) → [`frontend/AGENTS.md`](frontend/AGENTS.md)
 
+## Always maintain the feature & test-point log
+
+- [`docs/features-and-tests.md`](docs/features-and-tests.md) is the living single source of foundational features + manual test points. **Every time you add or change a feature, update it in the same change**: add/adjust the feature entry and list its test points (and prepend a one-line 变更履歴 entry). Treat this as part of "done", like updating tests.
+
 ## Before writing backend business code, don't miss:
 
 - **Adding a module/table/endpoint** follows a fixed recipe (scaffold tool, `core_*`/`{module}_*` table naming, `@RequiresPermission` constants, `@OpLog`): [backend/AGENTS.md § Business code recipe](backend/AGENTS.md#business-code-recipe--adding-a-new-table--endpoint).
