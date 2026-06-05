@@ -159,6 +159,21 @@ public class PlatformTenantController {
     }
 
     /**
+     * Mark the operator's support session ended (they exited before the 30-min
+     * token expired). Called by the SPA on terminate with the freshly-restored
+     * ops token (which carries {@code platform:tenant:impersonate}), so the
+     * "active support sessions" dashboard metric reflects reality instead of
+     * counting every start in the last 30 min as live.
+     */
+    @PostMapping("/support-session/terminate")
+    @RequiresPermission(PlatformPermissions.TENANT_IMPERSONATE)
+    @OpLog(module = "platform", action = "tenant.impersonate.end", targetType = "tenant")
+    public JsonResult<Void> terminateSupportSession(@Valid @RequestBody TenantDto.TerminateSupportRequest body) {
+        impersonationService.endSession(body.sessionId());
+        return JsonResult.ok();
+    }
+
+    /**
      * Permanent hard delete — the "empty recycle bin" operation.
      *
      * <p>UX contract: tenant must already be in suspended state

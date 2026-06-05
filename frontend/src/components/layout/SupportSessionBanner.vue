@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { LifeBuoy, X } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/useToast'
+import { terminateSupportSessionApi } from '@/services/tenant'
 
 /**
  * Persistent red banner shown while the platform-ops user is acting as
@@ -46,8 +47,16 @@ const remainingFmt = computed(() => {
   return `${mm}:${ss}`
 })
 
-function terminate() {
+async function terminate() {
+  // Capture the session id BEFORE terminating (terminate clears the metadata).
+  const sessionId = auth.supportSessionInfo?.sessionId
   if (!auth.terminateSupportSession()) return
+  // Ops token is now restored; tell the backend the session ended so the
+  // platform dashboard's "active sessions" reflects reality. Best-effort —
+  // never block the exit on this bookkeeping call.
+  if (sessionId) {
+    try { await terminateSupportSessionApi(sessionId) } catch { /* ignore */ }
+  }
   toast.success(t('platform.tenant.support.message.terminated'))
   // Hard navigation (NOT router.push) back to the platform tenants list.
   // Dynamic routes are registered once per page-load from the menu and are

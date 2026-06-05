@@ -139,7 +139,8 @@ public final class PlatformDashboardDto {
             String targetTenantCode,
             String targetDisplayName,
             LocalDateTime startedAt,
-            String reason
+            String reason,
+            boolean active        // ended_at IS NULL AND expires_at > now()
     ) {}
 
     /**

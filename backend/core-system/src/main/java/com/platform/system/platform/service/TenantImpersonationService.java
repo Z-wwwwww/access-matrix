@@ -160,6 +160,21 @@ public class TenantImpersonationService {
                 "tenant:*", List.of(roleId),
                 act, SUPPORT_SESSION_TTL);
 
+        // Server-side session record so "is this session still live?" is knowable
+        // (the dashboard reads it; terminate sets ended_at). Best-effort: a tracking
+        // hiccup must not block emergency triage — the token is already minted.
+        try {
+            jdbc.update(
+                    "INSERT INTO core_support_session "
+                            + "  (id, tenant_id, tenant_code, operator, reason, started_at, expires_at) "
+                            + "VALUES (?, 'system', ?, ?, ?, CURRENT_TIMESTAMP, "
+                            + "        CURRENT_TIMESTAMP + make_interval(mins => ?))",
+                    sessionId, row.getTenantCode(), actorUsername, reason,
+                    (int) SUPPORT_SESSION_TTL.toMinutes());
+        } catch (RuntimeException e) {
+            log.warn("[support] could not record support session {} (continuing): {}", sessionId, e.toString());
+        }
+
         log.info("[support] minted session for ops={} → tenant={} (session={}, ttl={}min, reason='{}')",
                 actorUsername, row.getTenantCode(), sessionId, SUPPORT_SESSION_TTL.toMinutes(), reason);
 
@@ -170,5 +185,24 @@ public class TenantImpersonationService {
                 row.getDisplayName(),
                 issued.expiresAt().toString(),
                 issued.expiresInSec());
+    }
+
+    /**
+     * Mark a support session ended (operator exited before the token expired).
+     * Idempotent: only flips a row that is still open. The token isn't revoked
+     * server-side (it's a stateless short-lived JWT that simply expires) — this
+     * is the "live session" bookkeeping the dashboard reads.
+     */
+    public void endSession(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return;
+        }
+        int n = jdbc.update(
+                "UPDATE core_support_session SET ended_at = CURRENT_TIMESTAMP "
+                        + "WHERE id = ? AND ended_at IS NULL",
+                sessionId);
+        if (n > 0) {
+            log.info("[support] session {} terminated by operator", sessionId);
+        }
     }
 }

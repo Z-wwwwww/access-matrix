@@ -214,14 +214,12 @@ public class PlatformDashboardService {
 
     // ── 5. Security ────────────────────────────────────────────────────────
     private PlatformDashboardDto.Security security() {
+        // Truly live sessions (started, not ended, not expired) — from the
+        // server-side session record (V52), not a 30-min proxy over start events.
         long activeSupport = q1Long(
-                "SELECT COUNT(*) FROM core_oplog "
-                        + "WHERE module = 'platform' AND action = 'tenant.impersonate.start' "
-                        + "AND create_time >= now() - INTERVAL '30 minutes'");
+                "SELECT COUNT(*) FROM core_support_session WHERE ended_at IS NULL AND expires_at > now()");
         long support7d = q1Long(
-                "SELECT COUNT(*) FROM core_oplog "
-                        + "WHERE module = 'platform' AND action = 'tenant.impersonate.start' "
-                        + "AND create_time >= now() - INTERVAL '7 days'");
+                "SELECT COUNT(*) FROM core_support_session WHERE started_at >= now() - INTERVAL '7 days'");
         long breakGlass7d = q1Long(
                 "SELECT COUNT(*) FROM core_oplog "
                         + "WHERE module = 'system' AND action = 'auth.breakGlass' "
@@ -233,17 +231,18 @@ public class PlatformDashboardService {
                 "SELECT COUNT(*) FROM core_password_reset_token "
                         + "WHERE create_time >= now() - INTERVAL '7 days'");
 
+        // Recent sessions (newest first), incl. ended/expired — the "active" flag
+        // marks the ones still live so the list and the KPI agree.
         List<PlatformDashboardDto.SupportSession> recent = jdbc.query(
-                "SELECT o.username, o.target_id, o.create_time, o.request_body, "
-                        + "       t.tenant_code, t.display_name "
-                        + "FROM core_oplog o "
-                        + "LEFT JOIN core_tenant t ON t.id = o.target_id "
-                        + "WHERE o.module = 'platform' AND o.action = 'tenant.impersonate.start' "
-                        + "ORDER BY o.create_time DESC LIMIT " + LIST_CAP,
+                "SELECT s.operator, s.tenant_code, t.display_name, s.started_at, s.reason, "
+                        + "       (s.ended_at IS NULL AND s.expires_at > now()) AS active "
+                        + "FROM core_support_session s "
+                        + "LEFT JOIN core_tenant t ON t.tenant_code = s.tenant_code "
+                        + "ORDER BY s.started_at DESC LIMIT " + LIST_CAP,
                 (rs, n) -> new PlatformDashboardDto.SupportSession(
-                        rs.getString("username"), rs.getString("tenant_code"),
-                        rs.getString("display_name"), ts(rs.getObject("create_time")),
-                        rs.getString("request_body")));
+                        rs.getString("operator"), rs.getString("tenant_code"),
+                        rs.getString("display_name"), ts(rs.getObject("started_at")),
+                        rs.getString("reason"), rs.getBoolean("active")));
 
         // Break-glass logins (oplog.tenant_id IS the tenant code for these rows).
         List<PlatformDashboardDto.BreakGlassUse> breakGlass = jdbc.query(

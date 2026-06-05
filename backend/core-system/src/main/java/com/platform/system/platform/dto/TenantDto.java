@@ -123,6 +123,16 @@ public final class TenantDto {
     ) {}
 
     /**
+     * Request body for {@code POST /platform/tenants/support-session/terminate}.
+     * The client sends the active session's id (from the JWT act claim / the
+     * support-session response) when the operator exits, so the backend can mark
+     * the {@code core_support_session} row ended.
+     */
+    public record TerminateSupportRequest(
+            @NotBlank @Size(max = 64) String sessionId
+    ) {}
+
+    /**
      * Response shape from starting a support session. The frontend stashes
      * {@code token} as its active Bearer (saving the prior ops token for
      * restoration on terminate) and renders the countdown / banner from

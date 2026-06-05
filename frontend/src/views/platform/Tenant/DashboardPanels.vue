@@ -13,7 +13,7 @@ import { toJSTDateTimeDisp } from '@/lib/date'
 import { getPlatformDashboardApi } from '@/services/tenant'
 import {
   UserCheck, Activity, ServerCog, ShieldAlert,
-  Clock, AlarmClockOff, LifeBuoy, KeyRound, Flame
+  Clock, AlarmClockOff, KeyRound, Flame
 } from 'lucide-vue-next'
 
 use([CanvasRenderer, LineChart, TooltipComponent, GridComponent])
@@ -32,7 +32,7 @@ const data = reactive({
 // Defaults (set in fetchDashboard) to the first card that has a value, so the
 // panel always shows the most relevant detail without a click. Clicking just
 // switches — there's always exactly one selected.
-const sel = reactive({ act: 'pending', rel: 'jobs' })
+const sel = reactive({ act: 'pending', rel: 'jobs', sec: 'support' })
 function pick(group, key) {
   sel[group] = key
 }
@@ -161,6 +161,11 @@ async function fetchDashboard() {
         ['backlog', (d.reliability?.eventPending || 0) + (d.reliability?.eventFailed || 0)],
         ['oldest', d.reliability?.eventBacklogOldestMin],
         ['errors', d.reliability?.oplogErrors24h]
+      ])
+      sel.sec = firstWithValue([
+        ['support', d.security?.activeSupportSessions],
+        ['support7d', d.security?.supportSessions7d],
+        ['breakglass', d.security?.breakGlass7d]
       ])
       loaded.value = true
     } else {
@@ -351,59 +356,64 @@ onMounted(fetchDashboard)
         <span class="text-sm font-medium">{{ t('platform.tenant.ops.security.title') }}</span>
       </div>
       <div class="grid grid-cols-5 gap-2 mb-3">
-        <div class="text-center">
+        <button type="button" class="rounded-lg border p-2 text-center cursor-pointer transition-colors"
+                :class="cardCls('sec','support')" @click="pick('sec','support')">
           <div class="text-xl font-semibold" :class="data.security.activeSupportSessions ? 'text-amber-600' : 'text-foreground'">
             {{ data.security.activeSupportSessions }}
           </div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.security.activeSupport') }}</div>
-        </div>
-        <div class="text-center">
+        </button>
+        <button type="button" class="rounded-lg border p-2 text-center cursor-pointer transition-colors"
+                :class="cardCls('sec','support7d')" @click="pick('sec','support7d')">
           <div class="text-xl font-semibold">{{ data.security.supportSessions7d }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.security.support7d') }}</div>
-        </div>
-        <div class="text-center">
+        </button>
+        <button type="button" class="rounded-lg border p-2 text-center cursor-pointer transition-colors"
+                :class="cardCls('sec','breakglass')" @click="pick('sec','breakglass')">
           <div class="text-xl font-semibold" :class="alertClass(data.security.breakGlass7d)">{{ data.security.breakGlass7d }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.security.breakGlass') }}</div>
-        </div>
-        <div class="text-center">
+        </button>
+        <div class="p-2 text-center">
           <div class="text-xl font-semibold" :class="alertClass(data.security.loginFailures24h, 10)">{{ data.security.loginFailures24h }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.security.loginFailures') }}</div>
         </div>
-        <div class="text-center">
+        <div class="p-2 text-center">
           <div class="text-xl font-semibold">{{ data.security.passwordResets7d }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('platform.tenant.ops.security.passwordResets') }}</div>
         </div>
       </div>
-      <div class="text-[11px] text-muted-foreground mb-1 flex items-center gap-1">
-        <LifeBuoy class="size-3.5" /> {{ t('platform.tenant.ops.security.supportListTitle') }}
-      </div>
-      <div v-if="data.security.recentSupportSessions.length" class="divide-y divide-border/60">
-        <div v-for="(s, i) in data.security.recentSupportSessions" :key="i"
-             class="py-1.5 flex items-center gap-2 text-sm">
-          <KeyRound class="size-3.5 text-amber-600 shrink-0" />
-          <span class="shrink-0 font-medium">{{ s.operator }}</span>
-          <span class="text-muted-foreground shrink-0">→</span>
-          <span class="font-mono text-xs shrink-0">{{ s.targetTenantCode || '—' }}</span>
-          <span class="truncate text-muted-foreground italic">{{ reasonOf(s.reason) }}</span>
-          <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ fmtDate(s.startedAt) }}</span>
-        </div>
-      </div>
-      <div v-else class="py-3 text-center text-xs text-muted-foreground">{{ t('platform.tenant.ops.empty') }}</div>
 
-      <div class="text-[11px] text-muted-foreground mt-3 mb-1 flex items-center gap-1">
-        <Flame class="size-3.5 text-destructive" /> {{ t('platform.tenant.ops.security.breakGlassListTitle') }}
-      </div>
-      <div v-if="data.security.recentBreakGlass.length" class="divide-y divide-border/60">
-        <div v-for="(b, i) in data.security.recentBreakGlass" :key="i"
-             class="py-1.5 flex items-center gap-2 text-sm">
-          <Flame class="size-3.5 text-destructive shrink-0" />
-          <span class="shrink-0 font-medium">{{ b.operator }}</span>
-          <span class="font-mono text-xs shrink-0">{{ b.tenantCode }}</span>
-          <span class="truncate text-muted-foreground">{{ b.clientIp || '—' }}</span>
-          <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ fmtDate(b.usedAt) }}</span>
+      <!-- support sessions (active / 7d share this list) -->
+      <template v-if="sel.sec === 'support' || sel.sec === 'support7d'">
+        <div v-if="data.security.recentSupportSessions.length" class="divide-y divide-border/60">
+          <div v-for="(s, i) in data.security.recentSupportSessions" :key="i"
+               class="py-1.5 flex items-center gap-2 text-sm">
+            <span class="size-2 rounded-full shrink-0"
+                  :class="s.active ? 'bg-emerald-500' : 'bg-muted-foreground/30'" />
+            <KeyRound class="size-3.5 text-amber-600 shrink-0" />
+            <span class="shrink-0 font-medium">{{ s.operator }}</span>
+            <span class="text-muted-foreground shrink-0">→</span>
+            <span class="font-mono text-xs shrink-0">{{ s.targetTenantCode || '—' }}</span>
+            <span class="truncate text-muted-foreground italic">{{ reasonOf(s.reason) }}</span>
+            <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ fmtDate(s.startedAt) }}</span>
+          </div>
         </div>
-      </div>
-      <div v-else class="py-3 text-center text-xs text-muted-foreground">{{ t('platform.tenant.ops.empty') }}</div>
+        <div v-else class="py-3 text-center text-xs text-muted-foreground">{{ t('platform.tenant.ops.empty') }}</div>
+      </template>
+      <!-- break-glass -->
+      <template v-else-if="sel.sec === 'breakglass'">
+        <div v-if="data.security.recentBreakGlass.length" class="divide-y divide-border/60">
+          <div v-for="(b, i) in data.security.recentBreakGlass" :key="i"
+               class="py-1.5 flex items-center gap-2 text-sm">
+            <Flame class="size-3.5 text-destructive shrink-0" />
+            <span class="shrink-0 font-medium">{{ b.operator }}</span>
+            <span class="font-mono text-xs shrink-0">{{ b.tenantCode }}</span>
+            <span class="truncate text-muted-foreground">{{ b.clientIp || '—' }}</span>
+            <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ fmtDate(b.usedAt) }}</span>
+          </div>
+        </div>
+        <div v-else class="py-3 text-center text-xs text-muted-foreground">{{ t('platform.tenant.ops.empty') }}</div>
+      </template>
     </Card>
   </div>
 
