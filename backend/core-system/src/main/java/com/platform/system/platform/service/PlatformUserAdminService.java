@@ -6,6 +6,7 @@ import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.core.common.result.PageResult;
 import com.platform.core.common.security.BuiltInRoles;
+import com.platform.core.infrastructure.security.ForceLogoutService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.platform.dto.PlatformUserDto;
 import org.slf4j.Logger;
@@ -50,11 +51,15 @@ public class PlatformUserAdminService {
     private final JdbcTemplate jdbc;
     /** KC is only present in oidc mode; ObjectProvider keeps this bootable otherwise. */
     private final ObjectProvider<KeycloakUserService> userServiceProvider;
+    /** Used to terminate a disabled/deleted operator's in-flight sessions immediately. */
+    private final ForceLogoutService forceLogoutService;
 
     public PlatformUserAdminService(JdbcTemplate jdbc,
-                                    ObjectProvider<KeycloakUserService> userServiceProvider) {
+                                    ObjectProvider<KeycloakUserService> userServiceProvider,
+                                    ForceLogoutService forceLogoutService) {
         this.jdbc = jdbc;
         this.userServiceProvider = userServiceProvider;
+        this.forceLogoutService = forceLogoutService;
     }
 
     public PageResult<PlatformUserDto.View> list(long page, long size, String keyword) {
@@ -154,6 +159,13 @@ public class PlatformUserAdminService {
         }
         jdbc.update("UPDATE core_auth_user SET status = ?, update_time = ? WHERE id = ?",
                 enabled ? 1 : 0, LocalDateTime.now(), t.id());
+        // Disable = kick out now (in-flight access tokens rejected on next request,
+        // refresh blocked); enable = clear the kick so fresh tokens work.
+        if (enabled) {
+            forceLogoutService.clear(t.id());
+        } else {
+            forceLogoutService.kickOut(t.id());
+        }
         log.info("[platform-user] {} ops user '{}' (id={})", enabled ? "enabled" : "disabled", t.username(), t.id());
     }
 
@@ -176,6 +188,7 @@ public class PlatformUserAdminService {
                         t.username(), t.keycloakId(), e.toString());
             }
         }
+        forceLogoutService.kickOut(t.id());   // terminate any in-flight session immediately
         log.info("[platform-user] deleted ops user '{}' (id={})", t.username(), t.id());
     }
 
