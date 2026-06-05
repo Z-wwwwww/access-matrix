@@ -104,7 +104,8 @@ export default {
       networkError: '네트워크 오류',
       sessionExpired: '세션이 만료되었습니다',
       operationSuccessful: '작업이 완료되었습니다',
-      iframeLoadFailed: '외부 페이지를 불러올 수 없습니다'
+      iframeLoadFailed: '외부 페이지를 불러올 수 없습니다',
+      invalidEmail: '이메일 형식이 올바르지 않습니다'
     },
     label: {
       keyword: '키워드'
@@ -243,7 +244,7 @@ export default {
         copy: '복사'
       },
       message: {
-        loadFailed: '사용자 목록 로드 실패', required: '사용자명과 표시 이름은 필수입니다',
+        loadFailed: '사용자 목록 로드 실패', required: '필수 항목을 입력하세요',
         createSuccess: '플랫폼 사용자 생성됨', createFailed: '사용자 생성 실패',
         copied: '복사됨', copyFailed: '복사 실패',
         disableSuccess: '비활성화됨', enableSuccess: '활성화됨', resetSuccess: '비밀번호 재설정됨',

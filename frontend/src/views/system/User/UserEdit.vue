@@ -8,6 +8,7 @@ import DeptTreeDialog from '@/components/shared/DeptTreeDialog.vue'
 import { Check } from 'lucide-vue-next'
 import { toast } from '@/composables/useToast'
 import { useDict } from '@/composables/useDict'
+import { isValidEmail } from '@/lib/validators'
 import { addUserApi, updateUserApi, getUserRolesApi, assignUserRolesApi } from '@/services/user'
 import { getRoleListApi } from '@/services/role'
 
@@ -83,6 +84,10 @@ function isRoleSelected(id) {
 }
 
 async function save() {
+  if (!isValidEmail(form.email)) {
+    toast.error(t('common.message.invalidEmail'))
+    return
+  }
   saving.value = true
   try {
     let userId

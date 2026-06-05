@@ -73,7 +73,13 @@ public class KeycloakUserService {
                 u.setFirstName(displayName.substring(0, sp));
                 u.setLastName(displayName.substring(sp + 1));
             } else {
+                // Single-token name (e.g. CJK names have no space). Realms require
+                // both firstName and lastName by default, so set both to the whole
+                // name — leaving lastName empty would force an UPDATE_PROFILE step
+                // on first login. KC's first/last names aren't user-facing in this
+                // app (we display our own display_name).
                 u.setFirstName(displayName);
+                u.setLastName(displayName);
             }
         }
         if (tempPassword != null && !tempPassword.isBlank()) {

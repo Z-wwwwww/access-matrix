@@ -26,6 +26,8 @@
 - [ ] break-glass 登录后:`core_oplog` 有 `system/auth.breakGlass` 记录;安全面板"break-glass(7天)"+1;本人收到告警邮件(或日志)。
 - [ ] access token 过期后自动刷新、原请求重放成功;刷新失败被踢回 `/login`。
 - [ ] 多 realm:在 A 租户的账号无法登录 B 租户。
+- [ ] 新建运维用户用临时密码首登 → KC「修改密码」页,按钮是通用「提交」(不是「发送重置链接」)。Keycloak 主题 `doSubmit` 必须保持通用(多页面共用),不要写成某页专属文案。
+- [ ] KC 多字段表单(更新账户信息 / 修改密码)排版整齐:必填 `*` 紧跟 label **同一行**,label↔input、字段↔字段间距正常(不因 `.pf-*__label-text` 被设成 block 而拉开)。
 
 ---
 
@@ -99,6 +101,8 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 - [ ] 新用户能管租户/事件等,但**看不到运维用户菜单**(只比 ops 低一档)。
 - [ ] 停用→该用户无法登录;启用→恢复;重置密码→弹新临时密码;删除→DB 软删 + KC 用户删除。
 - [ ] 不能对**自己**或**ops(超级)**执行停用/删除/重置(行内按钮隐藏 + 后端拦截)。
+- [ ] 新建表单必填项 `*` 为红色;邮箱有格式校验(前端正则 + 后端 `@Email`),格式不对被拦。
+- [ ] 新建用户邮箱**必填**;首登**不**经过"更新账户信息"页(不报"请指定此字段"),直接进设置密码——KC 用户的 email/firstName/lastName 创建时已补全(单段名 lastName 也填)。
 
 ---
 
@@ -135,6 +139,11 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 
 ## 変更履歴 / 变更记录(追加在最上)
 
+- 2026-06-05 — 全项目邮箱输入统一前端格式校验(`@/lib/validators` 的 `isValidEmail` + `common.message.invalidEmail`):平台用户、租户新建/编辑、重发邀请、用户编辑;后端各 DTO 本就有 `@Email`。
+
+- 2026-06-05 — 新建运维用户:email 改必填 + 单段名也填 lastName,使首登跳过 UPDATE_PROFILE(不再一进来就报"请指定此字段")。
+- 2026-06-05 — 修复 KC 主题多字段表单(更新账户/修改密码)排版:必填 `*` 回到 label 同行、收紧 label/字段间距(`.pf-*__label-text` 不再被设成 block)。
+- 2026-06-05 — 修复 KC 登录主题 `doSubmit` 被改成"发送重置链接"导致"设置/修改密码"页按钮文案错误;改回通用"提交"。
 - 2026-06-05 — 平台运维用户控制台(两级:ops / PLATFORM_OPERATOR;新建/停用/删除/重置密码)。
 - 2026-06-05 — 支持会话服务端追踪(`core_support_session`)+ 安全面板可选卡。
 - 2026-06-05 — 领域事件控制台(列表 + 重发)+ demo task emit 事件 + outbox 保留作业。

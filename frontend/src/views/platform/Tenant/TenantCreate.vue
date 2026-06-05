@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import Drawer from '@/components/ui/Drawer.vue'
 import Input from '@/components/ui/Input.vue'
 import { toast } from '@/composables/useToast'
+import { isValidEmail } from '@/lib/validators'
 import { createTenantApi } from '@/services/tenant'
 
 const { t } = useI18n()
@@ -58,6 +59,10 @@ async function save() {
   const overrideUsername = form.value.adminUsername?.trim() || ''
   if (overrideUsername && !USERNAME_RE.test(overrideUsername)) {
     errorMsg.value = t('platform.tenant.edit.error.invalidAdminUsername')
+    return
+  }
+  if (!isValidEmail(form.value.contactEmail)) {
+    errorMsg.value = t('common.message.invalidEmail')
     return
   }
   saving.value = true

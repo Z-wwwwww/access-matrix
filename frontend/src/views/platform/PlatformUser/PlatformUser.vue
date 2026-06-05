@@ -9,6 +9,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { toJSTDateTimeDisp } from '@/lib/date'
+import { isValidEmail } from '@/lib/validators'
 import { Plus, Search, RotateCcw, Copy, ShieldCheck, Pause, Play, KeyRound, Trash2 } from 'lucide-vue-next'
 import {
   listPlatformUsersApi, createPlatformUserApi,
@@ -82,8 +83,12 @@ function openCreate() {
 }
 
 async function submitCreate() {
-  if (!form.username || !form.displayName) {
+  if (!form.username || !form.displayName || !form.email) {
     toast.error(t('platform.user.message.required'))
+    return
+  }
+  if (!isValidEmail(form.email)) {
+    toast.error(t('common.message.invalidEmail'))
     return
   }
   saving.value = true
@@ -270,16 +275,16 @@ onMounted(fetchData)
       <div class="space-y-3">
         <p class="text-xs text-muted-foreground leading-relaxed">{{ t('platform.user.create.intro') }}</p>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">{{ t('platform.user.column.username') }} *</label>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('platform.user.column.username') }} <span class="text-destructive">*</span></label>
           <Input v-model="form.username" :placeholder="t('platform.user.create.usernamePlaceholder')" />
           <p class="text-[11px] text-muted-foreground mt-1">{{ t('platform.user.create.usernameHint') }}</p>
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">{{ t('platform.user.column.displayName') }} *</label>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('platform.user.column.displayName') }} <span class="text-destructive">*</span></label>
           <Input v-model="form.displayName" :placeholder="t('platform.user.create.displayNamePlaceholder')" />
         </div>
         <div>
-          <label class="text-xs text-muted-foreground block mb-1">{{ t('platform.user.column.email') }}</label>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('platform.user.column.email') }} <span class="text-destructive">*</span></label>
           <Input v-model="form.email" :placeholder="t('platform.user.create.emailPlaceholder')" />
         </div>
       </div>

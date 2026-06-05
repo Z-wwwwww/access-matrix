@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import Drawer from '@/components/ui/Drawer.vue'
 import Input from '@/components/ui/Input.vue'
 import { toast } from '@/composables/useToast'
+import { isValidEmail } from '@/lib/validators'
 import { updateTenantApi } from '@/services/tenant'
 
 /**
@@ -45,6 +46,10 @@ async function save() {
   errorMsg.value = ''
   if (!form.value.displayName?.trim()) {
     errorMsg.value = t('platform.tenant.edit.error.missingDisplayName')
+    return
+  }
+  if (!isValidEmail(form.value.contactEmail)) {
+    errorMsg.value = t('common.message.invalidEmail')
     return
   }
   saving.value = true

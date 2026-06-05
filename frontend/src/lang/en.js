@@ -104,7 +104,8 @@ export default {
       networkError: 'Network error',
       sessionExpired: 'Session expired',
       operationSuccessful: 'Operation successful',
-      iframeLoadFailed: 'Failed to load the external page'
+      iframeLoadFailed: 'Failed to load the external page',
+      invalidEmail: 'Invalid email format'
     },
     label: {
       keyword: 'Keyword'
@@ -243,7 +244,7 @@ export default {
         copy: 'Copy'
       },
       message: {
-        loadFailed: 'Failed to load users', required: 'Username and display name are required',
+        loadFailed: 'Failed to load users', required: 'Please fill in all required fields',
         createSuccess: 'Platform user created', createFailed: 'Failed to create user',
         copied: 'Copied', copyFailed: 'Copy failed',
         disableSuccess: 'Disabled', enableSuccess: 'Enabled', resetSuccess: 'Password reset',

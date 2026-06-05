@@ -34,7 +34,9 @@ public final class PlatformUserDto {
                     message = "username must be lowercase alphanumeric / dash / underscore")
             String username,
 
-            @Email @Size(max = 255) String email,
+            // Required: the realm marks email mandatory, so a missing email would
+            // force an UPDATE_PROFILE step on the new user's first login.
+            @NotBlank @Email @Size(max = 255) String email,
 
             @NotBlank @Size(max = 128) String displayName
     ) {}

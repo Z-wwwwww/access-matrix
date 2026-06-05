@@ -3,6 +3,8 @@ import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Drawer from '@/components/ui/Drawer.vue'
 import { Send } from 'lucide-vue-next'
+import { toast } from '@/composables/useToast'
+import { isValidEmail } from '@/lib/validators'
 
 /**
  * Resend the tenant admin's onboarding invite — for a missed email or a
@@ -42,6 +44,10 @@ function onClose(v) {
 }
 
 function submit() {
+  if (!isValidEmail(email.value)) {
+    toast.error(t('common.message.invalidEmail'))
+    return
+  }
   submitting.value = true
   // Only send `email` when the operator actually changed it — otherwise pass
   // null so the backend re-sends to the current address without a needless

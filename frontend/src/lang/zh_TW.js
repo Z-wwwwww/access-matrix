@@ -104,7 +104,8 @@ export default {
       networkError: '網路錯誤',
       sessionExpired: '工作階段已過期',
       operationSuccessful: '操作成功',
-      iframeLoadFailed: '無法載入外部頁面'
+      iframeLoadFailed: '無法載入外部頁面',
+      invalidEmail: '電子郵件格式不正確'
     },
     label: {
       keyword: '關鍵字'
@@ -243,7 +244,7 @@ export default {
         copy: '複製'
       },
       message: {
-        loadFailed: '載入使用者清單失敗', required: '使用者名稱與顯示名稱為必填',
+        loadFailed: '載入使用者清單失敗', required: '請填寫所有必填項',
         createSuccess: '已建立平台使用者', createFailed: '建立使用者失敗',
         copied: '已複製', copyFailed: '複製失敗',
         disableSuccess: '已停用', enableSuccess: '已啟用', resetSuccess: '已重設密碼',

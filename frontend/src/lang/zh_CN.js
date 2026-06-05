@@ -104,7 +104,8 @@ export default {
       networkError: '网络错误',
       sessionExpired: '会话已过期',
       operationSuccessful: '操作成功',
-      iframeLoadFailed: '无法加载外部页面'
+      iframeLoadFailed: '无法加载外部页面',
+      invalidEmail: '邮箱格式不正确'
     },
     label: {
       keyword: '关键词'
@@ -243,7 +244,7 @@ export default {
         copy: '复制'
       },
       message: {
-        loadFailed: '加载用户列表失败', required: '用户名和显示名必填',
+        loadFailed: '加载用户列表失败', required: '请填写所有必填项',
         createSuccess: '已创建平台用户', createFailed: '创建用户失败',
         copied: '已复制', copyFailed: '复制失败',
         disableSuccess: '已停用', enableSuccess: '已启用', resetSuccess: '已重置密码',

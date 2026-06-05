@@ -111,7 +111,8 @@ export default {
       networkError: 'ネットワークエラー',
       sessionExpired: 'セッションが切れました',
       operationSuccessful: '操作が完了しました',
-      iframeLoadFailed: '外部ページを読み込めません'
+      iframeLoadFailed: '外部ページを読み込めません',
+      invalidEmail: 'メールアドレスの形式が正しくありません'
     },
     label: {
       keyword: 'キーワード'
@@ -250,7 +251,7 @@ export default {
         copy: 'コピー'
       },
       message: {
-        loadFailed: 'ユーザー一覧の取得に失敗しました', required: 'ユーザー名と表示名は必須です',
+        loadFailed: 'ユーザー一覧の取得に失敗しました', required: '必須項目を入力してください',
         createSuccess: '運用ユーザーを作成しました', createFailed: 'ユーザー作成に失敗しました',
         copied: 'コピーしました', copyFailed: 'コピーに失敗しました',
         disableSuccess: '停止しました', enableSuccess: '再開しました', resetSuccess: 'パスワードを再設定しました',
