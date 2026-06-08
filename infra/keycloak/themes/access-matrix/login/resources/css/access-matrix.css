@@ -1891,46 +1891,110 @@ button:focus-visible,
    tooling can drive it from prefers-color-scheme.
    ============================================================ */
 [data-theme="dark"] {
-  --am-bg:           #0B1320;
-  --am-card:         #111C2D;
-  --am-foreground:   #EDE6D8;
-  --am-muted:        #8893A6;
-  --am-faint:        #6B7484;
-  --am-border:       #1E2A3D;
-  --am-border-strong:#2A3850;
+  /* Warm near-black surfaces — mirror the app's `.dark` palette
+     (frontend/src/styles/main.css) so the login page's dark mode matches the
+     in-app dashboard: warm near-black bg, warm off-white text, terracotta
+     brand accent. Light mode keeps the navy editorial look untouched. */
+  --am-bg:           hsl(20, 12%, 8%);
+  --am-card:         hsl(20, 10%, 13%);
+  --am-foreground:   hsl(30, 15%, 92%);
+  --am-muted:        hsl(30, 10%, 62%);
+  --am-faint:        hsl(28, 8%, 52%);
+  --am-border:       hsl(20, 10%, 26%);
+  --am-border-strong:hsl(16, 70%, 60%);   /* focused input border = terracotta */
+  /* Terracotta accent (= app `--primary` dark). Drives the primary button /
+     focus ring / checked checkbox / link hover below. The gold logo mark
+     (--am-accent + its hardcoded SVG) intentionally STAYS gold. */
+  --am-brand:        hsl(16, 70%, 60%);
+  --am-brand-hover:  hsl(16, 72%, 66%);
+  --am-on-brand:     hsl(20, 20%, 10%);    /* dark text/glyph on terracotta */
 
   /* PatternFly tokens follow */
   --pf-v5-global--primary-color--100: var(--am-foreground);
   --pf-v5-global--BackgroundColor--100: var(--am-card);
 }
 
-/* Dark-mode tweaks the form CSS can't infer from token swaps alone */
-[data-theme="dark"] input[type="checkbox"]:checked {
-  /* In dark mode the foreground is cream, so the check stroke needs
-     to flip to navy to keep contrast. */
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3.5 8.5l3 3 6-6.5' fill='none' stroke='%230B1320' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-}
+/* Dark-mode accent = terracotta. The light theme uses --am-foreground (navy)
+   as BOTH text and the interactive accent; in dark that foreground becomes
+   warm off-white, so re-point the primary button / focus ring / checkbox /
+   link hover to --am-brand to match the app's dark dashboard. */
+[data-theme="dark"] #kc-login,
+[data-theme="dark"] input[name="login"],
 [data-theme="dark"] .pf-c-button.pf-m-primary,
 [data-theme="dark"] .pf-v5-c-button.pf-m-primary,
-[data-theme="dark"] #kc-login,
-[data-theme="dark"] input[name="login"] {
-  color: var(--am-bg) !important;
+[data-theme="dark"] input[type="submit"].pf-c-button,
+[data-theme="dark"] input[type="submit"].pf-v5-c-button,
+[data-theme="dark"] .btn-primary {
+  background-color: var(--am-brand) !important;
+  color: var(--am-on-brand) !important;
+}
+[data-theme="dark"] #kc-login:hover,
+[data-theme="dark"] input[name="login"]:hover,
+[data-theme="dark"] .pf-c-button.pf-m-primary:hover,
+[data-theme="dark"] .pf-v5-c-button.pf-m-primary:hover,
+[data-theme="dark"] .btn-primary:hover {
+  background-color: var(--am-brand-hover) !important;
+}
+
+/* Input / input-group focus ring → terracotta */
+[data-theme="dark"] .pf-c-input-group:focus-within,
+[data-theme="dark"] .pf-v5-c-input-group:focus-within,
+[data-theme="dark"] input[type="text"]:focus,
+[data-theme="dark"] input[type="email"]:focus,
+[data-theme="dark"] input[type="password"]:focus,
+[data-theme="dark"] input[type="number"]:focus,
+[data-theme="dark"] input[type="tel"]:focus,
+[data-theme="dark"] .form-control:focus,
+[data-theme="dark"] .pf-c-form-control input:focus,
+[data-theme="dark"] .pf-v5-c-form-control input:focus {
+  border-color: var(--am-brand) !important;
+  box-shadow: 0 0 0 4px hsla(16, 70%, 60%, 0.20) !important;
+}
+
+/* Checked checkbox → terracotta fill + dark check glyph (cream stroke would
+   wash out on the brand color). */
+[data-theme="dark"] input[type="checkbox"]:checked {
+  background: var(--am-brand);
+  border-color: var(--am-brand);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3.5 8.5l3 3 6-6.5' fill='none' stroke='%231a1410' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+[data-theme="dark"] input[type="checkbox"]:focus-visible {
+  box-shadow: 0 0 0 4px hsla(16, 70%, 60%, 0.20);
+}
+
+/* Link hover → terracotta (default link color stays muted). Covers the
+   forgot-password / locale toggle / generic links. */
+[data-theme="dark"] a:hover,
+[data-theme="dark"] .pf-c-button.pf-m-link:hover,
+[data-theme="dark"] .pf-v5-c-button.pf-m-link:hover,
+[data-theme="dark"] .btn-link:hover,
+[data-theme="dark"] .pf-c-form__helper-text a:hover,
+[data-theme="dark"] .pf-v5-c-form__helper-text a:hover,
+[data-theme="dark"] a#kc-forgot-password,
+[data-theme="dark"] #login-select-toggle:hover {
+  color: var(--am-brand) !important;
 }
 
 /* Auto-honour OS preference. Disable by removing this block (or set
    data-theme="light" explicitly on <html> to override). */
 @media (prefers-color-scheme: dark) {
+  /* Fallback for the rare case the SPA's ui_mode never reached us (JS off, or
+     KC opened directly without the param + no sessionStorage). Surfaces go
+     warm-dark to match the app; the terracotta accent overrides above are
+     scoped to [data-theme="dark"] (the normal path login.js always sets), so
+     this fallback keeps the foreground-as-accent treatment — fine for a
+     direct hit. */
   :root:not([data-theme="light"]) {
-    --am-bg:           #0B1320;
-    --am-card:         #111C2D;
-    --am-foreground:   #EDE6D8;
-    --am-muted:        #8893A6;
-    --am-faint:        #6B7484;
-    --am-border:       #1E2A3D;
-    --am-border-strong:#2A3850;
+    --am-bg:           hsl(20, 12%, 8%);
+    --am-card:         hsl(20, 10%, 13%);
+    --am-foreground:   hsl(30, 15%, 92%);
+    --am-muted:        hsl(30, 10%, 62%);
+    --am-faint:        hsl(28, 8%, 52%);
+    --am-border:       hsl(20, 10%, 26%);
+    --am-border-strong:hsl(20, 12%, 36%);
   }
   :root:not([data-theme="light"]) input[type="checkbox"]:checked {
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3.5 8.5l3 3 6-6.5' fill='none' stroke='%230B1320' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3.5 8.5l3 3 6-6.5' fill='none' stroke='%231a1410' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
   }
   :root:not([data-theme="light"]) #kc-login,
   :root:not([data-theme="light"]) input[name="login"] {
