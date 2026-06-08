@@ -221,11 +221,19 @@ export default {
       title: '플랫폼 사용자',
       column: { username: '사용자명', displayName: '표시 이름', email: '이메일', role: '역할', status: '상태', createTime: '생성 시각', actions: '작업' },
       role: { admin: '관리자', operator: '운영' },
-      action: { disable: '비활성', enable: '활성', reset: '비밀번호 재설정', delete: '삭제' },
+      action: { disable: '비활성', enable: '활성', reset: '비밀번호 재설정', delete: '삭제', edit: '편집', resend: '메일 재발송' },
+      edit: {
+        title: '플랫폼 사용자 편집',
+        intro: '표시 이름 / 이메일을 수정합니다(Keycloak에 동기화). 사용자명은 로그인 식별자이며 변경할 수 없습니다.',
+        usernameReadonly: '사용자명은 변경할 수 없습니다. 변경하려면 삭제 후 다시 생성하세요.',
+        save: '저장',
+        saving: '저장 중...'
+      },
       confirm: {
         disableTitle: '사용자 비활성', disableMessage: '"{username}"을(를) 비활성하시겠습니까? Keycloak에서도 비활성되어 로그인할 수 없습니다.',
-        resetTitle: '비밀번호 재설정', resetMessage: '"{username}"의 비밀번호를 재설정하시겠습니까? 임시 비밀번호가 발급됩니다.',
-        deleteTitle: '사용자 삭제', deleteMessage: '"{username}"을(를) 삭제하시겠습니까? 되돌릴 수 없습니다(Keycloak 사용자도 삭제).'
+        resetTitle: '비밀번호 재설정', resetMessage: '"{username}"의 비밀번호를 재설정하시겠습니까? 현재 비밀번호가 즉시 무효화되며, 새 임시 비밀번호를 발급하고 이메일이 있으면 전송합니다.',
+        deleteTitle: '사용자 삭제', deleteMessage: '"{username}"을(를) 삭제하시겠습니까? 되돌릴 수 없습니다(Keycloak 사용자도 삭제).',
+        resendTitle: '메일 재발송', resendMessage: '"{username}"({email})에게 계정 개설 메일을 재발송하시겠습니까? 비밀번호를 재설정하고(현재 비밀번호 즉시 무효) 새 로그인 정보(사용자명 + 임시 비밀번호)를 해당 메일로 보냅니다.'
       },
       secret: { titleNew: '플랫폼 사용자 생성됨', titleReset: '비밀번호 재설정됨' },
       search: { placeholder: '사용자명 / 이메일로 검색' },
@@ -238,7 +246,11 @@ export default {
         displayNamePlaceholder: '운영 담당',
         emailPlaceholder: 'ops2@example.com',
         creating: '생성 중...',
-        doneIntro: '"{username}" 생성됨. 아래 임시 비밀번호를 본인에게 안전하게 전달하세요(첫 로그인 시 변경 필요).',
+        doneIntro: '"{username}" 생성됨.',
+        emailSent: '로그인 정보 메일을 {email}(으)로 발송했습니다(로그인 주소·사용자명·임시 비밀번호 포함; 로그인 후 변경 필요).',
+        emailNotSent: '메일을 보내지 못했습니다(앱 메일 설정 CORE_MAIL_* 확인). 아래 임시 비밀번호를 전달하거나 나중에 목록에서 재발송하세요.',
+        resetIntro: '"{username}"의 비밀번호를 재설정했습니다. 새 임시 비밀번호는 아래와 같습니다(첫 로그인 시 변경 필요).',
+        resendIntro: '"{username}"에게 계정 메일을 재발송하고 임시 비밀번호를 재설정했습니다(기존 비밀번호는 무효). 새 임시 비밀번호는 아래와 같습니다.',
         tempPassword: '임시 비밀번호',
         tempPasswordHint: '이 창을 닫으면 다시 표시되지 않습니다.',
         copy: '복사'
@@ -248,7 +260,7 @@ export default {
         createSuccess: '플랫폼 사용자 생성됨', createFailed: '사용자 생성 실패',
         copied: '복사됨', copyFailed: '복사 실패',
         disableSuccess: '비활성화됨', enableSuccess: '활성화됨', resetSuccess: '비밀번호 재설정됨',
-        deleteSuccess: '삭제됨', opFailed: '작업 실패'
+        deleteSuccess: '삭제됨', updateSuccess: '수정됨', resendSuccess: '메일 발송됨', opFailed: '작업 실패'
       }
     },
     tenant: {

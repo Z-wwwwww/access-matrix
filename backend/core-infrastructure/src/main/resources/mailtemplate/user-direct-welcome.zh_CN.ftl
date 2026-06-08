@@ -12,17 +12,18 @@
           <tr>
             <td style="padding:32px 40px 8px;">
               <div style="font-size:20px;font-weight:600;color:#111827;">${appName!"Access Matrix"}</div>
-              <div style="font-size:13px;color:#6b7280;margin-top:4px;">账号开通通知</div>
+              <div style="font-size:13px;color:#6b7280;margin-top:4px;"><#if reset!false>密码重置通知<#else>账号开通通知</#if></div>
             </td>
           </tr>
           <tr>
             <td style="padding:8px 40px 32px;color:#374151;font-size:14px;line-height:1.7;">
               <p style="margin:16px 0;">${displayName!username}<#if displayName?? && displayName != username> (${username})</#if> 您好，</p>
               <p style="margin:16px 0;">
-                管理员已为您开通 ${appName!"Access Matrix"} 账号。请使用以下初始信息登录。
+                <#if reset!false>管理员已重置您的 ${appName!"Access Matrix"} 密码。请使用下方临时密码登录，并按提示设置新密码。<#else>管理员已为您开通 ${appName!"Access Matrix"} 账号。请使用以下初始信息登录。</#if>
               </p>
 
               <table cellpadding="6" cellspacing="0" border="0" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin:20px 0;font-size:13px;">
+                <#if !(reset!false)>
                 <tr>
                   <td style="color:#6b7280;padding:6px 14px;">登录地址</td>
                   <td style="color:#374151;padding:6px 14px;"><a href="${loginUrl}" style="color:#2563eb;">${loginUrl}</a></td>
@@ -31,14 +32,17 @@
                   <td style="color:#6b7280;padding:6px 14px;">用户名</td>
                   <td style="color:#374151;padding:6px 14px;font-family:monospace;">${username}</td>
                 </tr>
+                </#if>
                 <tr>
                   <td style="color:#6b7280;padding:6px 14px;">初始密码</td>
                   <td style="color:#374151;padding:6px 14px;font-family:monospace;">${tempPassword}</td>
                 </tr>
+                <#if !(reset!false)>
                 <tr>
                   <td style="color:#6b7280;padding:6px 14px;">租户</td>
                   <td style="color:#374151;padding:6px 14px;font-family:monospace;">${tenantId!"default"}</td>
                 </tr>
+                </#if>
               </table>
 
               <p style="margin:16px 0;color:#dc2626;font-size:13px;">

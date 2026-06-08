@@ -6,6 +6,8 @@ import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.core.common.result.PageResult;
 import com.platform.core.common.security.BuiltInRoles;
+import com.platform.core.infrastructure.config.properties.AppMailProperties;
+import com.platform.core.infrastructure.mail.MailService;
 import com.platform.core.infrastructure.security.ForceLogoutService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.platform.dto.PlatformUserDto;
@@ -19,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -53,13 +57,21 @@ public class PlatformUserAdminService {
     private final ObjectProvider<KeycloakUserService> userServiceProvider;
     /** Used to terminate a disabled/deleted operator's in-flight sessions immediately. */
     private final ForceLogoutService forceLogoutService;
+    /** App SMTP (CORE_MAIL_*); absent if mail isn't configured. Onboarding emails go
+        through this (the app's own SMTP), NOT the per-realm Keycloak SMTP. */
+    private final ObjectProvider<MailService> mailProvider;
+    private final AppMailProperties mailProps;
 
     public PlatformUserAdminService(JdbcTemplate jdbc,
                                     ObjectProvider<KeycloakUserService> userServiceProvider,
-                                    ForceLogoutService forceLogoutService) {
+                                    ForceLogoutService forceLogoutService,
+                                    ObjectProvider<MailService> mailProvider,
+                                    AppMailProperties mailProps) {
         this.jdbc = jdbc;
         this.userServiceProvider = userServiceProvider;
         this.forceLogoutService = forceLogoutService;
+        this.mailProvider = mailProvider;
+        this.mailProps = mailProps;
     }
 
     public PageResult<PlatformUserDto.View> list(long page, long size, String keyword) {
@@ -132,9 +144,16 @@ public class PlatformUserAdminService {
                             + "VALUES (?, ?, ?, ?, 1, 'platform-admin', 'platform-admin')",
                     IdGenerator.ulid(), SYSTEM_TENANT, userId, BuiltInRoles.PLATFORM_OPERATOR_ID);
 
-            log.info("[platform-user] provisioned ops user '{}' (id={}, kcId={}) with PLATFORM_OPERATOR",
-                    req.username(), userId, kcId);
-            return new PlatformUserDto.CreateResponse(userId, req.username(), tempPassword);
+            // Email the account-opening "welcome" message via the app's OWN
+            // MailService (CORE_MAIL_*, NOT Keycloak's per-realm SMTP): it carries
+            // the login URL + username + temporary password, and Keycloak forces a
+            // password change on first login (the temp credential is single-use, so
+            // it cannot be reused to reset the password later). Best-effort — a mail
+            // failure must NOT fail creation (the temp password is shown as fallback).
+            boolean emailSent = sendCredentialsMail(req.username(), req.email(), req.displayName(), tempPassword, false);
+            log.info("[platform-user] provisioned ops user '{}' (id={}, kcId={}) with PLATFORM_OPERATOR, emailSent={}",
+                    req.username(), userId, kcId, emailSent);
+            return new PlatformUserDto.CreateResponse(userId, req.username(), tempPassword, emailSent);
         } catch (RuntimeException e) {
             // Compensation: remove the orphan KC user so a retry can reuse the username.
             try {
@@ -192,21 +211,101 @@ public class PlatformUserAdminService {
         log.info("[platform-user] deleted ops user '{}' (id={})", t.username(), t.id());
     }
 
-    /** Reset a platform operator's password to a one-time temporary one (KC forces change). */
+    /** Reset password — re-issue credentials with the password-reset email wording. */
     public PlatformUserDto.ResetPwResponse resetPassword(String id) {
+        return reissueCredentials(id, /* reset = */ true);
+    }
+
+    /** Resend the onboarding/account email — re-issue credentials with the welcome wording. */
+    public PlatformUserDto.ResetPwResponse resendWelcome(String id) {
+        return reissueCredentials(id, /* reset = */ false);
+    }
+
+    /**
+     * Single re-issue path behind BOTH "reset password" and "resend email": ALWAYS
+     * rotates to a fresh single-use temporary password (so the user's current
+     * password becomes invalid — the UI must confirm this) and best-effort emails
+     * the credentials (login URL + username + temp password) via the app's
+     * MailService. {@code reset} only switches the email wording / subject:
+     * true → "password reset", false → "account opened / welcome".
+     */
+    private PlatformUserDto.ResetPwResponse reissueCredentials(String id, boolean reset) {
         Target t = requireManageable(id);
         KeycloakUserService kc = userServiceProvider.getIfAvailable();
         if (kc == null) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR,
-                    "Keycloak is not enabled — password reset requires app.security.mode=oidc");
+                    "Keycloak is not enabled — requires app.security.mode=oidc");
         }
         if (t.keycloakId() == null || t.keycloakId().isBlank()) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "User has no Keycloak link");
         }
         String tempPassword = generateTempPassword();
         kc.setPassword(SYSTEM_REALM, t.keycloakId(), tempPassword, true);
-        log.info("[platform-user] reset password for ops user '{}' (id={})", t.username(), t.id());
-        return new PlatformUserDto.ResetPwResponse(t.username(), tempPassword);
+        boolean emailSent = sendCredentialsMail(t.username(), t.email(), t.displayName(), tempPassword, reset);
+        log.info("[platform-user] re-issued credentials for ops user '{}' (id={}), reset={}, emailSent={}",
+                t.username(), t.id(), reset, emailSent);
+        return new PlatformUserDto.ResetPwResponse(t.username(), tempPassword, emailSent);
+    }
+
+    /**
+     * Correct a platform operator's email + display name (username is immutable).
+     * Syncs Keycloak (email kept verified, first/last re-derived) and the local
+     * {@code core_auth_user} row so the list/search and KC stay consistent.
+     */
+    @Transactional
+    public void update(String id, PlatformUserDto.UpdateRequest req) {
+        Target t = requireManageable(id);
+        KeycloakUserService kc = userServiceProvider.getIfAvailable();
+        if (kc != null && t.keycloakId() != null && !t.keycloakId().isBlank()) {
+            kc.updateProfile(SYSTEM_REALM, t.keycloakId(), req.email(), req.displayName());
+        }
+        jdbc.update("UPDATE core_auth_user SET email = ?, display_name = ?, update_time = ? WHERE id = ?",
+                req.email(), req.displayName(), LocalDateTime.now(), t.id());
+        log.info("[platform-user] updated ops user '{}' (id={}) email/displayName", t.username(), t.id());
+    }
+
+    /**
+     * Resend the account-setup email: triggers Keycloak's UPDATE_PASSWORD
+     * required-action email so the user sets their own password via the OIDC
+     * reset-credentials page (no temp-password hand-off needed). Requires the
+     * system realm's SMTP to be configured — KC returns 500 otherwise.
+     */
+    /**
+     * Email the account-opening "welcome" message via the app's {@link MailService}
+     * (CORE_MAIL_*, NOT Keycloak's per-realm SMTP). It carries the login URL +
+     * username + temporary password; the user logs in and Keycloak forces a password
+     * change on first login (the temp credential is single-use, so it can't be reused
+     * to reset the password afterwards). Returns true on dispatch; swallows failures
+     * so the caller decides whether that's fatal. Reuses the shared
+     * {@code user-direct-welcome} template (same as system-user direct provisioning).
+     */
+    private boolean sendCredentialsMail(String username, String email, String displayName,
+                                        String tempPassword, boolean reset) {
+        MailService mail = mailProvider.getIfAvailable();
+        if (mail == null || email == null || email.isBlank()) {
+            log.warn("[platform-user] skipped credentials email for '{}' — mail service or email unavailable", username);
+            return false;
+        }
+        try {
+            Map<String, Object> model = new HashMap<>();
+            model.put("appName", mailProps.fromName());
+            model.put("username", username);
+            model.put("displayName", displayName);
+            model.put("tenantId", SYSTEM_TENANT);
+            model.put("supportEmail", mailProps.from());
+            model.put("loginUrl", mailProps.baseUrl() + "/login");
+            model.put("tempPassword", tempPassword);
+            model.put("reset", reset);   // template switches headline + body wording on this flag
+            String subjectKey = reset ? "user-account-reset.subject" : "user-direct-welcome.subject";
+            Object[] subjectArgs = new Object[] { "[" + mailProps.fromName() + "]" };
+            Locale locale = RequestContext.locale();
+            if (locale == null) locale = Locale.JAPAN;
+            mail.sendHtmlAsync(email, locale, subjectKey, subjectArgs, "user-direct-welcome", model);
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("[platform-user] credentials email dispatch failed for '{}': {}", username, e.toString());
+            return false;
+        }
     }
 
     /**
@@ -218,7 +317,7 @@ public class PlatformUserAdminService {
         Map<String, Object> u;
         try {
             u = jdbc.queryForMap(
-                    "SELECT id, username, keycloak_id FROM core_auth_user "
+                    "SELECT id, username, email, display_name, keycloak_id FROM core_auth_user "
                             + "WHERE id = ? AND tenant_id = ? AND mark = 1", id, SYSTEM_TENANT);
         } catch (EmptyResultDataAccessException e) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Platform user not found: " + id);
@@ -235,10 +334,11 @@ public class PlatformUserAdminService {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR,
                     "Cannot manage a platform admin (ops) account");
         }
-        return new Target(userId, (String) u.get("username"), (String) u.get("keycloak_id"));
+        return new Target(userId, (String) u.get("username"), (String) u.get("email"),
+                (String) u.get("display_name"), (String) u.get("keycloak_id"));
     }
 
-    private record Target(String id, String username, String keycloakId) {}
+    private record Target(String id, String username, String email, String displayName, String keycloakId) {}
 
     /** Next per-tenant user_no for the system tenant: U%08d after the current max. */
     private String nextSystemUserNo() {

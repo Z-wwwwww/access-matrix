@@ -42,6 +42,16 @@ public final class PlatformUserDto {
     ) {}
 
     /**
+     * Update body. Username is the login identity and is immutable here — only
+     * the email + display name can be corrected (to fix a typo without a
+     * delete-and-recreate). Synced to both Keycloak and {@code core_auth_user}.
+     */
+    public record UpdateRequest(
+            @NotBlank @Email @Size(max = 255) String email,
+            @NotBlank @Size(max = 128) String displayName
+    ) {}
+
+    /**
      * Create response. The {@code tempPassword} is a one-time temporary password
      * set on the Keycloak user (KC forces a change on first login). Shown once to
      * the operator who must hand it over securely — it is never stored or
@@ -50,12 +60,22 @@ public final class PlatformUserDto {
     public record CreateResponse(
             String id,
             String username,
-            String tempPassword
+            String tempPassword,
+            // true if the "set your password" email was dispatched at creation;
+            // false when the system realm has no SMTP (the temp password is then
+            // the only delivery path — operator hands it over or resends later).
+            boolean emailSent
     ) {}
 
-    /** Reset-password response — one-time temp password (KC forces change on next login). */
+    /**
+     * Reset / re-issue-credentials response — one-time temp password (KC forces a
+     * change on next login) + whether the credentials email was dispatched. The
+     * single "re-issue" path covers both "forgot password" and "resend / wrong
+     * email": it always rotates the temp password and best-effort emails it.
+     */
     public record ResetPwResponse(
             String username,
-            String tempPassword
+            String tempPassword,
+            boolean emailSent
     ) {}
 }

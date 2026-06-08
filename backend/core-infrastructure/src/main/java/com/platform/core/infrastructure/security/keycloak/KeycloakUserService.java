@@ -187,6 +187,40 @@ public class KeycloakUserService {
         }
     }
 
+    /**
+     * Update a user's email AND display name (first/last) in one call, keeping
+     * the email verified (an admin set it). Used by the platform-user "edit"
+     * flow. Mirrors {@link #createUser}'s name splitting: a single-token (e.g.
+     * CJK) name fills both first and last so the realm's required-field policy
+     * doesn't force an UPDATE_PROFILE step on next login. Blank inputs are left
+     * untouched.
+     */
+    public void updateProfile(String realm, String keycloakUserId, String email, String displayName) {
+        try (Keycloak kc = newAdminClient()) {
+            UserResource ur = kc.realm(realm).users().get(keycloakUserId);
+            UserRepresentation u = ur.toRepresentation();
+            if (email != null && !email.isBlank()) {
+                u.setEmail(email);
+                u.setEmailVerified(true);
+            }
+            if (displayName != null && !displayName.isBlank()) {
+                int sp = displayName.indexOf(' ');
+                if (sp > 0) {
+                    u.setFirstName(displayName.substring(0, sp));
+                    u.setLastName(displayName.substring(sp + 1));
+                } else {
+                    u.setFirstName(displayName);
+                    u.setLastName(displayName);
+                }
+            }
+            ur.update(u);
+            log.info("[kc] updated profile (email+name) for user {} in realm {}", keycloakUserId, realm);
+        } catch (WebApplicationException e) {
+            throw new KeycloakOperationException("Keycloak update-profile failed: realm=%s userId=%s %s"
+                    .formatted(realm, keycloakUserId, responseDetail(e.getResponse())), e);
+        }
+    }
+
     public void disableUser(String realm, String keycloakUserId) {
         setEnabled(realm, keycloakUserId, false);
     }

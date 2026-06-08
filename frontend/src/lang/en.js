@@ -221,11 +221,19 @@ export default {
       title: 'Platform users',
       column: { username: 'Username', displayName: 'Display name', email: 'Email', role: 'Role', status: 'Status', createTime: 'Created', actions: 'Actions' },
       role: { admin: 'Admin', operator: 'Operator' },
-      action: { disable: 'Disable', enable: 'Enable', reset: 'Reset password', delete: 'Delete' },
+      action: { disable: 'Disable', enable: 'Enable', reset: 'Reset password', delete: 'Delete', edit: 'Edit', resend: 'Resend email' },
+      edit: {
+        title: 'Edit platform user',
+        intro: 'Change the display name / email (synced to Keycloak). The username is the login identity and cannot be changed.',
+        usernameReadonly: 'Username is immutable — delete and recreate to change it.',
+        save: 'Save',
+        saving: 'Saving...'
+      },
       confirm: {
         disableTitle: 'Disable user', disableMessage: 'Disable "{username}"? They will be disabled in Keycloak too and cannot sign in.',
-        resetTitle: 'Reset password', resetMessage: 'Reset the password for "{username}"? A temporary password will be issued.',
-        deleteTitle: 'Delete user', deleteMessage: 'Delete "{username}"? This cannot be undone (the Keycloak user is removed too).'
+        resetTitle: 'Reset password', resetMessage: 'Reset the password for "{username}"? Their current password becomes invalid immediately; a new temporary password is issued and (if they have an email) sent to them.',
+        deleteTitle: 'Delete user', deleteMessage: 'Delete "{username}"? This cannot be undone (the Keycloak user is removed too).',
+        resendTitle: 'Resend email', resendMessage: 'Resend the account-opening email to "{username}" ({email})? Their password will be reset (the current one becomes invalid immediately) and the new login info (username + temp password) emailed to them.'
       },
       secret: { titleNew: 'Platform user created', titleReset: 'Password reset' },
       search: { placeholder: 'Search by username / email' },
@@ -238,7 +246,11 @@ export default {
         displayNamePlaceholder: 'Jane Ops',
         emailPlaceholder: 'ops2@example.com',
         creating: 'Creating...',
-        doneIntro: 'Created "{username}". Hand the temporary password below to them securely (they must change it on first login).',
+        doneIntro: 'Created "{username}".',
+        emailSent: 'A credentials email was sent to {email} (login URL, username, temporary password; they must change it on first login).',
+        emailNotSent: 'Email could not be sent (check the app mail config CORE_MAIL_*). Hand over the temporary password below, or resend later from the list.',
+        resetIntro: 'Reset the password for "{username}". The new temporary password is below (they must change it on first login).',
+        resendIntro: 'Resent the account email to "{username}" and reset the temporary password (the old one is now invalid). The new temporary password is below.',
         tempPassword: 'Temporary password',
         tempPasswordHint: 'It will not be shown again once you close this panel.',
         copy: 'Copy'
@@ -248,7 +260,7 @@ export default {
         createSuccess: 'Platform user created', createFailed: 'Failed to create user',
         copied: 'Copied', copyFailed: 'Copy failed',
         disableSuccess: 'Disabled', enableSuccess: 'Enabled', resetSuccess: 'Password reset',
-        deleteSuccess: 'Deleted', opFailed: 'Operation failed'
+        deleteSuccess: 'Deleted', updateSuccess: 'Updated', resendSuccess: 'Email sent', opFailed: 'Operation failed'
       }
     },
     tenant: {

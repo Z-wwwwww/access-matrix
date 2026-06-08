@@ -10,10 +10,11 @@ import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { toJSTDateTimeDisp } from '@/lib/date'
 import { isValidEmail } from '@/lib/validators'
-import { Plus, Search, RotateCcw, Copy, ShieldCheck, Pause, Play, KeyRound, Trash2 } from 'lucide-vue-next'
+import { Plus, Search, RotateCcw, Copy, ShieldCheck, Pause, Play, KeyRound, Trash2, Pencil, Mail } from 'lucide-vue-next'
 import {
-  listPlatformUsersApi, createPlatformUserApi,
-  disablePlatformUserApi, enablePlatformUserApi, resetPlatformUserPwApi, deletePlatformUserApi
+  listPlatformUsersApi, createPlatformUserApi, updatePlatformUserApi,
+  disablePlatformUserApi, enablePlatformUserApi, resetPlatformUserPwApi,
+  resendPlatformUserInviteApi, deletePlatformUserApi
 } from '@/services/platformUser'
 
 const { t } = useI18n()
@@ -29,6 +30,9 @@ const search = reactive({ keyword: '' })
 const showCreate = ref(false)
 const saving = ref(false)
 const form = reactive({ username: '', email: '', displayName: '' })
+
+const showEdit = ref(false)
+const editForm = reactive({ id: '', username: '', email: '', displayName: '' })
 
 // Shared "one-time secret" drawer for create + reset-password.
 const secret = ref(null)   // { username, tempPassword, title }
@@ -100,7 +104,7 @@ async function submitCreate() {
     })
     if (res.data.code === 0) {
       showCreate.value = false
-      secret.value = { ...res.data.data, title: t('platform.user.secret.titleNew') }
+      secret.value = { ...res.data.data, email: form.email, kind: 'create', title: t('platform.user.secret.titleNew') }
       toast.success(t('platform.user.message.createSuccess'))
       fetchData()
     } else {
@@ -108,6 +112,43 @@ async function submitCreate() {
     }
   } catch (e) {
     toast.error(e.message || t('platform.user.message.createFailed'))
+  } finally {
+    saving.value = false
+  }
+}
+
+function openEdit(row) {
+  editForm.id = row.id
+  editForm.username = row.username
+  editForm.email = row.email || ''
+  editForm.displayName = row.displayName || ''
+  showEdit.value = true
+}
+
+async function submitEdit() {
+  if (!editForm.displayName || !editForm.email) {
+    toast.error(t('platform.user.message.required'))
+    return
+  }
+  if (!isValidEmail(editForm.email)) {
+    toast.error(t('common.message.invalidEmail'))
+    return
+  }
+  saving.value = true
+  try {
+    const res = await updatePlatformUserApi(editForm.id, {
+      email: editForm.email,
+      displayName: editForm.displayName
+    })
+    if (res.data.code === 0) {
+      showEdit.value = false
+      toast.success(t('platform.user.message.updateSuccess'))
+      fetchData()
+    } else {
+      toast.error(res.data.msg || t('platform.user.message.opFailed'))
+    }
+  } catch (e) {
+    toast.error(e.message || t('platform.user.message.opFailed'))
   } finally {
     saving.value = false
   }
@@ -131,14 +172,37 @@ async function handleReset(row) {
   const ok = await confirm({
     title: t('platform.user.confirm.resetTitle'),
     message: t('platform.user.confirm.resetMessage', { username: row.username }),
+    variant: 'destructive',
     confirmText: t('platform.user.action.reset')
   })
   if (!ok) return
   try {
     const res = await resetPlatformUserPwApi(row.id)
     if (res.data.code === 0) {
-      secret.value = { ...res.data.data, title: t('platform.user.secret.titleReset') }
+      secret.value = { ...res.data.data, email: row.email, kind: 'reset', title: t('platform.user.secret.titleReset') }
       toast.success(t('platform.user.message.resetSuccess'))
+    } else {
+      toast.error(res.data.msg || t('platform.user.message.opFailed'))
+    }
+  } catch (e) {
+    toast.error(e.message || t('platform.user.message.opFailed'))
+  }
+}
+
+async function handleResend(row) {
+  const ok = await confirm({
+    title: t('platform.user.confirm.resendTitle'),
+    message: t('platform.user.confirm.resendMessage', { username: row.username, email: row.email }),
+    variant: 'destructive',
+    confirmText: t('platform.user.action.resend')
+  })
+  if (!ok) return
+  try {
+    const res = await resendPlatformUserInviteApi(row.id)
+    if (res.data.code === 0) {
+      // Resend just (re)sends the email to the user — no temp-password popup here
+      // (that's the "reset password" action's job). Password is still rotated server-side.
+      toast.success(t('platform.user.message.resendSuccess'))
     } else {
       toast.error(res.data.msg || t('platform.user.message.opFailed'))
     }
@@ -245,6 +309,11 @@ onMounted(fetchData)
           <!-- the super 'ops' (platformAdmin) is unmanageable from here -->
           <span v-if="row.platformAdmin" class="text-xs text-muted-foreground">—</span>
           <div v-else class="inline-flex items-center gap-0.5">
+            <button v-permission="'opsuser:update'"
+                    class="h-7 px-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-xs inline-flex items-center"
+                    :title="t('platform.user.action.edit')" @click="openEdit(row)">
+              <Pencil class="size-3.5" />
+            </button>
             <button v-if="row.status === 1" v-permission="'opsuser:update'"
                     class="h-7 px-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-xs inline-flex items-center"
                     :title="t('platform.user.action.disable')" @click="handleDisable(row)">
@@ -259,6 +328,11 @@ onMounted(fetchData)
                     class="h-7 px-2 rounded hover:bg-primary/10 text-primary text-xs inline-flex items-center"
                     :title="t('platform.user.action.reset')" @click="handleReset(row)">
               <KeyRound class="size-3.5" />
+            </button>
+            <button v-permission="'opsuser:update'"
+                    class="h-7 px-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-xs inline-flex items-center"
+                    :title="t('platform.user.action.resend')" @click="handleResend(row)">
+              <Mail class="size-3.5" />
             </button>
             <button v-permission="'opsuser:delete'"
                     class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs inline-flex items-center"
@@ -299,10 +373,42 @@ onMounted(fetchData)
       </template>
     </Drawer>
 
+    <!-- Edit drawer (display name + email; username is immutable) -->
+    <Drawer v-model:open="showEdit" :title="t('platform.user.edit.title')" width="max-w-md">
+      <div class="space-y-3">
+        <p class="text-xs text-muted-foreground leading-relaxed">{{ t('platform.user.edit.intro') }}</p>
+        <div>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('platform.user.column.username') }}</label>
+          <div class="px-3 py-2 rounded bg-muted/40 font-mono text-sm">{{ editForm.username }}</div>
+          <p class="text-[11px] text-muted-foreground mt-1">{{ t('platform.user.edit.usernameReadonly') }}</p>
+        </div>
+        <div>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('platform.user.column.displayName') }} <span class="text-destructive">*</span></label>
+          <Input v-model="editForm.displayName" :placeholder="t('platform.user.create.displayNamePlaceholder')" />
+        </div>
+        <div>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('platform.user.column.email') }} <span class="text-destructive">*</span></label>
+          <Input v-model="editForm.email" :placeholder="t('platform.user.create.emailPlaceholder')" />
+        </div>
+      </div>
+      <template #footer>
+        <button class="h-9 px-3 rounded border border-border text-sm" @click="showEdit = false">
+          {{ t('common.button.cancel') }}
+        </button>
+        <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1 disabled:opacity-50"
+                :disabled="saving" @click="submitEdit">
+          {{ saving ? t('platform.user.edit.saving') : t('platform.user.edit.save') }}
+        </button>
+      </template>
+    </Drawer>
+
     <!-- One-time temp-password drawer (create + reset) -->
     <Drawer :open="!!secret" :title="secret ? secret.title : ''" width="max-w-md" @close="secret = null">
       <div v-if="secret" class="space-y-3 text-sm">
-        <p class="text-muted-foreground">{{ t('platform.user.create.doneIntro', { username: secret.username }) }}</p>
+        <!-- create / reset / resend share this drawer; secret.kind picks the intro line. All carry emailSent. -->
+        <p class="text-muted-foreground">{{ secret.kind === 'reset' ? t('platform.user.create.resetIntro', { username: secret.username }) : secret.kind === 'resend' ? t('platform.user.create.resendIntro', { username: secret.username }) : t('platform.user.create.doneIntro', { username: secret.username }) }}</p>
+        <p v-if="secret.emailSent === true" class="text-emerald-600">{{ t('platform.user.create.emailSent', { email: secret.email }) }}</p>
+        <p v-else-if="secret.emailSent === false" class="text-amber-600">{{ t('platform.user.create.emailNotSent') }}</p>
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('platform.user.create.tempPassword') }}</label>
           <div class="flex items-center gap-2">

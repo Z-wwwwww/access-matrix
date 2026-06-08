@@ -12,17 +12,18 @@
           <tr>
             <td style="padding:32px 40px 8px;">
               <div style="font-size:20px;font-weight:600;color:#111827;">${appName!"Access Matrix"}</div>
-              <div style="font-size:13px;color:#6b7280;margin-top:4px;">アカウント開設のお知らせ</div>
+              <div style="font-size:13px;color:#6b7280;margin-top:4px;"><#if reset!false>パスワード再設定のお知らせ<#else>アカウント開設のお知らせ</#if></div>
             </td>
           </tr>
           <tr>
             <td style="padding:8px 40px 32px;color:#374151;font-size:14px;line-height:1.7;">
               <p style="margin:16px 0;">${displayName!username}<#if displayName?? && displayName != username> (${username})</#if> 様</p>
               <p style="margin:16px 0;">
-                ${appName!"Access Matrix"} のアカウントが管理者により開設されました。下記の初期情報でログインしてください。
+                <#if reset!false>${appName!"Access Matrix"} のパスワードが管理者によりリセットされました。下記の一時パスワードでログインし、画面の指示に従って新しいパスワードを設定してください。<#else>${appName!"Access Matrix"} のアカウントが管理者により開設されました。下記の初期情報でログインしてください。</#if>
               </p>
 
               <table cellpadding="6" cellspacing="0" border="0" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin:20px 0;font-size:13px;">
+                <#if !(reset!false)>
                 <tr>
                   <td style="color:#6b7280;padding:6px 14px;">ログイン URL</td>
                   <td style="color:#374151;padding:6px 14px;"><a href="${loginUrl}" style="color:#2563eb;">${loginUrl}</a></td>
@@ -31,14 +32,17 @@
                   <td style="color:#6b7280;padding:6px 14px;">ユーザー名</td>
                   <td style="color:#374151;padding:6px 14px;font-family:monospace;">${username}</td>
                 </tr>
+                </#if>
                 <tr>
                   <td style="color:#6b7280;padding:6px 14px;">初期パスワード</td>
                   <td style="color:#374151;padding:6px 14px;font-family:monospace;">${tempPassword}</td>
                 </tr>
+                <#if !(reset!false)>
                 <tr>
                   <td style="color:#6b7280;padding:6px 14px;">テナント</td>
                   <td style="color:#374151;padding:6px 14px;font-family:monospace;">${tenantId!"default"}</td>
                 </tr>
+                </#if>
               </table>
 
               <p style="margin:16px 0;color:#dc2626;font-size:13px;">

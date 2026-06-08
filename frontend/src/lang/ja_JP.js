@@ -228,11 +228,19 @@ export default {
       title: '運用ユーザー',
       column: { username: 'ユーザー名', displayName: '表示名', email: 'メール', role: 'ロール', status: '状態', createTime: '作成日時', actions: '操作' },
       role: { admin: '管理者', operator: '運用' },
-      action: { disable: '停止', enable: '再開', reset: 'パスワード再設定', delete: '削除' },
+      action: { disable: '停止', enable: '再開', reset: 'パスワード再設定', delete: '削除', edit: '編集', resend: 'メール再送' },
+      edit: {
+        title: '運用ユーザーを編集',
+        intro: '表示名 / メールを変更します（Keycloak に同期）。ユーザー名はログイン識別子のため変更できません。',
+        usernameReadonly: 'ユーザー名は変更できません。変更する場合は削除して作り直してください。',
+        save: '保存',
+        saving: '保存中...'
+      },
       confirm: {
         disableTitle: 'ユーザー停止', disableMessage: '「{username}」を停止しますか？Keycloak でも無効化され、サインインできなくなります。',
-        resetTitle: 'パスワード再設定', resetMessage: '「{username}」のパスワードを再設定しますか？一時パスワードが発行されます。',
-        deleteTitle: 'ユーザー削除', deleteMessage: '「{username}」を削除しますか？元に戻せません（Keycloak ユーザーも削除）。'
+        resetTitle: 'パスワード再設定', resetMessage: '「{username}」のパスワードを再設定しますか？現在のパスワードは即座に無効になります。新しい一時パスワードを発行し、メールアドレスがあれば送信します。',
+        deleteTitle: 'ユーザー削除', deleteMessage: '「{username}」を削除しますか？元に戻せません（Keycloak ユーザーも削除）。',
+        resendTitle: 'メール再送', resendMessage: '「{username}」（{email}）に開設メールを再送しますか？パスワードを再設定し（現在のパスワードは即座に無効）、新しいログイン情報（ユーザー名 + 一時パスワード）をそのメールアドレスへ送信します。'
       },
       secret: { titleNew: '運用ユーザーを作成しました', titleReset: 'パスワードを再設定しました' },
       search: { placeholder: 'ユーザー名 / メールで検索' },
@@ -245,7 +253,11 @@ export default {
         displayNamePlaceholder: '運用 太郎',
         emailPlaceholder: 'ops2@example.com',
         creating: '作成中...',
-        doneIntro: '「{username}」を作成しました。下の一時パスワードを本人に安全に渡してください（初回ログイン時に変更が必要）。',
+        doneIntro: '「{username}」を作成しました。',
+        emailSent: 'ログイン情報メールを {email} に送信しました（ログイン URL・ユーザー名・一時パスワードを記載。ログイン後に変更が必要）。',
+        emailNotSent: 'メールを送信できませんでした（アプリのメール設定 CORE_MAIL_* をご確認ください）。下の一時パスワードを渡すか、後で一覧から再送してください。',
+        resetIntro: '「{username}」のパスワードを再設定しました。新しい一時パスワードは下記です（初回ログイン時に変更が必要）。',
+        resendIntro: '「{username}」に開設メールを再送し、一時パスワードを再設定しました（元のパスワードは無効）。新しい一時パスワードは下記です。',
         tempPassword: '一時パスワード',
         tempPasswordHint: 'この画面を閉じると二度と表示されません。',
         copy: 'コピー'
@@ -255,7 +267,7 @@ export default {
         createSuccess: '運用ユーザーを作成しました', createFailed: 'ユーザー作成に失敗しました',
         copied: 'コピーしました', copyFailed: 'コピーに失敗しました',
         disableSuccess: '停止しました', enableSuccess: '再開しました', resetSuccess: 'パスワードを再設定しました',
-        deleteSuccess: '削除しました', opFailed: '操作に失敗しました'
+        deleteSuccess: '削除しました', updateSuccess: '更新しました', resendSuccess: 'メールを送信しました', opFailed: '操作に失敗しました'
       }
     },
     tenant: {

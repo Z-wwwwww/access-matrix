@@ -221,11 +221,19 @@ export default {
       title: '平台使用者',
       column: { username: '使用者名稱', displayName: '顯示名稱', email: '電子郵件', role: '角色', status: '狀態', createTime: '建立時間', actions: '操作' },
       role: { admin: '管理員', operator: '維運' },
-      action: { disable: '停用', enable: '啟用', reset: '重設密碼', delete: '刪除' },
+      action: { disable: '停用', enable: '啟用', reset: '重設密碼', delete: '刪除', edit: '編輯', resend: '重發郵件' },
+      edit: {
+        title: '編輯平台使用者',
+        intro: '修改顯示名稱 / 電子郵件（同步到 Keycloak）。使用者名稱為登入識別，不可修改。',
+        usernameReadonly: '使用者名稱不可修改；如需變更請刪除後重建。',
+        save: '儲存',
+        saving: '儲存中...'
+      },
       confirm: {
         disableTitle: '停用使用者', disableMessage: '確認停用「{username}」？Keycloak 也會被停用，無法登入。',
-        resetTitle: '重設密碼', resetMessage: '確認重設「{username}」的密碼？將產生一個臨時密碼。',
-        deleteTitle: '刪除使用者', deleteMessage: '確認刪除「{username}」？無法復原（同時刪除 Keycloak 使用者）。'
+        resetTitle: '重設密碼', resetMessage: '確認重設「{username}」的密碼？當前密碼將立即失效；會產生新的臨時密碼並（若有信箱）發送到其信箱。',
+        deleteTitle: '刪除使用者', deleteMessage: '確認刪除「{username}」？無法復原（同時刪除 Keycloak 使用者）。',
+        resendTitle: '重發郵件', resendMessage: '向「{username}」（{email}）重發開戶郵件？會重設其密碼（當前密碼立即失效），並把新的登入資訊（使用者名稱 + 臨時密碼）發送到該信箱。'
       },
       secret: { titleNew: '已建立平台使用者', titleReset: '已重設密碼' },
       search: { placeholder: '依使用者名稱 / 電郵搜尋' },
@@ -238,7 +246,11 @@ export default {
         displayNamePlaceholder: '維運張三',
         emailPlaceholder: 'ops2@example.com',
         creating: '建立中...',
-        doneIntro: '已建立「{username}」。請將下方臨時密碼安全地交給本人（首次登入需變更）。',
+        doneIntro: '已建立「{username}」。',
+        emailSent: '憑據郵件已發送至 {email}（含登入地址、使用者名稱、臨時密碼；使用者登入後需修改密碼）。',
+        emailNotSent: '郵件未發送（請檢查應用郵件設定 CORE_MAIL_*）。可先轉交下方臨時密碼，或稍後在清單中重發。',
+        resetIntro: '已為「{username}」重設密碼，新的臨時密碼如下（對方首次登入需變更）。',
+        resendIntro: '已為「{username}」重發開戶郵件，並重設了臨時密碼（原密碼已失效）。新的臨時密碼如下。',
         tempPassword: '臨時密碼',
         tempPasswordHint: '關閉此頁後將無法再次檢視。',
         copy: '複製'
@@ -248,7 +260,7 @@ export default {
         createSuccess: '已建立平台使用者', createFailed: '建立使用者失敗',
         copied: '已複製', copyFailed: '複製失敗',
         disableSuccess: '已停用', enableSuccess: '已啟用', resetSuccess: '已重設密碼',
-        deleteSuccess: '已刪除', opFailed: '操作失敗'
+        deleteSuccess: '已刪除', updateSuccess: '已更新', resendSuccess: '郵件已發送', opFailed: '操作失敗'
       }
     },
     tenant: {

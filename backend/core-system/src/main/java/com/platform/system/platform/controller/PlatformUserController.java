@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -54,6 +55,16 @@ public class PlatformUserController {
         return JsonResult.ok(userService.create(body));
     }
 
+    /** Correct a platform operator's email + display name (username is immutable). */
+    @PutMapping("/{id}")
+    @RequiresPermission(PlatformPermissions.OPSUSER_UPDATE)
+    @OpLog(module = "platform", action = "opsuser.update", targetType = "user")
+    public JsonResult<Void> update(@PathVariable String id,
+                                   @Valid @RequestBody PlatformUserDto.UpdateRequest body) {
+        userService.update(id, body);
+        return JsonResult.ok();
+    }
+
     /** Disable a platform operator (DB status + Keycloak). */
     @PostMapping("/{id}/disable")
     @RequiresPermission(PlatformPermissions.OPSUSER_UPDATE)
@@ -78,6 +89,14 @@ public class PlatformUserController {
     @OpLog(module = "platform", action = "opsuser.resetPassword", targetType = "user")
     public JsonResult<PlatformUserDto.ResetPwResponse> resetPassword(@PathVariable String id) {
         return JsonResult.ok(userService.resetPassword(id));
+    }
+
+    /** Resend the onboarding/account email — re-issues credentials (rotates the temp password). */
+    @PostMapping("/{id}/resend-invite")
+    @RequiresPermission(PlatformPermissions.OPSUSER_UPDATE)
+    @OpLog(module = "platform", action = "opsuser.resendInvite", targetType = "user")
+    public JsonResult<PlatformUserDto.ResetPwResponse> resendWelcome(@PathVariable String id) {
+        return JsonResult.ok(userService.resendWelcome(id));
     }
 
     /** Soft-delete a platform operator + remove the Keycloak user. */

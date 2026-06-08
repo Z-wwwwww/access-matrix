@@ -221,11 +221,19 @@ export default {
       title: '平台用户',
       column: { username: '用户名', displayName: '显示名', email: '邮箱', role: '角色', status: '状态', createTime: '创建时间', actions: '操作' },
       role: { admin: '管理员', operator: '运维' },
-      action: { disable: '停用', enable: '启用', reset: '重置密码', delete: '删除' },
+      action: { disable: '停用', enable: '启用', reset: '重置密码', delete: '删除', edit: '编辑', resend: '重发邮件' },
+      edit: {
+        title: '编辑平台用户',
+        intro: '修改显示名 / 邮箱（同步到 Keycloak）。用户名是登录标识，不可修改。',
+        usernameReadonly: '用户名不可修改；如需更改请删除后重建。',
+        save: '保存',
+        saving: '保存中...'
+      },
       confirm: {
         disableTitle: '停用用户', disableMessage: '确认停用「{username}」？Keycloak 也会被禁用，无法登录。',
-        resetTitle: '重置密码', resetMessage: '确认重置「{username}」的密码？将生成一个临时密码。',
-        deleteTitle: '删除用户', deleteMessage: '确认删除「{username}」？不可恢复（同时删除 Keycloak 用户）。'
+        resetTitle: '重置密码', resetMessage: '确认重置「{username}」的密码？当前密码将立即失效；会生成新的临时密码并（若有邮箱）发送到其邮箱。',
+        deleteTitle: '删除用户', deleteMessage: '确认删除「{username}」？不可恢复（同时删除 Keycloak 用户）。',
+        resendTitle: '重发邮件', resendMessage: '向「{username}」（{email}）重发开户邮件？会重置其密码（当前密码立即失效），并把新的登录信息（用户名 + 临时密码）发送到该邮箱。'
       },
       secret: { titleNew: '已创建平台用户', titleReset: '已重置密码' },
       search: { placeholder: '按用户名 / 邮箱搜索' },
@@ -238,7 +246,11 @@ export default {
         displayNamePlaceholder: '运维张三',
         emailPlaceholder: 'ops2@example.com',
         creating: '创建中...',
-        doneIntro: '已创建「{username}」。请把下面的临时密码安全地交给本人（首次登录需修改）。',
+        doneIntro: '已创建「{username}」。',
+        emailSent: '凭据邮件已发送至 {email}（含登录地址、用户名、临时密码；用户登录后需修改密码）。',
+        emailNotSent: '邮件未发送（请检查应用邮件配置 CORE_MAIL_*）。可先转交下方临时密码，或稍后在列表中重发。',
+        resetIntro: '已为「{username}」重置密码，新的临时密码如下（对方首次登录需修改）。',
+        resendIntro: '已为「{username}」重发开户邮件，并重置了临时密码（原密码已失效）。新的临时密码如下。',
         tempPassword: '临时密码',
         tempPasswordHint: '关闭此页后将无法再次查看。',
         copy: '复制'
@@ -248,7 +260,7 @@ export default {
         createSuccess: '已创建平台用户', createFailed: '创建用户失败',
         copied: '已复制', copyFailed: '复制失败',
         disableSuccess: '已停用', enableSuccess: '已启用', resetSuccess: '已重置密码',
-        deleteSuccess: '已删除', opFailed: '操作失败'
+        deleteSuccess: '已删除', updateSuccess: '已更新', resendSuccess: '邮件已发送', opFailed: '操作失败'
       }
     },
     tenant: {

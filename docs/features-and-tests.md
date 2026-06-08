@@ -105,7 +105,7 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 - [ ] 内置租户不可被模拟。
 
 ### 2.6 運用ユーザー管理 / 平台用户(Platform users,两级)
-`/platform/users`(`opsuser:*`,仅 ops 可见):列表、新建(KC system realm 用户 + 临时密码 + 授 **PLATFORM_OPERATOR**)、停用/启用、重置密码、删除。常规运维(PLATFORM_OPERATOR=`*:*`)**看不到本页**。
+`/platform/users`(`opsuser:*`,仅 ops 可见):列表、新建(KC system realm 用户 + 授 **PLATFORM_OPERATOR** + 临时密码;**创建时即 best-effort 发送凭据邮件**——应用 `MailService` 发 `user-direct-welcome` 模板,含**登录地址 + 用户名 + 临时密码**;用户登录后 KC **强制改密**(临时凭据单次,改完即失效,无法被复用来重置密码)。**走应用 `CORE_MAIL_*`,不依赖 KC realm SMTP**;成功弹窗显示是否已发送 + 临时密码,邮件失败不影响创建)、**编辑(改显示名/邮箱,用户名不可改;同步 KC `updateProfile` + `core_auth_user`)**、停用/启用、**重置密码 / 重发邮件(两个入口,后台同一 `reissueCredentials(id, reset)` 逻辑**:都轮换临时密码 → **当前密码立即失效**,best-effort 发凭据邮件 + 弹窗显示新临时密码作后备;区别仅**邮件文案**——`reset=true` 发「密码重置」标题/正文,`reset=false` 发「账户开设」标题/正文,均复用 `user-direct-welcome` 模板靠 `reset` 开关切换,subject 分别取 `user-account-reset.subject` / `user-direct-welcome.subject`;**重置邮件仅含临时密码,重发邮件含登录地址+用户名+临时密码**(模板靠 `reset` 开关隐藏多余行)。**两入口都 confirm 提示会重置当前密码;重发不在页面弹临时密码(仅 toast),重置仍弹临时密码作后备**)**、删除。编辑/重置/重发走 `opsuser:update`。登录链接指向应用 `/login`(走 SSO 到 KC,不直接暴露 KC UI)。常规运维(PLATFORM_OPERATOR=`*:*`)**看不到本页**。
 **测试点**
 - [ ] ops 能看到「运维用户」菜单;常规运维**看不到**(`opsuser:*` 不被 `*:*` 覆盖),直接访问 API 403。
 - [ ] 新建用户 → 弹一次性临时密码;新用户用它登录、KC 强制改密。
@@ -116,6 +116,10 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 - [ ] 新建表单必填项 `*` 为红色;邮箱有格式校验(前端正则 + 后端 `@Email`),格式不对被拦。
 - [ ] 新建用户邮箱**必填**;首登**不**经过"更新账户信息"页(不报"请指定此字段"),直接进设置密码——KC 用户的 email/firstName/lastName 创建时已补全(单段名 lastName 也填)。
 - [ ] 状态徽标有颜色区分:启用=绿(success)、禁用=红(danger)。
+- [ ] 编辑:改某用户的显示名/邮箱 → 列表即时更新;用户名为只读(改不了,提示删重建);邮箱格式校验;Keycloak 用户的 email/firstName/lastName 同步更新。
+- [ ] 新建(应用 `CORE_MAIL_*` 已配):创建成功弹窗显示「开户邮件已发送至 {email}」+ 临时密码;用户收到**开户邮件**(登录地址+用户名+临时密码)→ 登录 → KC **强制改密** → 设永久密码后正常使用。`CORE_MAIL_*` 未配/发送失败时弹窗仍显示临时密码作后备,且**创建本身不失败**。
+- [ ] **重置密码 / 重发邮件**(两入口、同一后台逻辑):各自点击都先 confirm 提示「会重置当前密码」;确认后**临时密码被轮换**(原密码立即失效)。**重置密码**:页面弹窗显示新临时密码(后备)+ 邮件**仅含临时密码**(无登录地址/用户名/租户行)。**重发邮件**:页面**不弹**临时密码(仅 toast 成功)+ 邮件含**登录地址+用户名+临时密码**(开户文案)。走应用 `CORE_MAIL_*`,不需配 KC realm SMTP。
+- [ ] 一次性:临时密码登录并改密后即失效;重置/重发会轮换出新的临时密码(旧的同时失效)。
 
 ---
 
