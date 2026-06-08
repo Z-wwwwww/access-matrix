@@ -46,6 +46,7 @@
 - [ ] 改某角色权限后,持有该角色的用户**下次请求**即生效(权限缓存按角色失效)。
 - [ ] 菜单按权限显隐;无权限的路由直接访问被拦/404。
 - [ ] 菜单管理列表的类型徽标按 `menu_type` dict 的 css_class 着色:目录=info(蓝)、菜单=success(绿)、按钮=violet(紫)。
+- [ ] 菜单管理**操作列**:ops(`*:*`)能看到增删改按钮——写权限码是 `platform:menu:*`,前端 `v-permission` 必须带 `platform:` 前缀(`*:*` 只匹配 `platform:` 命名空间,不匹配 2 段 `menu:*`);业务 super(`tenant:*`)看不到写按钮,但 `menu:read` 仍可用于 RoleEdit 菜单选择器。
 - [ ] 数据范围:不同 data_scope 的用户看到的 task 行集不同。
 
 ---
