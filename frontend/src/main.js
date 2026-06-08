@@ -9,6 +9,13 @@ import { registerPermissionDirectives } from './directives/permission'
 import { toast } from '@/composables/useToast'
 import '@/lib/date'
 import './styles/main.css'
+// Apply the persisted theme (the `.dark` class + `data-palette`) to <html> at
+// startup so the very FIRST screen — including the unauthenticated /login page —
+// reflects the user's choice. useTheme.js applies it as a module-load side
+// effect; it was previously only imported by AppHeader (rendered inside
+// AppLayout, i.e. only after login), so /login always painted in light mode and
+// the SSO redirect forwarded ui_mode=light regardless of the in-app toggle.
+import '@/composables/useTheme'
 
 // ─── TanStack Query client ───
 // staleTime 30s で filter 切替直後の連打を抑え、再マウント時に余計な再取得を防ぐ。

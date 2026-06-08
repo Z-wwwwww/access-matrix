@@ -35,7 +35,7 @@ const confirmClass = computed(() => {
     :open="open"
     :title="state?.title || t('common.button.confirm')"
     width="max-w-md"
-    z-index="z-[60]"
+    z-index="z-[100]"
     :close-on-overlay="false"
     @update:open="$event ? null : handleCancel()"
   >

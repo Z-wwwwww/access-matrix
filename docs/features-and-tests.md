@@ -1,8 +1,8 @@
 # 基盤機能 & テストポイント / 基盘功能 & 测试点
 
-> **维护约定（重要）**：本文件是**基盘功能清单 + 手动测试点**的单一来源。
-> **每次新增或改动功能,必须同步更新本文件**——在对应小节追加/修改功能说明,并**列出该功能的测试点**(可勾选清单)。
-> 加了什么功能,就要在这里列出"怎么验证它能用"。AI 助手在实现新功能后也应主动更新本文件。
+> **维护约定（重要）**：本文件是**当前功能 + 怎么用 + 手动测试点**的单一来源——描述"这个项目有哪些功能、怎么用"的**现状快照**,不是变更日志。
+> **每次新增或改动功能,就地更新对应小节**使其反映最新行为,并保持其测试点最新(可勾选清单)。**只同步最新状态,不记录历史/变更履历。**
+> AI 助手在实现或修改功能后也应主动更新本文件,把它当作"完成"的一部分(像更新测试一样)。
 
 约定标记:`mode=oidc` 指 Keycloak SSO 模式(dev/prod 默认);本地 dev 账号见 `docs/getting-started`。
 平台运维(ops)= `system` 租户用户;业务用户 = 各业务租户(demo / acme …)。
@@ -28,6 +28,7 @@
 - [ ] 多 realm:在 A 租户的账号无法登录 B 租户。
 - [ ] 新建运维用户用临时密码首登 → KC「修改密码」页,按钮是通用「提交」(不是「发送重置链接」)。Keycloak 主题 `doSubmit` 必须保持通用(多页面共用),不要写成某页专属文案。
 - [ ] KC 多字段表单(更新账户信息 / 修改密码)排版整齐:必填 `*` 紧跟 label **同一行**,label↔input、字段↔字段间距正常(不因 `.pf-*__label-text` 被设成 block 而拉开)。
+- [ ] **SSO 页跟随应用明暗**:在应用内切到深色(即使系统为亮色)后点登录跳到 KC,登录页为深色;切回亮色则 KC 为亮色;登录失败重渲染后仍保持(sessionStorage `am_ui_mode` 兜底)。强调色(陶土/松绿等)**不**带到 KC——登录页保持 navy/gold 品牌入口设计。机制:前端在 `/authorize`(及忘记密码 `reset-credentials`)URL 追加 `ui_mode=dark|light`(`oidc.js`),KC 主题 `login.js` 读取并在 `<html>` 设 `data-theme`(头部同步脚本,无闪烁)。
 
 ---
 
@@ -137,38 +138,18 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 ## 4. フロントエンド基盤（Frontend foundation）
 
 - **多 Tab + keep-alive**:目录占位 `EmptyLayout` 单实例复用(修复了"多 tab 后新 tab 发重复请求")。
+- **Tab 栏(Browser 风)**:`AppTabBar`。非激活 tab 之间用 `::before` 竖分割线分隔(相邻激活/hover 时隐藏);tab `flex-1 min-w-[56px] max-w-[120px]` + `truncate` 均匀缩小;缩到极限不向右延伸,多出的收进右侧 `+N`(`ResizeObserver` 测宽算 `visibleCount`,始终保证 active 可见),hover `+N` 弹出隐藏 tab 列表;标题被截断时 hover 在 tab 下方弹完整名 tooltip(`pointer-events-none`,Teleport 到 body 避免被裁,仅 `scrollWidth > clientWidth` 时弹)。拖拽排序 / 右键菜单 / 末端批量操作保留。
+- **详细 tab 业务标识**:`tabsStore.tabExtras`(**不持久化**的内存 map,`fullPath → {prefixKey, badge}`)+ `setTabExtra`。业务详细页在自身 `loadDetail` 内调用(切忌用依赖全局 route 的 watch,keep-alive 缓存下会污染别的 tab);`tabLabel` 读它把 `予約番号/施設名` 等业务标识拼到「XX-詳細」后,`prefixKey` 存 i18n key 以跟随语言。基盘暂无业务详细页,此为预置基础设施。
+- **确认弹窗**:全项目用 `useConfirm()` 的 `confirm()`(Promise)+ 常驻 `<ConfirmDialog>`(无 `window.confirm`);`ConfirmDialog` z-index = `z-[100]`,高于 `Dialog`(`z-[90]`),保证从 Dialog 内触发删除时确认框可见可点(否则被遮 → Promise 永不 resolve → "点击无反应")。
 - **侧边栏**:收藏 / 置顶 / 顶层叶子菜单提升 / 折叠 flyout。
-- **主题 / 调色板**:CSS 变量;`.dark` + `data-palette`。单一暖色主题(暖米白 `#f4efe9` 背景 + 纯白卡片 + 页面背景两团极淡品牌径向光晕,深色模式去掉光晕),仅**品牌强调色**可切:陶土铁锈(默认)/ 砖红 / 赭黄 / 暗松绿 / 灰紫;surfaces 五色共用,只换 `--primary/--accent/--ring/--brand-orange`。
+- **主题 / 调色板**:CSS 变量;`.dark` + `data-palette`。单一暖色主题(暖米白 `#f4efe9` 背景 + 纯白卡片 + 页面背景两团极淡品牌径向光晕,深色模式去掉光晕),仅**品牌强调色**可切:陶土铁锈(默认)/ 砖红 / 赭黄 / 暗松绿 / 灰紫;surfaces 五色共用,只换 `--primary/--accent/--ring/--brand-orange`。**深色用 `.dark` class 切换**(`useTheme.js`),`main.css` 必须配 `@custom-variant dark (&:where(.dark, .dark *))`,否则 Tailwind v4 的 `dark:` 默认跟随系统 `prefers-color-scheme`,"系统亮色 + 手动深色"时全项目 `dark:` 静默失效。主题在 app **启动时即应用**(`main.js` 引入 `useTheme`,模块副作用给 `<html>` 加 `.dark`/`data-palette`),使**未登录的 `/login` 等首屏**也跟随;否则 `useTheme` 只被登录后的 `AppHeader` 引入,登录页会停在亮色、且 SSO 跳转会误传 `ui_mode=light`。
 
 **测试点**
 - [ ] 打开多个 tab,再开新 tab:每个接口**只发一次**(无重复请求)。
 - [ ] 关闭 tab 不残留 404;双击 tab 刷新该页。
+- [ ] Tab 栏:非激活 tab 间有竖分割线(激活/hover 及其相邻处隐藏);窗口变窄时 tab 均匀缩小并 `…` 截断,不向右溢出;再窄则多出的收进 `+N`,active 始终可见;hover `+N` 弹隐藏列表可点选/关闭;hover 被截断的 tab 在其下方弹完整名 tooltip。
+- [ ] 删除确认:从抽屉/Dialog **内部**触发删除时,确认框浮在最上层可点(不被 Dialog 遮);取消/确认都能正常 resolve。
 - [ ] 收藏/置顶菜单显示在顶部;折叠侧栏 hover 出 flyout。
 - [ ] 切主题/调色板,图表与界面颜色随之更新。
-
----
-
-## 変更履歴 / 变更记录(追加在最上)
-
-- 2026-06-05 — 平台总览按 Claude Design 稿重做为 bento 仪表盘:4 KPI 卡(图标在左)+ 状态环形(圆心总数)+ 手绘 SVG 面积趋势(直线段不过冲)+ 入驻漏斗/活跃/健康/安全四卡(tiles + 健康 pill + 安全审计列表)。新增 `AreaChart.vue`、`platform.tenant.overview.*`(5 语言);移除 echarts 依赖与旧 `DashboardPanels.vue`,颜色走主题令牌。
-
-- 2026-06-05 — 徽标着色区分:平台用户状态徽标启用=绿(success)/禁用=红(danger)(原 `destructive` 非法变体,实际无色);菜单管理类型徽标由 `MenuType` enum 新增 `css_class`(目录=info/菜单=success/按钮=violet)驱动,前端 `menuType.cssClass(row.menuType) || 'outline'`(后端重启后生效)。
-
-- 2026-06-05 — 主题系统精简为单一暖色主题:背景改暖米白 `#f4efe9` + 纯白卡片 + 页面两团极淡品牌径向光晕(深色去掉);删除其余 12 套调色板,只保留 5 个品牌强调色(陶土铁锈默认 / 砖红 / 赭黄 / 暗松绿 / 灰紫,共用 surfaces)。`useTheme.js` PALETTES 缩为 5、默认 `warm`(旧 localStorage 失效值自动回落);`main.css` 重写 `:root`/`.dark` + 强调色变体 + body 光晕。
-
-- 2026-06-05 — 租户管理列表按 Claude Design 稿重构:字母徽标 + 双行单元格 + 语义状态点 + 相对时间 + 悬停操作 + 表格/卡片切换 + 状态分段筛选(后端新增可选 `status` 参数)+ 详情抽屉 + 可折叠回收站提示。颜色/字体走 app 主题令牌(适配主题强调色+深色),设计稿中后端无的字段(plan/users/region/owner)省略。新增 `TenantRowActions.vue`、5 语言 `platform.tenant.list.*` 文案、`list_statusFilter_addsStatusPredicate` 单测。
-
-- 2026-06-05 — 平台 dashboard 拆出独立「平台总览」页(`/platform/overview`,菜单 `platform.overview`,门控 `platform:tenant:read`,V56):KPI/图表/4 监控面板从租户管理页移出,租户表格首屏即可见。另:活跃与参与卡曲线图上方加「登录趋势(14天)」小标题。
-
-- 2026-06-05 — 停用/删除运维用户时同时 ForceLogout 踢下线(在飞 token 立即失效);启用清除踢出标记。
-
-- 2026-06-05 — 全项目邮箱输入统一前端格式校验(`@/lib/validators` 的 `isValidEmail` + `common.message.invalidEmail`):平台用户、租户新建/编辑、重发邀请、用户编辑;后端各 DTO 本就有 `@Email`。
-
-- 2026-06-05 — 新建运维用户:email 改必填 + 单段名也填 lastName,使首登跳过 UPDATE_PROFILE(不再一进来就报"请指定此字段")。
-- 2026-06-05 — 修复 KC 主题多字段表单(更新账户/修改密码)排版:必填 `*` 回到 label 同行、收紧 label/字段间距(`.pf-*__label-text` 不再被设成 block)。
-- 2026-06-05 — 修复 KC 登录主题 `doSubmit` 被改成"发送重置链接"导致"设置/修改密码"页按钮文案错误;改回通用"提交"。
-- 2026-06-05 — 平台运维用户控制台(两级:ops / PLATFORM_OPERATOR;新建/停用/删除/重置密码)。
-- 2026-06-05 — 支持会话服务端追踪(`core_support_session`)+ 安全面板可选卡。
-- 2026-06-05 — 领域事件控制台(列表 + 重发)+ demo task emit 事件 + outbox 保留作业。
-- 2026-06-04 — 租户管理改 dashboard(KPI/图表 + 4 监控面板)+ break-glass 审计 + oplog error_code。
-- 2026-06-04 — 修复多 tab keep-alive 重复请求;平台菜单图标修正 + 拍平。
+- [ ] **深色模式**:系统设为亮色、应用内手动切深色,所有 `dark:` 工具类(登录页 / 租户行 / 徽标 / Header / Break-glass 弹窗等)正常生效,无局部变白。
+- [ ] **登录页跟随主题**:选深色后退出到 `/login`(或 SSO 跳转过渡页),登录页本身为深色(`<html>` 启动即带 `.dark`);此时点 SSO 登录,KC 也收到 `ui_mode=dark`(印证 `currentUiMode()` 读得到 `.dark`)。

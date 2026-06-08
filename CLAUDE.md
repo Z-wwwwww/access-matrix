@@ -8,7 +8,7 @@ This file is intentionally thin. The **`AGENTS.md` files are the single source o
 
 ## Always maintain the feature & test-point log
 
-- [`docs/features-and-tests.md`](docs/features-and-tests.md) is the living single source of foundational features + manual test points. **Every time you add or change a feature, update it in the same change**: add/adjust the feature entry and list its test points (and prepend a one-line 变更履歴 entry). Treat this as part of "done", like updating tests.
+- [`docs/features-and-tests.md`](docs/features-and-tests.md) is the living single source of foundational features + manual test points — a **current-state snapshot** of what the project does and how it's used, NOT a changelog. **Every time you add or change a feature, update it in the same change**: edit the relevant feature section in place so it reflects the latest behavior, and keep its test points current. Only sync the latest state — do not accumulate dated/历史 entries. Treat this as part of "done", like updating tests.
 
 ## Before writing backend business code, don't miss:
 

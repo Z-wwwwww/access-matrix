@@ -56,6 +56,14 @@ export const useTabsStore = defineStore('tabs', () => {
    */
   const refreshVersions = reactive({})
 
+  /**
+   * tab の追記情報（例: 予約番号 / 施設名）: { fullPath: { prefixKey, badge } | string }
+   * AppTabBar 側で base ラベルに付与する。意図的に**永続化しない**:
+   * リロード時はページ側が loadDetail で再設定する。旧バージョンの誤った残留も
+   * （別ページに切替えた瞬間に汚染された値が）自動失効する。
+   */
+  const tabExtras = reactive({})
+
   const cachedViews = computed(() =>
     tabs.value.map((t) => (t.path || t.key || '').replace(/\//g, '-').replace(/^-/, ''))
   )
@@ -246,6 +254,18 @@ export const useTabsStore = defineStore('tabs', () => {
     refreshVersions[fullPath] = (refreshVersions[fullPath] || 0) + 1
   }
 
+  /**
+   * tab に追記情報（例: 予約番号 / 施設名）をセット。fullPath をキーに保持（永続化しない）。
+   * ページ側は自身の loadDetail 内でのみ呼ぶこと —— keep-alive キャッシュ済みコンポーネントで
+   * グローバル route に依存した watch から呼ぶと、別の詳細ページに切替えた際に誤った fullPath で
+   * 他 tab を汚染する（高頻度 bug）。
+   */
+  function setTabExtra(fullPath, extra) {
+    if (!fullPath) return
+    if (extra) tabExtras[fullPath] = extra
+    else delete tabExtras[fullPath]
+  }
+
   return {
     tabs,
     activeTab,
@@ -253,6 +273,7 @@ export const useTabsStore = defineStore('tabs', () => {
     homeTitle,
     cachedViews,
     refreshVersions,
+    tabExtras,
     setHome,
     addTab,
     removeTab,
@@ -261,6 +282,7 @@ export const useTabsStore = defineStore('tabs', () => {
     closeAll,
     clearTabs,
     moveTab,
-    refreshTab
+    refreshTab,
+    setTabExtra
   }
 })

@@ -99,6 +99,23 @@ export function keycloakLogoutUrl(idToken, postLogoutTo) {
 }
 
 /**
+ * The app's active light/dark mode, read from the `.dark` class useTheme.js
+ * applies to <html> on init (covers both the explicit in-app toggle and the
+ * OS fallback). Forwarded to Keycloak as `ui_mode` on the authorize URL so
+ * the login theme matches the app — KC is a different origin and can't read
+ * our localStorage. Keycloak ignores the unknown param but preserves it in
+ * the rendered page URL, where the theme's login.js reads it and sets
+ * `data-theme` on <html>. Defaults to light if the DOM isn't available.
+ */
+function currentUiMode() {
+  try {
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  } catch {
+    return 'light'
+  }
+}
+
+/**
  * URL of the Keycloak built-in "forgot password" flow. Lands the user at
  * the email-collection page; Keycloak handles the rest (sending the
  * reset email, validating the link, prompting for a new password).
@@ -115,7 +132,8 @@ export function keycloakForgotPasswordUrl() {
     // tab_id-less reset-credentials shortcut: append &kc_action=reset
     // to a normal authorize URL → Keycloak triggers the reset-password
     // required action immediately instead of asking for credentials.
-    kc_action:     'reset-credentials'
+    kc_action:     'reset-credentials',
+    ui_mode:       currentUiMode()
   })
   return `${cfg.issuer}/protocol/openid-connect/auth?${params}`
 }
@@ -267,7 +285,9 @@ export async function beginLogin() {
     scope:                 cfg.scopes,
     state:                 state,
     code_challenge:        challenge,
-    code_challenge_method: 'S256'
+    code_challenge_method: 'S256',
+    // Forward the app's light/dark mode so the KC login theme matches it.
+    ui_mode:               currentUiMode()
   })
 
   window.location.assign(`${cfg.issuer}/protocol/openid-connect/auth?${params}`)

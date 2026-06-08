@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* ── Dark mode variant ──
+   This project switches theme via a `.dark` class on <html> (see
+   composables/useTheme.js), NOT the OS `prefers-color-scheme`. Tailwind v4
+   defaults `dark:` to follow `prefers-color-scheme`, so without this override
+   every `dark:` utility silently fails whenever the OS is light but the user
+   picked dark (or vice-versa). Bind `dark:` to the `.dark` class instead so all
+   `dark:` utilities track the in-app toggle. Must stay right after the import. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
  * Access Matrix Design System Tokens
  *

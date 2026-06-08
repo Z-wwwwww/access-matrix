@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useTabsStore } from '@/stores/tabs'
 // Business-specific quick-filter labels were removed with the PMS business code.
 // Stub returns null so the tab title falls through to the menu-translated base.
@@ -25,10 +25,20 @@ function tabLabel(tab) {
   if (typeof path === 'string' && path.endsWith('/detail')) {
     const parentPath = path.slice(0, -'/detail'.length)
     const base = translateMenu({ path: parentPath, title: stripSuffix(tab.title), titleI18n: tab.titleI18n })
-    const suffix = tab.fullPath && tab.fullPath.includes('id=')
-      ? t('common.button.detail')
-      : t('common.button.new')
-    return `${base} - ${suffix}`
+    const hasId = tab.fullPath && tab.fullPath.includes('id=')
+    // ページが setTabExtra で { prefixKey, badge } を渡せる:
+    //   prefixKey … 詳細名の i18n キー（例 'reservation.detailTabTitle'）。ここで t() するので言語切替に追従。
+    //               無ければ「菜单名 - 詳細/新規」
+    //   badge     … 予約番号 / 施設名 など。あれば後ろに付与
+    const ex = tabsStore.tabExtras[tab.fullPath] || tabsStore.tabExtras[tab.key]
+    const exObj = ex && typeof ex === 'object' ? ex : ex ? { badge: ex } : null
+    const defaultSuffix = hasId ? t('common.button.detail') : t('common.button.new')
+    const prefix = exObj && exObj.prefixKey
+      ? t(exObj.prefixKey)
+      : `${base} - ${defaultSuffix}`
+    const badge = exObj ? exObj.badge : ''
+    if (hasId && badge) return `${prefix} - ${badge}`
+    return prefix
   }
   const base = translateMenu({ path, title: tab.title, titleI18n: tab.titleI18n })
   // Dashboard カードからの quickFilter 付き遷移: カード名を後缀に表示
@@ -117,6 +127,7 @@ function onWindowPointerMove(e) {
     dragSession.started = true
     dragSession.suppressClick = true
     draggingKey.value = dragSession.key
+    tip.value.show = false
     document.body.classList.add('app-tab-dragging')
     try {
       dragSession.el.setPointerCapture(e.pointerId)
@@ -185,6 +196,33 @@ function onTabClick(tab) {
   tabsStore.switchTab(tab.key)
 }
 
+// ── hover 提示：标题被省略(…)时，在 tab 正下方显示完整标题 ──
+// 纯展示浮层（pointer-events-none），与同行 tab 不同高度 → 不遮挡邻居。
+// Teleport 到 body 避免被 tab 栏 overflow 裁剪；仅 scrollWidth > clientWidth 时弹。
+const tip = ref({ show: false, cx: 0, top: 0, text: '' })
+
+function onTabEnter(e, tab) {
+  if (draggingKey.value) return
+  const el = e.currentTarget
+  const span = el.querySelector('span')
+  // 文字未被截断则不弹（短标签无需提示）
+  if (!span || span.scrollWidth <= span.clientWidth + 1) {
+    tip.value.show = false
+    return
+  }
+  const rect = el.getBoundingClientRect()
+  tip.value = {
+    show: true,
+    cx: rect.left + rect.width / 2,
+    top: rect.bottom + 8,
+    text: tabLabel(tab)
+  }
+}
+
+function onTabLeave() {
+  tip.value.show = false
+}
+
 // ── 右键菜单 ──
 const contextMenu = ref({ show: false, x: 0, y: 0, key: '' })
 
@@ -249,6 +287,81 @@ const canCloseOthers = computed(
   () => tabsStore.tabs.filter((t) => t.path !== tabsStore.homePath).length >= 1
 )
 const canCloseAll = canCloseOthers
+
+// ── overflow（多到极限不向右延伸，多出的收进 +N）──
+const MIN_TAB = 56   // tab 最小宽度（与 min-w-[56px] 一致）
+const PLUS_W = 48    // +N 按钮预留宽度
+const navRef = ref(null)
+const navWidth = ref(9999) // 测量前先假设够宽，避免首帧闪 +N
+let navRO = null
+
+onMounted(() => {
+  if (!navRef.value) return
+  navWidth.value = navRef.value.clientWidth
+  navRO = new ResizeObserver((entries) => {
+    navWidth.value = entries[0].contentRect.width
+  })
+  navRO.observe(navRef.value)
+})
+onBeforeUnmount(() => {
+  if (navRO) navRO.disconnect()
+})
+
+// 容纳得下的 tab 数（放不下时为 +N 预留空间）
+const visibleCount = computed(() => {
+  const total = tabsStore.tabs.length
+  const w = navWidth.value
+  let count = Math.max(1, Math.floor(w / MIN_TAB))
+  if (total > count) {
+    count = Math.max(1, Math.floor((w - PLUS_W) / MIN_TAB))
+  }
+  return count
+})
+
+// 可见 tab：始终保证 active 在可见区
+const visibleTabs = computed(() => {
+  const all = tabsStore.tabs
+  const n = visibleCount.value
+  if (all.length <= n) return all
+  const head = all.slice(0, n)
+  const activeKey = tabsStore.activeTab
+  if (head.some((t) => t.key === activeKey)) return head
+  const activeTab = all.find((t) => t.key === activeKey)
+  if (!activeTab) return head
+  // active 落在隐藏区：用它替换最后一个可见槽
+  return [...all.slice(0, Math.max(1, n - 1)), activeTab]
+})
+
+const hiddenTabs = computed(() => {
+  const visKeys = new Set(visibleTabs.value.map((t) => t.key))
+  return tabsStore.tabs.filter((t) => !visKeys.has(t.key))
+})
+
+// ── +N 溢出面板（hover 展开全部未显示 tab）──
+const overflowPanel = ref({ show: false, x: 0, y: 0 })
+let overflowTimer = null
+
+function openOverflow(e) {
+  clearTimeout(overflowTimer)
+  tip.value.show = false // tooltip 与面板互斥
+  const r = e.currentTarget.getBoundingClientRect()
+  overflowPanel.value = { show: true, x: r.right, y: r.bottom + 6 }
+}
+function keepOverflow() {
+  clearTimeout(overflowTimer)
+}
+function scheduleCloseOverflow() {
+  overflowTimer = setTimeout(() => {
+    overflowPanel.value.show = false
+  }, 120)
+}
+function pickHidden(tab) {
+  tabsStore.switchTab(tab.key)
+  overflowPanel.value.show = false
+}
+function closeHidden(tab) {
+  tabsStore.removeTab(tab.key)
+}
 </script>
 
 <template>
@@ -257,36 +370,52 @@ const canCloseAll = canCloseOthers
     class="sticky top-14 z-30 bg-background flex items-center px-3 md:px-4 lg:px-6 py-2 gap-2 shrink-0 transition-shadow duration-200"
     :class="hasStickySubheader ? '' : 'shadow-[0_3px_6px_-3px_rgba(0,0,0,0.16)]'"
   >
-    <!-- Scrollable tabs -->
-    <div class="flex items-center gap-2 overflow-x-auto scrollbar-none flex-1 min-w-0">
-      <button
-        v-for="tab in tabsStore.tabs"
-        :key="tab.key"
-        :data-tab-key="tab.key"
-        class="group relative inline-flex items-center justify-center h-7 px-3 rounded-md text-xs font-medium whitespace-nowrap transition-all duration-200 shrink-0 cursor-pointer"
-        :class="[
-          tabsStore.activeTab === tab.key
-            ? 'bg-brand-orange text-white'
-            : 'bg-card text-muted-foreground hover:text-foreground',
-          isClosable(tab) && 'hover:pr-7',
-          draggingKey === tab.key && 'opacity-40 cursor-grabbing'
-        ]"
-        @pointerdown="onTabPointerDown($event, tab)"
-        @click="onTabClick(tab)"
-        @dblclick="tabsStore.refreshTab(tab.fullPath)"
-        @contextmenu="onContextMenu($event, tab.key)"
-      >
-        <span>{{ tabLabel(tab) }}</span>
-        <span
-          v-if="isClosable(tab)"
-          class="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-4 h-4 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-          :class="tabsStore.activeTab === tab.key ? 'hover:bg-white/25' : 'hover:bg-muted'"
-          @pointerdown.stop
-          @click.stop="tabsStore.removeTab(tab.key)"
-          @dblclick.stop
+    <!-- Browser 风 tabs：竖分割线分隔，均匀缩小并 truncate，缩到极限后收进 +N（不向右延伸） -->
+    <div ref="navRef" class="flex items-center flex-1 min-w-0">
+      <div class="flex items-center flex-1 min-w-0 overflow-hidden">
+        <button
+          v-for="tab in visibleTabs"
+          :key="tab.key"
+          :data-tab-key="tab.key"
+          class="app-tab group relative inline-flex items-center justify-center h-7 px-3 rounded-md text-xs font-medium transition-all duration-200 cursor-pointer flex-1 min-w-[56px] max-w-[120px]"
+          :class="[
+            tabsStore.activeTab === tab.key
+              ? 'is-active bg-brand-orange text-white'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+            isClosable(tab) && 'hover:pr-7',
+            draggingKey === tab.key && 'opacity-40 cursor-grabbing'
+          ]"
+          @pointerdown="onTabPointerDown($event, tab)"
+          @click="onTabClick(tab)"
+          @dblclick="tabsStore.refreshTab(tab.fullPath)"
+          @contextmenu="onContextMenu($event, tab.key)"
+          @mouseenter="onTabEnter($event, tab)"
+          @mouseleave="onTabLeave"
         >
-          <X :size="12" />
-        </span>
+          <span class="truncate min-w-0">{{ tabLabel(tab) }}</span>
+          <span
+            v-if="isClosable(tab)"
+            class="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-4 h-4 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            :class="tabsStore.activeTab === tab.key ? 'hover:bg-white/25' : 'hover:bg-foreground/15'"
+            @pointerdown.stop
+            @click.stop="tabsStore.removeTab(tab.key)"
+            @dblclick.stop
+          >
+            <X :size="12" />
+          </span>
+        </button>
+      </div>
+
+      <!-- +N 溢出：未显示的 tab 数；hover 展开全部 -->
+      <button
+        v-if="hiddenTabs.length"
+        type="button"
+        class="shrink-0 ml-1 inline-flex items-center justify-center h-7 px-2 rounded-md text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        @mouseenter="openOverflow"
+        @mouseleave="scheduleCloseOverflow"
+        @click.stop="openOverflow"
+      >
+        +{{ hiddenTabs.length }}
       </button>
     </div>
 
@@ -301,6 +430,45 @@ const canCloseAll = canCloseOthers
         <MoreHorizontal :size="16" />
       </button>
     </div>
+
+    <!-- +N 溢出面板：列出全部未显示的 tab -->
+    <Teleport to="body">
+      <div
+        v-if="overflowPanel.show && hiddenTabs.length"
+        class="fixed z-[100] -translate-x-full min-w-[200px] max-w-[280px] max-h-[60vh] overflow-y-auto scrollbar-thin py-1 bg-card border border-border rounded-lg shadow-xl text-sm"
+        :style="{ left: overflowPanel.x + 'px', top: overflowPanel.y + 'px' }"
+        @mouseenter="keepOverflow"
+        @mouseleave="scheduleCloseOverflow"
+      >
+        <div
+          v-for="tab in hiddenTabs"
+          :key="tab.key"
+          class="group flex items-center gap-2 px-3 py-1.5 cursor-pointer transition-colors hover:bg-muted"
+          :class="tabsStore.activeTab === tab.key ? 'text-brand-orange font-medium' : 'text-foreground'"
+          @click="pickHidden(tab)"
+        >
+          <span class="flex-1 truncate">{{ tabLabel(tab) }}</span>
+          <span
+            v-if="isClosable(tab)"
+            class="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded opacity-0 transition group-hover:opacity-100 hover:bg-background"
+            @click.stop="closeHidden(tab)"
+          >
+            <X :size="12" />
+          </span>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- hover 提示：标题被截断时，在 tab 正下方显示完整标题（纯展示，不遮挡邻居）-->
+    <Teleport to="body">
+      <div
+        v-if="tip.show"
+        class="app-tab-tip fixed z-[110] -translate-x-1/2 whitespace-nowrap px-2.5 py-1 rounded-md bg-foreground text-background text-xs font-medium shadow-lg pointer-events-none"
+        :style="{ left: tip.cx + 'px', top: tip.top + 'px' }"
+      >
+        {{ tip.text }}
+      </div>
+    </Teleport>
 
     <!-- 右键上下文菜单 -->
     <Teleport to="body">
@@ -373,5 +541,55 @@ body.app-tab-dragging,
 body.app-tab-dragging * {
   cursor: grabbing !important;
   user-select: none;
+}
+
+/* ── Browser 风分割线 ──
+ * 非激活 tab 之间用竖线分隔；线在 tab 左侧。
+ * 隐藏条件：首个 tab / 自身激活或 hover / 紧跟在激活或 hover 之后（Chrome 同款逻辑）。 */
+.app-tab::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.app-tab:first-child::before,
+.app-tab.is-active::before,
+.app-tab:hover::before,
+.app-tab.is-active + .app-tab::before,
+.app-tab:hover + .app-tab::before {
+  opacity: 0;
+}
+
+/* ── hover 提示（tab 下方）──
+ * tab の真下に表示。上向きの三角矢印で tab を指す。 */
+.app-tab-tip {
+  animation: app-tab-tip-in 0.12s ease-out;
+}
+/* 上向き矢印 */
+.app-tab-tip::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  background-color: inherit;
+  transform: translateX(-50%) rotate(45deg);
+}
+@keyframes app-tab-tip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 </style>

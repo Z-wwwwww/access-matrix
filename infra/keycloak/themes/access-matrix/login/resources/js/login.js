@@ -24,6 +24,32 @@
 (function () {
   'use strict';
 
+  // ─── 0pre. Theme sync from the SPA ─────────────────────────────
+  // The access-matrix front-end switches light/dark via a `.dark` class on
+  // <html> (different origin → we can't read its localStorage). It forwards
+  // its active mode as `?ui_mode=dark|light` on the authorize URL; apply it
+  // as `data-theme` on <html> so the login form matches the app's toggle
+  // even when that disagrees with the OS `prefers-color-scheme` (the CSS
+  // already has both `[data-theme=...]` and a media-query auto-honour).
+  //
+  // Runs FIRST (this script is a classic <head> tag in keycloak.v2, so it
+  // executes before the body paints — no flash). Stash to sessionStorage
+  // because the param drops off the URL on KC's internal re-renders (e.g. a
+  // failed login POSTs to login-actions/authenticate). Mirrors the
+  // SPA_ORIGIN capture below.
+  var UI_MODE_SS_KEY = 'am_ui_mode';
+  (function applyUiMode() {
+    try {
+      var mode = new URLSearchParams(window.location.search).get('ui_mode');
+      if (mode !== 'dark' && mode !== 'light') {
+        mode = sessionStorage.getItem(UI_MODE_SS_KEY);
+      }
+      if (mode !== 'dark' && mode !== 'light') return; // no signal → keep OS default
+      sessionStorage.setItem(UI_MODE_SS_KEY, mode);
+      document.documentElement.setAttribute('data-theme', mode);
+    } catch (e) { /* sessionStorage blocked / URL malformed — fall back to OS */ }
+  })();
+
   // ─── 0a. SPA origin capture ────────────────────────────────────
   // The realm pill's "switch tenant" feature needs to know the URL of
   // the access-matrix front-end so it can land the user there under
