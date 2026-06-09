@@ -26,8 +26,14 @@ const isEdit = computed(() => !!props.user)
 // are open so break-glass alerts can be delivered to a real inbox.
 // Structural fields (deptId, status, role assignments) stay locked —
 // backend re-enforces this even if the UI is bypassed.
-const isBuiltInAdmin = computed(() => isEdit.value && props.user?.username === 'admin')
-const isStructuralLocked = computed(() => isBuiltInAdmin.value)
+const isBuiltInAdmin = computed(() => isEdit.value && props.user?.builtin === true)
+// "Protected admin" = the built-in admin OR the tenant's singular SUPER_ADMIN.
+// Both are contact-only: email + display name editable, everything else (dept,
+// status, roles) locked — and suspend / delete / force-logout are blocked in
+// the list. The backend enforces all of this regardless of the UI.
+const isProtectedAdmin = computed(() =>
+  isEdit.value && (props.user?.builtin === true || props.user?.superAdmin === true))
+const isStructuralLocked = computed(() => isProtectedAdmin.value)
 
 const form = reactive({
   username: '',
@@ -45,6 +51,18 @@ const form = reactive({
 const allRoles = ref([])
 const selectedRoleIds = ref([])
 const saving = ref(false)
+
+// The built-in Super Administrator role is singular & locked to the tenant
+// owner (the user invited at tenant creation). Hide it from the picker for
+// anyone who doesn't already hold it, and render it non-toggleable for the
+// one who does — the backend enforces both (assignRoles rejects granting it
+// to a second user / stripping it from the sole holder).
+function roleLocked(r) {
+  return r.isBuiltIn === 1
+}
+const visibleRoles = computed(() =>
+  allRoles.value.filter((r) => !roleLocked(r) || selectedRoleIds.value.includes(r.id))
+)
 
 watch(() => props.open, async (open) => {
   if (!open) return
@@ -72,11 +90,11 @@ watch(() => props.open, async (open) => {
   }
 })
 
-function toggleRole(id) {
-  if (isStructuralLocked.value) return
-  const idx = selectedRoleIds.value.indexOf(id)
+function toggleRole(r) {
+  if (isStructuralLocked.value || roleLocked(r)) return
+  const idx = selectedRoleIds.value.indexOf(r.id)
   if (idx >= 0) selectedRoleIds.value.splice(idx, 1)
-  else selectedRoleIds.value.push(id)
+  else selectedRoleIds.value.push(r.id)
 }
 
 function isRoleSelected(id) {
@@ -97,7 +115,7 @@ async function save() {
       // backend's "cannot change department/status" guards don't trip
       // even on a no-op echo of the current values (defends against
       // the form picking up null → "" coercion).
-      const body = isBuiltInAdmin.value
+      const body = isProtectedAdmin.value
         ? { email: form.email, displayName: form.displayName }
         : { email: form.email, displayName: form.displayName, deptId: form.deptId, status: form.status }
       const r = await updateUserApi(props.user.id, body)
@@ -119,11 +137,10 @@ async function save() {
       if (r.data.code !== 0) { toast.error(r.data.msg || t('user.edit.message.createFailed')); return }
       userId = r.data.data
     }
-    // assign roles — skipped for built-in admin: roles are immutable on
-    // that row (the backend's assignRoles still calls assertNotBuiltInAdmin
-    // and would reject), AND the UI gates the role toggles via
-    // isStructuralLocked so there's nothing to persist anyway.
-    if (!isBuiltInAdmin.value) {
+    // assign roles — skipped for a protected admin (built-in / tenant
+    // SUPER_ADMIN): roles are locked on that row (backend rejects, and the UI
+    // gates the toggles via isStructuralLocked), so there's nothing to persist.
+    if (!isProtectedAdmin.value) {
       const r2 = await assignUserRolesApi(userId, selectedRoleIds.value)
       if (r2.data.code !== 0) { toast.error(r2.data.msg || t('user.edit.message.assignRolesFailed')); return }
     }
@@ -219,16 +236,16 @@ async function save() {
       <div>
         <div class="flex items-center justify-between mb-1">
           <label class="text-xs text-muted-foreground">{{ t('user.edit.label.roles') }}</label>
-          <span v-if="allRoles.length" class="text-xs text-muted-foreground">
-            {{ t('user.edit.label.rolesSelected', { selected: selectedRoleIds.length, total: allRoles.length }) }}
+          <span v-if="visibleRoles.length" class="text-xs text-muted-foreground">
+            {{ t('user.edit.label.rolesSelected', { selected: selectedRoleIds.length, total: visibleRoles.length }) }}
           </span>
         </div>
         <div class="border border-border rounded-lg p-2 max-h-56 overflow-y-auto bg-muted/20"
              :class="isStructuralLocked && 'opacity-60 pointer-events-none'">
-          <div v-if="allRoles.length" class="flex flex-wrap gap-1.5">
-            <button v-for="r in allRoles" :key="r.id"
+          <div v-if="visibleRoles.length" class="flex flex-wrap gap-1.5">
+            <button v-for="r in visibleRoles" :key="r.id"
                     type="button"
-                    :disabled="isStructuralLocked"
+                    :disabled="isStructuralLocked || roleLocked(r)"
                     :title="r.description || r.name"
                     :class="[
                       'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition cursor-pointer disabled:cursor-not-allowed',
@@ -236,7 +253,7 @@ async function save() {
                         ? 'border-primary bg-primary/10 text-primary shadow-sm'
                         : 'border-border bg-card hover:border-primary/40 hover:bg-muted text-foreground'
                     ]"
-                    @click="toggleRole(r.id)">
+                    @click="toggleRole(r)">
               <Check v-if="isRoleSelected(r.id)" :size="14" class="shrink-0" />
               <span class="font-medium whitespace-nowrap">{{ r.name }}</span>
             </button>

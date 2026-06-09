@@ -27,7 +27,13 @@ export default {
       usernameExists: '用户名已被占用',
       emailExists: '该邮箱已被占用',
       passwordRequired: '直接设密方式需要填写密码',
-      emailRequired: '邀请邮件方式需要填写邮箱'
+      emailRequired: '邀请邮件方式需要填写邮箱',
+      superAdminSingleton: '超级管理员角色为租户所有者保留，不能授予其他用户',
+      adminProtected: '该管理员账号受保护，不能被强制登出、停用或删除',
+      adminContactOnly: '该管理员账号仅可编辑联系信息（邮箱、显示名）'
+    },
+    role: {
+      superPermissionReserved: '租户级超级权限为内置超级管理员角色保留，不能分配给自定义角色'
     },
     auth: {
       tenantSuspended: '租户已被停用，无法登录'
@@ -219,6 +225,7 @@ export default {
       enterPassword: '请输入密码',
       loginFailed: '登录失败',
       sessionExpired: '会话已过期或已被登出，请重新登录。',
+      noAccess: '您的账号暂无可访问的页面，请联系管理员为您分配角色。',
       ssoFailed: 'SSO 登录失败'
     }
   },
@@ -699,18 +706,22 @@ export default {
       status: '状态',
       actions: '操作'
     },
+    badge: {
+      tenantAdmin: '租户管理员'
+    },
     tooltip: {
       editDisabled: '内置用户不可编辑',
-      editAdminContactOnly: '内置 admin：仅可编辑联系信息（邮箱、显示名）',
+      editAdminContactOnly: '管理员账号：仅可编辑联系信息（邮箱、显示名）',
       edit: '编辑',
       resetPassword: '重置密码',
       resetPasswordDisabledSso: 'SSO 模式下不可用 — 用户在 Keycloak 账号控制台自助修改密码',
-      statusChangeDisabled: '内置用户状态不可变更',
+      statusChangeDisabled: '管理员账号状态不可变更',
       toggleStatus: '启用/禁用',
       disable: '停用',
       enable: '启用',
       forceLogout: '强制登出',
-      deleteDisabled: '内置用户不可删除'
+      forceLogoutDisabled: '管理员账号不可被强制登出',
+      deleteDisabled: '管理员账号不可删除'
     },
     confirm: {
       deleteTitle: '删除用户',
@@ -725,7 +736,7 @@ export default {
     edit: {
       titleEdit: '编辑用户',
       titleCreate: '新增用户',
-      lockedHint: '内置 admin 用户「仅可编辑联系信息」：邮箱和显示名可以修改（应急密码告警需要可达邮箱）。部门、状态、角色保持锁定。',
+      lockedHint: '管理员账号「仅可编辑联系信息」：邮箱和显示名可以修改（应急密码告警需要可达邮箱）。部门、状态、角色保持锁定。',
       label: {
         username: '登录ID',
         password: '密码',

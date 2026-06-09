@@ -185,6 +185,7 @@ public class RoleAdminService {
         assertAllExist(dedup, "permission", ids ->
                 permissionMapper.selectCount(
                         new QueryWrapper<PermissionEntity>().eq("mark", 1).in("id", ids)));
+        assertNoReservedSuperPermission(dedup);
         rolePermissionMapper.update(null,
                 new UpdateWrapper<RolePermissionEntity>().eq("role_id", roleId).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));
@@ -306,6 +307,26 @@ public class RoleAdminService {
         if (Integer.valueOf(1).equals(r.getIsBuiltIn())) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR,
                     "Built-in role " + r.getName() + " is read-only (rejected: " + op + ")");
+        }
+    }
+
+    /**
+     * The tenant-wide super wildcards are reserved for the built-in SUPER_ADMIN
+     * role (which legitimately holds {@code tenant:*} and is itself locked by
+     * {@code assertNotBuiltIn}). A custom role must never hold them — that would
+     * mint a second, equally-powered super admin, which the platform forbids:
+     * a tenant has exactly one super admin, the user invited at tenant creation.
+     */
+    private static final java.util.Set<String> RESERVED_SUPER_CODES = java.util.Set.of("tenant:*", "*:*");
+
+    private void assertNoReservedSuperPermission(LinkedHashSet<String> permissionIds) {
+        if (permissionIds.isEmpty()) return;
+        Long reserved = permissionMapper.selectCount(
+                new QueryWrapper<PermissionEntity>().eq("mark", 1)
+                        .in("code", RESERVED_SUPER_CODES)
+                        .in("id", permissionIds));
+        if (reserved != null && reserved > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.role.superPermissionReserved");
         }
     }
 

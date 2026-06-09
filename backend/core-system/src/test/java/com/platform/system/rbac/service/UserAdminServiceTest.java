@@ -207,7 +207,7 @@ class UserAdminServiceTest {
                 null, null, "DEPT-OTHER", null);
         assertThatThrownBy(() -> service.update("u1", req))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("cannot change department");
+                .hasMessageContaining("error.user.adminContactOnly");
 
         verify(userMapper, never()).updateById(any(UserEntity.class));
     }
@@ -222,7 +222,7 @@ class UserAdminServiceTest {
                 null, null, null, 0);
         assertThatThrownBy(() -> service.update("u1", req))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("cannot change status");
+                .hasMessageContaining("error.user.adminContactOnly");
 
         verify(userMapper, never()).updateById(any(UserEntity.class));
     }

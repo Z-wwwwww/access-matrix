@@ -34,7 +34,13 @@ export default {
       usernameExists: 'ユーザー名は既に使われています',
       emailExists: 'このメールアドレスは既に使われています',
       passwordRequired: '直接設定方式ではパスワードが必須です',
-      emailRequired: '招待メール方式ではメールアドレスが必須です'
+      emailRequired: '招待メール方式ではメールアドレスが必須です',
+      superAdminSingleton: 'スーパー管理者ロールはテナント所有者専用で、他のユーザーには付与できません',
+      adminProtected: 'この管理者アカウントは保護されており、強制ログアウト・停止・削除はできません',
+      adminContactOnly: 'この管理者アカウントは連絡先情報（メール・表示名）のみ編集できます'
+    },
+    role: {
+      superPermissionReserved: 'テナント全体のスーパー権限は組み込みのスーパー管理者ロール専用で、カスタムロールには割り当てできません'
     },
     auth: {
       tenantSuspended: 'テナントが停止されているためログインできません'
@@ -226,6 +232,7 @@ export default {
       enterPassword: 'パスワードを入力してください',
       loginFailed: 'ログインに失敗しました',
       sessionExpired: 'セッションの有効期限が切れたか、ログアウトされました。再度サインインしてください。',
+      noAccess: 'このアカウントにはまだアクセスできるページがありません。管理者にロールの割り当てを依頼してください。',
       ssoFailed: 'SSO ログインに失敗しました'
     }
   },
@@ -709,18 +716,22 @@ export default {
       status: '状態',
       actions: '操作'
     },
+    badge: {
+      tenantAdmin: 'テナント管理者'
+    },
     tooltip: {
       editDisabled: '内蔵ユーザーは編集不可',
-      editAdminContactOnly: '内蔵 admin：連絡先情報（メール・表示名）のみ編集可能',
+      editAdminContactOnly: '管理者アカウント：連絡先情報（メール・表示名）のみ編集可能',
       edit: '編集',
       resetPassword: 'パスワードリセット',
       resetPasswordDisabledSso: 'SSO モードでは無効：ユーザーは Keycloak アカウントコンソールで自分のパスワードを変更します',
-      statusChangeDisabled: '内蔵ユーザーは状態変更不可',
+      statusChangeDisabled: '管理者アカウントは状態変更不可',
       toggleStatus: '有効/無効',
       disable: '停止',
       enable: '再開',
       forceLogout: '強制ログアウト',
-      deleteDisabled: '内蔵ユーザーは削除不可'
+      forceLogoutDisabled: '管理者アカウントは強制ログアウト不可',
+      deleteDisabled: '管理者アカウントは削除不可'
     },
     confirm: {
       deleteTitle: 'ユーザー削除',
@@ -735,7 +746,7 @@ export default {
     edit: {
       titleEdit: 'ユーザー編集',
       titleCreate: 'ユーザー新規',
-      lockedHint: '内蔵 admin ユーザーは「連絡先のみ編集可能」です。メールアドレスと表示名は変更できます（ブレークグラス通知のため）。部署・状態・ロールは変更できません。',
+      lockedHint: '管理者アカウントは「連絡先のみ編集可能」です。メールアドレスと表示名は変更できます（ブレークグラス通知のため）。部署・状態・ロールは変更できません。',
       label: {
         username: 'ログインID',
         password: 'パスワード',

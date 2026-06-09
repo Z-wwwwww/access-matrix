@@ -244,6 +244,10 @@ function shouldAutoRedirectToSso() {
   // would just hit the same brick wall. Show the unreachable banner
   // directly instead.
   if (route.query.logout === 'local-only') return false
+  // No accessible menu (zero permissions). Re-authenticating via SSO would
+  // land back here with the same empty menu — an infinite loop. Stay on the
+  // login page and show the "no access" notice instead.
+  if (route.query.reason === 'no-access') return false
   return true
 }
 
@@ -293,6 +297,12 @@ onMounted(() => {
   // technical "Menu load failed — 401".
   if (route.query.session === 'expired') {
     ssoErrorFromQuery.value = t('login.message.sessionExpired')
+  }
+  // Account has no accessible menu (no permissions / roles not yet assigned).
+  // Distinct from an expired session — re-signing in won't help; the admin
+  // must grant a role/permissions first.
+  if (route.query.reason === 'no-access') {
+    ssoErrorFromQuery.value = t('login.message.noAccess')
   }
   // Fire-and-forget SSO redirect after a short window. The delay gives
   // the user time to engage the 5-click hot-zone (break-glass) if they

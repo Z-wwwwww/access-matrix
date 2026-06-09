@@ -64,7 +64,17 @@ public final class UserDto {
             String userNo,
             String displayName,
             String deptId,
-            Integer status) {}
+            Integer status,
+            // True for the platform's built-in admin row (read-only at the
+            // admin API — only contact fields are editable). The frontend
+            // uses this to lock structural fields, instead of hardcoding the
+            // built-in username (which drifted: 'admin' vs 'demo-admin').
+            boolean builtin,
+            // True when the user holds the tenant's singular SUPER_ADMIN role.
+            // The frontend uses it to lock structural fields (only email /
+            // display name editable) and to hide the force-logout / suspend /
+            // delete actions; the backend enforces the same on every path.
+            boolean superAdmin) {}
 
     public record AssignRolesRequest(@NotNull List<String> roleIds) {}
 

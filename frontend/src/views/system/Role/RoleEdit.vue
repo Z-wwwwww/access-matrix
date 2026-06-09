@@ -37,6 +37,11 @@ const isEdit = computed(() => !!props.role)
 const isLocked = computed(() => isEdit.value && props.role?.isBuiltIn === 1)
 const tab = ref('basic')
 
+// Tenant-wide super wildcards — reserved for the built-in Super Administrator
+// role. Custom roles must never hold them (would mint a second super admin),
+// so we hide them from the picker; the backend rejects binding them too.
+const RESERVED_SUPER_PERM_CODES = new Set(['tenant:*', '*:*'])
+
 const form = reactive({
   name: '',
   description: '',
@@ -93,7 +98,17 @@ watch(() => props.open, async (open) => {
     getDeptTreeApi()
   ])
   if (pRes.status === 'fulfilled' && pRes.value.data.code === 0) {
-    permsByModule.value = pRes.value.data.data || {}
+    let byModule = pRes.value.data.data || {}
+    // 自定义角色（非内置）不能持有租户级超级通配权限——从选择器中剔除 tenant:* / *:*。
+    // 内置超管角色（isLocked）则保留可见但只读，正常展示其 tenant:* 权限。
+    if (!isLocked.value) {
+      byModule = Object.fromEntries(
+        Object.entries(byModule)
+          .map(([m, perms]) => [m, perms.filter((p) => !RESERVED_SUPER_PERM_CODES.has(p.code))])
+          .filter(([, perms]) => perms.length)
+      )
+    }
+    permsByModule.value = byModule
     // 左ペインのデフォルト選択を最初の module に
     const modules = Object.keys(permsByModule.value)
     activePermModule.value = modules[0] || null

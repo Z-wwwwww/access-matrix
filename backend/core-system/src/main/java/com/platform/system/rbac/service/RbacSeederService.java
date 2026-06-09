@@ -1,6 +1,7 @@
 package com.platform.system.rbac.service;
 
 import com.platform.core.common.id.IdGenerator;
+import com.platform.core.common.security.PermissionRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -79,8 +80,41 @@ public class RbacSeederService {
         String permId = ensureSuperPermission(newTenant);
         String roleId = ensureSuperRole(newTenant);
         ensureRolePermission(newTenant, roleId, permId);
+        // Granular business permission catalog so the tenant's admin can build
+        // real custom roles. Without it a new tenant only had tenant:* — which
+        // is hidden from custom roles — leaving the role permission-picker empty
+        // and any custom-role user with no menu (→ login redirect loop).
+        seedPermissionCatalog(newTenant);
         // Menus are global (V41) — no per-tenant clone, no role_menu seeding.
         return roleId;
+    }
+
+    /**
+     * Copy the granular, business-side permission catalog into {@code tenant}
+     * from {@link PermissionRegistry} (the in-code source of truth). Idempotent
+     * per code. Platform-ops permissions ({@code platform:*} / {@code opsuser:*}
+     * — module {@code "platform"}) are intentionally excluded: they belong to the
+     * {@code system} tenant only and must never be assignable inside a business
+     * tenant. Wildcards (e.g. the {@code tenant:*} super perm, seeded above) are
+     * skipped too — they are not assignable units.
+     */
+    private void seedPermissionCatalog(String tenant) {
+        for (PermissionRegistry.Entry e : PermissionRegistry.allEntries().values()) {
+            if (PermissionRegistry.isWildcard(e.code())) continue;
+            if ("platform".equals(e.module())) continue;
+            Integer exists = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM core_rbac_permission "
+                            + " WHERE tenant_id = ? AND code = ? AND mark = 1",
+                    Integer.class, tenant, e.code());
+            if (exists != null && exists > 0) continue;
+            jdbc.update(
+                    "INSERT INTO core_rbac_permission "
+                            + "  (id, tenant_id, code, name, resource, action, module, is_built_in, mark, "
+                            + "   create_user, update_user) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 'rbac-seeder', 'rbac-seeder')",
+                    IdGenerator.ulid(), tenant, e.code(), e.code(), e.resource(), e.action(), e.module());
+        }
+        log.info("[rbac-seed] ensured granular permission catalog for {}", tenant);
     }
 
     // ───────── permission ──────────────────────────────────────────────

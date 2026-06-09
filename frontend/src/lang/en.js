@@ -27,7 +27,13 @@ export default {
       usernameExists: 'That username is already taken',
       emailExists: 'That email is already in use',
       passwordRequired: 'A password is required for direct provisioning',
-      emailRequired: 'An email is required for invite provisioning'
+      emailRequired: 'An email is required for invite provisioning',
+      superAdminSingleton: 'The Super Administrator role is reserved for the tenant owner and cannot be granted to another user',
+      adminProtected: 'This administrator account is protected and cannot be forced to log out, suspended, or deleted',
+      adminContactOnly: 'This administrator account allows editing contact details (email, display name) only'
+    },
+    role: {
+      superPermissionReserved: 'The tenant-wide super permission is reserved for the built-in Super Administrator role and cannot be assigned to a custom role'
     },
     auth: {
       tenantSuspended: 'This tenant is suspended; sign-in is disabled'
@@ -219,6 +225,7 @@ export default {
       enterPassword: 'Please enter your password',
       loginFailed: 'Login failed',
       sessionExpired: 'Your session has expired or was signed out. Please sign in again.',
+      noAccess: 'Your account has no accessible pages yet. Please contact your administrator to be assigned a role.',
       ssoFailed: 'SSO sign-in failed'
     }
   },
@@ -699,18 +706,22 @@ export default {
       status: 'Status',
       actions: 'Actions'
     },
+    badge: {
+      tenantAdmin: 'Tenant admin'
+    },
     tooltip: {
       editDisabled: 'Built-in user is not editable',
-      editAdminContactOnly: 'Built-in admin: only contact details (email, display name) editable',
+      editAdminContactOnly: 'Admin account: only contact details (email, display name) editable',
       edit: 'Edit',
       resetPassword: 'Reset password',
       resetPasswordDisabledSso: 'Disabled in SSO mode — users change their password in the Keycloak account console',
-      statusChangeDisabled: 'Built-in user status cannot be changed',
+      statusChangeDisabled: 'Admin account status cannot be changed',
       toggleStatus: 'Enable / Disable',
       disable: 'Disable',
       enable: 'Enable',
       forceLogout: 'Force logout',
-      deleteDisabled: 'Built-in user cannot be deleted'
+      forceLogoutDisabled: 'Admin account cannot be forced to log out',
+      deleteDisabled: 'Admin account cannot be deleted'
     },
     confirm: {
       deleteTitle: 'Delete user',
@@ -725,7 +736,7 @@ export default {
     edit: {
       titleEdit: 'Edit user',
       titleCreate: 'New user',
-      lockedHint: 'Built-in admin user: only contact info is editable. Email and display name can be changed (needed for break-glass alerts). Department, status, and roles stay locked.',
+      lockedHint: 'Administrator account: only contact info is editable. Email and display name can be changed (needed for break-glass alerts). Department, status, and roles stay locked.',
       label: {
         username: 'Login ID',
         password: 'Password',

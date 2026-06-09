@@ -11,6 +11,7 @@ import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
 import com.platform.core.common.security.RequiresPermission;
 import com.platform.system.security.SystemPermissions;
+import com.platform.system.rbac.service.UserAdminService;
 import com.platform.core.infrastructure.security.AccountLockoutService;
 import com.platform.system.auth.service.SessionTerminationService;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
@@ -32,6 +33,7 @@ public class AdminAuthController {
     private final PasswordPolicyService passwordPolicy;
     private final PasswordEncoder encoder;
     private final SessionTerminationService sessionTermination;
+    private final UserAdminService userAdminService;
 
     /**
      * Active security mode. In OIDC mode this controller's reset-password
@@ -46,12 +48,14 @@ public class AdminAuthController {
 
     public AdminAuthController(UserMapper userMapper, AccountLockoutService lockoutService,
                                PasswordPolicyService passwordPolicy, PasswordEncoder encoder,
-                               SessionTerminationService sessionTermination) {
+                               SessionTerminationService sessionTermination,
+                               UserAdminService userAdminService) {
         this.userMapper = userMapper;
         this.lockoutService = lockoutService;
         this.passwordPolicy = passwordPolicy;
         this.encoder = encoder;
         this.sessionTermination = sessionTermination;
+        this.userAdminService = userAdminService;
     }
 
     @PostMapping("/unlock")
@@ -110,13 +114,14 @@ public class AdminAuthController {
      * Force-logout a user — every in-flight access token issued <em>before</em>
      * this call will be rejected by the permission aspect at next API hit.
      * Requires the {@code *:*} super-permission so a kicked-out admin can't
-     * grant the kick-back via a low-tier permission.
+     * grant the kick-back via a low-tier permission. Delegates to the service,
+     * which refuses to kick a protected admin (built-in / tenant SUPER_ADMIN).
      */
     @PostMapping("/force-logout/{userId}")
     @RequiresPermission("*:*")
     @OpLog(module = "system", action = "auth.forceLogout", targetType = "user")
     public JsonResult<Void> forceLogout(@PathVariable String userId) {
-        sessionTermination.terminateUser(userId);
+        userAdminService.forceLogout(userId);
         return JsonResult.ok();
     }
 }

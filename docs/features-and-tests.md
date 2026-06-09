@@ -39,6 +39,10 @@
 - **多租户**:业务行带 `tenant_id`;`system` 租户(平台运维)被 MyBatis-Plus 拦截器识别为"绕过租户范围",可跨租户读写。
 - **权限通配符**(`PermissionMatcher`,前后端同源 `frontend/src/utils/permission.js`):`*:*`=平台超级(仅匹配 `platform:` 命名空间);`tenant:*`=租户超级(匹配业务权限,即 `platform:` **与** `opsuser:` 之外);`resource:*`=某资源全动作;精确匹配。两个超级互不覆盖;`opsuser:`(平台用户管理)是独立保留命名空间,`platform:*`/`*:*`/`tenant:*` 都不自动覆盖,只有显式 `opsuser:*` 才命中。
 - **角色**:SUPER_ADMIN(各租户,`tenant:*`)、PLATFORM_ADMIN(ops,`*:*`+`opsuser:*`)、PLATFORM_OPERATOR(常规运维,`*:*`)。
+- **超管唯一且锁定**:每个业务租户**有且仅有一个** SUPER_ADMIN——即租户新建时邀请的那个用户。该内置「Super Administrator」角色**不可转移**:`UserAdminService.assignRoles` 拒绝把它授予第二个用户(`error.user.superAdminSingleton`),也拒绝从唯一持有者身上剥离(沿用「最后一个超管」守卫);内置角色本身已被 `assertNotBuiltIn` 全锁(改名/删除/改权限均拒)。**「同级别」也封堵**:自定义角色不能绑定 `tenant:*`/`*:*` 通配权限(`RoleAdminService.bindPermissions` → `error.role.superPermissionReserved`),避免造出等效超管。前端 `UserEdit` 角色选择器对非持有者隐藏超管角色、对持有者只读;`RoleEdit` 权限选择器对自定义角色隐藏 `tenant:*`/`*:*`。
+- **租户管理员账号(=超管用户)在用户管理界面受保护**:**只能编辑邮箱 + 显示名**(部门/状态/角色锁定),且**不能被强制登出/停用/删除**。识别走后端 `UserDto.View.superAdmin`(以及内置 admin 的 `builtin`)标志位下发,前端 `User.vue` 据此禁用对应按钮 + 显示原因、`UserEdit` 锁定结构字段。后端硬守卫:`update` 锁部门/状态(`error.user.adminContactOnly`)、`forceLogout`(`/admin/auth/force-logout` 委托 `UserAdminService.forceLogout`)拒踢超管(`error.user.adminProtected`,**此前 force-logout 完全无守卫**)、删除/停用沿用「最后一个超管」守卫(超管唯一即恒拦)。
+- **新建租户自动获得细粒度权限目录**:`RbacSeederService.seedDefaultsForTenant` 除了种 `tenant:*` + 超管角色,还按 `PermissionRegistry` 把**业务侧**(非 `platform:`/`opsuser:`,即 module≠`platform`)的细粒度权限全部种进该租户的 `core_rbac_permission`,这样租户管理员能给自定义角色配权限。**权限目录仍按租户存**(`demo`/业务租户=业务权限,`system`=平台权限),天然隔离平台/业务。此前新租户只有 `tenant:*`——又对自定义角色隐藏——导致角色权限选择器全空、自定义角色拿不到任何权限。
+- **无可用菜单时不再无限跳转**:零权限/未分配角色的用户登录后,菜单为空 → 守卫清登录态跳 `login?reason=no-access`(区别于 `session=expired`),登录页**不再自动重定向 SSO**(否则 KC 静默重登→菜单仍空→死循环),而是停在登录页提示 `login.message.noAccess`「账号暂无可访问页面,请联系管理员分配角色」。真正的会话过期(401)仍走 `session=expired` + 自动 SSO(有菜单则无缝重登)。
 - **菜单**:全局一套(`core_rbac_menu`,无 tenant_id),按 `permission_code` 过滤;前端由 `menu-to-routes` 动态注册路由。
 - **数据范围(data scope)**:`DataScopeHelper` 按 dept/创建人重写查询(见 `docs/data-scope-demo`)。
 
@@ -49,10 +53,16 @@
 - [ ] **禁用用户后无法再登录(bug 修复)**:禁用时**同步禁用 Keycloak 用户**(`kc.setEnabled(false)`),启用时 `setEnabled(true)` + 清除 kick。光把 DB `status=0` **拦不住 SSO**——KC 仍会认证该用户、OIDC JIT 解析器也不查 status 就放行(这正是 `sozo-admin2` 禁用后仍能登录的原因)。**业务用户(`UserAdminService.changeStatus`)与平台运维用户(`PlatformUserAdminService.setEnabled`)的"有效/无效=停用/启用"副作用现在共用同一处** `SessionTerminationService.applyEnabled(userId, enabled)`(开关 KC + kick/clear + 停用时结束 KC 会话);两个 console 各自只管 DB status 写 + 自己的守卫,杜绝再次漂移。**UI 也对齐**:业务「用户管理」的状态徽标(`success`/`danger` 绿/红 + `common.status.enabled/disabled` 文案)和开关动作(`Pause`=停用 / `Play`=启用 两态按钮)与平台运维用户管理一致(原先是单个 `Power` 切换 + dict 徽标)。
 - [ ] **删除用户不会再生成"幽灵"账号(bug 修复)**:`delete` 软删后 `kc.deleteUser`(挡新 SSO 登录);且 `OidcJitUserService` 对**已删除**(`keycloak_id` 有 `mark=0` 行)的 token **拒绝重新 provision**(返回 null,不再插入无角色无编号的新行)。此前删 `sozo-admin2` 后,其未过期 token 一请求就被 JIT 重建成一个 displayName=`sozo-admin2 sozo-admin2`、无编号的新用户。配合前端守卫(无可用菜单→登出),被删用户刷新即登出、后端也不产垃圾行。
 - [ ] **JIT 自动落地保留且数据完整**:真正全新的 KC 用户(无 `mark=0` 旧行)首次 SSO 时仍自动落地一行,且**采番分配 `user_no`**(与 `UserAdminService.create` 同一编号,不再永久无编号——本无"事后补编号"入口)。该用户尚无角色 → 菜单为空 → 前端守卫先登出;管理员在用户列表给其授角色/部门后,再次登录即可正常使用。numbering 失败(租户定义缺失)只记 WARN、不阻断登录(`user_no` 退化为 NULL)。
+- [ ] **超管唯一**:在「用户管理」给第二个用户勾选超管角色 → 选择器里根本看不到该角色(非持有者隐藏);即便绕过前端直接调 `assignRoles` 带上超管 roleId,后端返回 `error.user.superAdminSingleton`。唯一超管自身的超管角色徽标只读、取消不了;尝试剥离 → 「最后一个超管」守卫拒绝。
+- [ ] **封堵等效超管**:新建/编辑自定义角色时,权限选择器看不到 `tenant:*`/`*:*`;绕过前端 `bindPermissions` 带上该权限 id → 后端返回 `error.role.superPermissionReserved`。内置超管角色仍正常显示并持有 `tenant:*`(只读)。
+- [ ] **租户管理员账号受保护**:用户列表里超管那行(带「租户管理员」徽标)的 停用/删除/强制登出 按钮**置灰**(hover 提示原因),只有编辑可点且仅放开邮箱+显示名;绕过前端直接调 API:改部门/状态→`error.user.adminContactOnly`,force-logout→`error.user.adminProtected`,删除/停用→「最后一个超管」守卫。普通用户不受影响。识别用后端下发的 `superAdmin`/`builtin` 标志,不再硬编码用户名。
+- [ ] **新租户能建可用的自定义角色**:新建租户后,在该租户「角色管理」新建角色,权限选择器里有完整业务权限(user/role/dept/menu/task… 不含 platform/opsuser);给角色配权限并授予某用户后,该用户登录能看到对应菜单。(回归:此前新租户权限目录只有 `tenant:*` 且被隐藏 → 选择器全空 → 自定义角色零权限 → 该用户登录无菜单。)
+- [ ] **零权限用户不再死循环**:给一个用户只建空角色(无权限)或不分配角色,其登录后**停在登录页**并提示「账号暂无可访问页面,请联系管理员」(`reason=no-access`),**不会**反复自动 SSO 重登。管理员给其角色配上权限后,重新登录即正常进入。
 - [ ] 改某角色权限后,持有该角色的用户**下次请求**即生效(权限缓存按角色失效)。
 - [ ] 菜单按权限显隐;无权限的路由直接访问被拦/404。
 - [ ] 菜单管理列表的类型徽标按 `menu_type` dict 的 css_class 着色:目录=info(蓝)、菜单=success(绿)、按钮=violet(紫)。
 - [ ] 菜单管理**操作列**:ops(`*:*`)能看到增删改按钮——写权限码是 `platform:menu:*`,前端 `v-permission` 必须带 `platform:` 前缀(`*:*` 只匹配 `platform:` 命名空间,不匹配 2 段 `menu:*`);业务 super(`tenant:*`)看不到写按钮,但 `menu:read` 仍可用于 RoleEdit 菜单选择器。
+- [ ] **内置 admin 的字段锁定真正生效(bug 修复)**:编辑内置 `demo-admin` 时,部门/状态/角色被锁、只能改联系字段。判定不再前端硬编码用户名(原 `username === 'admin'` 与后端 `demo-admin` 漂移、永不命中),改由后端 `UserDto.View.builtin` 下发(后端 `BUILTIN_ADMIN_USERNAME` 单一来源),前端 `UserEdit` 据此锁定;后端 `update` 守卫仍兜底。
 - [ ] 数据范围:不同 data_scope 的用户看到的 task 行集不同。
 - [ ] 新建业务用户选**邀请邮件(INVITE)**方式时**不需要密码**:不再报 701 `password 个数必须在8和128之间`(DTO 只 `@Size(max=128)`,不设 min;密码长度/复杂度只在 DIRECT 模式由 `PasswordPolicyService` 校验)。DIRECT 模式空/短密码仍被服务端拒。
 - [ ] 校验失败(701)前端 toast 显示**具体字段原因**(如 `email: 邮箱格式不正确`),而非笼统的 "Validation failed"——`request.js` 拦截器把 `data` 里的字段错误合进 `msg`。

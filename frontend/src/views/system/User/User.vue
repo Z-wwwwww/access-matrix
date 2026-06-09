@@ -30,6 +30,14 @@ import { oidcConfig } from '@/utils/oidc'
 // account console (linked from the "Change password" entry).
 const ssoMode = oidcConfig().enabled
 
+// "Protected admin" = the built-in admin OR the tenant's singular SUPER_ADMIN.
+// Such rows are contact-only (email / display name editable) and cannot be
+// suspended, deleted, or force-logged-out from this console. The backend
+// enforces the same; here we just disable the actions + show why.
+function isProtectedAdmin(row) {
+  return row?.builtin === true || row?.superAdmin === true
+}
+
 const loading = ref(false)
 const list = ref([])
 const total = ref(0)
@@ -200,7 +208,8 @@ onMounted(() => {
       >
         <template #cell-username="{ row }">
           <span>{{ row.username }}</span>
-          <Badge v-if="row.username === 'admin'" variant="outline" class="ml-2 text-[10px]">{{ t('common.status.builtIn') }}</Badge>
+          <Badge v-if="row.builtin === true" variant="outline" class="ml-2 text-[10px]">{{ t('common.status.builtIn') }}</Badge>
+          <Badge v-else-if="row.superAdmin === true" variant="outline" class="ml-2 text-[10px]">{{ t('user.badge.tenantAdmin') }}</Badge>
         </template>
         <template #cell-deptId="{ row }">
           <span>{{ deptName(row.deptId) }}</span>
@@ -214,7 +223,7 @@ onMounted(() => {
           <div class="inline-flex items-center gap-1">
             <button v-permission="'user:update'"
                     class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
-                    :title="row.username === 'admin' ? t('user.tooltip.editAdminContactOnly') : t('user.tooltip.edit')"
+                    :title="isProtectedAdmin(row) ? t('user.tooltip.editAdminContactOnly') : t('user.tooltip.edit')"
                     @click="openEdit(row)">
               <Pencil class="size-3.5" />
             </button>
@@ -227,28 +236,29 @@ onMounted(() => {
             </button>
             <button v-if="row.status === 1" v-permission="'user:update'"
                     class="h-7 px-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                    :disabled="row.username === 'admin'"
-                    :title="row.username === 'admin' ? t('user.tooltip.statusChangeDisabled') : t('user.tooltip.disable')"
+                    :disabled="isProtectedAdmin(row)"
+                    :title="isProtectedAdmin(row) ? t('user.tooltip.statusChangeDisabled') : t('user.tooltip.disable')"
                     @click="toggleStatus(row)">
               <Pause class="size-3.5" />
             </button>
             <button v-else v-permission="'user:update'"
                     class="h-7 px-2 rounded hover:bg-emerald-500/10 text-emerald-600 text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                    :disabled="row.username === 'admin'"
-                    :title="row.username === 'admin' ? t('user.tooltip.statusChangeDisabled') : t('user.tooltip.enable')"
+                    :disabled="isProtectedAdmin(row)"
+                    :title="isProtectedAdmin(row) ? t('user.tooltip.statusChangeDisabled') : t('user.tooltip.enable')"
                     @click="toggleStatus(row)">
               <Play class="size-3.5" />
             </button>
             <button v-permission="'*:*'"
-                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
-                    :title="t('user.tooltip.forceLogout')"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    :disabled="isProtectedAdmin(row)"
+                    :title="isProtectedAdmin(row) ? t('user.tooltip.forceLogoutDisabled') : t('user.tooltip.forceLogout')"
                     @click="handleForceLogout(row)">
               <LogOut class="size-3.5" />
             </button>
             <button v-permission="'user:delete'"
                     class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                    :disabled="row.username === 'admin'"
-                    :title="row.username === 'admin' ? t('user.tooltip.deleteDisabled') : t('common.button.delete')"
+                    :disabled="isProtectedAdmin(row)"
+                    :title="isProtectedAdmin(row) ? t('user.tooltip.deleteDisabled') : t('common.button.delete')"
                     @click="handleDelete(row)">
               <Trash2 class="size-3.5" />
             </button>

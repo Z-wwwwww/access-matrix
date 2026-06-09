@@ -27,7 +27,13 @@ export default {
       usernameExists: '이미 사용 중인 사용자명입니다',
       emailExists: '이미 사용 중인 이메일입니다',
       passwordRequired: '직접 설정 방식은 비밀번호가 필요합니다',
-      emailRequired: '초대 메일 방식은 이메일이 필요합니다'
+      emailRequired: '초대 메일 방식은 이메일이 필요합니다',
+      superAdminSingleton: '슈퍼 관리자 역할은 테넌트 소유자 전용이며 다른 사용자에게 부여할 수 없습니다',
+      adminProtected: '이 관리자 계정은 보호되어 강제 로그아웃·정지·삭제할 수 없습니다',
+      adminContactOnly: '이 관리자 계정은 연락처 정보(이메일·표시명)만 편집할 수 있습니다'
+    },
+    role: {
+      superPermissionReserved: '테넌트 전체 슈퍼 권한은 내장 슈퍼 관리자 역할 전용이며 사용자 정의 역할에 할당할 수 없습니다'
     },
     auth: {
       tenantSuspended: '테넌트가 정지되어 로그인할 수 없습니다'
@@ -219,6 +225,7 @@ export default {
       enterPassword: '비밀번호를 입력하세요',
       loginFailed: '로그인에 실패했습니다',
       sessionExpired: '세션이 만료되었거나 로그아웃되었습니다. 다시 로그인하세요.',
+      noAccess: '계정에 아직 접근 가능한 페이지가 없습니다. 관리자에게 역할 할당을 요청하세요.',
       ssoFailed: 'SSO 로그인 실패'
     }
   },
@@ -699,18 +706,22 @@ export default {
       status: '상태',
       actions: '작업'
     },
+    badge: {
+      tenantAdmin: '테넌트 관리자'
+    },
     tooltip: {
       editDisabled: '기본 제공 사용자는 편집할 수 없습니다',
-      editAdminContactOnly: '기본 제공 admin: 연락처 정보(이메일·표시명)만 편집 가능',
+      editAdminContactOnly: '관리자 계정: 연락처 정보(이메일·표시명)만 편집 가능',
       edit: '편집',
       resetPassword: '비밀번호 재설정',
       resetPasswordDisabledSso: 'SSO 모드에서는 비활성화됩니다 — 사용자는 Keycloak 계정 콘솔에서 직접 비밀번호를 변경합니다',
-      statusChangeDisabled: '기본 제공 사용자 상태는 변경할 수 없습니다',
+      statusChangeDisabled: '관리자 계정 상태는 변경할 수 없습니다',
       toggleStatus: '활성/비활성',
       disable: '비활성',
       enable: '활성',
       forceLogout: '강제 로그아웃',
-      deleteDisabled: '기본 제공 사용자는 삭제할 수 없습니다'
+      forceLogoutDisabled: '관리자 계정은 강제 로그아웃할 수 없습니다',
+      deleteDisabled: '관리자 계정은 삭제할 수 없습니다'
     },
     confirm: {
       deleteTitle: '사용자 삭제',
@@ -725,7 +736,7 @@ export default {
     edit: {
       titleEdit: '사용자 편집',
       titleCreate: '사용자 신규',
-      lockedHint: '기본 제공 admin 사용자는 「연락처 정보만 편집 가능」합니다. 이메일과 표시명은 수정할 수 있습니다(비상용 비밀번호 알림 수신에 필요). 부서·상태·역할은 잠겨 있습니다.',
+      lockedHint: '관리자 계정은 「연락처 정보만 편집 가능」합니다. 이메일과 표시명은 수정할 수 있습니다(비상용 비밀번호 알림 수신에 필요). 부서·상태·역할은 잠겨 있습니다.',
       label: {
         username: '로그인 ID',
         password: '비밀번호',

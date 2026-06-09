@@ -112,7 +112,11 @@ router.beforeEach(async (to, from, next) => {
         // Log out cleanly to /login instead of showing a 404.
         if (!home || toRaw(menuStore.routeChildren).length === 0) {
           authStore.clearAuth()
-          next({ path: '/login', query: { from: to.fullPath, session: 'expired' } })
+          // NOT a session problem — the token is valid, the account just has no
+          // accessible menu (zero permissions / roles not yet assigned). Use a
+          // distinct reason so the login page does NOT auto-redirect to SSO:
+          // KC would silently re-authenticate, land here again, and loop forever.
+          next({ path: '/login', query: { from: to.fullPath, reason: 'no-access' } })
           return
         }
         // 整体注册 layout 路由（与原项目一致）

@@ -28,8 +28,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class UserAdminService {
@@ -90,12 +92,13 @@ public class UserAdminService {
             w.eq("dept_id", deptId);
         }
         Page<UserEntity> result = userMapper.selectPage(p, w);
-        List<UserDto.View> records = result.getRecords().stream().map(this::toView).toList();
+        Set<String> superIds = superAdminUserIds();
+        List<UserDto.View> records = result.getRecords().stream().map(u -> toView(u, superIds)).toList();
         return PageResult.of(records, result.getTotal(), page, size);
     }
 
     public UserDto.View get(String id) {
-        return toView(require(id));
+        return toView(require(id), superAdminUserIds());
     }
 
     @Transactional
@@ -236,30 +239,27 @@ public class UserAdminService {
     @Transactional
     public void update(String id, UserDto.UpdateRequest req) {
         UserEntity u = require(id);
-        // Built-in admin is partially editable: contact fields (email,
-        // displayName) are allowed because break-glass alerts need a
-        // reachable inbox and a recognisable sender name. Structural
-        // fields (deptId, status) stay locked — changing them would
-        // break invariants the rest of the codebase depends on (e.g.
-        // disabling the only super-admin would lock everyone out).
-        // The other mutating paths (delete / changeStatus / assignRoles
-        // / changeDept) still call assertNotBuiltInAdmin themselves and
-        // remain fully blocked.
-        boolean isBuiltIn = BUILTIN_ADMIN_USERNAME.equalsIgnoreCase(u.getUsername());
-        if (isBuiltIn) {
+        // "Protected admin" = the built-in admin OR the tenant's singular
+        // SUPER_ADMIN. Both are partially editable: contact fields (email,
+        // displayName) are allowed because break-glass alerts need a reachable
+        // inbox and a recognisable sender name. Structural fields (deptId,
+        // status) stay locked — changing them would break invariants the rest
+        // of the codebase depends on (e.g. disabling the only super-admin would
+        // lock everyone out). Roles are gated in assignRoles; delete /
+        // changeStatus / force-logout block these accounts wholesale.
+        boolean locked = isBuiltInAdmin(u) || isTenantSuperAdmin(u);
+        if (locked) {
             if (req.deptId() != null && !java.util.Objects.equals(req.deptId(), u.getDeptId())) {
-                throw new BusinessException(ErrorCode.BUSINESS_ERROR,
-                        "Built-in admin user cannot change department");
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.adminContactOnly");
             }
             if (req.status() != null && !java.util.Objects.equals(req.status(), u.getStatus())) {
-                throw new BusinessException(ErrorCode.BUSINESS_ERROR,
-                        "Built-in admin user cannot change status");
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.adminContactOnly");
             }
         }
         if (req.email() != null) u.setEmail(req.email());
         // userNo は採番（read-only）。クライアントから来ても無視（DTO にも無い）。
         if (req.displayName() != null) u.setDisplayName(req.displayName());
-        if (!isBuiltIn) {
+        if (!locked) {
             if (req.deptId() != null) u.setDeptId(req.deptId());
             if (req.status() != null) {
                 DictEnum.requireValid(CommonStatus.class, req.status(), "status");
@@ -315,15 +315,23 @@ public class UserAdminService {
     public void assignRoles(String userId, List<String> roleIds) {
         UserEntity u = require(userId);
         assertNotBuiltInAdmin(u, "assign roles");
-        // If the new set strips SUPER_ADMIN from a user who currently holds it,
-        // and they are the sole super admin left, refuse — same invariant the
-        // delete/disable paths enforce.
+        // SUPER_ADMIN is singular and locked to the user invited at tenant
+        // creation. Two directions are enforced so the UI can't bypass either:
+        //  - it can NEVER be granted to a second user (no transfer) — the tenant
+        //    keeps exactly one super admin, the original invitee;
+        //  - the sole holder can never have it stripped (would strand the tenant
+        //    with zero super admins) — same invariant delete/disable enforce.
         String tid = RequestContext.tenantIdOrDefault();
         String superRoleId = roleLookup.superAdminRoleId(tid);
-        if (superRoleId != null
-                && userRoleMapper.existsActiveLink(userId, superRoleId, tid) != null
-                && (roleIds == null || !roleIds.contains(superRoleId))) {
-            assertNotLastSuperAdmin(userId, "strip SUPER_ADMIN from");
+        if (superRoleId != null) {
+            boolean alreadyHolds = userRoleMapper.existsActiveLink(userId, superRoleId, tid) != null;
+            boolean wantsSuper = roleIds != null && roleIds.contains(superRoleId);
+            if (wantsSuper && !alreadyHolds) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.superAdminSingleton");
+            }
+            if (alreadyHolds && !wantsSuper) {
+                assertNotLastSuperAdmin(userId, "strip SUPER_ADMIN from");
+            }
         }
         userRoleMapper.update(null,
                 new UpdateWrapper<UserRoleEntity>().eq("user_id", userId).eq("mark", 1)
@@ -337,6 +345,20 @@ public class UserAdminService {
             }
         }
         cacheService.evictUser(userId);
+    }
+
+    /**
+     * Force a user's sessions to end (kick) — but refuse for a protected admin
+     * (built-in admin or the tenant's SUPER_ADMIN), who must stay reachable in
+     * the management UI. The {@code /admin/auth/force-logout} endpoint delegates
+     * here so the guard lives in the service (Hard Rule 12), not the controller.
+     */
+    public void forceLogout(String userId) {
+        UserEntity u = require(userId);
+        if (isBuiltInAdmin(u) || isTenantSuperAdmin(u)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.adminProtected");
+        }
+        sessionTermination.terminateUser(userId);
     }
 
     @Transactional
@@ -376,7 +398,7 @@ public class UserAdminService {
      * {@code AdminAuthController.resetPassword}, not this service).
      */
     private void assertNotBuiltInAdmin(UserEntity u, String op) {
-        if (BUILTIN_ADMIN_USERNAME.equalsIgnoreCase(u.getUsername())) {
+        if (isBuiltInAdmin(u)) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR,
                     "Built-in admin user is read-only — only password reset is allowed (rejected: " + op + ")");
         }
@@ -410,10 +432,31 @@ public class UserAdminService {
         return u;
     }
 
-    private UserDto.View toView(UserEntity u) {
+    private UserDto.View toView(UserEntity u, Set<String> superAdminIds) {
         return new UserDto.View(
                 u.getId(), u.getUsername(), u.getEmail(),
                 u.getUserNo(), u.getDisplayName(), u.getDeptId(),
-                u.getStatus());
+                u.getStatus(), isBuiltInAdmin(u), superAdminIds.contains(u.getId()));
+    }
+
+    /** Whether {@code u} is the platform's read-only built-in admin row. */
+    private static boolean isBuiltInAdmin(UserEntity u) {
+        return BUILTIN_ADMIN_USERNAME.equalsIgnoreCase(u.getUsername());
+    }
+
+    /** Ids of the user(s) holding the tenant's SUPER_ADMIN role — singular by design. */
+    private Set<String> superAdminUserIds() {
+        String tid = RequestContext.tenantIdOrDefault();
+        String superRoleId = roleLookup.superAdminRoleId(tid);
+        if (superRoleId == null) return Set.of();
+        return new HashSet<>(userRoleMapper.findUserIdsByRoleId(superRoleId, tid));
+    }
+
+    /** Whether {@code u} holds the tenant's SUPER_ADMIN role. */
+    private boolean isTenantSuperAdmin(UserEntity u) {
+        String tid = RequestContext.tenantIdOrDefault();
+        String superRoleId = roleLookup.superAdminRoleId(tid);
+        return superRoleId != null
+                && userRoleMapper.existsActiveLink(u.getId(), superRoleId, tid) != null;
     }
 }

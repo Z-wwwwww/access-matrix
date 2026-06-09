@@ -27,7 +27,13 @@ export default {
       usernameExists: '使用者名稱已被佔用',
       emailExists: '該信箱已被佔用',
       passwordRequired: '直接設密方式需要填寫密碼',
-      emailRequired: '邀請信件方式需要填寫信箱'
+      emailRequired: '邀請信件方式需要填寫信箱',
+      superAdminSingleton: '超級管理員角色為租戶擁有者保留，不能授予其他使用者',
+      adminProtected: '該管理員帳號受保護，不能被強制登出、停用或刪除',
+      adminContactOnly: '該管理員帳號僅可編輯連絡資訊（信箱、顯示名稱）'
+    },
+    role: {
+      superPermissionReserved: '租戶級超級權限為內建超級管理員角色保留，不能指派給自訂角色'
     },
     auth: {
       tenantSuspended: '租戶已被停用，無法登入'
@@ -219,6 +225,7 @@ export default {
       enterPassword: '請輸入密碼',
       loginFailed: '登入失敗',
       sessionExpired: '工作階段已過期或已被登出，請重新登入。',
+      noAccess: '您的帳號暫無可存取的頁面，請聯絡管理員為您指派角色。',
       ssoFailed: 'SSO 登入失敗'
     }
   },
@@ -699,18 +706,22 @@ export default {
       status: '狀態',
       actions: '操作'
     },
+    badge: {
+      tenantAdmin: '租戶管理員'
+    },
     tooltip: {
       editDisabled: '內建使用者不可編輯',
-      editAdminContactOnly: '內建 admin：僅可編輯連絡資訊（信箱、顯示名稱）',
+      editAdminContactOnly: '管理員帳號：僅可編輯連絡資訊（信箱、顯示名稱）',
       edit: '編輯',
       resetPassword: '重設密碼',
       resetPasswordDisabledSso: 'SSO 模式下不可用 — 使用者於 Keycloak 帳號控制台自助修改密碼',
-      statusChangeDisabled: '內建使用者狀態不可變更',
+      statusChangeDisabled: '管理員帳號狀態不可變更',
       toggleStatus: '啟用/停用',
       disable: '停用',
       enable: '啟用',
       forceLogout: '強制登出',
-      deleteDisabled: '內建使用者不可刪除'
+      forceLogoutDisabled: '管理員帳號不可被強制登出',
+      deleteDisabled: '管理員帳號不可刪除'
     },
     confirm: {
       deleteTitle: '刪除使用者',
@@ -725,7 +736,7 @@ export default {
     edit: {
       titleEdit: '編輯使用者',
       titleCreate: '新增使用者',
-      lockedHint: '內建 admin 使用者「僅可編輯連絡資訊」：信箱和顯示名稱可以修改（應急密碼通知需要可達信箱）。部門、狀態、角色保持鎖定。',
+      lockedHint: '管理員帳號「僅可編輯連絡資訊」：信箱和顯示名稱可以修改（應急密碼通知需要可達信箱）。部門、狀態、角色保持鎖定。',
       label: {
         username: '登入 ID',
         password: '密碼',
