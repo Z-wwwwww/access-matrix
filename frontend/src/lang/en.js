@@ -23,6 +23,18 @@ export default {
       usernameExists: 'That username is already taken',
       emailExists: 'That email is already in use'
     },
+    user: {
+      usernameExists: 'That username is already taken',
+      emailExists: 'That email is already in use',
+      passwordRequired: 'A password is required for direct provisioning',
+      emailRequired: 'An email is required for invite provisioning'
+    },
+    auth: {
+      tenantSuspended: 'This tenant is suspended; sign-in is disabled'
+    },
+    keycloak: {
+      operationFailed: 'Keycloak rejected the operation (it may violate a username length/format policy); please check your input'
+    },
     invite: {
       notFoundOrUsed: 'This invite link is invalid or has already been used',
       expired: 'This invite link has expired',
@@ -268,6 +280,7 @@ export default {
       },
       message: {
         loadFailed: 'Failed to load users', required: 'Please fill in all required fields',
+        invalidUsername: 'Username must be 3-64 characters, start with a lowercase letter or digit, and use only lowercase letters, digits, hyphens, underscores',
         createSuccess: 'Platform user created', createFailed: 'Failed to create user',
         createdInviteSent: 'Created. Invite email sent to {email} (they set their own password via the link).', createdInviteFailed: 'Created, but the invite email failed to send — use "Resend email" to retry.',
         copied: 'Copied', copyFailed: 'Copy failed',

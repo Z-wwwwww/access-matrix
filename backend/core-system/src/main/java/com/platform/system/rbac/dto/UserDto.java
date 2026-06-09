@@ -34,8 +34,11 @@ public final class UserDto {
     // 旧クライアント互換のためフィールドが届いても無視する（DTO に持たない＝Jackson が黙って捨てる）。
     public record CreateRequest(
             @NotBlank @Size(max = 64) String username,
-            // Required only in DIRECT mode — validated conditionally in the service.
-            @Size(min = 8, max = 128) String password,
+            // Optional at the bean level (INVITE mode sends none / an empty string).
+            // DIRECT mode validates presence + length/complexity in the service via
+            // PasswordPolicyService — so we only cap the max here, never require a min
+            // (a min=8 here would wrongly reject INVITE's empty password with a 701).
+            @Size(max = 128) String password,
             @Email @Size(max = 255) String email,
             @Size(max = 128) String displayName,
             String deptId,

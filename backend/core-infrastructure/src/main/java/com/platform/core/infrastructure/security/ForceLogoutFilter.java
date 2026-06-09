@@ -80,11 +80,13 @@ public class ForceLogoutFilter extends OncePerRequestFilter {
             // (e.g. permit-all paths). subject equals business ULID in jwt mode.
             userId = jwt.getSubject();
         }
-        if (userId == null || userId.isBlank()) {
-            chain.doFilter(req, resp);
-            return;
-        }
-        long kickAt = forceLogoutService.kickOutAt(userId);
+        // Reject if the token predates EITHER a per-user kick (disable / delete /
+        // force-logout) OR a tenant-wide kick (tenant suspended). The tenant kick
+        // is keyed by tenant_id = tenant_code; RequestContext.tenantId() was set by
+        // CoreRequestContextFilter (runs before this filter) from the JWT tid claim.
+        long userKickAt = (userId == null || userId.isBlank()) ? 0L : forceLogoutService.kickOutAt(userId);
+        long tenantKickAt = forceLogoutService.tenantKickOutAt(RequestContext.tenantId());
+        long kickAt = Math.max(userKickAt, tenantKickAt);
         if (kickAt <= 0) {
             chain.doFilter(req, resp);
             return;

@@ -23,6 +23,18 @@ export default {
       usernameExists: '使用者名稱已被佔用',
       emailExists: '該信箱已被佔用'
     },
+    user: {
+      usernameExists: '使用者名稱已被佔用',
+      emailExists: '該信箱已被佔用',
+      passwordRequired: '直接設密方式需要填寫密碼',
+      emailRequired: '邀請信件方式需要填寫信箱'
+    },
+    auth: {
+      tenantSuspended: '租戶已被停用，無法登入'
+    },
+    keycloak: {
+      operationFailed: 'Keycloak 拒絕了該操作(可能不符合使用者名稱長度/格式等策略),請檢查輸入'
+    },
     invite: {
       notFoundOrUsed: '邀請連結無效或已被使用',
       expired: '邀請連結已過期',
@@ -268,6 +280,7 @@ export default {
       },
       message: {
         loadFailed: '載入使用者清單失敗', required: '請填寫所有必填項',
+        invalidUsername: '使用者名稱需 3-64 位，小寫字母或數字開頭，僅含小寫字母、數字、連字號、底線',
         createSuccess: '已建立平台使用者', createFailed: '建立使用者失敗',
         createdInviteSent: '已建立，邀請信已寄至 {email}（對方點擊連結自行設定密碼）。', createdInviteFailed: '已建立，但邀請信寄送失敗，請稍後用「重發郵件」重試。',
         copied: '已複製', copyFailed: '複製失敗',

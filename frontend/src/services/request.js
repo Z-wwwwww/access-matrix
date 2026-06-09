@@ -69,6 +69,15 @@ request.interceptors.response.use(
     // Localize any error message in place (key → localized; prose → unchanged), so
     // both the interceptor-reject path and the page's `res.data.msg` path are i18n'd.
     if (code && code !== 0 && data.msg) data.msg = localizeError(data.msg)
+    // 701 = bean-validation failure. The backend puts the per-field messages in
+    // `data` ({ field: message }, already server-localized); the bare msg
+    // ("Validation failed") is useless on its own. Fold the field errors into
+    // `data.msg` so every caller that shows `res.data.msg` (or catches the
+    // rejection below) gets the actual reason instead of the generic label.
+    if (code === 701 && data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+      const fields = Object.entries(data.data)
+      if (fields.length) data.msg = fields.map(([f, m]) => `${f}: ${m}`).join('; ')
+    }
     const msg = data.msg
 
     // 401 returned via JsonResult body (e.g., business-level unauthenticated)

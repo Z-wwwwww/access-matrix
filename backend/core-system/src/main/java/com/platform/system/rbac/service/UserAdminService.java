@@ -13,7 +13,7 @@ import com.platform.core.common.result.PageResult;
 import com.platform.core.infrastructure.config.properties.AppMailProperties;
 import com.platform.core.infrastructure.mail.MailService;
 import com.platform.core.infrastructure.numbering.NumberingService;
-import com.platform.core.infrastructure.security.ForceLogoutService;
+import com.platform.system.auth.service.SessionTerminationService;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.auth.entity.UserEntity;
@@ -44,7 +44,7 @@ public class UserAdminService {
     private final PasswordEncoder encoder;
     private final PasswordPolicyService passwordPolicy;
     private final PermissionCacheService cacheService;
-    private final ForceLogoutService forceLogoutService;
+    private final SessionTerminationService sessionTermination;
     private final NumberingService numberingService;
     // The following four are only wired when app.security.mode=oidc (the
     // beans are @ConditionalOnProperty). ObjectProvider keeps this service
@@ -60,7 +60,7 @@ public class UserAdminService {
                             PasswordEncoder encoder,
                             PasswordPolicyService passwordPolicy,
                             PermissionCacheService cacheService,
-                            ForceLogoutService forceLogoutService,
+                            SessionTerminationService sessionTermination,
                             NumberingService numberingService,
                             ObjectProvider<KeycloakUserService> keycloakProvider,
                             ObjectProvider<InviteTokenService> inviteProvider,
@@ -72,7 +72,7 @@ public class UserAdminService {
         this.encoder = encoder;
         this.passwordPolicy = passwordPolicy;
         this.cacheService = cacheService;
-        this.forceLogoutService = forceLogoutService;
+        this.sessionTermination = sessionTermination;
         this.numberingService = numberingService;
         this.keycloakProvider = keycloakProvider;
         this.inviteProvider = inviteProvider;
@@ -105,20 +105,28 @@ public class UserAdminService {
         UserDto.ProvisionMode mode = req.mode();
         if (mode == UserDto.ProvisionMode.DIRECT) {
             if (req.password() == null || req.password().isBlank()) {
-                throw new BusinessException(ErrorCode.BUSINESS_ERROR,
-                        "Password is required when provision mode is DIRECT");
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.passwordRequired");
             }
             passwordPolicy.validate(req.password());
         } else {
             if (req.email() == null || req.email().isBlank()) {
-                throw new BusinessException(ErrorCode.BUSINESS_ERROR,
-                        "Email is required when provision mode is INVITE");
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.emailRequired");
             }
         }
 
-        Long dup = userMapper.selectCount(new QueryWrapper<UserEntity>().eq("mark", 1).eq("username", req.username()));
-        if (dup != null && dup > 0) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Username already exists: " + req.username());
+        // Precise duplicate pre-checks (username + email) BEFORE touching Keycloak —
+        // otherwise an email clash surfaces only as KC's generic English CONFLICT.
+        // Messages are i18n KEYS so the frontend localizes them (see localizeError).
+        // The MP tenant interceptor scopes both counts to the caller's tenant.
+        Long usernameDup = userMapper.selectCount(new QueryWrapper<UserEntity>().eq("mark", 1).eq("username", req.username()));
+        if (usernameDup != null && usernameDup > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.usernameExists");
+        }
+        if (req.email() != null && !req.email().isBlank()) {
+            Long emailDup = userMapper.selectCount(new QueryWrapper<UserEntity>().eq("mark", 1).eq("email", req.email()));
+            if (emailDup != null && emailDup > 0) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.emailExists");
+            }
         }
 
         // Tenant for numbering: each tenant has its own user-no counter.
@@ -277,8 +285,23 @@ public class UserAdminService {
         cacheService.evictUser(id);
         // Any access token still in flight must die — without this kick a
         // deleted user could keep hitting /menu/me etc. until their token
-        // naturally expires.
-        forceLogoutService.kickOut(id);
+        // naturally expires. terminateUser also ends the KC SSO session so the
+        // deleted user can't be silently re-authenticated on the login redirect.
+        sessionTermination.terminateUser(id);
+        // Remove the Keycloak user too. Otherwise a soft-deleted user (mark=0)
+        // could SSO back in and the JIT resolver — which only sees mark=1 rows —
+        // would RE-PROVISION a brand-new account for them. Best-effort: the DB
+        // row is already gone, so a KC hiccup just leaves an orphan to clean up.
+        KeycloakUserService keycloak = keycloakProvider.getIfAvailable();
+        if (keycloak != null && u.getKeycloakId() != null && !u.getKeycloakId().isBlank()) {
+            try {
+                keycloak.deleteUser(RequestContext.tenantIdOrDefault(), u.getKeycloakId());
+            } catch (RuntimeException e) {
+                org.slf4j.LoggerFactory.getLogger(UserAdminService.class)
+                        .warn("[user] soft-deleted {} but KC delete failed (kcId={}): {}",
+                                id, u.getKeycloakId(), e.toString());
+            }
+        }
     }
 
     public List<String> listRoleIds(String userId) {
@@ -330,20 +353,30 @@ public class UserAdminService {
         DictEnum.requireValid(CommonStatus.class, status, "status");
         UserEntity u = require(userId);
         assertNotBuiltInAdmin(u, "change status");
+        boolean enabling = status == CommonStatus.ENABLED.code();
         // Only the "disable" direction can strand the platform without a super
         // admin; enabling a previously-disabled super-admin is always safe.
-        if (status != CommonStatus.ENABLED.code()) {
+        if (!enabling) {
             assertNotLastSuperAdmin(userId, "disable");
         }
         u.setStatus(status);
         userMapper.updateById(u);
         cacheService.evictUser(userId);
-        // Disabling a user must take effect immediately for every active token,
-        // not just on endpoints that happen to be @RequiresPermission-annotated.
-        // The kick combined with the global ForceLogoutFilter shuts down all
-        // in-flight sessions on the next API call.
-        if (status != CommonStatus.ENABLED.code()) {
-            forceLogoutService.kickOut(userId);
+
+        // Mirror the status into Keycloak. CRITICAL: a DB status=0 alone does NOT
+        // stop SSO — Keycloak still authenticates the (KC-enabled) user and the
+        // OIDC JIT resolver lets them in. Disabling the KC user makes Keycloak
+        // itself refuse the login, so a disabled user can't simply sign in again.
+        KeycloakUserService keycloak = keycloakProvider.getIfAvailable();
+        if (keycloak != null && u.getKeycloakId() != null && !u.getKeycloakId().isBlank()) {
+            keycloak.setEnabled(RequestContext.tenantIdOrDefault(), u.getKeycloakId(), enabling);
+        }
+        // Disabling must take effect immediately for every active token (kick +
+        // end the KC session); enabling clears the stale kick so fresh tokens work.
+        if (enabling) {
+            sessionTermination.reactivateUser(userId);
+        } else {
+            sessionTermination.terminateUser(userId);
         }
     }
 

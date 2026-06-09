@@ -67,6 +67,7 @@ class TenantAdminServiceTest {
     @Mock MailService mailService;
     @Mock AppMailProperties mailProps;
     @Mock JdbcTemplate jdbc;
+    @Mock com.platform.system.auth.service.SessionTerminationService sessionTermination;
 
     private ObjectProvider<KeycloakRealmService> realmServiceProvider;
     private ObjectProvider<KeycloakUserService> userServiceProvider;
@@ -97,7 +98,7 @@ class TenantAdminServiceTest {
 
         service = new TenantAdminService(tenantMapper, realmServiceProvider, userServiceProvider,
                 numberingService, rbacSeederService, inviteTokenService,
-                mailProvider, mailProps, jdbc, selfProvider);
+                mailProvider, mailProps, jdbc, selfProvider, sessionTermination);
         // In-process self-proxy: persistNewTenant runs directly on the same
         // instance (no real transaction in a unit test — interactions still verify).
         when(selfProvider.getObject()).thenReturn(service);
@@ -483,6 +484,9 @@ class TenantAdminServiceTest {
         // status=0, mark stays 1 (distinct from softDelete which sets mark=0).
         assertThat(cap.getValue().getSqlSet()).contains("status=");
         assertThat(cap.getValue().getSqlSet()).doesNotContain("mark=");
+        // Existing sessions of the tenant are terminated NOW (tenant-wide kick) —
+        // realm-disable alone only blocks new logins, not in-flight access tokens.
+        verify(sessionTermination).terminateTenant("acme");
     }
 
     @Test
@@ -522,6 +526,8 @@ class TenantAdminServiceTest {
         inOrder.verify(tenantMapper).update(org.mockito.ArgumentMatchers.isNull(), cap.capture());
         assertThat(cap.getValue().getSqlSet()).contains("status=");
         assertThat(cap.getValue().getParamNameValuePairs().values()).contains(1);
+        // The tenant-wide kick is lifted so its users can log in again.
+        verify(sessionTermination).reactivateTenant("acme");
     }
 
     @Test

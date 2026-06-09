@@ -4,6 +4,7 @@ import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
 import com.platform.core.infrastructure.config.properties.AppDebugProperties;
+import com.platform.core.infrastructure.security.keycloak.KeycloakUserService.KeycloakOperationException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -95,6 +96,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     public void handleClientDisconnect(AsyncRequestNotUsableException ex) {
         log.debug("Client disconnected before the response finished: {}", ex.getMessage());
+    }
+
+    /**
+     * A Keycloak-side rejection (validation / policy / conflict) is a caller
+     * error, not a server bug — surface it as a business error (with the KC
+     * detail logged at WARN for ops) instead of letting it fall through to
+     * {@link #handleGeneric} and become a raw 500 + scary "Unhandled exception".
+     * e.g. creating a user whose username is shorter than KC's user-profile
+     * length policy. The message is an i18n KEY localized by the frontend.
+     */
+    @ExceptionHandler(KeycloakOperationException.class)
+    public ResponseEntity<JsonResult<Object>> handleKeycloak(KeycloakOperationException ex) {
+        log.warn("Keycloak operation rejected: {}", ex.getMessage());
+        return ResponseEntity.ok(new JsonResult<>(
+                ErrorCode.BUSINESS_ERROR.code(), "error.keycloak.operationFailed", null));
     }
 
     @ExceptionHandler(Exception.class)

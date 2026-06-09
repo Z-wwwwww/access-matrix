@@ -8,7 +8,7 @@ import com.platform.core.common.security.BuiltInRoles;
 import com.platform.core.infrastructure.config.properties.AppMailProperties;
 import com.platform.core.infrastructure.mail.MailService;
 import com.platform.core.infrastructure.numbering.NumberingService;
-import com.platform.core.infrastructure.security.ForceLogoutService;
+import com.platform.system.auth.service.SessionTerminationService;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.auth.entity.UserEntity;
@@ -62,7 +62,7 @@ class UserAdminServiceTest {
     @Mock PasswordEncoder encoder;
     @Mock PasswordPolicyService passwordPolicy;
     @Mock PermissionCacheService cacheService;
-    @Mock ForceLogoutService forceLogoutService;
+    @Mock SessionTerminationService sessionTermination;
     @Mock NumberingService numberingService;
     // ObjectProvider mocks for the three OIDC-conditional beans + the mail
     // properties record. Default behaviour: getIfAvailable() returns null,
@@ -155,7 +155,7 @@ class UserAdminServiceTest {
         verify(cacheService).evictUser("u1");
         // Tokens must die immediately on user delete — otherwise the deleted
         // user can keep hitting endpoints until their token naturally expires.
-        verify(forceLogoutService).kickOut("u1");
+        verify(sessionTermination).terminateUser("u1");
     }
 
     @Test
@@ -167,7 +167,7 @@ class UserAdminServiceTest {
                 .hasMessageContaining("Built-in admin");
 
         verify(userMapper, never()).update(any(), any());
-        verify(forceLogoutService, never()).kickOut(any());
+        verify(sessionTermination, never()).terminateUser(any());
     }
 
     // ─── built-in admin partial editability ───────────────────────────
@@ -256,7 +256,7 @@ class UserAdminServiceTest {
 
         // No soft-delete or token kick when we bail out early.
         verify(userMapper, never()).update(any(), any());
-        verify(forceLogoutService, never()).kickOut(any());
+        verify(sessionTermination, never()).terminateUser(any());
     }
 
     @Test
@@ -268,7 +268,7 @@ class UserAdminServiceTest {
         service.delete("u1");
 
         verify(userMapper).update(eq(null), any(UpdateWrapper.class));
-        verify(forceLogoutService).kickOut("u1");
+        verify(sessionTermination).terminateUser("u1");
     }
 
     @Test
@@ -279,7 +279,7 @@ class UserAdminServiceTest {
         service.changeStatus("u1", 0);
 
         // Disabling must immediately invalidate tokens, not just on the next perm check.
-        verify(forceLogoutService).kickOut("u1");
+        verify(sessionTermination).terminateUser("u1");
         verify(cacheService).evictUser("u1");
     }
 
@@ -290,7 +290,40 @@ class UserAdminServiceTest {
 
         service.changeStatus("u1", 1);
 
-        verify(forceLogoutService, never()).kickOut(any());
+        verify(sessionTermination, never()).terminateUser(any());
+    }
+
+    @Test
+    void changeStatus_disable_disablesKeycloakUser() {
+        // Core fix: a disabled user must be disabled in Keycloak too — otherwise
+        // KC still authenticates them and the OIDC JIT resolver lets them in, so
+        // DB status=0 alone does NOT stop SSO login.
+        UserEntity u = user("u1", "sozo-admin2");
+        u.setKeycloakId("kc-uuid-1");
+        when(userMapper.selectById("u1")).thenReturn(u);
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+        KeycloakUserService kc = org.mockito.Mockito.mock(KeycloakUserService.class);
+        when(keycloakProvider.getIfAvailable()).thenReturn(kc);
+
+        service.changeStatus("u1", 0);
+
+        verify(kc).setEnabled("acme", "kc-uuid-1", false);   // ← KC refuses SSO auth
+        verify(sessionTermination).terminateUser("u1");
+    }
+
+    @Test
+    void changeStatus_enable_reEnablesKeycloakUserAndClearsKick() {
+        UserEntity u = user("u1", "sozo-admin2");
+        u.setKeycloakId("kc-uuid-1");
+        when(userMapper.selectById("u1")).thenReturn(u);
+        KeycloakUserService kc = org.mockito.Mockito.mock(KeycloakUserService.class);
+        when(keycloakProvider.getIfAvailable()).thenReturn(kc);
+
+        service.changeStatus("u1", 1);
+
+        verify(kc).setEnabled("acme", "kc-uuid-1", true);
+        verify(sessionTermination).reactivateUser("u1");
+        verify(sessionTermination, never()).terminateUser(any());
     }
 
     @Test

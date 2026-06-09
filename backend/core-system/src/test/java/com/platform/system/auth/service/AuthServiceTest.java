@@ -73,6 +73,7 @@ class AuthServiceTest {
     @Mock RoleMapper roleMapper;
     @Mock com.platform.system.rbac.service.BuiltInRoleLookup roleLookup;
     @Mock ForceLogoutService forceLogoutService;
+    @Mock com.platform.system.platform.mapper.TenantMapper tenantMapper;
     @Mock MailService mailService;
     @Mock AppMailProperties mailProps;
     @Mock com.platform.core.infrastructure.audit.OpLogSink opLogSink;
@@ -91,6 +92,12 @@ class AuthServiceTest {
         when(mailProps.baseUrl()).thenReturn("https://app.example.com");
         // RequestContext.tenantId() is read by AuthService; set a synthetic one.
         RequestContext.set("demo", null, null, Locale.JAPAN, "test-trace");
+        // Tenant-active guard (login/refresh): default to an ACTIVE tenant so the
+        // success-path tests proceed. A suspended-tenant case stubs status=0.
+        com.platform.system.platform.entity.TenantEntity activeTenant =
+                new com.platform.system.platform.entity.TenantEntity();
+        activeTenant.setStatus(1);
+        when(tenantMapper.findActiveByCode(anyString())).thenReturn(activeTenant);
         // Stub the rest of the login dependencies so the success path completes.
         when(jwtIssuer.issue(any(), any(), any(), any(), any()))
                 .thenReturn(new JwtIssuer.TokenIssue(
@@ -232,5 +239,24 @@ class AuthServiceTest {
         AuthService.LoginResult result = service.login("demo-admin", "RightPassword", req);
 
         org.assertj.core.api.Assertions.assertThat(result.tokens()).isNotNull();
+    }
+
+    @Test
+    void login_suspendedTenant_rejected() {
+        // Password-mode hardening: a suspended tenant blocks login even when the
+        // user's own status is fine (the user-status check passes, the tenant
+        // check then fails).
+        ReflectionTestUtils.setField(service, "securityMode", "password");
+        UserEntity user = successfulUserRow();
+        stubLoginSuccess(user);
+        com.platform.system.platform.entity.TenantEntity suspended =
+                new com.platform.system.platform.entity.TenantEntity();
+        suspended.setStatus(0);
+        when(tenantMapper.findActiveByCode(anyString())).thenReturn(suspended);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service.login("demo-admin", "RightPassword", req))
+                .isInstanceOf(com.platform.core.common.error.BusinessException.class)
+                .hasMessageContaining("error.auth.tenantSuspended");
     }
 }

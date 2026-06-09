@@ -16,3 +16,15 @@ export function isValidEmail(val) {
   // local@domain.tld：ローカル部に空白・@ 不可、ドメイン部にドット必須
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
 }
+
+/**
+ * ユーザー名書式チェック — 3〜64 文字、小文字英数字で始まり、以降は
+ * 小文字英数字・ハイフン・アンダースコアのみ。バックエンド
+ * （PlatformUserDto の @Pattern + @Size(min=3) / Keycloak の username
+ * 長さポリシー 3..255）と一致させ、サーバー往復前にフロントで弾く。
+ * 空値は許容（必須チェックは別途）。
+ */
+export function isValidUsername(val) {
+  if (val === '' || val === null || val === undefined) return true
+  return /^[a-z0-9][a-z0-9_-]{2,63}$/.test(String(val).trim())
+}

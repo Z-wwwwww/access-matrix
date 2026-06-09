@@ -44,11 +44,17 @@
 **测试点**
 - [ ] 业务 super(`tenant:*`)看不到平台菜单 / 调 `/platform/*` 返回 403。
 - [ ] 平台 ops(`*:*`)能管租户但不能模拟业务用户(无 `tenant:*`)。
+- [ ] **踢出/禁用/删除/重置密码会结束 KC 会话(bug 修复)**:业务用户被禁用/删除/踢下线/重置密码后,被踢者在登录跳转页**不会被 SSO 静默重新登录**——`UserAdminService`/`AdminAuthController` 经 `SessionTerminationService.terminateUser` 同时 `kickOut`(拒旧 token)+ `kc.logoutUser`(结束 KC 会话,逼真正重新认证)。此前只 kickOut、KC 会话还在,跳转即被静默重登,踢出形同无效。
+- [ ] **禁用用户后无法再登录(bug 修复)**:`changeStatus` 禁用时**同步禁用 Keycloak 用户**(`kc.setEnabled(false)`),启用时 `setEnabled(true)` + 清除 kick。光把 DB `status=0` **拦不住 SSO**——KC 仍会认证该用户、OIDC JIT 解析器也不查 status 就放行(这正是 `sozo-admin2` 禁用后仍能登录的原因)。
+- [ ] **删除用户会删除其 KC 用户(bug 修复)**:`delete` 软删后 `kc.deleteUser`,否则被软删用户(`mark=0`)SSO 重登时,JIT 解析器只看 `mark=1` → 会**重新 provision 一个全新账号**。
 - [ ] 改某角色权限后,持有该角色的用户**下次请求**即生效(权限缓存按角色失效)。
 - [ ] 菜单按权限显隐;无权限的路由直接访问被拦/404。
 - [ ] 菜单管理列表的类型徽标按 `menu_type` dict 的 css_class 着色:目录=info(蓝)、菜单=success(绿)、按钮=violet(紫)。
 - [ ] 菜单管理**操作列**:ops(`*:*`)能看到增删改按钮——写权限码是 `platform:menu:*`,前端 `v-permission` 必须带 `platform:` 前缀(`*:*` 只匹配 `platform:` 命名空间,不匹配 2 段 `menu:*`);业务 super(`tenant:*`)看不到写按钮,但 `menu:read` 仍可用于 RoleEdit 菜单选择器。
 - [ ] 数据范围:不同 data_scope 的用户看到的 task 行集不同。
+- [ ] 新建业务用户选**邀请邮件(INVITE)**方式时**不需要密码**:不再报 701 `password 个数必须在8和128之间`(DTO 只 `@Size(max=128)`,不设 min;密码长度/复杂度只在 DIRECT 模式由 `PasswordPolicyService` 校验)。DIRECT 模式空/短密码仍被服务端拒。
+- [ ] 校验失败(701)前端 toast 显示**具体字段原因**(如 `email: 邮箱格式不正确`),而非笼统的 "Validation failed"——`request.js` 拦截器把 `data` 里的字段错误合进 `msg`。
+- [ ] 新建业务用户**用户名/邮箱重复**的提示**按所选语言**显示(不再是英文 prose):服务端在写 KC 前精确预检,抛 i18n KEY(`error.user.usernameExists` / `error.user.emailExists`),前端 `localizeError` 翻译;密码/邮箱必填同理走 KEY。
 
 ---
 
@@ -62,6 +68,7 @@
 **测试点**
 - [ ] 新建租户:KC realm 建好、管理员收到邀请、列表出现该租户。
 - [ ] 停用→登录被拒;恢复→可登录。
+- [ ] **停用立即终结现有会话(bug 修复)**:租户被停用后,其用户**正在使用的会话**下一个请求即 401——不只是挡新登录。机制:`suspend` 调 `sessionTermination.terminateTenant(code)` 写**租户级 kick**,`ForceLogoutFilter` 按 `RequestContext.tenantId()` 比对 token `iat`(自包含 JWT 不查 realm 实时状态,光禁用 realm 拦不住已签发 token)。停用期间也无法重新登录:OIDC 被禁用的 realm 挡住;password 模式 `AuthService.login/refresh` 加了租户状态校验(`error.auth.tenantSuspended`)。恢复→`reactivateTenant` 清除 kick,可重新登录。
 - [ ] 硬删除需先停用 + 输入正确 tenantCode;**仅** `system` 不可改/停/删,也不能被新建占名;`demo` 可改/停/删、其名也可被新建。
 - [ ] 新建租户的 numbering 定义从预留模板 `__template__` 克隆(已与 `demo` 解耦);即使删掉 `demo`,新建租户首次取号(U 编号)仍正常。
 - [ ] 重发邀请(可改邮箱)。
@@ -113,6 +120,7 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 `/platform/users`(`opsuser:*`,仅 ops 可见):列表、新建(KC system realm 用户 + 授 **PLATFORM_OPERATOR**;**与「重发邀请」完全相同的逻辑(plan B)**——KC 用户**不设临时密码**,`mint` 一次性 `/invite/{token}` 链接 + 发 `user-invite` 邮件,用户在落地页自助设永久密码;**页面不弹临时密码、仅 toast**(邀请已发/失败);**走应用 `CORE_MAIL_*`,不依赖 KC realm SMTP**;邮件失败不影响创建,可用「重发邮件」补发)、**编辑(改显示名/邮箱,用户名不可改;同步 KC `updateProfile` + `core_auth_user`)**、停用/启用、**重置密码(轮换临时密码 → 当前密码立即失效;弹窗显示新临时密码作后备 + 发「密码重置」邮件,该邮件**仅含临时密码**;confirm 提示会重置当前密码;并**踢下线**——已登录会话的旧 token 立即失效、需重登)**、**重发邀请邮件(plan B:`mint` 一次性 `/invite/{token}` 链接 + 发 `user-invite` 邮件,用户在落地页**自助设永久密码**;不动当前密码、页面不弹临时密码仅 toast;先作废该用户旧的未用 invite,只最新链接有效)**、**踢下线(ForceLogout:使现有会话立即失效、需重新登录;账号不停用,可立即重登)**、删除。编辑/重置/重发/踢下线走 `opsuser:update`。登录链接指向应用 `/login`(走 SSO 到 KC,不直接暴露 KC UI)。常规运维(PLATFORM_OPERATOR=`*:*`)**看不到本页**。
 **测试点**
 - [ ] ops 能看到「运维用户」菜单;常规运维**看不到**(`opsuser:*` 不被 `*:*` 覆盖),直接访问 API 403。
+- [ ] 新建运维用户**用户名 3-64 位 + 格式**由**前端**先校验(`isValidUsername`,提交前 toast **按语言**显示 `platform.user.message.invalidUsername`),`op` 等不合规直接挡下、不发请求。后端为兜底:DTO `@Size(min=3)`/`@Pattern`(对齐 KC user-profile 长度策略),且任何 KC 拒绝由 `GlobalExceptionHandler` 兜成业务错误(`error.keycloak.operationFailed`,按语言显示)+ WARN 日志,而非「Unhandled exception」500。
 - [ ] **业务租户超管(`tenant:*`)看不到「运维用户」菜单、列表/详情接口 403**(回归:`opsuser:` 在 `platform:` 之外,曾被 `tenant:*` 的"非 platform 即业务"规则误吃,导致租户管理员能看到 ops 用户)。
 - [ ] 新建用户 → toast「邀请邮件已发送至 {email}」(不弹临时密码);新用户点邮件链接落地页自助设密、再登录。
 - [ ] 新用户能管租户/事件等,但**看不到运维用户菜单**(只比 ops 低一档)。

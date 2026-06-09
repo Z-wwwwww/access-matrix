@@ -30,6 +30,11 @@ public final class PlatformUserDto {
     /** Create body. The new user is provisioned in the {@code system} Keycloak realm. */
     public record CreateRequest(
             @NotBlank
+            // Min length 3: Keycloak's default declarative user-profile enforces a
+            // username length of 3..255, so a shorter name (e.g. "op") would be
+            // rejected by KC with an opaque HTTP 400. Pre-validate it here for a
+            // clean field error instead.
+            @Size(min = 3, max = 64, message = "username must be 3-64 characters")
             @Pattern(regexp = "^[a-z0-9][a-z0-9_-]{0,63}$",
                     message = "username must be lowercase alphanumeric / dash / underscore")
             String username,

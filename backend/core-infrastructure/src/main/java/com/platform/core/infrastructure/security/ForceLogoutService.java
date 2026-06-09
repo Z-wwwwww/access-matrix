@@ -23,6 +23,8 @@ public class ForceLogoutService {
 
     public static final Duration TTL = Duration.ofDays(8);
     private static final String KEY_PREFIX = "core:auth:logout:";
+    /** Tenant-wide kick (every user of a tenant) — set when a tenant is suspended. */
+    private static final String TENANT_KEY_PREFIX = "core:auth:logout-tenant:";
 
     private final StringRedisTemplate redis;
 
@@ -56,5 +58,35 @@ public class ForceLogoutService {
     public void clear(String userId) {
         if (userId == null || userId.isBlank()) return;
         redis.delete(KEY_PREFIX + userId);
+    }
+
+    // ── Tenant-wide kick ────────────────────────────────────────────────────
+    // A single key per tenant terminates EVERY user of that tenant at once
+    // (O(1), no per-user enumeration). Set on tenant suspend; the filter rejects
+    // any token of that tenant issued before the kick. Cleared on resume.
+
+    /** Mark every user of {@code tenantCode} as force-logged-out at now. */
+    public void kickOutTenant(String tenantCode) {
+        if (tenantCode == null || tenantCode.isBlank()) return;
+        long now = Instant.now().getEpochSecond();
+        redis.opsForValue().set(TENANT_KEY_PREFIX + tenantCode, Long.toString(now), TTL);
+    }
+
+    /** @return the most recent tenant-wide kick timestamp (epoch second), or {@code 0}. */
+    public long tenantKickOutAt(String tenantCode) {
+        if (tenantCode == null || tenantCode.isBlank()) return 0L;
+        String v = redis.opsForValue().get(TENANT_KEY_PREFIX + tenantCode);
+        if (v == null || v.isBlank()) return 0L;
+        try {
+            return Long.parseLong(v.trim());
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    /** Clear the tenant-wide kick — used on tenant resume. */
+    public void clearTenant(String tenantCode) {
+        if (tenantCode == null || tenantCode.isBlank()) return;
+        redis.delete(TENANT_KEY_PREFIX + tenantCode);
     }
 }

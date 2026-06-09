@@ -9,7 +9,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { toJSTDateTimeDisp } from '@/lib/date'
-import { isValidEmail } from '@/lib/validators'
+import { isValidEmail, isValidUsername } from '@/lib/validators'
 import { Plus, Search, RotateCcw, Copy, ShieldCheck, Pause, Play, KeyRound, Trash2, Pencil, Mail, LogOut } from 'lucide-vue-next'
 import {
   listPlatformUsersApi, createPlatformUserApi, updatePlatformUserApi,
@@ -89,6 +89,14 @@ function openCreate() {
 async function submitCreate() {
   if (!form.username || !form.displayName || !form.email) {
     toast.error(t('platform.user.message.required'))
+    return
+  }
+  // Front-line username rule (3-64, lowercase alnum + dash/underscore) — mirrors
+  // the backend @Pattern/@Size + Keycloak's length policy, so the user gets a
+  // clear localized message here instead of a server round-trip. Backend stays
+  // the safety net.
+  if (!isValidUsername(form.username)) {
+    toast.error(t('platform.user.message.invalidUsername'))
     return
   }
   if (!isValidEmail(form.email)) {

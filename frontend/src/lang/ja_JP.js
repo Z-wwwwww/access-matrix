@@ -30,6 +30,18 @@ export default {
       usernameExists: 'ユーザー名は既に使われています',
       emailExists: 'このメールアドレスは既に使われています'
     },
+    user: {
+      usernameExists: 'ユーザー名は既に使われています',
+      emailExists: 'このメールアドレスは既に使われています',
+      passwordRequired: '直接設定方式ではパスワードが必須です',
+      emailRequired: '招待メール方式ではメールアドレスが必須です'
+    },
+    auth: {
+      tenantSuspended: 'テナントが停止されているためログインできません'
+    },
+    keycloak: {
+      operationFailed: 'Keycloak が操作を拒否しました(ユーザー名の長さ/形式ポリシー違反の可能性)。入力をご確認ください'
+    },
     invite: {
       notFoundOrUsed: 'この招待リンクは無効か、既に使用されています',
       expired: 'この招待リンクは有効期限が切れています',
@@ -275,6 +287,7 @@ export default {
       },
       message: {
         loadFailed: 'ユーザー一覧の取得に失敗しました', required: '必須項目を入力してください',
+        invalidUsername: 'ユーザー名は3〜64文字、小文字英数字で始まり、小文字英数字・ハイフン・アンダースコアのみ使用できます',
         createSuccess: '運用ユーザーを作成しました', createFailed: 'ユーザー作成に失敗しました',
         createdInviteSent: '作成しました。招待メールを {email} に送信しました（本人がリンクからパスワードを設定します）。', createdInviteFailed: '作成しましたが、招待メールの送信に失敗しました。後で「メール再送」で再試行してください。',
         copied: 'コピーしました', copyFailed: 'コピーに失敗しました',

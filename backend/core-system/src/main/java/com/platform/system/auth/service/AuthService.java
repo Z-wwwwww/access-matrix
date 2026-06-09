@@ -3,6 +3,9 @@ package com.platform.system.auth.service;
 import com.platform.system.auth.dto.TokenResponse;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
+import com.platform.system.dict.builtin.TenantStatus;
+import com.platform.system.platform.entity.TenantEntity;
+import com.platform.system.platform.mapper.TenantMapper;
 import com.platform.system.rbac.mapper.RoleMapper;
 import com.platform.system.rbac.service.BuiltInRoleLookup;
 import com.platform.system.rbac.service.PermissionQueryService;
@@ -56,6 +59,7 @@ public class AuthService {
     private final RoleMapper roleMapper;
     private final BuiltInRoleLookup roleLookup;
     private final ForceLogoutService forceLogoutService;
+    private final TenantMapper tenantMapper;
     private final MailService mailService;
     private final AppMailProperties mailProps;
     /** Async best-effort audit sink — used to record break-glass logins (see {@link #recordBreakGlassUse}). */
@@ -78,6 +82,7 @@ public class AuthService {
                        RoleMapper roleMapper,
                        BuiltInRoleLookup roleLookup,
                        ForceLogoutService forceLogoutService,
+                       TenantMapper tenantMapper,
                        MailService mailService,
                        AppMailProperties mailProps,
                        OpLogSink opLogSink) {
@@ -91,9 +96,24 @@ public class AuthService {
         this.roleMapper = roleMapper;
         this.roleLookup = roleLookup;
         this.forceLogoutService = forceLogoutService;
+        this.tenantMapper = tenantMapper;
         this.mailService = mailService;
         this.mailProps = mailProps;
         this.opLogSink = opLogSink;
+    }
+
+    /**
+     * Reject login/refresh into a suspended (or missing) tenant. The OIDC path is
+     * already covered (disabling the KC realm blocks SSO + the tenant-wide kick
+     * terminates existing tokens); this guards the password-mode path, which
+     * otherwise only checks the user's status, not the tenant's.
+     */
+    private void assertTenantActive(String tenantId) {
+        TenantEntity tenant = tenantMapper.findActiveByCode(tenantId);
+        if (tenant == null || tenant.getStatus() == null
+                || !tenant.getStatus().equals(TenantStatus.ACTIVE.code())) {
+            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "error.auth.tenantSuspended");
+        }
     }
 
     public LoginResult login(String identifier, String password, HttpServletRequest req) {
@@ -129,6 +149,8 @@ public class AuthService {
             auditService.record(tenantId, user.getId(), identifier, clientIp, userAgent, false, "account-disabled");
             throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "Account is disabled");
         }
+        // A disabled user must not log in; neither must any user of a suspended tenant.
+        assertTenantActive(tenantId);
 
         lockoutService.reset(tenantId, identifier);
         TokenResponse tokens = issueTokens(user);
@@ -273,6 +295,9 @@ public class AuthService {
         if (user.getStatus() == null || user.getStatus() != 1) {
             throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "Account is disabled");
         }
+        // Block refresh into a suspended tenant — otherwise a still-valid refresh
+        // token would keep minting access tokens after the tenant was suspended.
+        assertTenantActive(holder.tenantId());
         return issueTokens(user);
     }
 

@@ -23,6 +23,18 @@ export default {
       usernameExists: '이미 사용 중인 사용자명입니다',
       emailExists: '이미 사용 중인 이메일입니다'
     },
+    user: {
+      usernameExists: '이미 사용 중인 사용자명입니다',
+      emailExists: '이미 사용 중인 이메일입니다',
+      passwordRequired: '직접 설정 방식은 비밀번호가 필요합니다',
+      emailRequired: '초대 메일 방식은 이메일이 필요합니다'
+    },
+    auth: {
+      tenantSuspended: '테넌트가 정지되어 로그인할 수 없습니다'
+    },
+    keycloak: {
+      operationFailed: 'Keycloak가 작업을 거부했습니다(사용자명 길이/형식 정책 위반 가능). 입력을 확인하세요'
+    },
     invite: {
       notFoundOrUsed: '이 초대 링크는 유효하지 않거나 이미 사용되었습니다',
       expired: '이 초대 링크는 만료되었습니다',
@@ -268,6 +280,7 @@ export default {
       },
       message: {
         loadFailed: '사용자 목록 로드 실패', required: '필수 항목을 입력하세요',
+        invalidUsername: '사용자명은 3~64자이며 소문자/숫자로 시작하고 소문자·숫자·하이픈·밑줄만 사용할 수 있습니다',
         createSuccess: '플랫폼 사용자 생성됨', createFailed: '사용자 생성 실패',
         createdInviteSent: '생성됨. 초대 메일을 {email}(으)로 보냈습니다(본인이 링크로 비밀번호 설정).', createdInviteFailed: '생성되었지만 초대 메일 발송에 실패했습니다. 나중에 "메일 재발송"으로 재시도하세요.',
         copied: '복사됨', copyFailed: '복사 실패',

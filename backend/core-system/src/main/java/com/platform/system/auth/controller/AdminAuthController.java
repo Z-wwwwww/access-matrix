@@ -12,7 +12,7 @@ import com.platform.core.common.result.JsonResult;
 import com.platform.core.common.security.RequiresPermission;
 import com.platform.system.security.SystemPermissions;
 import com.platform.core.infrastructure.security.AccountLockoutService;
-import com.platform.core.infrastructure.security.ForceLogoutService;
+import com.platform.system.auth.service.SessionTerminationService;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,7 +31,7 @@ public class AdminAuthController {
     private final AccountLockoutService lockoutService;
     private final PasswordPolicyService passwordPolicy;
     private final PasswordEncoder encoder;
-    private final ForceLogoutService forceLogoutService;
+    private final SessionTerminationService sessionTermination;
 
     /**
      * Active security mode. In OIDC mode this controller's reset-password
@@ -46,12 +46,12 @@ public class AdminAuthController {
 
     public AdminAuthController(UserMapper userMapper, AccountLockoutService lockoutService,
                                PasswordPolicyService passwordPolicy, PasswordEncoder encoder,
-                               ForceLogoutService forceLogoutService) {
+                               SessionTerminationService sessionTermination) {
         this.userMapper = userMapper;
         this.lockoutService = lockoutService;
         this.passwordPolicy = passwordPolicy;
         this.encoder = encoder;
-        this.forceLogoutService = forceLogoutService;
+        this.sessionTermination = sessionTermination;
     }
 
     @PostMapping("/unlock")
@@ -95,8 +95,9 @@ public class AdminAuthController {
         userMapper.updateById(user);
         // パスワード変更後は当該ユーザーの既存トークンを必ず無効化する。
         // これをしないと、漏洩した旧 access token が自然失効までずっと使えてしまい、
-        // 「リセット = 攻撃者を追い出す」という前提が成り立たない。
-        forceLogoutService.kickOut(user.getId());
+        // 「リセット = 攻撃者を追い出す」という前提が成り立たない。KC セッションも
+        // 終了させ、ログイン画面リダイレクト時に SSO で黙って再認証されるのを防ぐ。
+        sessionTermination.terminateUser(user.getId());
         return JsonResult.ok();
     }
 
@@ -115,7 +116,7 @@ public class AdminAuthController {
     @RequiresPermission("*:*")
     @OpLog(module = "system", action = "auth.forceLogout", targetType = "user")
     public JsonResult<Void> forceLogout(@PathVariable String userId) {
-        forceLogoutService.kickOut(userId);
+        sessionTermination.terminateUser(userId);
         return JsonResult.ok();
     }
 }

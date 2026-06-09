@@ -15,6 +15,7 @@ import com.platform.core.infrastructure.numbering.NumberingService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakRealmService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.auth.service.InviteTokenService;
+import com.platform.system.auth.service.SessionTerminationService;
 import com.platform.system.platform.dto.TenantDto;
 import com.platform.system.platform.entity.TenantEntity;
 import com.platform.system.platform.mapper.TenantMapper;
@@ -133,6 +134,8 @@ public class TenantAdminService {
      * transaction so its Keycloak calls aren't trapped in one.
      */
     private final ObjectProvider<TenantAdminService> self;
+    /** Tenant-wide force-logout on suspend (terminates every active session of the tenant). */
+    private final SessionTerminationService sessionTermination;
 
     public TenantAdminService(TenantMapper tenantMapper,
                               ObjectProvider<KeycloakRealmService> realmServiceProvider,
@@ -143,7 +146,8 @@ public class TenantAdminService {
                               ObjectProvider<MailService> mailProvider,
                               AppMailProperties mailProps,
                               JdbcTemplate jdbc,
-                              ObjectProvider<TenantAdminService> self) {
+                              ObjectProvider<TenantAdminService> self,
+                              SessionTerminationService sessionTermination) {
         this.tenantMapper = tenantMapper;
         this.realmServiceProvider = realmServiceProvider;
         this.userServiceProvider = userServiceProvider;
@@ -154,6 +158,7 @@ public class TenantAdminService {
         this.mailProps = mailProps;
         this.jdbc = jdbc;
         this.self = self;
+        this.sessionTermination = sessionTermination;
     }
 
     public PageResult<TenantDto.View> list(long page, long size, String keyword, Integer status) {
@@ -649,6 +654,11 @@ public class TenantAdminService {
                         .set("status", TenantStatus.SUSPENDED.code())
                         .set("update_user", "platform-admin")
                         .set("update_time", LocalDateTime.now()));
+        // Terminate every active session of the tenant NOW — disabling the realm
+        // only blocks NEW logins, but already-issued (self-contained) access tokens
+        // keep working until they expire. The tenant-wide kick makes the
+        // ForceLogoutFilter reject them on the very next request.
+        sessionTermination.terminateTenant(row.getTenantCode());
         log.info("[tenant] suspended tenant '{}' (id={})", row.getTenantCode(), id);
     }
 
@@ -678,6 +688,8 @@ public class TenantAdminService {
                         .set("status", TenantStatus.ACTIVE.code())
                         .set("update_user", "platform-admin")
                         .set("update_time", LocalDateTime.now()));
+        // Lift the tenant-wide kick so the tenant's users can log in again.
+        sessionTermination.reactivateTenant(row.getTenantCode());
         log.info("[tenant] resumed tenant '{}' (id={})", row.getTenantCode(), id);
     }
 
