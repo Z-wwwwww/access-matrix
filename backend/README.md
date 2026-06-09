@@ -22,7 +22,7 @@ multiple downstream business modules.
 | Framework    | Spring Boot 4.0 (Spring 7, Spring Security 7)                       |
 | Web          | Tomcat 11 (Jakarta EE 11), virtual threads enabled                  |
 | Persistence  | MyBatis-Plus 3.5.16 (`mybatis-plus-spring-boot4-starter`)           |
-| Database     | PostgreSQL 15+ (`new_inntouch_core`), JSONB for i18n menu titles    |
+| Database     | PostgreSQL 15+ (`access_matrix_db`), JSONB for i18n menu titles    |
 | Migrations   | Flyway 11 (`flyway-core` + `flyway-database-postgresql`)            |
 | L1 cache     | Caffeine 3 via Spring Cache                                         |
 | L2 / session | Redis 7 (Lettuce), Spring Data Redis 4                              |

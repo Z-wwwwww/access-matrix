@@ -51,7 +51,7 @@ git clone <your-fork-url> access-matrix && cd access-matrix
 
 # 2. Create the DB
 psql -h 127.0.0.1 -U postgres \
-  -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
+  -c "CREATE DATABASE access_matrix_db WITH ENCODING 'UTF8' TEMPLATE template0;"
 
 # 3. Backend — the dev profile reads DB/Redis from env vars (no defaults).
 #    Load backend/.env.dev first (committed throwaway local values), or

@@ -35,17 +35,17 @@ Get the whole project running locally from scratch. Two sign-in scenarios are co
 
 ```bash
 psql -h 127.0.0.1 -U postgres \
-  -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
+  -c "CREATE DATABASE access_matrix_db WITH ENCODING 'UTF8' TEMPLATE template0;"
 ```
 
-> The name `new_inntouch_core` is a historical project name. If you rename it, also update `CORE_DB_URL` in `backend/.env.dev` — the dev profile reads `spring.datasource.url` from that env var, not a hardcoded value in `application.yml`.
+> If you rename the database, also update `CORE_DB_URL` in `backend/.env.dev` — the dev profile reads `spring.datasource.url` from that env var, not a hardcoded value in `application.yml`.
 
 ### 2.2 (Optional) Create the Keycloak schema
 
 Only needed if you plan to enable SSO:
 
 ```bash
-psql -h 127.0.0.1 -U postgres -d new_inntouch_core \
+psql -h 127.0.0.1 -U postgres -d access_matrix_db \
   -c "CREATE SCHEMA IF NOT EXISTS keycloak;"
 ```
 

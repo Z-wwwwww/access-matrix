@@ -15,7 +15,7 @@ if [[ ! -x "$KEYCLOAK_HOME/bin/kc.sh" ]]; then
 fi
 
 export KC_DB=postgres
-export KC_DB_URL="${KC_DB_URL:-jdbc:postgresql://127.0.0.1:5432/new_inntouch_core?currentSchema=keycloak}"
+export KC_DB_URL="${KC_DB_URL:-jdbc:postgresql://127.0.0.1:5432/access_matrix_db?currentSchema=keycloak}"
 export KC_DB_USERNAME="${KC_DB_USERNAME:-postgres}"
 export KC_DB_PASSWORD="${KC_DB_PASSWORD:-abcd@1234}"
 

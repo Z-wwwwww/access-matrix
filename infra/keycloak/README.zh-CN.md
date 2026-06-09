@@ -19,7 +19,7 @@
 | 要求 | 说明 |
 | --- | --- |
 | **JDK 17+** | 后端已经使用了 JDK 25。 |
-| **Postgres 17+** | 应用使用的同一个实例（`127.0.0.1:5432`，数据库 `new_inntouch_core`）。 |
+| **Postgres 17+** | 应用使用的同一个实例（`127.0.0.1:5432`，数据库 `access_matrix_db`）。 |
 | **`keycloak` schema** | 通过 `CREATE SCHEMA IF NOT EXISTS keycloak;` 创建 —— 已完成。 |
 | **Keycloak 26+ ZIP** | 从 <https://www.keycloak.org/downloads> 下载。 |
 
@@ -44,7 +44,7 @@
 2. **（已完成）确认 `keycloak` schema 存在**
 
    ```sql
-   -- run as postgres against new_inntouch_core
+   -- run as postgres against access_matrix_db
    CREATE SCHEMA IF NOT EXISTS keycloak;
    ```
 

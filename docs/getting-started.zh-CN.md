@@ -35,17 +35,17 @@
 
 ```bash
 psql -h 127.0.0.1 -U postgres \
-  -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
+  -c "CREATE DATABASE access_matrix_db WITH ENCODING 'UTF8' TEMPLATE template0;"
 ```
 
-> 名字 `new_inntouch_core` 是项目历史遗留命名。如要改，同时改 `backend/.env.dev` 里的 `CORE_DB_URL` —— dev profile 的 `spring.datasource.url` 取自该环境变量，并非 `application.yml` 里的硬编码值。
+> 如要改库名，同时改 `backend/.env.dev` 里的 `CORE_DB_URL` —— dev profile 的 `spring.datasource.url` 取自该环境变量，并非 `application.yml` 里的硬编码值。
 
 ### 2.2 （可选）创建 Keycloak 用 schema
 
 只在准备启用 SSO 时需要：
 
 ```bash
-psql -h 127.0.0.1 -U postgres -d new_inntouch_core \
+psql -h 127.0.0.1 -U postgres -d access_matrix_db \
   -c "CREATE SCHEMA IF NOT EXISTS keycloak;"
 ```
 

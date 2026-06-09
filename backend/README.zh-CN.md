@@ -19,7 +19,7 @@
 | 框架          | Spring Boot 4.0（Spring 7、Spring Security 7）                      |
 | Web           | Tomcat 11（Jakarta EE 11），启用虚拟线程                            |
 | 持久层        | MyBatis-Plus 3.5.16（`mybatis-plus-spring-boot4-starter`）          |
-| 数据库        | PostgreSQL 15+（`new_inntouch_core`），i18n 菜单标题用 JSONB        |
+| 数据库        | PostgreSQL 15+（`access_matrix_db`），i18n 菜单标题用 JSONB        |
 | 迁移          | Flyway 11（`flyway-core` + `flyway-database-postgresql`）           |
 | L1 缓存       | Caffeine 3，通过 Spring Cache                                       |
 | L2 / session  | Redis 7（Lettuce），Spring Data Redis 4                             |

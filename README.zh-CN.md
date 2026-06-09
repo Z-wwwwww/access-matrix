@@ -51,7 +51,7 @@ git clone <your-fork-url> access-matrix && cd access-matrix
 
 # 2. 建数据库
 psql -h 127.0.0.1 -U postgres \
-  -c "CREATE DATABASE new_inntouch_core WITH ENCODING 'UTF8' TEMPLATE template0;"
+  -c "CREATE DATABASE access_matrix_db WITH ENCODING 'UTF8' TEMPLATE template0;"
 
 # 3. 后端 —— dev profile 的 DB/Redis 连接走环境变量（无默认值）。
 #    先加载 backend/.env.dev（已提交的本地 throwaway 值），否则启动会因

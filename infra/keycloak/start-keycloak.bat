@@ -9,7 +9,7 @@ REM
 REM Requires:
 REM   - JDK 17+ on PATH (you already have JDK 25 for the backend)
 REM   - Keycloak 26+ extracted somewhere on disk
-REM   - Postgres running on 127.0.0.1:5432 with database `new_inntouch_core`
+REM   - Postgres running on 127.0.0.1:5432 with database `access_matrix_db`
 REM     and a schema named `keycloak` (CREATE SCHEMA IF NOT EXISTS keycloak;)
 REM
 REM Set KEYCLOAK_HOME to your install directory before first run, e.g. one of:
@@ -27,7 +27,7 @@ if not exist "%KEYCLOAK_HOME%\bin\kc.bat" (
 )
 
 REM --- Database (override CORE_DB_* if your local PG differs) ---
-if "%KC_DB_URL%"==""      set KC_DB_URL=jdbc:postgresql://127.0.0.1:5432/new_inntouch_core?currentSchema=keycloak
+if "%KC_DB_URL%"==""      set KC_DB_URL=jdbc:postgresql://127.0.0.1:5432/access_matrix_db?currentSchema=keycloak
 if "%KC_DB_USERNAME%"=="" set KC_DB_USERNAME=postgres
 if "%KC_DB_PASSWORD%"=="" set KC_DB_PASSWORD=abcd@1234
 set KC_DB=postgres

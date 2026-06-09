@@ -26,7 +26,7 @@ For dev, running Keycloak locally:
 | Requirement | Notes |
 | --- | --- |
 | **JDK 17+** | You already have JDK 25 for the backend. |
-| **Postgres 17+** | Same instance the application uses (`127.0.0.1:5432`, database `new_inntouch_core`). |
+| **Postgres 17+** | Same instance the application uses (`127.0.0.1:5432`, database `access_matrix_db`). |
 | **`keycloak` schema** | Created with `CREATE SCHEMA IF NOT EXISTS keycloak;` — already done. |
 | **Keycloak 26+ ZIP** | Download from <https://www.keycloak.org/downloads>. |
 
@@ -51,7 +51,7 @@ For dev, running Keycloak locally:
 2. **(Already done) Verify the `keycloak` schema exists**
 
    ```sql
-   -- run as postgres against new_inntouch_core
+   -- run as postgres against access_matrix_db
    CREATE SCHEMA IF NOT EXISTS keycloak;
    ```
 
