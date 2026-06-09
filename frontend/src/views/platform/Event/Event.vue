@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
@@ -33,14 +33,14 @@ const STATES = [
   { value: 2, label: () => t('platform.event.state.failed') }
 ]
 
-const columns = [
-  { key: 'occurredAt',     label: () => t('platform.event.column.occurredAt'),  width: '170px' },
-  { key: 'eventType',      label: () => t('platform.event.column.eventType') },
-  { key: 'aggregate',      label: () => t('platform.event.column.aggregate') },
-  { key: 'dispatchState',  label: () => t('platform.event.column.status'),      width: '110px' },
-  { key: 'dispatchAttempts', label: () => t('platform.event.column.attempts'),  width: '90px' },
-  { key: 'actions',        label: () => t('platform.event.column.actions'),     width: '130px' }
-]
+const columns = computed(() => [
+  { key: 'occurredAt',     title: t('platform.event.column.occurredAt'),  width: '170px' },
+  { key: 'eventType',      title: t('platform.event.column.eventType') },
+  { key: 'aggregate',      title: t('platform.event.column.aggregate') },
+  { key: 'dispatchState',  title: t('platform.event.column.status'),      width: '110px' },
+  { key: 'dispatchAttempts', title: t('platform.event.column.attempts'),  width: '90px' },
+  { key: 'actions',        title: t('platform.event.column.actions'),     width: '130px' }
+])
 
 // state code → { label, badge variant/classes }
 function stateLabel(s) {

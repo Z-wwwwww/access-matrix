@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
@@ -37,15 +37,15 @@ const editForm = reactive({ id: '', username: '', email: '', displayName: '' })
 // Shared "one-time secret" drawer for create + reset-password.
 const secret = ref(null)   // { username, tempPassword, title }
 
-const columns = [
-  { key: 'username',      label: () => t('platform.user.column.username'),    width: '170px' },
-  { key: 'displayName',   label: () => t('platform.user.column.displayName') },
-  { key: 'email',         label: () => t('platform.user.column.email'),       width: '220px' },
-  { key: 'platformAdmin', label: () => t('platform.user.column.role'),        width: '120px' },
-  { key: 'status',        label: () => t('platform.user.column.status'),      width: '90px' },
-  { key: 'createTime',    label: () => t('platform.user.column.createTime'),  width: '170px' },
-  { key: 'actions',       label: () => t('platform.user.column.actions'),     width: '150px' }
-]
+const columns = computed(() => [
+  { key: 'username',      title: t('platform.user.column.username'),    width: '170px' },
+  { key: 'displayName',   title: t('platform.user.column.displayName') },
+  { key: 'email',         title: t('platform.user.column.email'),       width: '220px' },
+  { key: 'platformAdmin', title: t('platform.user.column.role'),        width: '120px' },
+  { key: 'status',        title: t('platform.user.column.status'),      width: '90px' },
+  { key: 'createTime',    title: t('platform.user.column.createTime'),  width: '170px' },
+  { key: 'actions',       title: t('platform.user.column.actions'),     width: '150px' }
+])
 
 function fmtDate(s) {
   return s ? toJSTDateTimeDisp(s) : '—'
