@@ -36,7 +36,7 @@
 ## 1. マルチテナント & RBAC 基盤
 
 - **多租户**:业务行带 `tenant_id`;`system` 租户(平台运维)被 MyBatis-Plus 拦截器识别为"绕过租户范围",可跨租户读写。
-- **权限通配符**(`PermissionMatcher`):`*:*`=平台超级(仅匹配 `platform:` 命名空间);`tenant:*`=租户超级(匹配 `platform:` 之外的业务权限);`resource:*`=某资源全动作;精确匹配。两个超级互不覆盖。
+- **权限通配符**(`PermissionMatcher`,前后端同源 `frontend/src/utils/permission.js`):`*:*`=平台超级(仅匹配 `platform:` 命名空间);`tenant:*`=租户超级(匹配业务权限,即 `platform:` **与** `opsuser:` 之外);`resource:*`=某资源全动作;精确匹配。两个超级互不覆盖;`opsuser:`(平台用户管理)是独立保留命名空间,`platform:*`/`*:*`/`tenant:*` 都不自动覆盖,只有显式 `opsuser:*` 才命中。
 - **角色**:SUPER_ADMIN(各租户,`tenant:*`)、PLATFORM_ADMIN(ops,`*:*`+`opsuser:*`)、PLATFORM_OPERATOR(常规运维,`*:*`)。
 - **菜单**:全局一套(`core_rbac_menu`,无 tenant_id),按 `permission_code` 过滤;前端由 `menu-to-routes` 动态注册路由。
 - **数据范围(data scope)**:`DataScopeHelper` 按 dept/创建人重写查询(见 `docs/data-scope-demo`)。
@@ -113,6 +113,7 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 `/platform/users`(`opsuser:*`,仅 ops 可见):列表、新建(KC system realm 用户 + 授 **PLATFORM_OPERATOR**;**与「重发邀请」完全相同的逻辑(plan B)**——KC 用户**不设临时密码**,`mint` 一次性 `/invite/{token}` 链接 + 发 `user-invite` 邮件,用户在落地页自助设永久密码;**页面不弹临时密码、仅 toast**(邀请已发/失败);**走应用 `CORE_MAIL_*`,不依赖 KC realm SMTP**;邮件失败不影响创建,可用「重发邮件」补发)、**编辑(改显示名/邮箱,用户名不可改;同步 KC `updateProfile` + `core_auth_user`)**、停用/启用、**重置密码(轮换临时密码 → 当前密码立即失效;弹窗显示新临时密码作后备 + 发「密码重置」邮件,该邮件**仅含临时密码**;confirm 提示会重置当前密码;并**踢下线**——已登录会话的旧 token 立即失效、需重登)**、**重发邀请邮件(plan B:`mint` 一次性 `/invite/{token}` 链接 + 发 `user-invite` 邮件,用户在落地页**自助设永久密码**;不动当前密码、页面不弹临时密码仅 toast;先作废该用户旧的未用 invite,只最新链接有效)**、**踢下线(ForceLogout:使现有会话立即失效、需重新登录;账号不停用,可立即重登)**、删除。编辑/重置/重发/踢下线走 `opsuser:update`。登录链接指向应用 `/login`(走 SSO 到 KC,不直接暴露 KC UI)。常规运维(PLATFORM_OPERATOR=`*:*`)**看不到本页**。
 **测试点**
 - [ ] ops 能看到「运维用户」菜单;常规运维**看不到**(`opsuser:*` 不被 `*:*` 覆盖),直接访问 API 403。
+- [ ] **业务租户超管(`tenant:*`)看不到「运维用户」菜单、列表/详情接口 403**(回归:`opsuser:` 在 `platform:` 之外,曾被 `tenant:*` 的"非 platform 即业务"规则误吃,导致租户管理员能看到 ops 用户)。
 - [ ] 新建用户 → toast「邀请邮件已发送至 {email}」(不弹临时密码);新用户点邮件链接落地页自助设密、再登录。
 - [ ] 新用户能管租户/事件等,但**看不到运维用户菜单**(只比 ops 低一档)。
 - [ ] 停用→该用户无法登录;启用→恢复;重置密码→弹新临时密码;删除→DB 软删 + KC 用户删除。

@@ -19,10 +19,14 @@ import java.util.Set;
  *       impersonate business-tenant users (GDPR / SOC2 privacy boundary).</li>
  *   <li>{@code tenant:*} — <b>TENANT super</b>. Matches every business
  *       permission ({@code user:read}, {@code role:create}, ...) but
- *       <em>not</em> anything in the {@code platform:} namespace. Held by
- *       SUPER_ADMIN of each business tenant. A compromised business admin
- *       should not be able to reach {@code POST /platform/tenants} and
- *       create realms.</li>
+ *       <em>not</em> anything in a platform-ops reserved namespace
+ *       ({@code platform:} or {@code opsuser:}). Held by SUPER_ADMIN of each
+ *       business tenant. A compromised business admin must not reach
+ *       {@code POST /platform/tenants} (create realms) NOR the platform-user
+ *       console ({@code opsuser:*}). {@code opsuser:} lives OUTSIDE
+ *       {@code platform:} on purpose (so {@code platform:*}/{@code *:*} don't
+ *       auto-grant it) — which means {@code tenant:*}'s "everything else" rule
+ *       must explicitly carve it out too, else a tenant admin would inherit it.</li>
  * </ul>
  *
  * <p>Other wildcards:
@@ -66,7 +70,21 @@ public final class PermissionMatcher {
      */
     public static final String PLATFORM_NS = "platform:";
 
+    /**
+     * Platform-ops staff-management namespace ({@code opsuser:read/create/...}).
+     * Deliberately OUTSIDE {@link #PLATFORM_NS} so {@code platform:*}/{@code *:*}
+     * don't auto-grant it — only an explicit {@code opsuser:*} grant does. Like
+     * {@link #PLATFORM_NS}, it is reserved away from the business
+     * {@link #TENANT_SUPER} wildcard.
+     */
+    public static final String OPSUSER_NS = "opsuser:";
+
     private PermissionMatcher() {}
+
+    /** Platform-ops reserved namespaces — not reachable via {@link #TENANT_SUPER}. */
+    private static boolean isPlatformOpsReserved(String required) {
+        return required.startsWith(PLATFORM_NS) || required.startsWith(OPSUSER_NS);
+    }
 
     /**
      * @param userPerms permission strings the user is known to hold
@@ -78,8 +96,9 @@ public final class PermissionMatcher {
         if (userPerms == null || userPerms.isEmpty()) return false;
         // Platform super matches only the platform: namespace.
         if (userPerms.contains(SUPER) && required.startsWith(PLATFORM_NS)) return true;
-        // Tenant super matches everything except the platform: namespace.
-        if (userPerms.contains(TENANT_SUPER) && !required.startsWith(PLATFORM_NS)) return true;
+        // Tenant super matches every business permission — but NOT the
+        // platform-ops reserved namespaces (platform: and opsuser:).
+        if (userPerms.contains(TENANT_SUPER) && !isPlatformOpsReserved(required)) return true;
         if (userPerms.contains(required)) return true;
         int colon = required.indexOf(':');
         if (colon > 0) {

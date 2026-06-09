@@ -24,9 +24,12 @@ export function arrayHasAny(source, targets) {
  *   - "*:*"          → PLATFORM super. Matches every "platform:*" permission;
  *                       does NOT cover business permissions like "user:read".
  *                       Held by PLATFORM_ADMIN.
- *   - "tenant:*"     → TENANT super. Matches every permission OUTSIDE the
- *                       "platform:" namespace. Held by business-tenant
- *                       SUPER_ADMIN.
+ *   - "tenant:*"     → TENANT super. Matches every BUSINESS permission, i.e.
+ *                       everything OUTSIDE the platform-ops reserved namespaces
+ *                       ("platform:" and "opsuser:"). Held by business-tenant
+ *                       SUPER_ADMIN. ("opsuser:" sits outside "platform:" so
+ *                       "platform:*"/"*:*" don't auto-grant it — so tenant:*
+ *                       must carve it out too, else a tenant admin inherits it.)
  *   - "resource:*"   → grants every action on that resource (e.g. "user:*")
  *   - exact "r:a"    → grants only that pair
  *
@@ -34,13 +37,20 @@ export function arrayHasAny(source, targets) {
  * button for super-admins who hold only the super wildcards.
  */
 const PLATFORM_NS = 'platform:'
+const OPSUSER_NS = 'opsuser:'
+
+// Platform-ops reserved namespaces — not reachable via the tenant:* wildcard.
+function isPlatformOpsReserved(want) {
+  return want.startsWith(PLATFORM_NS) || want.startsWith(OPSUSER_NS)
+}
 
 export function matchPermission(perms, want) {
   if (!Array.isArray(perms) || perms.length === 0 || !want) return false
   // Platform super matches only the platform: namespace.
   if (perms.includes('*:*') && want.startsWith(PLATFORM_NS)) return true
-  // Tenant super matches everything except the platform: namespace.
-  if (perms.includes('tenant:*') && !want.startsWith(PLATFORM_NS)) return true
+  // Tenant super matches every business perm — but NOT the platform-ops
+  // reserved namespaces (platform: and opsuser:).
+  if (perms.includes('tenant:*') && !isPlatformOpsReserved(want)) return true
   if (perms.includes(want)) return true
   const colon = want.indexOf(':')
   if (colon < 0) return false

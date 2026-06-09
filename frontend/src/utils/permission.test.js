@@ -30,15 +30,23 @@ describe('matchPermission — wildcard semantics', () => {
     expect(matchPermission(['*:*'], 'whatever:goes-here')).toBe(false)
   })
 
-  it('tenant:* is TENANT super — matches every non-platform permission', () => {
+  it('tenant:* is TENANT super — matches business perms, not platform: nor opsuser:', () => {
     // tenant:* is the business-tenant SUPER_ADMIN's wildcard. Matches every
-    // business permission but NOT the platform: namespace — a compromised
-    // business admin should not be able to reach POST /platform/tenants.
+    // business permission but NOT the platform-ops reserved namespaces
+    // (platform: and opsuser:) — a compromised business admin should not be
+    // able to reach POST /platform/tenants nor the platform-user console.
     expect(matchPermission(['tenant:*'], 'user:read')).toBe(true)
     expect(matchPermission(['tenant:*'], 'role:delete')).toBe(true)
     expect(matchPermission(['tenant:*'], 'whatever:goes-here')).toBe(true)
     expect(matchPermission(['tenant:*'], 'platform:tenant:read')).toBe(false)
     expect(matchPermission(['tenant:*'], 'platform:tenant:create')).toBe(false)
+    // Regression: tenant admin must NOT inherit platform-user management.
+    expect(matchPermission(['tenant:*'], 'opsuser:read')).toBe(false)
+    expect(matchPermission(['tenant:*'], 'opsuser:create')).toBe(false)
+    expect(matchPermission(['tenant:*'], 'opsuser:delete')).toBe(false)
+    // The super ops holding opsuser:* explicitly still passes.
+    expect(matchPermission(['platform:*', 'opsuser:*'], 'opsuser:read')).toBe(true)
+    expect(matchPermission(['platform:*'], 'opsuser:read')).toBe(false)
   })
 
   it('resource:* grants every action on that resource only', () => {

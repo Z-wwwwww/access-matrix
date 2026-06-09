@@ -39,12 +39,13 @@ class PermissionMatcherTest {
         }
 
         @Test
-        @DisplayName("tenant:* is TENANT super — matches everything outside platform:")
+        @DisplayName("tenant:* is TENANT super — matches business perms, not platform: nor opsuser:")
         void tenantSuperWildcard() {
             // tenant:* is the business-tenant SUPER_ADMIN's wildcard.
-            // Matches every business permission, but the platform:
-            // namespace is carved out — a compromised business admin
-            // cannot reach POST /platform/tenants.
+            // Matches every business permission, but the platform-ops
+            // reserved namespaces (platform: and opsuser:) are carved out —
+            // a compromised business admin cannot reach POST /platform/tenants
+            // nor the platform-user console.
             Set<String> perms = Set.of("tenant:*");
             assertThat(PermissionMatcher.matches(perms, "user:read")).isTrue();
             assertThat(PermissionMatcher.matches(perms, "role:delete")).isTrue();
@@ -53,6 +54,24 @@ class PermissionMatcherTest {
             assertThat(PermissionMatcher.matches(perms, "platform:tenant:read")).isFalse();
             assertThat(PermissionMatcher.matches(perms, "platform:tenant:create")).isFalse();
             assertThat(PermissionMatcher.matches(perms, "platform:anything")).isFalse();
+            // Regression: a tenant admin must NOT inherit platform-user (opsuser:*)
+            // management just because opsuser: lives outside the platform: namespace.
+            assertThat(PermissionMatcher.matches(perms, "opsuser:read")).isFalse();
+            assertThat(PermissionMatcher.matches(perms, "opsuser:create")).isFalse();
+            assertThat(PermissionMatcher.matches(perms, "opsuser:update")).isFalse();
+            assertThat(PermissionMatcher.matches(perms, "opsuser:delete")).isFalse();
+        }
+
+        @Test
+        @DisplayName("opsuser:* held explicitly still works for the super ops")
+        void opsuserExplicitGrant() {
+            // PLATFORM_ADMIN holds platform:* + opsuser:* — the explicit opsuser:*
+            // grant must still satisfy opsuser:read via the resource:* rule.
+            Set<String> perms = Set.of("platform:*", "opsuser:*");
+            assertThat(PermissionMatcher.matches(perms, "opsuser:read")).isTrue();
+            assertThat(PermissionMatcher.matches(perms, "opsuser:delete")).isTrue();
+            // PLATFORM_OPERATOR holds platform:* only → cannot reach opsuser.
+            assertThat(PermissionMatcher.matches(Set.of("platform:*"), "opsuser:read")).isFalse();
         }
 
         @Test
