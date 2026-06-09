@@ -17,4 +17,6 @@ export const resetPlatformUserPwApi  = (id)     => request.post(`/platform/users
 // Resend = same re-issue logic (rotates temp password) but "account/welcome" email
 // wording instead of the password-reset wording.
 export const resendPlatformUserInviteApi = (id) => request.post(`/platform/users/${id}/resend-invite`)
+// Force-logout: invalidate the user's active sessions (account stays enabled; can re-login).
+export const forcePlatformUserLogoutApi = (id) => request.post(`/platform/users/${id}/force-logout`)
 export const deletePlatformUserApi   = (id)     => request.delete(`/platform/users/${id}`)

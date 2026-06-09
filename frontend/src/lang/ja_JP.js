@@ -25,6 +25,15 @@ export default {
       itemInUse: 'この値は既存データに使用されているため削除できません。無効化してください',
       notFound: '辞書または辞書項目が見つかりません',
       invalidValue: '不正な辞書値です'
+    },
+    opsuser: {
+      usernameExists: 'ユーザー名は既に使われています',
+      emailExists: 'このメールアドレスは既に使われています'
+    },
+    invite: {
+      notFoundOrUsed: 'この招待リンクは無効か、既に使用されています',
+      expired: 'この招待リンクは有効期限が切れています',
+      invalid: 'この招待リンクは無効です'
     }
   },
   dict: {
@@ -204,6 +213,7 @@ export default {
       enterUsername: 'ユーザー名を入力してください',
       enterPassword: 'パスワードを入力してください',
       loginFailed: 'ログインに失敗しました',
+      sessionExpired: 'セッションの有効期限が切れたか、ログアウトされました。再度サインインしてください。',
       ssoFailed: 'SSO ログインに失敗しました'
     }
   },
@@ -228,7 +238,7 @@ export default {
       title: '運用ユーザー',
       column: { username: 'ユーザー名', displayName: '表示名', email: 'メール', role: 'ロール', status: '状態', createTime: '作成日時', actions: '操作' },
       role: { admin: '管理者', operator: '運用' },
-      action: { disable: '停止', enable: '再開', reset: 'パスワード再設定', delete: '削除', edit: '編集', resend: 'メール再送' },
+      action: { disable: '停止', enable: '再開', reset: 'パスワード再設定', delete: '削除', edit: '編集', resend: 'メール再送', forceLogout: '強制ログアウト' },
       edit: {
         title: '運用ユーザーを編集',
         intro: '表示名 / メールを変更します（Keycloak に同期）。ユーザー名はログイン識別子のため変更できません。',
@@ -240,7 +250,8 @@ export default {
         disableTitle: 'ユーザー停止', disableMessage: '「{username}」を停止しますか？Keycloak でも無効化され、サインインできなくなります。',
         resetTitle: 'パスワード再設定', resetMessage: '「{username}」のパスワードを再設定しますか？現在のパスワードは即座に無効になります。新しい一時パスワードを発行し、メールアドレスがあれば送信します。',
         deleteTitle: 'ユーザー削除', deleteMessage: '「{username}」を削除しますか？元に戻せません（Keycloak ユーザーも削除）。',
-        resendTitle: 'メール再送', resendMessage: '「{username}」（{email}）に開設メールを再送しますか？パスワードを再設定し（現在のパスワードは即座に無効）、新しいログイン情報（ユーザー名 + 一時パスワード）をそのメールアドレスへ送信します。'
+        resendTitle: 'メール再送', resendMessage: '「{username}」（{email}）に招待メールを再送しますか？メール内のワンタイムリンクから本人が新しいパスワードを設定できます（リンクは有効期限あり・一回のみ使用可）。',
+        forceLogoutTitle: '強制ログアウト', forceLogoutMessage: '「{username}」を強制ログアウトしますか？現在のセッションは即座に無効になり、再ログインが必要です（アカウントは無効化されません）。'
       },
       secret: { titleNew: '運用ユーザーを作成しました', titleReset: 'パスワードを再設定しました' },
       search: { placeholder: 'ユーザー名 / メールで検索' },
@@ -265,9 +276,10 @@ export default {
       message: {
         loadFailed: 'ユーザー一覧の取得に失敗しました', required: '必須項目を入力してください',
         createSuccess: '運用ユーザーを作成しました', createFailed: 'ユーザー作成に失敗しました',
+        createdInviteSent: '作成しました。招待メールを {email} に送信しました（本人がリンクからパスワードを設定します）。', createdInviteFailed: '作成しましたが、招待メールの送信に失敗しました。後で「メール再送」で再試行してください。',
         copied: 'コピーしました', copyFailed: 'コピーに失敗しました',
         disableSuccess: '停止しました', enableSuccess: '再開しました', resetSuccess: 'パスワードを再設定しました',
-        deleteSuccess: '削除しました', updateSuccess: '更新しました', resendSuccess: 'メールを送信しました', opFailed: '操作に失敗しました'
+        deleteSuccess: '削除しました', updateSuccess: '更新しました', resendSuccess: 'メールを送信しました', forceLogoutSuccess: '強制ログアウトしました', opFailed: '操作に失敗しました'
       }
     },
     tenant: {

@@ -1,6 +1,5 @@
 package com.platform.system.auth.service;
 
-import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
@@ -110,21 +109,20 @@ public class InviteTokenService {
     public UserInviteEntity consume(String cleartextToken) {
         UserInviteEntity row = inviteMapper.findActiveByTokenHash(sha256Hex(cleartextToken));
         if (row == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "Invite token not found or already used");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "error.invite.notFoundOrUsed");
         }
         if (row.getExpiresAt() == null || row.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Invite token has expired");
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.invite.expired");
         }
-        // Atomic single-use: set used_at via UpdateWrapper (mark is @TableLogic
-        // so updateById would strip it; we're not touching mark here, but the
-        // same SET-clause discipline as the rest of the codebase applies).
+        // Atomic single-use claim: only the FIRST caller flips used_at NULL → now.
+        // markUsed returns the affected-row count — 0 means it was already consumed
+        // (or lost a concurrent race), so we reject. The previous SELECT-then-
+        // UpdateWrapper version didn't check the row count and could silently let
+        // a token be re-used; this hand-written UPDATE + count check is the fix.
         LocalDateTime now = LocalDateTime.now();
-        inviteMapper.update(null,
-                new UpdateWrapper<UserInviteEntity>()
-                        .eq("id", row.getId())
-                        .isNull("used_at")
-                        .set("used_at", now)
-                        .set("update_user", "system"));
+        if (inviteMapper.markUsed(row.getId(), now) == 0) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "error.invite.notFoundOrUsed");
+        }
         row.setUsedAt(now);
         log.info("[invite] consumed token for user {} (tenant {})", row.getUserId(), row.getTenantId());
         return row;

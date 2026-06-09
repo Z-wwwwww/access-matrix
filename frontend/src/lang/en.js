@@ -18,6 +18,15 @@ export default {
       itemInUse: 'This value is in use by existing data and cannot be deleted; disable it instead',
       notFound: 'Dictionary or item not found',
       invalidValue: 'Invalid dictionary value'
+    },
+    opsuser: {
+      usernameExists: 'That username is already taken',
+      emailExists: 'That email is already in use'
+    },
+    invite: {
+      notFoundOrUsed: 'This invite link is invalid or has already been used',
+      expired: 'This invite link has expired',
+      invalid: 'This invite link is no longer valid'
     }
   },
   dict: {
@@ -197,6 +206,7 @@ export default {
       enterUsername: 'Please enter your username',
       enterPassword: 'Please enter your password',
       loginFailed: 'Login failed',
+      sessionExpired: 'Your session has expired or was signed out. Please sign in again.',
       ssoFailed: 'SSO sign-in failed'
     }
   },
@@ -221,7 +231,7 @@ export default {
       title: 'Platform users',
       column: { username: 'Username', displayName: 'Display name', email: 'Email', role: 'Role', status: 'Status', createTime: 'Created', actions: 'Actions' },
       role: { admin: 'Admin', operator: 'Operator' },
-      action: { disable: 'Disable', enable: 'Enable', reset: 'Reset password', delete: 'Delete', edit: 'Edit', resend: 'Resend email' },
+      action: { disable: 'Disable', enable: 'Enable', reset: 'Reset password', delete: 'Delete', edit: 'Edit', resend: 'Resend email', forceLogout: 'Force logout' },
       edit: {
         title: 'Edit platform user',
         intro: 'Change the display name / email (synced to Keycloak). The username is the login identity and cannot be changed.',
@@ -233,7 +243,8 @@ export default {
         disableTitle: 'Disable user', disableMessage: 'Disable "{username}"? They will be disabled in Keycloak too and cannot sign in.',
         resetTitle: 'Reset password', resetMessage: 'Reset the password for "{username}"? Their current password becomes invalid immediately; a new temporary password is issued and (if they have an email) sent to them.',
         deleteTitle: 'Delete user', deleteMessage: 'Delete "{username}"? This cannot be undone (the Keycloak user is removed too).',
-        resendTitle: 'Resend email', resendMessage: 'Resend the account-opening email to "{username}" ({email})? Their password will be reset (the current one becomes invalid immediately) and the new login info (username + temp password) emailed to them.'
+        resendTitle: 'Resend email', resendMessage: 'Resend the invite email to "{username}" ({email})? They can set a new password themselves via the one-time link in the email (time-limited, single-use).',
+        forceLogoutTitle: 'Force logout', forceLogoutMessage: 'Force logout "{username}"? Their current sessions are invalidated immediately and they must sign in again (the account stays enabled).'
       },
       secret: { titleNew: 'Platform user created', titleReset: 'Password reset' },
       search: { placeholder: 'Search by username / email' },
@@ -258,9 +269,10 @@ export default {
       message: {
         loadFailed: 'Failed to load users', required: 'Please fill in all required fields',
         createSuccess: 'Platform user created', createFailed: 'Failed to create user',
+        createdInviteSent: 'Created. Invite email sent to {email} (they set their own password via the link).', createdInviteFailed: 'Created, but the invite email failed to send — use "Resend email" to retry.',
         copied: 'Copied', copyFailed: 'Copy failed',
         disableSuccess: 'Disabled', enableSuccess: 'Enabled', resetSuccess: 'Password reset',
-        deleteSuccess: 'Deleted', updateSuccess: 'Updated', resendSuccess: 'Email sent', opFailed: 'Operation failed'
+        deleteSuccess: 'Deleted', updateSuccess: 'Updated', resendSuccess: 'Email sent', forceLogoutSuccess: 'Forced logout', opFailed: 'Operation failed'
       }
     },
     tenant: {

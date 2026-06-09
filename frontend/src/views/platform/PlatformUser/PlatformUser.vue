@@ -10,11 +10,11 @@ import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { toJSTDateTimeDisp } from '@/lib/date'
 import { isValidEmail } from '@/lib/validators'
-import { Plus, Search, RotateCcw, Copy, ShieldCheck, Pause, Play, KeyRound, Trash2, Pencil, Mail } from 'lucide-vue-next'
+import { Plus, Search, RotateCcw, Copy, ShieldCheck, Pause, Play, KeyRound, Trash2, Pencil, Mail, LogOut } from 'lucide-vue-next'
 import {
   listPlatformUsersApi, createPlatformUserApi, updatePlatformUserApi,
   disablePlatformUserApi, enablePlatformUserApi, resetPlatformUserPwApi,
-  resendPlatformUserInviteApi, deletePlatformUserApi
+  resendPlatformUserInviteApi, forcePlatformUserLogoutApi, deletePlatformUserApi
 } from '@/services/platformUser'
 
 const { t } = useI18n()
@@ -104,8 +104,12 @@ async function submitCreate() {
     })
     if (res.data.code === 0) {
       showCreate.value = false
-      secret.value = { ...res.data.data, email: form.email, kind: 'create', title: t('platform.user.secret.titleNew') }
-      toast.success(t('platform.user.message.createSuccess'))
+      // Plan B: no temp password popup — the user sets their own via the invite link.
+      if (res.data.data?.emailSent) {
+        toast.success(t('platform.user.message.createdInviteSent', { email: form.email }))
+      } else {
+        toast.error(t('platform.user.message.createdInviteFailed'))
+      }
       fetchData()
     } else {
       toast.error(res.data.msg || t('platform.user.message.createFailed'))
@@ -193,7 +197,6 @@ async function handleResend(row) {
   const ok = await confirm({
     title: t('platform.user.confirm.resendTitle'),
     message: t('platform.user.confirm.resendMessage', { username: row.username, email: row.email }),
-    variant: 'destructive',
     confirmText: t('platform.user.action.resend')
   })
   if (!ok) return
@@ -209,6 +212,17 @@ async function handleResend(row) {
   } catch (e) {
     toast.error(e.message || t('platform.user.message.opFailed'))
   }
+}
+
+async function handleForceLogout(row) {
+  const ok = await confirm({
+    title: t('platform.user.confirm.forceLogoutTitle'),
+    message: t('platform.user.confirm.forceLogoutMessage', { username: row.username }),
+    variant: 'destructive',
+    confirmText: t('platform.user.action.forceLogout')
+  })
+  if (!ok) return
+  await runOp(() => forcePlatformUserLogoutApi(row.id), 'forceLogoutSuccess')
 }
 
 async function handleDelete(row) {
@@ -333,6 +347,11 @@ onMounted(fetchData)
                     class="h-7 px-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-xs inline-flex items-center"
                     :title="t('platform.user.action.resend')" @click="handleResend(row)">
               <Mail class="size-3.5" />
+            </button>
+            <button v-permission="'opsuser:update'"
+                    class="h-7 px-2 rounded hover:bg-amber-500/10 text-amber-600 text-xs inline-flex items-center"
+                    :title="t('platform.user.action.forceLogout')" @click="handleForceLogout(row)">
+              <LogOut class="size-3.5" />
             </button>
             <button v-permission="'opsuser:delete'"
                     class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs inline-flex items-center"

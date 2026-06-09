@@ -52,18 +52,13 @@ public final class PlatformUserDto {
     ) {}
 
     /**
-     * Create response. The {@code tempPassword} is a one-time temporary password
-     * set on the Keycloak user (KC forces a change on first login). Shown once to
-     * the operator who must hand it over securely — it is never stored or
-     * retrievable afterwards.
+     * Create response (plan B): the new user has NO temp password — they set their
+     * own via the emailed invite link, same as resend. {@code emailSent} tells the
+     * UI whether the invite mail went out (false → operator should use "resend").
      */
     public record CreateResponse(
             String id,
             String username,
-            String tempPassword,
-            // true if the "set your password" email was dispatched at creation;
-            // false when the system realm has no SMTP (the temp password is then
-            // the only delivery path — operator hands it over or resends later).
             boolean emailSent
     ) {}
 

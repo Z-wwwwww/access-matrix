@@ -10,6 +10,7 @@ import com.platform.core.infrastructure.config.properties.AppMailProperties;
 import com.platform.core.infrastructure.mail.MailService;
 import com.platform.core.infrastructure.security.ForceLogoutService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
+import com.platform.system.auth.service.InviteTokenService;
 import com.platform.system.platform.dto.PlatformUserDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,17 +62,21 @@ public class PlatformUserAdminService {
         through this (the app's own SMTP), NOT the per-realm Keycloak SMTP. */
     private final ObjectProvider<MailService> mailProvider;
     private final AppMailProperties mailProps;
+    /** Single-use invite-token mint — backs the "resend invite link" (plan B). */
+    private final InviteTokenService inviteTokenService;
 
     public PlatformUserAdminService(JdbcTemplate jdbc,
                                     ObjectProvider<KeycloakUserService> userServiceProvider,
                                     ForceLogoutService forceLogoutService,
                                     ObjectProvider<MailService> mailProvider,
-                                    AppMailProperties mailProps) {
+                                    AppMailProperties mailProps,
+                                    InviteTokenService inviteTokenService) {
         this.jdbc = jdbc;
         this.userServiceProvider = userServiceProvider;
         this.forceLogoutService = forceLogoutService;
         this.mailProvider = mailProvider;
         this.mailProps = mailProps;
+        this.inviteTokenService = inviteTokenService;
     }
 
     public PageResult<PlatformUserDto.View> list(long page, long size, String keyword) {
@@ -109,12 +114,20 @@ public class PlatformUserAdminService {
     }
 
     public PlatformUserDto.CreateResponse create(PlatformUserDto.CreateRequest req) {
-        Long exists = jdbc.queryForObject(
+        // Precise duplicate checks BEFORE touching Keycloak — otherwise an email
+        // clash surfaces as KC's generic CONFLICT (message mentions the username)
+        // and misleads the operator into thinking the username is taken.
+        Long usernameDup = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM core_auth_user WHERE tenant_id = ? AND username = ? AND mark = 1",
                 Long.class, SYSTEM_TENANT, req.username());
-        if (exists != null && exists > 0) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
-                    "A platform user with username '" + req.username() + "' already exists");
+        if (usernameDup != null && usernameDup > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.opsuser.usernameExists");
+        }
+        Long emailDup = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM core_auth_user WHERE tenant_id = ? AND email = ? AND mark = 1",
+                Long.class, SYSTEM_TENANT, req.email());
+        if (emailDup != null && emailDup > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.opsuser.emailExists");
         }
         KeycloakUserService kc = userServiceProvider.getIfAvailable();
         if (kc == null) {
@@ -122,9 +135,10 @@ public class PlatformUserAdminService {
                     "Keycloak is not enabled — platform user provisioning requires app.security.mode=oidc");
         }
 
-        String tempPassword = generateTempPassword();
-        // External mutation first; compensated below if the DB half fails.
-        String kcId = kc.createUser(SYSTEM_REALM, req.username(), req.email(), req.displayName(), tempPassword);
+        // No temp password — the user sets their own via the invite link (plan B,
+        // the SAME path as resend). External mutation first; compensated below if
+        // the DB half fails.
+        String kcId = kc.createUser(SYSTEM_REALM, req.username(), req.email(), req.displayName(), null);
         try {
             String userId = IdGenerator.ulid();
             String userNo = nextSystemUserNo();
@@ -144,16 +158,15 @@ public class PlatformUserAdminService {
                             + "VALUES (?, ?, ?, ?, 1, 'platform-admin', 'platform-admin')",
                     IdGenerator.ulid(), SYSTEM_TENANT, userId, BuiltInRoles.PLATFORM_OPERATOR_ID);
 
-            // Email the account-opening "welcome" message via the app's OWN
-            // MailService (CORE_MAIL_*, NOT Keycloak's per-realm SMTP): it carries
-            // the login URL + username + temporary password, and Keycloak forces a
-            // password change on first login (the temp credential is single-use, so
-            // it cannot be reused to reset the password later). Best-effort — a mail
-            // failure must NOT fail creation (the temp password is shown as fallback).
-            boolean emailSent = sendCredentialsMail(req.username(), req.email(), req.displayName(), tempPassword, false);
-            log.info("[platform-user] provisioned ops user '{}' (id={}, kcId={}) with PLATFORM_OPERATOR, emailSent={}",
+            // Send the invite link (plan B) — the SAME path as resend: mint a
+            // single-use /invite/{token} and email it; the user sets their own
+            // password on the landing page. No temp password is set or returned.
+            // Best-effort: a mail failure must NOT fail creation (operator can use
+            // "resend" to retry).
+            boolean emailSent = sendInviteMail(userId, kcId, req.username(), req.email(), req.displayName());
+            log.info("[platform-user] provisioned ops user '{}' (id={}, kcId={}) with PLATFORM_OPERATOR, inviteSent={}",
                     req.username(), userId, kcId, emailSent);
-            return new PlatformUserDto.CreateResponse(userId, req.username(), tempPassword, emailSent);
+            return new PlatformUserDto.CreateResponse(userId, req.username(), emailSent);
         } catch (RuntimeException e) {
             // Compensation: remove the orphan KC user so a retry can reuse the username.
             try {
@@ -216,9 +229,84 @@ public class PlatformUserAdminService {
         return reissueCredentials(id, /* reset = */ true);
     }
 
-    /** Resend the onboarding/account email — re-issue credentials with the welcome wording. */
-    public PlatformUserDto.ResetPwResponse resendWelcome(String id) {
-        return reissueCredentials(id, /* reset = */ false);
+    /**
+     * Force-logout: invalidate the user's active sessions (already-issued tokens are
+     * rejected on their next request). The account stays enabled — the user can sign
+     * in again immediately. For when a session may be compromised, without disabling
+     * the account.
+     */
+    public void forceLogout(String id) {
+        Target t = requireManageable(id);
+        forceLogoutService.kickOut(t.id());
+        // Also end the KC SSO session — otherwise an SSO redirect silently
+        // re-authenticates the user (KC session still valid → fresh token) and the
+        // "force logout" has no visible effect.
+        KeycloakUserService kc = userServiceProvider.getIfAvailable();
+        if (kc != null && t.keycloakId() != null && !t.keycloakId().isBlank()) {
+            kc.logoutUser(SYSTEM_REALM, t.keycloakId());
+        }
+        log.info("[platform-user] force-logged-out ops user '{}' (id={})", t.username(), t.id());
+    }
+
+    /**
+     * Resend the onboarding INVITE (plan B): email a single-use {@code /invite/{token}}
+     * link so the user sets their OWN permanent password on the landing page. Unlike
+     * reset, this does NOT rotate/expose a temp password — the current password is
+     * untouched until the user completes the link. Any still-open invite is
+     * invalidated first so only the newest link works.
+     */
+    public void resendInvite(String id) {
+        Target t = requireManageable(id);
+        if (t.email() == null || t.email().isBlank()) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                    "ユーザーにメールアドレスが設定されていません。先に編集でメールを設定してください。");
+        }
+        if (t.keycloakId() == null || t.keycloakId().isBlank()) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Keycloak ユーザーが見つかりません。");
+        }
+        if (!sendInviteMail(t.id(), t.keycloakId(), t.username(), t.email(), t.displayName())) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                    "メール送信に失敗しました。CORE_MAIL_* の設定をご確認ください。");
+        }
+        log.info("[platform-user] resent invite link to ops user '{}' (id={})", t.username(), t.id());
+    }
+
+    /**
+     * Email a single-use invite link (/invite/{token}) via the app MailService so the
+     * user sets their own permanent password on the landing page (plan B). Invalidates
+     * any still-open invite for this user first (only the newest link works). Reuses
+     * the shared {@code user-invite} template + {@code InviteController} flow
+     * ({@code tenantId="system"} → system realm). Returns true on dispatch.
+     */
+    private boolean sendInviteMail(String userId, String kcId, String username, String email, String displayName) {
+        MailService mail = mailProvider.getIfAvailable();
+        if (mail == null || email == null || email.isBlank()) {
+            log.warn("[platform-user] skipped invite email for '{}' — mail service or email unavailable", username);
+            return false;
+        }
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            jdbc.update("UPDATE core_user_invite SET used_at = ?, update_time = ? "
+                            + "WHERE user_id = ? AND tenant_id = ? AND used_at IS NULL",
+                    now, now, userId, SYSTEM_TENANT);
+            String token = inviteTokenService.mint(SYSTEM_TENANT, userId, kcId);
+            Map<String, Object> model = new HashMap<>();
+            model.put("appName", mailProps.fromName());
+            model.put("username", username);
+            model.put("displayName", displayName);
+            model.put("tenantId", SYSTEM_TENANT);
+            model.put("supportEmail", mailProps.from());
+            model.put("inviteUrl", mailProps.baseUrl() + "/invite/" + token);
+            model.put("expiresIn", String.valueOf(inviteTokenService.ttlDays()));
+            Object[] subjectArgs = new Object[] { "[" + mailProps.fromName() + "]" };
+            Locale locale = RequestContext.locale();
+            if (locale == null) locale = Locale.JAPAN;
+            mail.sendHtmlAsync(email, locale, "user-invite.subject", subjectArgs, "user-invite", model);
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("[platform-user] invite email dispatch failed for '{}': {}", username, e.toString());
+            return false;
+        }
     }
 
     /**
@@ -241,6 +329,12 @@ public class PlatformUserAdminService {
         }
         String tempPassword = generateTempPassword();
         kc.setPassword(SYSTEM_REALM, t.keycloakId(), tempPassword, true);
+        // The new password invalidates existing sessions — force-logout so already
+        // issued tokens are rejected (kickOut), AND end the KC SSO session (logoutUser)
+        // so an SSO redirect can't silently re-authenticate with the old session.
+        // The user CAN sign in again with the new credentials.
+        forceLogoutService.kickOut(t.id());
+        kc.logoutUser(SYSTEM_REALM, t.keycloakId());
         boolean emailSent = sendCredentialsMail(t.username(), t.email(), t.displayName(), tempPassword, reset);
         log.info("[platform-user] re-issued credentials for ops user '{}' (id={}), reset={}, emailSent={}",
                 t.username(), t.id(), reset, emailSent);

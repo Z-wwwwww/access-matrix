@@ -18,6 +18,15 @@ export default {
       itemInUse: '該值已被現有資料引用，不可刪除，請改為停用',
       notFound: '字典或字典項不存在',
       invalidValue: '無效的字典值'
+    },
+    opsuser: {
+      usernameExists: '使用者名稱已被佔用',
+      emailExists: '該信箱已被佔用'
+    },
+    invite: {
+      notFoundOrUsed: '邀請連結無效或已被使用',
+      expired: '邀請連結已過期',
+      invalid: '邀請連結已失效'
     }
   },
   dict: {
@@ -197,6 +206,7 @@ export default {
       enterUsername: '請輸入使用者名稱',
       enterPassword: '請輸入密碼',
       loginFailed: '登入失敗',
+      sessionExpired: '工作階段已過期或已被登出，請重新登入。',
       ssoFailed: 'SSO 登入失敗'
     }
   },
@@ -221,7 +231,7 @@ export default {
       title: '平台使用者',
       column: { username: '使用者名稱', displayName: '顯示名稱', email: '電子郵件', role: '角色', status: '狀態', createTime: '建立時間', actions: '操作' },
       role: { admin: '管理員', operator: '維運' },
-      action: { disable: '停用', enable: '啟用', reset: '重設密碼', delete: '刪除', edit: '編輯', resend: '重發郵件' },
+      action: { disable: '停用', enable: '啟用', reset: '重設密碼', delete: '刪除', edit: '編輯', resend: '重發郵件', forceLogout: '踢下線' },
       edit: {
         title: '編輯平台使用者',
         intro: '修改顯示名稱 / 電子郵件（同步到 Keycloak）。使用者名稱為登入識別，不可修改。',
@@ -233,7 +243,8 @@ export default {
         disableTitle: '停用使用者', disableMessage: '確認停用「{username}」？Keycloak 也會被停用，無法登入。',
         resetTitle: '重設密碼', resetMessage: '確認重設「{username}」的密碼？當前密碼將立即失效；會產生新的臨時密碼並（若有信箱）發送到其信箱。',
         deleteTitle: '刪除使用者', deleteMessage: '確認刪除「{username}」？無法復原（同時刪除 Keycloak 使用者）。',
-        resendTitle: '重發郵件', resendMessage: '向「{username}」（{email}）重發開戶郵件？會重設其密碼（當前密碼立即失效），並把新的登入資訊（使用者名稱 + 臨時密碼）發送到該信箱。'
+        resendTitle: '重發郵件', resendMessage: '向「{username}」（{email}）重發邀請郵件？對方可憑郵件中的一次性連結自行設定新密碼（連結有時效、僅可使用一次）。',
+        forceLogoutTitle: '踢下線', forceLogoutMessage: '強制「{username}」下線？其目前所有工作階段立即失效、需重新登入（帳號不會被停用）。'
       },
       secret: { titleNew: '已建立平台使用者', titleReset: '已重設密碼' },
       search: { placeholder: '依使用者名稱 / 電郵搜尋' },
@@ -258,9 +269,10 @@ export default {
       message: {
         loadFailed: '載入使用者清單失敗', required: '請填寫所有必填項',
         createSuccess: '已建立平台使用者', createFailed: '建立使用者失敗',
+        createdInviteSent: '已建立，邀請信已寄至 {email}（對方點擊連結自行設定密碼）。', createdInviteFailed: '已建立，但邀請信寄送失敗，請稍後用「重發郵件」重試。',
         copied: '已複製', copyFailed: '複製失敗',
         disableSuccess: '已停用', enableSuccess: '已啟用', resetSuccess: '已重設密碼',
-        deleteSuccess: '已刪除', updateSuccess: '已更新', resendSuccess: '郵件已發送', opFailed: '操作失敗'
+        deleteSuccess: '已刪除', updateSuccess: '已更新', resendSuccess: '郵件已發送', forceLogoutSuccess: '已踢下線', opFailed: '操作失敗'
       }
     },
     tenant: {

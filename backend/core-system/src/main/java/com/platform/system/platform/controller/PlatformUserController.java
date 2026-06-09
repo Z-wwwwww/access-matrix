@@ -91,12 +91,22 @@ public class PlatformUserController {
         return JsonResult.ok(userService.resetPassword(id));
     }
 
-    /** Resend the onboarding/account email — re-issues credentials (rotates the temp password). */
+    /** Resend the onboarding invite link — user sets their own password on the landing page (plan B). */
     @PostMapping("/{id}/resend-invite")
     @RequiresPermission(PlatformPermissions.OPSUSER_UPDATE)
     @OpLog(module = "platform", action = "opsuser.resendInvite", targetType = "user")
-    public JsonResult<PlatformUserDto.ResetPwResponse> resendWelcome(@PathVariable String id) {
-        return JsonResult.ok(userService.resendWelcome(id));
+    public JsonResult<Void> resendInvite(@PathVariable String id) {
+        userService.resendInvite(id);
+        return JsonResult.ok();
+    }
+
+    /** Force-logout — invalidate the user's active sessions (account stays enabled). */
+    @PostMapping("/{id}/force-logout")
+    @RequiresPermission(PlatformPermissions.OPSUSER_UPDATE)
+    @OpLog(module = "platform", action = "opsuser.forceLogout", targetType = "user")
+    public JsonResult<Void> forceLogout(@PathVariable String id) {
+        userService.forceLogout(id);
+        return JsonResult.ok();
     }
 
     /** Soft-delete a platform operator + remove the Keycloak user. */

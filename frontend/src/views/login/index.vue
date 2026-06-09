@@ -289,6 +289,11 @@ onMounted(() => {
         ? `Menu load failed — ${detail}`
         : 'Menu load failed'
   }
+  // Session gone (expired / kicked-out / disabled) — friendly notice, not a
+  // technical "Menu load failed — 401".
+  if (route.query.session === 'expired') {
+    ssoErrorFromQuery.value = t('login.message.sessionExpired')
+  }
   // Fire-and-forget SSO redirect after a short window. The delay gives
   // the user time to engage the 5-click hot-zone (break-glass) if they
   // need it — without it, SSO would fire on the first paint and the

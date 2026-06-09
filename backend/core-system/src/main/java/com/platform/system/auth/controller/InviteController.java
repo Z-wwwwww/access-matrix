@@ -62,7 +62,7 @@ public class InviteController {
             // Intentionally one error code for all of "not found / expired /
             // used" so we don't leak which case it is (mild defence against
             // token-enumeration probing).
-            throw new BusinessException(ErrorCode.NOT_FOUND, "Invite is no longer valid");
+            throw new BusinessException(ErrorCode.NOT_FOUND, "error.invite.invalid");
         }
         return JsonResult.ok(Map.of(
                 "valid",     true,

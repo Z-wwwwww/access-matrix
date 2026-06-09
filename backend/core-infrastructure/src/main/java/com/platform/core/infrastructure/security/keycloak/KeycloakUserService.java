@@ -100,7 +100,10 @@ public class KeycloakUserService {
                 return kcId;
             }
             if (status == Response.Status.CONFLICT.getStatusCode()) {
-                throw new KeycloakOperationException("Keycloak user already exists: " + username);
+                // 409 can be a username OR an email clash — keep the message neutral
+                // so callers don't mislabel an email conflict as a username one.
+                throw new KeycloakOperationException(
+                        "Keycloak user already exists (username or email already in use): " + username);
             }
             throw new KeycloakOperationException("Keycloak create-user failed: realm=%s username=%s %s"
                     .formatted(realm, username, responseDetail(r)));
@@ -235,6 +238,23 @@ public class KeycloakUserService {
             log.info("[kc] {} user {} in realm {}", enabled ? "enabled" : "disabled", keycloakUserId, realm);
         } catch (WebApplicationException e) {
             throw new KeycloakOperationException("Keycloak set-enabled failed: realm=%s userId=%s %s"
+                    .formatted(realm, keycloakUserId, responseDetail(e.getResponse())), e);
+        }
+    }
+
+    /**
+     * End ALL of the user's Keycloak sessions (server-side logout). Pairs with
+     * {@link com.platform.core.infrastructure.security.ForceLogoutService#kickOut}:
+     * kickOut invalidates already-issued access tokens app-side, but the user's KC
+     * SSO session would otherwise let an SSO redirect silently mint a fresh token.
+     * Clearing the session means the next sign-in actually prompts for credentials.
+     */
+    public void logoutUser(String realm, String keycloakUserId) {
+        try (Keycloak kc = newAdminClient()) {
+            kc.realm(realm).users().get(keycloakUserId).logout();
+            log.info("[kc] logged out all sessions for user {} in realm {}", keycloakUserId, realm);
+        } catch (WebApplicationException e) {
+            throw new KeycloakOperationException("Keycloak logout failed: realm=%s userId=%s %s"
                     .formatted(realm, keycloakUserId, responseDetail(e.getResponse())), e);
         }
     }

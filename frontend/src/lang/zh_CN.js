@@ -18,6 +18,15 @@ export default {
       itemInUse: '该值已被现有数据引用，不可删除，请改为停用',
       notFound: '字典或字典项不存在',
       invalidValue: '无效的字典值'
+    },
+    opsuser: {
+      usernameExists: '用户名已被占用',
+      emailExists: '该邮箱已被占用'
+    },
+    invite: {
+      notFoundOrUsed: '邀请链接无效或已被使用',
+      expired: '邀请链接已过期',
+      invalid: '邀请链接已失效'
     }
   },
   dict: {
@@ -197,6 +206,7 @@ export default {
       enterUsername: '请输入用户名',
       enterPassword: '请输入密码',
       loginFailed: '登录失败',
+      sessionExpired: '会话已过期或已被登出，请重新登录。',
       ssoFailed: 'SSO 登录失败'
     }
   },
@@ -221,7 +231,7 @@ export default {
       title: '平台用户',
       column: { username: '用户名', displayName: '显示名', email: '邮箱', role: '角色', status: '状态', createTime: '创建时间', actions: '操作' },
       role: { admin: '管理员', operator: '运维' },
-      action: { disable: '停用', enable: '启用', reset: '重置密码', delete: '删除', edit: '编辑', resend: '重发邮件' },
+      action: { disable: '停用', enable: '启用', reset: '重置密码', delete: '删除', edit: '编辑', resend: '重发邮件', forceLogout: '踢下线' },
       edit: {
         title: '编辑平台用户',
         intro: '修改显示名 / 邮箱（同步到 Keycloak）。用户名是登录标识，不可修改。',
@@ -233,7 +243,8 @@ export default {
         disableTitle: '停用用户', disableMessage: '确认停用「{username}」？Keycloak 也会被禁用，无法登录。',
         resetTitle: '重置密码', resetMessage: '确认重置「{username}」的密码？当前密码将立即失效；会生成新的临时密码并（若有邮箱）发送到其邮箱。',
         deleteTitle: '删除用户', deleteMessage: '确认删除「{username}」？不可恢复（同时删除 Keycloak 用户）。',
-        resendTitle: '重发邮件', resendMessage: '向「{username}」（{email}）重发开户邮件？会重置其密码（当前密码立即失效），并把新的登录信息（用户名 + 临时密码）发送到该邮箱。'
+        resendTitle: '重发邮件', resendMessage: '向「{username}」（{email}）重发邀请邮件？对方可凭邮件中的一次性链接自行设置新密码（链接有时效、仅可使用一次）。',
+        forceLogoutTitle: '踢下线', forceLogoutMessage: '强制「{username}」下线？其当前所有会话立即失效、需重新登录（账号不会被停用）。'
       },
       secret: { titleNew: '已创建平台用户', titleReset: '已重置密码' },
       search: { placeholder: '按用户名 / 邮箱搜索' },
@@ -258,9 +269,10 @@ export default {
       message: {
         loadFailed: '加载用户列表失败', required: '请填写所有必填项',
         createSuccess: '已创建平台用户', createFailed: '创建用户失败',
+        createdInviteSent: '已创建，邀请邮件已发送至 {email}（对方点击链接自行设置密码）。', createdInviteFailed: '已创建，但邀请邮件发送失败，请稍后用「重发邮件」重试。',
         copied: '已复制', copyFailed: '复制失败',
         disableSuccess: '已停用', enableSuccess: '已启用', resetSuccess: '已重置密码',
-        deleteSuccess: '已删除', updateSuccess: '已更新', resendSuccess: '邮件已发送', opFailed: '操作失败'
+        deleteSuccess: '已删除', updateSuccess: '已更新', resendSuccess: '邮件已发送', forceLogoutSuccess: '已踢下线', opFailed: '操作失败'
       }
     },
     tenant: {

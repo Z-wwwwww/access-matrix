@@ -18,6 +18,15 @@ export default {
       itemInUse: '이 값은 기존 데이터가 사용 중이라 삭제할 수 없습니다. 비활성화하세요',
       notFound: '사전 또는 항목을 찾을 수 없습니다',
       invalidValue: '잘못된 사전 값입니다'
+    },
+    opsuser: {
+      usernameExists: '이미 사용 중인 사용자명입니다',
+      emailExists: '이미 사용 중인 이메일입니다'
+    },
+    invite: {
+      notFoundOrUsed: '이 초대 링크는 유효하지 않거나 이미 사용되었습니다',
+      expired: '이 초대 링크는 만료되었습니다',
+      invalid: '이 초대 링크는 더 이상 유효하지 않습니다'
     }
   },
   dict: {
@@ -197,6 +206,7 @@ export default {
       enterUsername: '사용자명을 입력하세요',
       enterPassword: '비밀번호를 입력하세요',
       loginFailed: '로그인에 실패했습니다',
+      sessionExpired: '세션이 만료되었거나 로그아웃되었습니다. 다시 로그인하세요.',
       ssoFailed: 'SSO 로그인 실패'
     }
   },
@@ -221,7 +231,7 @@ export default {
       title: '플랫폼 사용자',
       column: { username: '사용자명', displayName: '표시 이름', email: '이메일', role: '역할', status: '상태', createTime: '생성 시각', actions: '작업' },
       role: { admin: '관리자', operator: '운영' },
-      action: { disable: '비활성', enable: '활성', reset: '비밀번호 재설정', delete: '삭제', edit: '편집', resend: '메일 재발송' },
+      action: { disable: '비활성', enable: '활성', reset: '비밀번호 재설정', delete: '삭제', edit: '편집', resend: '메일 재발송', forceLogout: '강제 로그아웃' },
       edit: {
         title: '플랫폼 사용자 편집',
         intro: '표시 이름 / 이메일을 수정합니다(Keycloak에 동기화). 사용자명은 로그인 식별자이며 변경할 수 없습니다.',
@@ -233,7 +243,8 @@ export default {
         disableTitle: '사용자 비활성', disableMessage: '"{username}"을(를) 비활성하시겠습니까? Keycloak에서도 비활성되어 로그인할 수 없습니다.',
         resetTitle: '비밀번호 재설정', resetMessage: '"{username}"의 비밀번호를 재설정하시겠습니까? 현재 비밀번호가 즉시 무효화되며, 새 임시 비밀번호를 발급하고 이메일이 있으면 전송합니다.',
         deleteTitle: '사용자 삭제', deleteMessage: '"{username}"을(를) 삭제하시겠습니까? 되돌릴 수 없습니다(Keycloak 사용자도 삭제).',
-        resendTitle: '메일 재발송', resendMessage: '"{username}"({email})에게 계정 개설 메일을 재발송하시겠습니까? 비밀번호를 재설정하고(현재 비밀번호 즉시 무효) 새 로그인 정보(사용자명 + 임시 비밀번호)를 해당 메일로 보냅니다.'
+        resendTitle: '메일 재발송', resendMessage: '"{username}"({email})에게 초대 메일을 재발송하시겠습니까? 메일의 일회용 링크로 본인이 새 비밀번호를 설정할 수 있습니다(기간 제한·1회 사용).',
+        forceLogoutTitle: '강제 로그아웃', forceLogoutMessage: '"{username}"을(를) 강제 로그아웃하시겠습니까? 현재 세션이 즉시 무효화되어 다시 로그인해야 합니다(계정은 비활성화되지 않음).'
       },
       secret: { titleNew: '플랫폼 사용자 생성됨', titleReset: '비밀번호 재설정됨' },
       search: { placeholder: '사용자명 / 이메일로 검색' },
@@ -258,9 +269,10 @@ export default {
       message: {
         loadFailed: '사용자 목록 로드 실패', required: '필수 항목을 입력하세요',
         createSuccess: '플랫폼 사용자 생성됨', createFailed: '사용자 생성 실패',
+        createdInviteSent: '생성됨. 초대 메일을 {email}(으)로 보냈습니다(본인이 링크로 비밀번호 설정).', createdInviteFailed: '생성되었지만 초대 메일 발송에 실패했습니다. 나중에 "메일 재발송"으로 재시도하세요.',
         copied: '복사됨', copyFailed: '복사 실패',
         disableSuccess: '비활성화됨', enableSuccess: '활성화됨', resetSuccess: '비밀번호 재설정됨',
-        deleteSuccess: '삭제됨', updateSuccess: '수정됨', resendSuccess: '메일 발송됨', opFailed: '작업 실패'
+        deleteSuccess: '삭제됨', updateSuccess: '수정됨', resendSuccess: '메일 발송됨', forceLogoutSuccess: '강제 로그아웃됨', opFailed: '작업 실패'
       }
     },
     tenant: {

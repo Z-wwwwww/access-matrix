@@ -117,15 +117,19 @@ router.beforeEach(async (to, from, next) => {
         // 重新导航 — 必须显式传 query/hash，path key 不会从 fullPath 解析它们
         next({ path: to.path, query: to.query, hash: to.hash, replace: true })
       } catch (e) {
-        // Fail-loud: if /menu/me errored, the session is broken (often
-        // permission / token issue). Silently next()-ing here lands the
-        // user on a 404 catch-all with no clue why. Clear auth and
-        // bounce back to login with the reason so the next round of
-        // debugging doesn't need DevTools.
         console.error('[router] Failed to load menus:', e)
         authStore.clearAuth()
-        const detail = encodeURIComponent((e && e.message) || 'menu-load-failed')
-        next({ path: '/login', query: { err: 'menu', detail } })
+        // A 401 here means the session is gone (expired / kicked-out / disabled) —
+        // NOT a real menu-load failure. Show a friendly "please sign in again"
+        // instead of the technical "Menu load failed — 401". Reserve err=menu
+        // (with detail) for genuine menu errors (5xx, bad data) worth debugging.
+        const status = e?.response?.status
+        if (status === 401 || /\b401\b/.test(e?.message || '')) {
+          next({ path: '/login', query: { from: to.fullPath, session: 'expired' } })
+        } else {
+          const detail = encodeURIComponent((e && e.message) || 'menu-load-failed')
+          next({ path: '/login', query: { err: 'menu', detail } })
+        }
       }
     } else {
       // 访问 / 时重定向到后端指定的首页
