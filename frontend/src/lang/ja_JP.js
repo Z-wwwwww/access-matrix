@@ -350,6 +350,11 @@ export default {
           title: 'プラットフォーム健全性', jobFailures: 'ジョブ失敗(24h)', eventBacklog: 'イベント滞留',
           backlogAge: '最古滞留', oplogErrors: 'APIエラー(24h)', failuresListTitle: '直近のジョブ失敗',
           errorsListTitle: '直近のAPIエラー', statePending: '保留', stateFailed: '失敗',
+          detail: {
+            title: '詳細', jobCode: 'ジョブ', startTime: '開始時刻', duration: '所要時間', error: 'エラー',
+            eventType: 'イベント種別', aggregateType: '集約', state: '状態', attempts: '試行回数',
+            occurredAt: '発生時刻', api: 'API', username: 'ユーザー', errorMsg: 'エラーメッセージ', time: '時刻'
+          },
           tip: {
             jobFailures: '直近24時間に失敗した定時タスクの回数',
             eventBacklog: '未配信のドメインイベント数(保留＋失敗)',

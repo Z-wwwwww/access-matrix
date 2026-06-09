@@ -340,6 +340,11 @@ export default {
           title: '平台健康', jobFailures: '任务失败(24h)', eventBacklog: '事件积压',
           backlogAge: '最久积压', oplogErrors: '接口错误(24h)', failuresListTitle: '最近任务失败',
           errorsListTitle: '最近接口错误', statePending: '待分发', stateFailed: '失败',
+          detail: {
+            title: '详情', jobCode: '任务', startTime: '开始时间', duration: '耗时', error: '错误',
+            eventType: '事件类型', aggregateType: '聚合', state: '状态', attempts: '尝试次数',
+            occurredAt: '发生时间', api: '接口', username: '用户', errorMsg: '错误信息', time: '时间'
+          },
           tip: {
             jobFailures: '近24小时失败的定时任务次数',
             eventBacklog: '未分发的领域事件数(待分发+失败)',

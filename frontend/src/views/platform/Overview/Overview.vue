@@ -5,9 +5,10 @@ import { toast } from '@/composables/useToast'
 import { toJSTDateTimeDisp, nowJST } from '@/lib/date'
 import { getTenantStatsApi, getPlatformDashboardApi } from '@/services/tenant'
 import AreaChart from './AreaChart.vue'
+import Drawer from '@/components/ui/Drawer.vue'
 import {
   Building2, ShieldCheck, PauseCircle, TrendingUp, PieChart, UserCheck,
-  Activity, ServerCog, ShieldAlert, RotateCcw, KeyRound, Flame, CheckCircle2, AlarmClockOff
+  Activity, ServerCog, ShieldAlert, RotateCcw, KeyRound, Flame, CheckCircle2, AlarmClockOff, Eye
 } from 'lucide-vue-next'
 
 const { t, locale } = useI18n()
@@ -130,6 +131,40 @@ const relList = computed(() => {
   if (sel.rel === 'errors') return r.recentOplogErrors || []
   return r.backlogEvents || [] // backlog | oldest share the undispatched-event list
 })
+// Platform-health row drill-down: the eye on each reliability row opens a
+// drawer with every field, untruncated. `kind` collapses backlog/oldest (both
+// the undispatched-event list) into one 'event' renderer.
+const healthDetail = ref(null)  // { kind: 'jobs'|'event'|'errors', row }
+function openHealthDetail(row) {
+  const kind = sel.rel === 'jobs' ? 'jobs' : sel.rel === 'errors' ? 'errors' : 'event'
+  healthDetail.value = { kind, row }
+}
+const healthDetailFields = computed(() => {
+  const d = healthDetail.value
+  if (!d) return []
+  const r = d.row
+  const L = (k) => t('platform.tenant.ops.reliability.detail.' + k)
+  if (d.kind === 'jobs') return [
+    { label: L('jobCode'), value: r.jobCode, mono: true },
+    { label: L('startTime'), value: fmtDate(r.startTime) },
+    { label: L('duration'), value: r.durationMs != null ? `${r.durationMs} ms` : '—' },
+    { label: L('error'), value: r.error || '—', pre: true }
+  ]
+  if (d.kind === 'errors') return [
+    { label: L('api'), value: `${r.module}.${r.action}`, mono: true },
+    { label: L('username'), value: r.username || '—' },
+    { label: L('time'), value: fmtDate(r.time) },
+    { label: L('errorMsg'), value: r.errorMsg || '—', pre: true }
+  ]
+  return [
+    { label: L('eventType'), value: r.eventType, mono: true },
+    { label: L('aggregateType'), value: r.aggregateType, mono: true },
+    { label: L('state'), value: r.dispatchState === 2 ? t('platform.tenant.ops.reliability.stateFailed') : t('platform.tenant.ops.reliability.statePending') },
+    { label: L('attempts'), value: `×${r.attempts}` },
+    { label: L('occurredAt'), value: fmtDate(r.occurredAt) }
+  ]
+})
+
 const secIsBreakGlass = computed(() => sel.sec === 'breakglass')
 const secList = computed(() => {
   const s = dash.security; if (!s) return []
@@ -318,6 +353,7 @@ onMounted(fetchAll)
                 <span class="dl-code">{{ f.jobCode }}</span>
                 <span class="trunc" style="color: color-mix(in oklab, var(--destructive) 80%, var(--foreground))" :title="f.error">{{ f.error || '—' }}</span>
                 <span class="dl-time">{{ fmtDate(f.startTime) }}</span>
+                <button type="button" class="dl-eye" :title="t('common.button.detail')" @click="openHealthDetail(f)"><Eye class="size-3.5" /></button>
               </div>
             </template>
             <!-- undispatched events (backlog / oldest) -->
@@ -327,6 +363,7 @@ onMounted(fetchAll)
                 <span class="state-pill" :class="b.dispatchState === 2 ? 'failed' : 'pending'">{{ b.dispatchState === 2 ? t('platform.tenant.ops.reliability.stateFailed') : t('platform.tenant.ops.reliability.statePending') }}</span>
                 <span class="dl-mut">×{{ b.attempts }}</span>
                 <span class="dl-time">{{ fmtDate(b.occurredAt) }}</span>
+                <button type="button" class="dl-eye" :title="t('common.button.detail')" @click="openHealthDetail(b)"><Eye class="size-3.5" /></button>
               </div>
             </template>
             <!-- API errors -->
@@ -336,6 +373,7 @@ onMounted(fetchAll)
                 <span class="trunc" style="color: color-mix(in oklab, var(--destructive) 80%, var(--foreground))" :title="e.errorMsg">{{ e.errorMsg || '—' }}</span>
                 <span class="dl-mut">{{ e.username || '—' }}</span>
                 <span class="dl-time">{{ fmtDate(e.time) }}</span>
+                <button type="button" class="dl-eye" :title="t('common.button.detail')" @click="openHealthDetail(e)"><Eye class="size-3.5" /></button>
               </div>
             </template>
           </template>
@@ -396,6 +434,20 @@ onMounted(fetchAll)
         </div>
       </div>
     </div>
+
+    <!-- platform-health row detail (full, untruncated fields) -->
+    <Drawer :open="!!healthDetail" :title="t('platform.tenant.ops.reliability.detail.title')" width="max-w-md" @close="healthDetail = null">
+      <div v-if="healthDetail" class="hd-grid">
+        <template v-for="(f, i) in healthDetailFields" :key="i">
+          <div class="hd-label">{{ f.label }}</div>
+          <pre v-if="f.pre" class="hd-pre">{{ f.value }}</pre>
+          <div v-else class="hd-val" :class="{ mono: f.mono }">{{ f.value }}</div>
+        </template>
+      </div>
+      <template #footer>
+        <button type="button" class="refresh-btn" @click="healthDetail = null">{{ t('common.button.close') }}</button>
+      </template>
+    </Drawer>
   </div>
 </template>
 
@@ -494,6 +546,18 @@ onMounted(fetchAll)
 .dl-mut { color: var(--muted-foreground); }
 .dl-time { margin-left: auto; font-family: var(--font-mono, ui-monospace, monospace); font-size: 11.5px; color: var(--muted-foreground); white-space: nowrap; flex: none; }
 .dl-empty { padding: 16px; text-align: center; color: var(--muted-foreground); font-size: 13px; }
+.dl-eye { flex: none; display: inline-flex; align-items: center; justify-content: center; height: 22px; width: 22px;
+  border-radius: 6px; border: 0; background: transparent; color: var(--muted-foreground); cursor: pointer; transition: background .13s, color .13s; }
+.dl-eye:hover { background: var(--muted); color: var(--foreground); }
+
+/* health-row detail drawer */
+.hd-grid { display: grid; grid-template-columns: max-content 1fr; gap: 10px 16px; align-items: baseline; font-size: 13px; }
+.hd-label { color: var(--muted-foreground); white-space: nowrap; }
+.hd-val { color: var(--foreground); word-break: break-word; }
+.hd-val.mono { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; }
+.hd-pre { grid-column: 1 / -1; margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--muted);
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; white-space: pre-wrap; word-break: break-word;
+  max-height: 40vh; overflow: auto; color: color-mix(in oklab, var(--destructive) 80%, var(--foreground)); }
 .trunc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .state-pill { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; border: 1px solid; white-space: nowrap; flex: none; }
 .state-pill.failed { color: var(--destructive); border-color: color-mix(in oklab, var(--destructive) 40%, transparent); }

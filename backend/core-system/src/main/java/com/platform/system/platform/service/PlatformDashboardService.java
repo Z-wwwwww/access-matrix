@@ -49,10 +49,12 @@ public class PlatformDashboardService {
     private PlatformDashboardDto.Activation activation() {
         long pending = q1Long(
                 "SELECT COUNT(DISTINCT tenant_id) FROM core_user_invite "
-                        + "WHERE used_at IS NULL AND mark = 1 AND expires_at > now()");
+                        + "WHERE used_at IS NULL AND mark = 1 AND expires_at > now() "
+                        + "AND tenant_id NOT IN ('system','demo')");
         long expired = q1Long(
                 "SELECT COUNT(DISTINCT tenant_id) FROM core_user_invite "
-                        + "WHERE used_at IS NULL AND mark = 1 AND expires_at <= now()");
+                        + "WHERE used_at IS NULL AND mark = 1 AND expires_at <= now() "
+                        + "AND tenant_id NOT IN ('system','demo')");
 
         long nonBuiltin = q1Long(
                 "SELECT COUNT(*) FROM core_tenant WHERE mark = 1 "
@@ -91,7 +93,8 @@ public class PlatformDashboardService {
                         + "       i.create_time AS invited_at, i.expires_at "
                         + "FROM core_user_invite i "
                         + "JOIN core_tenant t ON t.tenant_code = i.tenant_id AND t.mark = 1 "
-                        + "WHERE i.used_at IS NULL AND i.mark = 1 " + tail + " LIMIT " + LIST_CAP,
+                        + "WHERE i.used_at IS NULL AND i.mark = 1 "
+                        + "AND i.tenant_id NOT IN ('system','demo') " + tail + " LIMIT " + LIST_CAP,
                 (rs, n) -> new PlatformDashboardDto.PendingInvite(
                         rs.getString("id"), rs.getString("tenant_code"),
                         rs.getString("display_name"), rs.getString("contact_email"),

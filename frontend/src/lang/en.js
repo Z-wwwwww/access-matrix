@@ -340,6 +340,11 @@ export default {
           title: 'Platform health', jobFailures: 'Job failures (24h)', eventBacklog: 'Event backlog',
           backlogAge: 'Oldest backlog', oplogErrors: 'API errors (24h)', failuresListTitle: 'Recent job failures',
           errorsListTitle: 'Recent API errors', statePending: 'Pending', stateFailed: 'Failed',
+          detail: {
+            title: 'Details', jobCode: 'Job', startTime: 'Start time', duration: 'Duration', error: 'Error',
+            eventType: 'Event type', aggregateType: 'Aggregate', state: 'State', attempts: 'Attempts',
+            occurredAt: 'Occurred at', api: 'API', username: 'User', errorMsg: 'Error message', time: 'Time'
+          },
           tip: {
             jobFailures: 'Scheduled-job runs that failed in the last 24 hours',
             eventBacklog: 'Undispatched domain events (pending + failed)',

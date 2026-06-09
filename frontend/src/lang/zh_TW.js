@@ -340,6 +340,11 @@ export default {
           title: '平台健康', jobFailures: '任務失敗(24h)', eventBacklog: '事件積壓',
           backlogAge: '最久積壓', oplogErrors: '介面錯誤(24h)', failuresListTitle: '最近任務失敗',
           errorsListTitle: '最近介面錯誤', statePending: '待分發', stateFailed: '失敗',
+          detail: {
+            title: '詳情', jobCode: '任務', startTime: '開始時間', duration: '耗時', error: '錯誤',
+            eventType: '事件類型', aggregateType: '聚合', state: '狀態', attempts: '嘗試次數',
+            occurredAt: '發生時間', api: '介面', username: '使用者', errorMsg: '錯誤訊息', time: '時間'
+          },
           tip: {
             jobFailures: '近24小時失敗的定時任務次數',
             eventBacklog: '未分發的領域事件數(待分發+失敗)',

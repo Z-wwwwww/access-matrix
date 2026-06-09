@@ -340,6 +340,11 @@ export default {
           title: '플랫폼 상태', jobFailures: '작업 실패(24h)', eventBacklog: '이벤트 적체',
           backlogAge: '최장 적체', oplogErrors: 'API 오류(24h)', failuresListTitle: '최근 작업 실패',
           errorsListTitle: '최근 API 오류', statePending: '대기', stateFailed: '실패',
+          detail: {
+            title: '상세', jobCode: '작업', startTime: '시작 시간', duration: '소요 시간', error: '오류',
+            eventType: '이벤트 유형', aggregateType: '집계', state: '상태', attempts: '시도 횟수',
+            occurredAt: '발생 시간', api: 'API', username: '사용자', errorMsg: '오류 메시지', time: '시간'
+          },
           tip: {
             jobFailures: '최근 24시간 실패한 예약 작업 횟수',
             eventBacklog: '미전송 도메인 이벤트 수(대기+실패)',
