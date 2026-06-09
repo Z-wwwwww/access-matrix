@@ -142,6 +142,18 @@ spring:
     # 用 CI 步骤跑 mvn flyway:migrate -D flyway.user=ddl_user -D ...
 ```
 
+### 3.4 启动顺序(oidc 模式必看)
+
+oidc 模式下后端**强依赖 Keycloak 在启动时可达**,正确顺序是:
+
+1. **建库 + 建 `keycloak` schema**(§3.1 / §3.2)。
+2. **先启动 Keycloak**,等 realm 导入完成、admin console 可访问。
+3. **再启动后端**(首次启动 Flyway 自动建业务表)。
+
+为什么不能反过来:后端在 oidc 模式启动期会向 KC 建/校验内置账号(`demo-admin` / `ops` 等,由 `*KeycloakAdminSeeder` 在 `ApplicationReadyEvent` 执行)。**KC 不可达会直接抛 `IllegalStateException` 让后端启动失败**(日志:`Start Keycloak ... then restart`)。
+
+> JWT 校验本身是懒加载(`MultiRealmJwtDecoder`,首个 token 到达才拉 JWKS),不在启动时阻塞;硬依赖来自上述 seeder。`password` / `permit-all` 模式无此依赖,后端可独立启动。
+
 ---
 
 ## 4. Keycloak 生产部署

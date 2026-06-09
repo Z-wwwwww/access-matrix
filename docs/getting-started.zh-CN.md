@@ -194,6 +194,8 @@ app:
 
 **重启**后端 + 前端（前端 `.env` 改动需要重启 vite dev server，不会热刷）。
 
+> **顺序**：oidc 模式下重启后端前，**先确保 Keycloak 已启动**（§5.2,realm 导入完成）。后端启动期会向 KC 建/校验 `demo-admin` / `ops`（`*KeycloakAdminSeeder`），KC 不可达会抛 `IllegalStateException` 让后端启动失败。`permit-all` / `password` 模式无此依赖。
+
 ### 5.4 第一次 SSO 登录
 
 后端启动时 `LocalKeycloakAdminSeeder` 会自动在 Keycloak 的 `demo` realm 里建 `demo-admin` 用户（密码 `demo-admin`，permanent），`SystemKeycloakAdminSeeder` 在 `system` realm 里建 `ops` 用户（密码 `ops`）。

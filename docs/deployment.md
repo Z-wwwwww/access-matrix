@@ -143,6 +143,18 @@ spring:
     # run `mvn flyway:migrate -D flyway.user=ddl_user -D ...` as a CI step instead
 ```
 
+### 3.4 Startup order (read this for OIDC mode)
+
+In OIDC mode the backend **hard-depends on Keycloak being reachable at boot**. The correct order is:
+
+1. **Create the DB + the `keycloak` schema** (§3.1 / §3.2).
+2. **Start Keycloak first**, and wait until the realms are imported and the admin console is reachable.
+3. **Then start the backend** (the first boot runs Flyway to create the business tables).
+
+Why not the other way around: on startup in OIDC mode the backend provisions/verifies its built-in accounts in Keycloak (`demo-admin` / `ops`, via the `*KeycloakAdminSeeder` beans on `ApplicationReadyEvent`). **If Keycloak is unreachable they throw `IllegalStateException` and the backend fails to boot** (log: `Start Keycloak ... then restart`).
+
+> JWT verification itself is lazy (`MultiRealmJwtDecoder` fetches JWKS on the first token, not at boot), so it never blocks startup; the hard dependency is the seeders above. `password` / `permit-all` mode has no such dependency — the backend boots standalone.
+
 ---
 
 ## 4. Keycloak production deployment

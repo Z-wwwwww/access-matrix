@@ -194,6 +194,8 @@ Edit `frontend/.env.development`:
 
 **Restart** both backend and frontend (a `.env` change requires restarting the Vite dev server — it does not hot-reload).
 
+> **Order**: in OIDC mode, **make sure Keycloak is already running** (§5.2, realms imported) before restarting the backend. On startup the backend provisions/verifies `demo-admin` / `ops` in Keycloak (`*KeycloakAdminSeeder`); if Keycloak is unreachable it throws `IllegalStateException` and the backend fails to boot. `permit-all` / `password` mode has no such dependency.
+
 ### 5.4 First SSO sign-in
 
 On backend startup, `LocalKeycloakAdminSeeder` automatically creates a `demo-admin` user (password `demo-admin`, permanent) in Keycloak's `demo` realm, and `SystemKeycloakAdminSeeder` creates an `ops` user (password `ops`) in the `system` realm.
