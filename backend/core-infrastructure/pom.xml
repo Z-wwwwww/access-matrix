@@ -112,11 +112,7 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
 
-        <!-- Mail (jakarta.mail under Spring Boot 4) + Freemarker for HTML templates.
-             Used by MailService for user-onboarding emails (account-opened
-             notice + invite link). Inntouch's SendMailUtil set the precedent
-             for this stack; we keep freemarker but switch from commons-email
-             + static fields to Spring's @Service + JavaMailSender. -->
+        <!-- JavaMailSender. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
