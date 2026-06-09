@@ -19,9 +19,9 @@ import java.util.Map;
  *
  * <p>Conventions used throughout:
  * <ul>
- *   <li>Built-in tenants ({@code system}, {@code demo}) are excluded from
- *       customer-facing metrics (activation, engagement) since they are platform
- *       internals, not real customers.</li>
+ *   <li>Only the {@code system} tenant is excluded from customer-facing metrics
+ *       (activation, engagement) — it's a platform internal, not a customer.
+ *       {@code demo} is an ordinary (seeded) customer tenant and IS counted.</li>
  *   <li>Business rows carry {@code tenant_id = tenant_code}; the registry's own
  *       {@code core_tenant.tenant_id} is always {@code 'system'}, so joins to
  *       login/invite data are on {@code core_tenant.tenant_code}.</li>
@@ -50,18 +50,18 @@ public class PlatformDashboardService {
         long pending = q1Long(
                 "SELECT COUNT(DISTINCT tenant_id) FROM core_user_invite "
                         + "WHERE used_at IS NULL AND mark = 1 AND expires_at > now() "
-                        + "AND tenant_id NOT IN ('system','demo')");
+                        + "AND tenant_id NOT IN ('system')");
         long expired = q1Long(
                 "SELECT COUNT(DISTINCT tenant_id) FROM core_user_invite "
                         + "WHERE used_at IS NULL AND mark = 1 AND expires_at <= now() "
-                        + "AND tenant_id NOT IN ('system','demo')");
+                        + "AND tenant_id NOT IN ('system')");
 
         long nonBuiltin = q1Long(
                 "SELECT COUNT(*) FROM core_tenant WHERE mark = 1 "
-                        + "AND tenant_code NOT IN ('system','demo')");
+                        + "AND tenant_code NOT IN ('system')");
         long activated = q1Long(
                 "SELECT COUNT(*) FROM core_tenant t WHERE t.mark = 1 "
-                        + "AND t.tenant_code NOT IN ('system','demo') "
+                        + "AND t.tenant_code NOT IN ('system') "
                         + "AND EXISTS (SELECT 1 FROM core_auth_login_log l "
                         + "            WHERE l.tenant_id = t.tenant_code AND l.success = true)");
         double rate = nonBuiltin == 0 ? 0.0 : (double) activated / nonBuiltin;
@@ -73,7 +73,7 @@ public class PlatformDashboardService {
                         + "      FROM core_tenant t "
                         + "      JOIN core_auth_login_log l "
                         + "        ON l.tenant_id = t.tenant_code AND l.success = true "
-                        + "      WHERE t.mark = 1 AND t.tenant_code NOT IN ('system','demo') "
+                        + "      WHERE t.mark = 1 AND t.tenant_code NOT IN ('system') "
                         + "      GROUP BY t.id, t.create_time) x");
 
         // Still-valid pending invites (soonest-expiring first).
@@ -94,7 +94,7 @@ public class PlatformDashboardService {
                         + "FROM core_user_invite i "
                         + "JOIN core_tenant t ON t.tenant_code = i.tenant_id AND t.mark = 1 "
                         + "WHERE i.used_at IS NULL AND i.mark = 1 "
-                        + "AND i.tenant_id NOT IN ('system','demo') " + tail + " LIMIT " + LIST_CAP,
+                        + "AND i.tenant_id NOT IN ('system') " + tail + " LIMIT " + LIST_CAP,
                 (rs, n) -> new PlatformDashboardDto.PendingInvite(
                         rs.getString("id"), rs.getString("tenant_code"),
                         rs.getString("display_name"), rs.getString("contact_email"),
@@ -106,24 +106,24 @@ public class PlatformDashboardService {
     private PlatformDashboardDto.Engagement engagement() {
         long active7d = q1Long(
                 "SELECT COUNT(DISTINCT tenant_id) FROM core_auth_login_log "
-                        + "WHERE success = true AND tenant_id NOT IN ('system','demo') "
+                        + "WHERE success = true AND tenant_id NOT IN ('system') "
                         + "AND login_time >= now() - INTERVAL '7 days'");
         long active30d = q1Long(
                 "SELECT COUNT(DISTINCT tenant_id) FROM core_auth_login_log "
-                        + "WHERE success = true AND tenant_id NOT IN ('system','demo') "
+                        + "WHERE success = true AND tenant_id NOT IN ('system') "
                         + "AND login_time >= now() - INTERVAL '30 days'");
         long dau = q1Long(
                 "SELECT COUNT(DISTINCT user_id) FROM core_auth_login_log "
-                        + "WHERE success = true AND tenant_id NOT IN ('system','demo') "
+                        + "WHERE success = true AND tenant_id NOT IN ('system') "
                         + "AND login_time >= now() - INTERVAL '1 day'");
         long mau = q1Long(
                 "SELECT COUNT(DISTINCT user_id) FROM core_auth_login_log "
-                        + "WHERE success = true AND tenant_id NOT IN ('system','demo') "
+                        + "WHERE success = true AND tenant_id NOT IN ('system') "
                         + "AND login_time >= now() - INTERVAL '30 days'");
 
         String silentBase =
                 "FROM core_tenant t WHERE t.mark = 1 AND t.status = 1 "
-                        + "AND t.tenant_code NOT IN ('system','demo') "
+                        + "AND t.tenant_code NOT IN ('system') "
                         + "AND NOT EXISTS (SELECT 1 FROM core_auth_login_log l "
                         + "                WHERE l.tenant_id = t.tenant_code AND l.success = true "
                         + "                  AND l.login_time >= now() - INTERVAL '30 days')";
@@ -143,7 +143,7 @@ public class PlatformDashboardService {
         jdbc.queryForList(
                 "SELECT to_char(date_trunc('day', login_time), 'YYYY-MM-DD') AS d, COUNT(*) AS c "
                         + "FROM core_auth_login_log "
-                        + "WHERE success = true AND tenant_id NOT IN ('system','demo') "
+                        + "WHERE success = true AND tenant_id NOT IN ('system') "
                         + "AND login_time >= date_trunc('day', now()) - INTERVAL '13 days' "
                         + "GROUP BY 1")
                 .forEach(r -> byDay.put((String) r.get("d"), ((Number) r.get("c")).longValue()));

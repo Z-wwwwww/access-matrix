@@ -40,7 +40,7 @@ import static org.mockito.Mockito.when;
 /**
  * Pins the TenantAdminService branching that matters most:
  *
- *   1. Reserved codes ('system', 'demo') cannot be created.
+ *   1. The reserved code 'system' cannot be created ('demo' is ordinary now).
  *   2. Existing code conflicts fail BEFORE we touch Keycloak (so we
  *      never leak orphan realms on duplicate-name attempts).
  *   3. The two-sided create writes Keycloak FIRST, then DB, and the
@@ -131,13 +131,18 @@ class TenantAdminServiceTest {
     }
 
     @Test
-    void create_reservedDemoCode_rejected() {
+    void create_demoCode_noLongerReserved() {
+        // 'demo' is now an ordinary tenant code — the reserved gate must NOT fire.
+        // It already exists (seeded), so create falls through to the duplicate
+        // check; we assert the failure is "already exists", NOT "reserved".
+        when(tenantMapper.findActiveByCode("demo")).thenReturn(row("id-demo", "demo"));
         TenantDto.CreateRequest req = new TenantDto.CreateRequest(
-                "demo", "Should not work", null, null);
+                "demo", "Should hit duplicate, not reserved", null, null);
 
         assertThatThrownBy(() -> service.create(req))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("reserved");
+                .hasMessageContaining("already exists")
+                .hasMessageNotContaining("reserved");
 
         verify(tenantMapper, never()).insert(any(TenantEntity.class));
     }
@@ -494,9 +499,10 @@ class TenantAdminServiceTest {
 
     @Test
     void suspend_builtIn_refused() {
-        when(tenantMapper.selectById("id-demo")).thenReturn(row("id-demo", "demo"));
+        // Only 'system' is built-in/protected now; 'demo' suspends like any tenant.
+        when(tenantMapper.selectById("id-sys")).thenReturn(row("id-sys", "system"));
 
-        assertThatThrownBy(() -> service.suspend("id-demo"))
+        assertThatThrownBy(() -> service.suspend("id-sys"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Built-in tenant");
     }

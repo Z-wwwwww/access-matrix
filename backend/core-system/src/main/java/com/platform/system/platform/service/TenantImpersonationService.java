@@ -67,8 +67,9 @@ public class TenantImpersonationService {
 
     private static final Logger log = LoggerFactory.getLogger(TenantImpersonationService.class);
 
-    /** tenant codes reserved by the project — same set as TenantAdminService.RESERVED_CODES. */
-    private static final Set<String> RESERVED_CODES = Set.of("system", "demo");
+    /** Built-in tenants that can't be impersonated — same set as TenantAdminService.RESERVED_CODES.
+        Only {@code system} (no business SUPER_ADMIN to assume); {@code demo} is an ordinary tenant. */
+    private static final Set<String> RESERVED_CODES = Set.of("system");
 
     /** Name of the auto-seeded super-admin role — keep in sync with RbacSeederService. */
     private static final String SUPER_ROLE_NAME = "Super Administrator";

@@ -288,6 +288,7 @@ export default {
         displayName: '表示名',
         contactEmail: '連絡先メール',
         status: '状態',
+        userCount: 'ユーザー数',
         createTime: '作成日時',
         actions: '操作'
       },

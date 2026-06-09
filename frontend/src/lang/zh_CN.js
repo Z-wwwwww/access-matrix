@@ -281,6 +281,7 @@ export default {
         displayName: '显示名称',
         contactEmail: '联系邮箱',
         status: '状态',
+        userCount: '用户数',
         createTime: '创建时间',
         actions: '操作'
       },

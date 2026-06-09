@@ -62,8 +62,13 @@ import java.util.List;
 @Service
 public class NumberingService {
 
-    /** Source tenant for {@link #seedDefaultsForTenant} — the reference business tenant. */
-    private static final String TEMPLATE_TENANT = "demo";
+    /**
+     * Source for {@link #seedDefaultsForTenant} — a reserved sentinel tenant id,
+     * NOT a real tenant (never listed, never deletable). Decoupled from the live
+     * {@code demo} tenant (V57) so {@code demo} can be an ordinary, deletable
+     * sample tenant without breaking new-tenant provisioning.
+     */
+    private static final String TEMPLATE_TENANT = "__template__";
 
     private final JdbcTemplate jdbc;
     private final LoadingCache<DefCacheKey, NumberingDef> defCache;
@@ -102,8 +107,9 @@ public class NumberingService {
     }
 
     /**
-     * Clone every numbering definition from the template tenant ({@code demo})
-     * into {@code newTenantId}, resetting each counter to {@code min_value -
+     * Clone every numbering definition from the template ({@code __template__},
+     * see {@link #TEMPLATE_TENANT}) into {@code newTenantId}, resetting each
+     * counter to {@code min_value -
      * step_value} so the new tenant's first allocation returns exactly
      * {@code min_value}. Called from {@code TenantAdminService.create} right
      * after the registry row is inserted; idempotent via {@code ON CONFLICT

@@ -73,8 +73,10 @@ const segs = computed(() => [
   [0, t('platform.tenant.status.suspended'), counts.suspended]
 ])
 
+// Only `system` is truly built-in (platform-ops users + registry live there).
+// `demo` is an ordinary seeded tenant — editable/suspendable/deletable.
 function isBuiltIn(row) {
-  return row.tenantCode === 'system' || row.tenantCode === 'demo'
+  return row.tenantCode === 'system'
 }
 
 // Deterministic warm-tinted monogram derived from the code; built on the theme's
@@ -375,6 +377,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               </div>
             </div>
             <div>
+              <div class="text-[11px] uppercase tracking-wide font-bold text-muted-foreground">{{ t('platform.tenant.column.userCount') }}</div>
+              <div class="text-[13px] font-mono mt-0.5 text-foreground tabular-nums">{{ row.userCount ?? 0 }}</div>
+            </div>
+            <div>
               <div class="text-[11px] uppercase tracking-wide font-bold text-muted-foreground">{{ t('platform.tenant.column.createTime') }}</div>
               <div class="text-[13px] font-mono mt-0.5 text-foreground" :title="fmtAbs(row.createTime)">{{ relTime(row.createTime) }}</div>
             </div>
@@ -394,6 +400,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             <th class="text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-4 py-3.5 w-[32%] min-w-[260px]">{{ t('platform.tenant.column.displayName') }}</th>
             <th class="text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-4 py-3.5">{{ t('platform.tenant.column.contactEmail') }}</th>
             <th class="text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-4 py-3.5">{{ t('platform.tenant.column.status') }}</th>
+            <th class="text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-4 py-3.5 whitespace-nowrap">{{ t('platform.tenant.column.userCount') }}</th>
             <th class="text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-4 py-3.5">{{ t('platform.tenant.column.createTime') }}</th>
             <th class="text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-4 py-3.5 w-px whitespace-nowrap">{{ t('platform.tenant.column.actions') }}</th>
           </tr>
@@ -431,6 +438,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
                 <span class="size-2 rounded-full" :style="{ background: statusDot(row.status) }"></span>
                 {{ tenantStatus.label(row.status) }}
               </span>
+            </td>
+            <!-- User count -->
+            <td class="px-4 py-3.5 align-middle text-right">
+              <span class="font-mono text-[13px] text-foreground tabular-nums">{{ row.userCount ?? 0 }}</span>
             </td>
             <!-- Created -->
             <td class="px-4 py-3.5 align-middle">

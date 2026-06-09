@@ -281,6 +281,7 @@ export default {
         displayName: '顯示名稱',
         contactEmail: '聯絡信箱',
         status: '狀態',
+        userCount: '使用者數',
         createTime: '建立時間',
         actions: '操作'
       },

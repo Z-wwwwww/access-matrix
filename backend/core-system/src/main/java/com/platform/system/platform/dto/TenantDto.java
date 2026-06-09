@@ -20,7 +20,7 @@ public final class TenantDto {
     /**
      * Aggregate counts for the platform tenant dashboard
      * ({@code GET /platform/tenants/stats}). Computed across ALL registry rows
-     * (mark=1), built-in system/demo tenants included, so the KPI totals match
+     * (mark=1), the system/demo tenants included, so the KPI totals match
      * what the list shows. {@code monthly} is a dense 12-month window (current
      * month back 11), gaps filled with 0 — ready to plot.
      */
@@ -45,6 +45,7 @@ public final class TenantDto {
             String displayName,
             String contactEmail,
             Integer status,
+            long userCount,
             LocalDateTime createTime,
             LocalDateTime updateTime
     ) {}

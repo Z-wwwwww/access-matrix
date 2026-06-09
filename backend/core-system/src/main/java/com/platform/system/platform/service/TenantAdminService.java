@@ -90,8 +90,14 @@ public class TenantAdminService {
 
     private static final Logger log = LoggerFactory.getLogger(TenantAdminService.class);
 
-    /** tenant codes reserved by the project — never available to customers. */
-    private static final Set<String> RESERVED_CODES = Set.of("system", "demo");
+    /**
+     * Tenant codes reserved/protected by the project — can't be created by
+     * customers, and can't be suspended/deleted. Only {@code system} is truly
+     * built-in: it owns the platform-ops users and the central registry, so
+     * losing it would break the whole platform. {@code demo} is an ordinary
+     * (seeded) tenant — editable, suspendable, deletable like any customer.
+     */
+    private static final Set<String> RESERVED_CODES = Set.of("system");
 
     /** Lowercase alphanumeric + dash/underscore, 1..64 chars. Username constraint. */
     private static final Pattern USERNAME_OK = Pattern.compile("^[a-z0-9][a-z0-9_-]{0,63}$");
@@ -163,8 +169,32 @@ public class TenantAdminService {
             w.eq("status", status);
         }
         Page<TenantEntity> result = tenantMapper.selectPage(p, w);
-        List<TenantDto.View> records = result.getRecords().stream().map(this::toView).toList();
+        // One batch grouped count (not N+1) for this page's tenants; business rows
+        // carry tenant_id = tenant_code, so we group core_auth_user by tenant_id.
+        Map<String, Long> counts = userCounts(
+                result.getRecords().stream().map(TenantEntity::getTenantCode).toList());
+        List<TenantDto.View> records = result.getRecords().stream()
+                .map(e -> toView(e, counts.getOrDefault(e.getTenantCode(), 0L)))
+                .toList();
         return PageResult.of(records, result.getTotal(), page, size);
+    }
+
+    /**
+     * Non-deleted user count per tenant for the given tenant codes, in a single
+     * grouped query. Raw {@link JdbcTemplate} so the MyBatis tenant interceptor
+     * stays out of the way (these are deliberately cross-tenant reads). Tenants
+     * with no users are simply absent from the map (caller defaults to 0).
+     */
+    private Map<String, Long> userCounts(List<String> tenantCodes) {
+        if (tenantCodes.isEmpty()) return Map.of();
+        String placeholders = String.join(",", java.util.Collections.nCopies(tenantCodes.size(), "?"));
+        Map<String, Long> counts = new HashMap<>();
+        jdbc.query(
+                "SELECT tenant_id, COUNT(*) AS c FROM core_auth_user "
+                        + "WHERE mark = 1 AND tenant_id IN (" + placeholders + ") GROUP BY tenant_id",
+                rs -> { counts.put(rs.getString("tenant_id"), rs.getLong("c")); },
+                tenantCodes.toArray());
+        return counts;
     }
 
     /**
@@ -215,7 +245,7 @@ public class TenantAdminService {
         if (row == null || !Integer.valueOf(1).equals(row.getMark())) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Tenant not found: " + id);
         }
-        return toView(row);
+        return toView(row, userCounts(List.of(row.getTenantCode())).getOrDefault(row.getTenantCode(), 0L));
     }
 
     /**
@@ -786,13 +816,14 @@ public class TenantAdminService {
         }
     }
 
-    private TenantDto.View toView(TenantEntity e) {
+    private TenantDto.View toView(TenantEntity e, long userCount) {
         return new TenantDto.View(
                 e.getId(),
                 e.getTenantCode(),
                 e.getDisplayName(),
                 e.getContactEmail(),
                 e.getStatus(),
+                userCount,
                 e.getCreateTime(),
                 e.getUpdateTime()
         );

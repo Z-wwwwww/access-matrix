@@ -281,6 +281,7 @@ export default {
         displayName: 'Display name',
         contactEmail: 'Contact email',
         status: 'Status',
+        userCount: 'Users',
         createTime: 'Created',
         actions: 'Actions'
       },

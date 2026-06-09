@@ -147,8 +147,8 @@ public class PlatformTenantController {
      * READ_ONLY is tracked as a follow-up; today the audit trail is the
      * sole protection against an ops user making bad writes during support.
      *
-     * <p>Built-in tenants (system, demo) refused: no operational reason to
-     * impersonate them, and accidents would be unusually costly there.
+     * <p>The built-in {@code system} tenant is refused (no business SUPER_ADMIN
+     * to assume); {@code demo} is an ordinary tenant and can be impersonated.
      */
     @PostMapping("/{id}/support-session")
     @RequiresPermission(PlatformPermissions.TENANT_IMPERSONATE)

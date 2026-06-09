@@ -281,6 +281,7 @@ export default {
         displayName: '표시명',
         contactEmail: '연락처 이메일',
         status: '상태',
+        userCount: '사용자 수',
         createTime: '생성 시각',
         actions: '작업'
       },

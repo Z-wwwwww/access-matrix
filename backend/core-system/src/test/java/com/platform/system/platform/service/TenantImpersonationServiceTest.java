@@ -33,7 +33,7 @@ import static org.mockito.Mockito.when;
 /**
  * Pins TenantImpersonationService.startSession:
  *
- *   1. Built-in tenants (system, demo) refused without touching JdbcTemplate.
+ *   1. Built-in tenant 'system' refused without touching JdbcTemplate ('demo' is ordinary now).
  *   2. Missing target SUPER_ADMIN role → NOT_FOUND with actionable message.
  *   3. Missing SUPER_ADMIN user holder → NOT_FOUND, distinct message.
  *   4. Happy path: act claim contains the original ops identity + reason
@@ -93,12 +93,17 @@ class TenantImpersonationServiceTest {
     }
 
     @Test
-    void builtInDemo_refused() {
+    void demo_noLongerBuiltIn_passesBuiltInGate() {
+        // 'demo' is an ordinary tenant now — the built-in gate must NOT fire.
+        // With no SUPER_ADMIN role mocked it fails LATER (role lookup), proving
+        // it got past the built-in check rather than being refused upfront.
         when(tenantMapper.selectById("id-demo")).thenReturn(row("id-demo", "demo", "Demo"));
+        when(jdbc.queryForObject(anyString(), eq(String.class), eq("demo"), anyString()))
+                .thenThrow(new EmptyResultDataAccessException(1));
 
         assertThatThrownBy(() -> service.startSession("id-demo", "diag"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Built-in tenant");
+                .hasMessageNotContaining("Built-in tenant");
     }
 
     @Test

@@ -13,7 +13,8 @@ const props = defineProps({ row: { type: Object, required: true } })
 const emit = defineEmits(['edit', 'support', 'resend', 'suspend', 'resume', 'delete'])
 const { t } = useI18n()
 
-const isBuiltIn = computed(() => props.row.tenantCode === 'system' || props.row.tenantCode === 'demo')
+// Only `system` is locked; `demo` is an ordinary seeded tenant.
+const isBuiltIn = computed(() => props.row.tenantCode === 'system')
 const isActive = computed(() => props.row.status === 1)
 
 const base =
