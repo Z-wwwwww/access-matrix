@@ -12,7 +12,7 @@
           <!-- Header -->
           <tr>
             <td style="padding:32px 40px 8px;">
-              <div style="font-size:20px;font-weight:600;color:#111827;">${appName!"Access Matrix"}</div>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="vertical-align:middle;padding-right:8px;line-height:0;"><img src="${logoUrl!''}" alt="" width="26" height="26" style="display:block;border:0;" /></td><td style="vertical-align:middle;font-size:20px;font-weight:600;color:#111827;">${appName!"Access Matrix"}</td></tr></table>
               <div style="font-size:13px;color:#6b7280;margin-top:4px;">アカウントへの招待</div>
             </td>
           </tr>

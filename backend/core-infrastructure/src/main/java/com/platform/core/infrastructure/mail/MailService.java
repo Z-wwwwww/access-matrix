@@ -100,6 +100,10 @@ public class MailService {
         }
         Locale loc = locale == null ? FALLBACK_LOCALE : locale;
         String subject = resolveSubject(subjectKey, subjectArgs, loc);
+        // Brand logo for the email header — external PNG under the app's base URL
+        // (SVG is rendered by the SPA but not by Gmail/Outlook). Caller may override
+        // by pre-setting logoUrl in the model.
+        if (model != null) model.putIfAbsent("logoUrl", props.baseUrl() + "/access_matrix_logo.png");
         String html    = renderTemplate(templateBase, loc, model);
 
         MimeMessage msg = sender.createMimeMessage();

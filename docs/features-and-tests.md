@@ -135,12 +135,14 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 - **通知(铃铛)**:`core_notification` + SSE 心跳(15s)。注意与领域事件是两套东西。
 - **编号(numbering)**:`core_numbering*`,按租户分配 user_no 等。
 - **i18n**:ja_JP / zh_CN / zh_TW / en / ko_KR 五语;权限标签由后端 `I18nPermissionPatcher` 生成占位 `__TODO__`,需人工填 `frontend/src/lang/generated/permissions.*.json`。
+- **邮件品牌 logo**:所有邮件模板(`user-invite` / `user-direct-welcome` / `user-password-reset` / `user-break-glass-used`,各 5 语言)header 含品牌 logo;**外链 PNG** `${baseUrl}/access_matrix_logo.png`(由 `frontend/public/access_matrix_favicon.svg` 渲染成位图——邮件客户端不显示 SVG)。`MailService` 对每封邮件统一注入 `logoUrl`(`putIfAbsent`,调用方可覆盖)。
 
 **测试点**
 - [ ] 字典:新增/停用管理字典项;被引用的项不可删(报"in use")、枚举项不可删——这些是**业务拒绝**,不计入仪表盘"接口错误"。
 - [ ] 任一带 `@OpLog` 的操作在 `core_oplog` 留痕;失败时 `error_code` 正确。
 - [ ] 语言切换:5 语言下新功能文案都不出现 key 原文 / `__TODO__`。
 - [ ] 通知:触发后铃铛出现未读、可标记已读。
+- [ ] 邮件 header 显示品牌 logo:在 Gmail/Outlook 等也能显示(因用 **PNG** 而非 SVG);logo 加载不出时下方文字「Access Matrix」兜底。`logoUrl` 指向 `${baseUrl}/access_matrix_logo.png`(前端静态资源,需前端已部署/可访问)。
 
 ---
 

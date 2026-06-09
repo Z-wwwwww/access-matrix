@@ -11,7 +11,7 @@
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
           <tr>
             <td style="padding:32px 40px 8px;border-bottom:3px solid #f59e0b;">
-              <div style="font-size:20px;font-weight:600;color:#111827;">${appName!"Access Matrix"}</div>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="vertical-align:middle;padding-right:8px;line-height:0;"><img src="${logoUrl!''}" alt="" width="26" height="26" style="display:block;border:0;" /></td><td style="vertical-align:middle;font-size:20px;font-weight:600;color:#111827;">${appName!"Access Matrix"}</td></tr></table>
               <div style="font-size:13px;color:#b45309;margin-top:4px;font-weight:500;">⚠ 應急密碼剛剛被使用</div>
             </td>
           </tr>
