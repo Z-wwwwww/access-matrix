@@ -12,20 +12,25 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 
 /**
- * One place to fully terminate sessions, so a kick can't be silently undone by a
- * still-live Keycloak SSO session.
+ * Single owner of the session / Keycloak side-effects of changing a user's
+ * access (disable / enable / delete / force-logout / password-reset). Both the
+ * business-user console ({@code UserAdminService}) and the platform-user console
+ * ({@code PlatformUserAdminService}) route through here so the two never drift
+ * apart again — they previously hand-rolled this and the business side silently
+ * missed the Keycloak sync (a disabled user could still SSO back in).
  *
- * <p>The bare {@link ForceLogoutService#kickOut} only invalidates already-issued
- * access tokens (the {@code ForceLogoutFilter} rejects tokens with {@code iat <=}
- * the kick). It does NOT end the user's Keycloak session — so a kicked user who
- * hits {@code /login} → "Sign in with SSO" is silently re-authenticated by the
- * live KC session and gets a fresh token straight back in. Ending the KC session
- * here forces a real re-authentication (and, if the account/tenant is disabled,
- * the login then fails for the right reason). Mirrors what
- * {@code PlatformUserAdminService} already does for platform-ops users.
+ * <p>Two distinct gates back each other up:
+ * <ul>
+ *   <li><b>App kick</b> ({@link ForceLogoutService}) — already-issued access
+ *       tokens are rejected by {@code ForceLogoutFilter} on the next request.</li>
+ *   <li><b>Keycloak</b> — disabling the KC user makes Keycloak itself refuse the
+ *       login, and ending the KC session stops a kicked user from being silently
+ *       re-authenticated on the {@code /login} redirect. A DB {@code status=0}
+ *       alone does NOT stop SSO (the OIDC JIT resolver doesn't check status).</li>
+ * </ul>
  *
- * <p>The KC step is best-effort: a Keycloak hiccup must not block the local kick
- * (which is the stronger, immediate gate). KC is only present in oidc mode.
+ * <p>The Keycloak step is best-effort: a KC hiccup must not block the local kick
+ * (the stronger, immediate gate). KC is only present in oidc mode.
  */
 @Service
 public class SessionTerminationService {
@@ -36,7 +41,7 @@ public class SessionTerminationService {
     private final ObjectProvider<KeycloakUserService> kcProvider;
     /** Raw lookup of a user's (tenant_id, keycloak_id) — deliberately cross-tenant
         (bypasses the MyBatis tenant interceptor) and ignores mark so a being-deleted
-        user is still logged out of Keycloak. */
+        user is still acted on in Keycloak. */
     private final JdbcTemplate jdbc;
 
     public SessionTerminationService(ForceLogoutService forceLogout,
@@ -49,13 +54,36 @@ public class SessionTerminationService {
 
     /**
      * Kick the user's tokens AND end their Keycloak SSO session, so they cannot be
-     * silently re-authenticated. Use everywhere a user is disabled / deleted /
-     * force-logged-out / password-reset.
+     * silently re-authenticated. Use where access is revoked but the account's
+     * enabled flag is unchanged: delete / force-logout / password-reset.
      */
     public void terminateUser(String userId) {
         if (userId == null || userId.isBlank()) return;
         forceLogout.kickOut(userId);
-        endKeycloakSession(userId);
+        withKcUser(userId, KeycloakUserService::logoutUser);
+    }
+
+    /**
+     * Apply a user's enabled/disabled state everywhere it must take effect:
+     * <ul>
+     *   <li>disable → kick in-flight tokens, disable the KC user (KC refuses the
+     *       login) and end the live KC session;</li>
+     *   <li>enable → clear the kick and re-enable the KC user.</li>
+     * </ul>
+     * Callers ({@code UserAdminService} / {@code PlatformUserAdminService}) own the
+     * DB {@code status} write + their domain guards; the side-effects live here.
+     */
+    public void applyEnabled(String userId, boolean enabled) {
+        if (userId == null || userId.isBlank()) return;
+        if (enabled) {
+            forceLogout.clear(userId);
+        } else {
+            forceLogout.kickOut(userId);
+        }
+        withKcUser(userId, (kc, tenant, kcId) -> {
+            kc.setEnabled(tenant, kcId, enabled);
+            if (!enabled) kc.logoutUser(tenant, kcId);   // end the live SSO session
+        });
     }
 
     /** Force-log-out every user of a tenant (tenant suspended). KC realm is disabled
@@ -69,27 +97,29 @@ public class SessionTerminationService {
         forceLogout.clearTenant(tenantCode);
     }
 
-    /** Clear a per-user kick (user re-enabled), so fresh tokens aren't rejected. */
-    public void reactivateUser(String userId) {
-        forceLogout.clear(userId);
+    /** A Keycloak action against a resolved (tenant, keycloakId). */
+    @FunctionalInterface
+    private interface KcUserAction {
+        void run(KeycloakUserService kc, String tenant, String keycloakId);
     }
 
-    private void endKeycloakSession(String userId) {
+    /** Resolve the user's (tenant, keycloakId) once and run {@code action} (best-effort). */
+    private void withKcUser(String userId, KcUserAction action) {
         KeycloakUserService kc = kcProvider.getIfAvailable();
-        if (kc == null) return;   // non-oidc mode: nothing to end
+        if (kc == null) return;   // non-oidc mode: nothing to do
         try {
             Map<String, Object> row = jdbc.queryForMap(
                     "SELECT tenant_id, keycloak_id FROM core_auth_user WHERE id = ?", userId);
             String kcId = (String) row.get("keycloak_id");
-            String tenantId = (String) row.get("tenant_id");
+            String tenant = (String) row.get("tenant_id");
             if (kcId != null && !kcId.isBlank()) {
-                kc.logoutUser(tenantId, kcId);
+                action.run(kc, tenant, kcId);
             }
         } catch (EmptyResultDataAccessException e) {
             // user row gone (hard-deleted) — nothing to do
         } catch (RuntimeException e) {
-            // best-effort: the local kick already stands; log for visibility
-            log.warn("[session] Keycloak logout failed for user {} (local kick still in effect): {}",
+            // best-effort: the local kick/clear already stands; log for visibility
+            log.warn("[session] Keycloak side-effect failed for user {} (local state still applied): {}",
                     userId, e.toString());
         }
     }

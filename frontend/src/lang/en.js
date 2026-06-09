@@ -707,6 +707,8 @@ export default {
       resetPasswordDisabledSso: 'Disabled in SSO mode — users change their password in the Keycloak account console',
       statusChangeDisabled: 'Built-in user status cannot be changed',
       toggleStatus: 'Enable / Disable',
+      disable: 'Disable',
+      enable: 'Enable',
       forceLogout: 'Force logout',
       deleteDisabled: 'Built-in user cannot be deleted'
     },

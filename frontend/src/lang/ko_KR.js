@@ -707,6 +707,8 @@ export default {
       resetPasswordDisabledSso: 'SSO 모드에서는 비활성화됩니다 — 사용자는 Keycloak 계정 콘솔에서 직접 비밀번호를 변경합니다',
       statusChangeDisabled: '기본 제공 사용자 상태는 변경할 수 없습니다',
       toggleStatus: '활성/비활성',
+      disable: '비활성',
+      enable: '활성',
       forceLogout: '강제 로그아웃',
       deleteDisabled: '기본 제공 사용자는 삭제할 수 없습니다'
     },

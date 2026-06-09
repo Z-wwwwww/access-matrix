@@ -2,6 +2,7 @@ package com.platform.system.auth.service;
 
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.platform.core.common.id.IdGenerator;
+import com.platform.core.infrastructure.numbering.NumberingService;
 import com.platform.system.rbac.service.BuiltInRoleLookup;
 import com.platform.core.infrastructure.security.OidcUserResolver;
 import com.platform.system.auth.entity.UserEntity;
@@ -45,9 +46,13 @@ public class OidcJitUserService implements OidcUserResolver {
 
     private static final Logger log = LoggerFactory.getLogger(OidcJitUserService.class);
 
+    /** Per-tenant user numbering category (matches UserAdminService.USER_NO_KBN). */
+    private static final String USER_NO_KBN = "USER";
+
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
     private final BuiltInRoleLookup roleLookup;
+    private final NumberingService numberingService;
 
     /**
      * Defaults match {@link com.platform.core.infrastructure.config.properties.AppSecurityProperties.Jwt}
@@ -83,10 +88,11 @@ public class OidcJitUserService implements OidcUserResolver {
     private String expectedIssuerBase;
 
     public OidcJitUserService(UserMapper userMapper, RoleMapper roleMapper,
-                              BuiltInRoleLookup roleLookup) {
+                              BuiltInRoleLookup roleLookup, NumberingService numberingService) {
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
         this.roleLookup = roleLookup;
+        this.numberingService = numberingService;
     }
 
     @Override
@@ -126,6 +132,18 @@ public class OidcJitUserService implements OidcUserResolver {
         // 1. Fast path: already bound.
         UserEntity bound = userMapper.findByKeycloakIdAndTenant(kcId, tid);
         if (bound != null) return bound.getId();
+
+        // 1b. Deleted user — refuse. An admin deleted this user (the business row
+        // is now mark=0), but their access token stays valid until it expires.
+        // Without this guard the JIT path below would find no mark=1 row and
+        // silently re-provision a brand-new roleless "ghost" account on every
+        // request (no user_no, displayName from the token). Return null so the
+        // request resolves to no business user → no access → the SPA logs out.
+        if (userMapper.countDeletedByKeycloakIdAndTenant(kcId, tid) > 0) {
+            log.warn("OIDC JIT: refusing to re-provision deleted user (tenant {}, keycloak id {}) — token still valid but account was deleted",
+                    tid, kcId);
+            return null;
+        }
 
         // 2. Legacy user with same username — bind.
         //
@@ -192,11 +210,19 @@ public class OidcJitUserService implements OidcUserResolver {
         }
         fresh.setDisplayName(display == null || display.isBlank() ? fresh.getUsername() : display);
         fresh.setStatus(1);
+        // Allocate the per-tenant user number so a JIT-provisioned user is a
+        // COMPLETE record (same as UserAdminService.create) — there is no
+        // "assign number later" path, so leaving it NULL would strand the user
+        // numberless forever. Best-effort: if the tenant's numbering definition
+        // is somehow missing, log and proceed (a missing number must never block
+        // a legitimate SSO login).
+        try {
+            fresh.setUserNo(numberingService.next(USER_NO_KBN, tid));
+        } catch (RuntimeException e) {
+            log.warn("OIDC JIT: could not allocate user_no for new user (tenant {}, keycloak id {}): {}",
+                    tid, kcId, e.toString());
+        }
         // Password column stays NULL — these users authenticate via the IdP.
-        // User number (userNo) intentionally left NULL: numbering is a business
-        // event that should be triggered explicitly by an admin (UserAdminService.create),
-        // not silently on every first-login. The user appears in User.vue
-        // without a number until an admin runs "assign user number".
         userMapper.insert(fresh);
         log.info("OIDC JIT: provisioned new user {} (tenant {}, username {}) for keycloak id {}",
                 fresh.getId(), tid, fresh.getUsername(), kcId);

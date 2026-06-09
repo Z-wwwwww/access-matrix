@@ -105,6 +105,16 @@ router.beforeEach(async (to, from, next) => {
     if (!menuStore.menus) {
       try {
         const { home } = await menuStore.fetchMenus()
+        // No accessible menu = no usable session. Happens when the logged-in
+        // user was deleted (or had every role stripped) while a tab was open:
+        // their token still resolves but yields zero menus, so registering an
+        // empty layout would land the refreshed path on the 404 catch-all.
+        // Log out cleanly to /login instead of showing a 404.
+        if (!home || toRaw(menuStore.routeChildren).length === 0) {
+          authStore.clearAuth()
+          next({ path: '/login', query: { from: to.fullPath, session: 'expired' } })
+          return
+        }
         // 整体注册 layout 路由（与原项目一致）
         // toRaw 确保传给 router 的是纯对象，非响应式代理
         router.addRoute({

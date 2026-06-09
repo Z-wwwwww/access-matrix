@@ -11,6 +11,7 @@ import com.platform.core.infrastructure.mail.MailService;
 import com.platform.core.infrastructure.security.ForceLogoutService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.auth.service.InviteTokenService;
+import com.platform.system.auth.service.SessionTerminationService;
 import com.platform.system.platform.dto.PlatformUserDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,19 +65,23 @@ public class PlatformUserAdminService {
     private final AppMailProperties mailProps;
     /** Single-use invite-token mint — backs the "resend invite link" (plan B). */
     private final InviteTokenService inviteTokenService;
+    /** Shared owner of enable/disable session + Keycloak side-effects (see setEnabled). */
+    private final SessionTerminationService sessionTermination;
 
     public PlatformUserAdminService(JdbcTemplate jdbc,
                                     ObjectProvider<KeycloakUserService> userServiceProvider,
                                     ForceLogoutService forceLogoutService,
                                     ObjectProvider<MailService> mailProvider,
                                     AppMailProperties mailProps,
-                                    InviteTokenService inviteTokenService) {
+                                    InviteTokenService inviteTokenService,
+                                    SessionTerminationService sessionTermination) {
         this.jdbc = jdbc;
         this.userServiceProvider = userServiceProvider;
         this.forceLogoutService = forceLogoutService;
         this.mailProvider = mailProvider;
         this.mailProps = mailProps;
         this.inviteTokenService = inviteTokenService;
+        this.sessionTermination = sessionTermination;
     }
 
     public PageResult<PlatformUserDto.View> list(long page, long size, String keyword) {
@@ -185,19 +190,12 @@ public class PlatformUserAdminService {
     @Transactional
     public void setEnabled(String id, boolean enabled) {
         Target t = requireManageable(id);
-        KeycloakUserService kc = userServiceProvider.getIfAvailable();
-        if (kc != null && t.keycloakId() != null && !t.keycloakId().isBlank()) {
-            kc.setEnabled(SYSTEM_REALM, t.keycloakId(), enabled);
-        }
         jdbc.update("UPDATE core_auth_user SET status = ?, update_time = ? WHERE id = ?",
                 enabled ? 1 : 0, LocalDateTime.now(), t.id());
-        // Disable = kick out now (in-flight access tokens rejected on next request,
-        // refresh blocked); enable = clear the kick so fresh tokens work.
-        if (enabled) {
-            forceLogoutService.clear(t.id());
-        } else {
-            forceLogoutService.kickOut(t.id());
-        }
+        // Session + Keycloak side-effects (KC user enable/disable, kick/clear, end
+        // session on disable) are owned by SessionTerminationService — the SAME
+        // path the business-user console uses, so the two can't drift apart.
+        sessionTermination.applyEnabled(t.id(), enabled);
         log.info("[platform-user] {} ops user '{}' (id={})", enabled ? "enabled" : "disabled", t.username(), t.id());
     }
 

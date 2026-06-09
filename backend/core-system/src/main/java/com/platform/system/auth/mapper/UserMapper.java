@@ -64,4 +64,21 @@ public interface UserMapper extends BaseMapper<UserEntity> {
             """)
     UserEntity findByKeycloakIdAndTenant(@Param("keycloakId") String keycloakId,
                                          @Param("tenantId") String tenantId);
+
+    /**
+     * Count SOFT-DELETED ({@code mark=0}) rows for a Keycloak id in a tenant.
+     * Used by OIDC JIT to refuse re-provisioning a user that an admin deleted:
+     * the deleted user's still-valid access token would otherwise resolve to no
+     * {@code mark=1} row and silently create a brand-new roleless ghost account.
+     * Hand-written {@code @Select} (explicit tenant_id) for the same interceptor
+     * reason as the lookups above.
+     */
+    @Select("""
+            SELECT COUNT(*) FROM core_auth_user
+             WHERE mark = 0
+               AND tenant_id = #{tenantId}
+               AND keycloak_id = #{keycloakId}
+            """)
+    long countDeletedByKeycloakIdAndTenant(@Param("keycloakId") String keycloakId,
+                                           @Param("tenantId") String tenantId);
 }

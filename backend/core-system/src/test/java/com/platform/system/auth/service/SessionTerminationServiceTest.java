@@ -84,4 +84,33 @@ class SessionTerminationServiceTest {
         service.reactivateTenant("acme");
         verify(forceLogout).clearTenant("acme");
     }
+
+    @Test
+    void applyEnabled_disable_kicksDisablesKcUserAndEndsSession() {
+        // The unified enable/disable side-effects (shared by business + platform
+        // user consoles): disable kicks tokens, disables the KC user (KC then
+        // refuses the login) and ends the live KC session.
+        when(kcProvider.getIfAvailable()).thenReturn(kc);
+        when(jdbc.queryForMap(anyString(), eq("u1")))
+                .thenReturn(Map.of("tenant_id", "acme", "keycloak_id", "kc-uuid-1"));
+
+        service.applyEnabled("u1", false);
+
+        verify(forceLogout).kickOut("u1");
+        verify(kc).setEnabled("acme", "kc-uuid-1", false);
+        verify(kc).logoutUser("acme", "kc-uuid-1");
+    }
+
+    @Test
+    void applyEnabled_enable_clearsKickAndReEnablesKcUser() {
+        when(kcProvider.getIfAvailable()).thenReturn(kc);
+        when(jdbc.queryForMap(anyString(), eq("u1")))
+                .thenReturn(Map.of("tenant_id", "acme", "keycloak_id", "kc-uuid-1"));
+
+        service.applyEnabled("u1", true);
+
+        verify(forceLogout).clear("u1");
+        verify(kc).setEnabled("acme", "kc-uuid-1", true);
+        verify(kc, never()).logoutUser(anyString(), anyString());   // no session-end on enable
+    }
 }

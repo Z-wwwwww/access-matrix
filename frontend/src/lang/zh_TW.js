@@ -707,6 +707,8 @@ export default {
       resetPasswordDisabledSso: 'SSO 模式下不可用 — 使用者於 Keycloak 帳號控制台自助修改密碼',
       statusChangeDisabled: '內建使用者狀態不可變更',
       toggleStatus: '啟用/停用',
+      disable: '停用',
+      enable: '啟用',
       forceLogout: '強制登出',
       deleteDisabled: '內建使用者不可刪除'
     },

@@ -150,6 +150,11 @@ class UserAdminServiceTest {
         verify(userMapper).update(eq(null), userCap.capture());
         assertThat(userCap.getValue().getSqlSet()).contains("mark=");
         assertThat(userCap.getValue().getParamNameValuePairs().values()).contains(0);
+        // Linchpin invariant: the soft-delete must NOT touch keycloak_id. The
+        // retained (mark=0, keycloak_id) "tombstone" is what OIDC JIT reads to
+        // refuse re-provisioning a deleted user (countDeletedByKeycloakIdAndTenant).
+        // Null it / purge the row and a stale token would re-land as a ghost.
+        assertThat(userCap.getValue().getSqlSet()).doesNotContain("keycloak_id");
 
         verify(userRoleMapper).update(eq(null), any(UpdateWrapper.class));
         verify(cacheService).evictUser("u1");
@@ -272,58 +277,26 @@ class UserAdminServiceTest {
     }
 
     @Test
-    void changeStatus_disablingTriggersKickOut() {
+    void changeStatus_disable_appliesDisabledState() {
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
         when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
 
         service.changeStatus("u1", 0);
 
-        // Disabling must immediately invalidate tokens, not just on the next perm check.
-        verify(sessionTermination).terminateUser("u1");
+        // All session/KC side-effects of "disabled" are owned by SessionTerminationService
+        // (kick + KC user disable + end session — tested in SessionTerminationServiceTest).
+        verify(sessionTermination).applyEnabled("u1", false);
         verify(cacheService).evictUser("u1");
     }
 
     @Test
-    void changeStatus_enablingDoesNotKickOut() {
-        // Enabling a disabled super-admin is always safe — no last-admin check, no token kick.
+    void changeStatus_enable_appliesEnabledState() {
+        // Enabling a disabled super-admin is always safe — no last-admin check.
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
 
         service.changeStatus("u1", 1);
 
-        verify(sessionTermination, never()).terminateUser(any());
-    }
-
-    @Test
-    void changeStatus_disable_disablesKeycloakUser() {
-        // Core fix: a disabled user must be disabled in Keycloak too — otherwise
-        // KC still authenticates them and the OIDC JIT resolver lets them in, so
-        // DB status=0 alone does NOT stop SSO login.
-        UserEntity u = user("u1", "sozo-admin2");
-        u.setKeycloakId("kc-uuid-1");
-        when(userMapper.selectById("u1")).thenReturn(u);
-        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
-        KeycloakUserService kc = org.mockito.Mockito.mock(KeycloakUserService.class);
-        when(keycloakProvider.getIfAvailable()).thenReturn(kc);
-
-        service.changeStatus("u1", 0);
-
-        verify(kc).setEnabled("acme", "kc-uuid-1", false);   // ← KC refuses SSO auth
-        verify(sessionTermination).terminateUser("u1");
-    }
-
-    @Test
-    void changeStatus_enable_reEnablesKeycloakUserAndClearsKick() {
-        UserEntity u = user("u1", "sozo-admin2");
-        u.setKeycloakId("kc-uuid-1");
-        when(userMapper.selectById("u1")).thenReturn(u);
-        KeycloakUserService kc = org.mockito.Mockito.mock(KeycloakUserService.class);
-        when(keycloakProvider.getIfAvailable()).thenReturn(kc);
-
-        service.changeStatus("u1", 1);
-
-        verify(kc).setEnabled("acme", "kc-uuid-1", true);
-        verify(sessionTermination).reactivateUser("u1");
-        verify(sessionTermination, never()).terminateUser(any());
+        verify(sessionTermination).applyEnabled("u1", true);
     }
 
     @Test

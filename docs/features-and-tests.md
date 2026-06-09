@@ -26,6 +26,7 @@
 - [ ] break-glass 登录后:`core_oplog` 有 `system/auth.breakGlass` 记录;安全面板"break-glass(7天)"+1;本人收到告警邮件(或日志)。
 - [ ] access token 过期后自动刷新、原请求重放成功;刷新失败被踢回 `/login`。
 - [ ] 会话失效(被踢下线 / 停用 / 过期且刷新失败)→ 下次请求(如 `/menu/me`)跳 `/login` 并显示友好「会话已过期或已被登出,请重新登录」,**不**再显示技术性的「Menu load failed — 401」(router 守卫把 401 与真正的 menu 加载错误 5xx/坏数据 分开处理,后者才带 detail 供排障)。
+- [ ] **已登录用户被删除后刷新页面 → 直接登出到 `/login`(bug 修复)**,而非 404。删除后其 token 解析不出可用菜单(角色已解绑;且旧业务行 `mark=0`),`/menu/me` 返回空菜单 → router 守卫检测到「无 home / 无可用路由」即 `clearAuth` + 跳 `/login`,不再注册空 layout 让刷新路径落到 404 兜底页。
 - [ ] 多 realm:在 A 租户的账号无法登录 B 租户。
 - [ ] 新建运维用户用临时密码首登 → KC「修改密码」页,按钮是通用「提交」(不是「发送重置链接」)。Keycloak 主题 `doSubmit` 必须保持通用(多页面共用),不要写成某页专属文案。
 - [ ] KC 多字段表单(更新账户信息 / 修改密码)排版整齐:必填 `*` 紧跟 label **同一行**,label↔input、字段↔字段间距正常(不因 `.pf-*__label-text` 被设成 block 而拉开)。
@@ -45,8 +46,9 @@
 - [ ] 业务 super(`tenant:*`)看不到平台菜单 / 调 `/platform/*` 返回 403。
 - [ ] 平台 ops(`*:*`)能管租户但不能模拟业务用户(无 `tenant:*`)。
 - [ ] **踢出/禁用/删除/重置密码会结束 KC 会话(bug 修复)**:业务用户被禁用/删除/踢下线/重置密码后,被踢者在登录跳转页**不会被 SSO 静默重新登录**——`UserAdminService`/`AdminAuthController` 经 `SessionTerminationService.terminateUser` 同时 `kickOut`(拒旧 token)+ `kc.logoutUser`(结束 KC 会话,逼真正重新认证)。此前只 kickOut、KC 会话还在,跳转即被静默重登,踢出形同无效。
-- [ ] **禁用用户后无法再登录(bug 修复)**:`changeStatus` 禁用时**同步禁用 Keycloak 用户**(`kc.setEnabled(false)`),启用时 `setEnabled(true)` + 清除 kick。光把 DB `status=0` **拦不住 SSO**——KC 仍会认证该用户、OIDC JIT 解析器也不查 status 就放行(这正是 `sozo-admin2` 禁用后仍能登录的原因)。
-- [ ] **删除用户会删除其 KC 用户(bug 修复)**:`delete` 软删后 `kc.deleteUser`,否则被软删用户(`mark=0`)SSO 重登时,JIT 解析器只看 `mark=1` → 会**重新 provision 一个全新账号**。
+- [ ] **禁用用户后无法再登录(bug 修复)**:禁用时**同步禁用 Keycloak 用户**(`kc.setEnabled(false)`),启用时 `setEnabled(true)` + 清除 kick。光把 DB `status=0` **拦不住 SSO**——KC 仍会认证该用户、OIDC JIT 解析器也不查 status 就放行(这正是 `sozo-admin2` 禁用后仍能登录的原因)。**业务用户(`UserAdminService.changeStatus`)与平台运维用户(`PlatformUserAdminService.setEnabled`)的"有效/无效=停用/启用"副作用现在共用同一处** `SessionTerminationService.applyEnabled(userId, enabled)`(开关 KC + kick/clear + 停用时结束 KC 会话);两个 console 各自只管 DB status 写 + 自己的守卫,杜绝再次漂移。**UI 也对齐**:业务「用户管理」的状态徽标(`success`/`danger` 绿/红 + `common.status.enabled/disabled` 文案)和开关动作(`Pause`=停用 / `Play`=启用 两态按钮)与平台运维用户管理一致(原先是单个 `Power` 切换 + dict 徽标)。
+- [ ] **删除用户不会再生成"幽灵"账号(bug 修复)**:`delete` 软删后 `kc.deleteUser`(挡新 SSO 登录);且 `OidcJitUserService` 对**已删除**(`keycloak_id` 有 `mark=0` 行)的 token **拒绝重新 provision**(返回 null,不再插入无角色无编号的新行)。此前删 `sozo-admin2` 后,其未过期 token 一请求就被 JIT 重建成一个 displayName=`sozo-admin2 sozo-admin2`、无编号的新用户。配合前端守卫(无可用菜单→登出),被删用户刷新即登出、后端也不产垃圾行。
+- [ ] **JIT 自动落地保留且数据完整**:真正全新的 KC 用户(无 `mark=0` 旧行)首次 SSO 时仍自动落地一行,且**采番分配 `user_no`**(与 `UserAdminService.create` 同一编号,不再永久无编号——本无"事后补编号"入口)。该用户尚无角色 → 菜单为空 → 前端守卫先登出;管理员在用户列表给其授角色/部门后,再次登录即可正常使用。numbering 失败(租户定义缺失)只记 WARN、不阻断登录(`user_no` 退化为 NULL)。
 - [ ] 改某角色权限后,持有该角色的用户**下次请求**即生效(权限缓存按角色失效)。
 - [ ] 菜单按权限显隐;无权限的路由直接访问被拦/404。
 - [ ] 菜单管理列表的类型徽标按 `menu_type` dict 的 css_class 着色:目录=info(蓝)、菜单=success(绿)、按钮=violet(紫)。

@@ -362,22 +362,11 @@ public class UserAdminService {
         u.setStatus(status);
         userMapper.updateById(u);
         cacheService.evictUser(userId);
-
-        // Mirror the status into Keycloak. CRITICAL: a DB status=0 alone does NOT
-        // stop SSO — Keycloak still authenticates the (KC-enabled) user and the
-        // OIDC JIT resolver lets them in. Disabling the KC user makes Keycloak
-        // itself refuse the login, so a disabled user can't simply sign in again.
-        KeycloakUserService keycloak = keycloakProvider.getIfAvailable();
-        if (keycloak != null && u.getKeycloakId() != null && !u.getKeycloakId().isBlank()) {
-            keycloak.setEnabled(RequestContext.tenantIdOrDefault(), u.getKeycloakId(), enabling);
-        }
-        // Disabling must take effect immediately for every active token (kick +
-        // end the KC session); enabling clears the stale kick so fresh tokens work.
-        if (enabling) {
-            sessionTermination.reactivateUser(userId);
-        } else {
-            sessionTermination.terminateUser(userId);
-        }
+        // All session/Keycloak side-effects of the enabled state live in one place
+        // (shared with the platform-user console): disable kicks tokens + disables
+        // the KC user (KC refuses the login — a DB status=0 alone does NOT stop SSO)
+        // + ends the KC session; enable clears the kick + re-enables the KC user.
+        sessionTermination.applyEnabled(userId, enabling);
     }
 
     /**

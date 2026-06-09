@@ -45,6 +45,7 @@ class OidcJitUserServiceTest {
     @Mock UserMapper userMapper;
     @Mock RoleMapper roleMapper;
     @Mock com.platform.system.rbac.service.BuiltInRoleLookup roleLookup;
+    @Mock com.platform.core.infrastructure.numbering.NumberingService numberingService;
     @InjectMocks OidcJitUserService service;
 
     @BeforeEach
@@ -199,6 +200,7 @@ class OidcJitUserServiceTest {
                 "name", "Carol Carolsdottir"));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-3", "acme")).thenReturn(null);
         when(userMapper.findByIdentifier("acme", "carol")).thenReturn(null);
+        when(numberingService.next("USER", "acme")).thenReturn("U00000007");
 
         String businessId = service.resolveBusinessUserId(token);
 
@@ -213,11 +215,32 @@ class OidcJitUserServiceTest {
         assertThat(inserted.getEmail()).isEqualTo("carol@acme.example");
         assertThat(inserted.getDisplayName()).isEqualTo("Carol Carolsdottir");
         assertThat(inserted.getStatus()).isEqualTo(1);
-        // userNo intentionally NOT auto-numbered — admin must do that
-        // explicitly so the audit trail attributes the number to a person.
-        assertThat(inserted.getUserNo()).isNull();
+        // JIT users are COMPLETE records: a per-tenant user_no is allocated
+        // (same numbering as UserAdminService.create) — not left NULL.
+        assertThat(inserted.getUserNo()).isEqualTo("U00000007");
         // No password — these users authenticate via the IdP.
         assertThat(inserted.getPasswordHash()).isNull();
+    }
+
+    @Test
+    void deletedUser_refusesReProvision_returnsNullNoGhostInsert() {
+        // Regression: an admin deleted this user (business row now mark=0), but
+        // their access token is still valid. The JIT path must NOT create a new
+        // roleless "ghost" row — it returns null (→ no business user → SPA logs out).
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-deleted",
+                "tid", "demo",
+                "preferred_username", "sozo-admin2",
+                "given_name", "sozo-admin2",
+                "family_name", "sozo-admin2"));
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-deleted", "demo")).thenReturn(null);
+        when(userMapper.countDeletedByKeycloakIdAndTenant("kc-uuid-deleted", "demo")).thenReturn(1L);
+
+        String businessId = service.resolveBusinessUserId(token);
+
+        assertThat(businessId).isNull();
+        verify(userMapper, never()).insert(any(UserEntity.class));     // no ghost
+        verify(userMapper, never()).findByIdentifier(any(), any());    // refused before legacy-bind
     }
 
     @Test

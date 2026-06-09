@@ -717,6 +717,8 @@ export default {
       resetPasswordDisabledSso: 'SSO モードでは無効：ユーザーは Keycloak アカウントコンソールで自分のパスワードを変更します',
       statusChangeDisabled: '内蔵ユーザーは状態変更不可',
       toggleStatus: '有効/無効',
+      disable: '停止',
+      enable: '再開',
       forceLogout: '強制ログアウト',
       deleteDisabled: '内蔵ユーザーは削除不可'
     },

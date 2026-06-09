@@ -8,12 +8,10 @@ import DeptPicker from '@/components/shared/DeptPicker.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import { useDict } from '@/composables/useDict'
-import { Plus, Search, RotateCcw, Pencil, Trash2, Power, Key, LogOut } from 'lucide-vue-next'
+import { Plus, Search, RotateCcw, Pencil, Trash2, Pause, Play, Key, LogOut } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
-const commonStatus = useDict('common_status')
 import {
   getUserListApi, deleteUserApi, changeUserStatusApi, forceLogoutApi
 } from '@/services/user'
@@ -208,8 +206,8 @@ onMounted(() => {
           <span>{{ deptName(row.deptId) }}</span>
         </template>
         <template #cell-status="{ row }">
-          <Badge :variant="commonStatus.cssClass(row.status) || 'outline'">
-            {{ commonStatus.label(row.status) }}
+          <Badge :variant="row.status === 1 ? 'success' : 'danger'">
+            {{ row.status === 1 ? t('common.status.enabled') : t('common.status.disabled') }}
           </Badge>
         </template>
         <template #cell-actions="{ row }">
@@ -227,12 +225,19 @@ onMounted(() => {
                     @click="openResetPwd(row)">
               <Key class="size-3.5" />
             </button>
-            <button v-permission="'user:update'"
-                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            <button v-if="row.status === 1" v-permission="'user:update'"
+                    class="h-7 px-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                     :disabled="row.username === 'admin'"
-                    :title="row.username === 'admin' ? t('user.tooltip.statusChangeDisabled') : t('user.tooltip.toggleStatus')"
+                    :title="row.username === 'admin' ? t('user.tooltip.statusChangeDisabled') : t('user.tooltip.disable')"
                     @click="toggleStatus(row)">
-              <Power class="size-3.5" />
+              <Pause class="size-3.5" />
+            </button>
+            <button v-else v-permission="'user:update'"
+                    class="h-7 px-2 rounded hover:bg-emerald-500/10 text-emerald-600 text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    :disabled="row.username === 'admin'"
+                    :title="row.username === 'admin' ? t('user.tooltip.statusChangeDisabled') : t('user.tooltip.enable')"
+                    @click="toggleStatus(row)">
+              <Play class="size-3.5" />
             </button>
             <button v-permission="'*:*'"
                     class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
