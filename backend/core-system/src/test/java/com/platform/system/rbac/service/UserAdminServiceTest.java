@@ -255,6 +255,64 @@ class UserAdminServiceTest {
         verify(userMapper).updateById(adminUser);
     }
 
+    // ─── KC profile sync on email / displayName edits ──────────────────
+    // Both the admin console edit and the self-service Profile page must
+    // mirror contact changes into Keycloak — otherwise KC keeps the old
+    // email and its "forgot password" flow mails the stale address.
+
+    @Test
+    void update_syncsEmailAndDisplayNameToKeycloak() {
+        UserEntity u = user("u1", "alice");
+        u.setKeycloakId("kc-1");
+        when(userMapper.selectById("u1")).thenReturn(u);
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+        KeycloakUserService kc = org.mockito.Mockito.mock(KeycloakUserService.class);
+        when(keycloakProvider.getIfAvailable()).thenReturn(kc);
+
+        service.update("u1", new UserDto.UpdateRequest(
+                "alice-new@example.com", "Alice New", null, null));
+
+        verify(kc).updateProfile("acme", "kc-1", "alice-new@example.com", "Alice New");
+        verify(userMapper).updateById(u);
+    }
+
+    @Test
+    void update_keycloakFailureLeavesDbUntouched() {
+        // KC-first ordering (same as create): if the KC mirror fails, the
+        // local row must NOT be written — otherwise DB and KC diverge and
+        // the operator gets no signal.
+        UserEntity u = user("u1", "alice");
+        u.setKeycloakId("kc-1");
+        when(userMapper.selectById("u1")).thenReturn(u);
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+        KeycloakUserService kc = org.mockito.Mockito.mock(KeycloakUserService.class);
+        when(keycloakProvider.getIfAvailable()).thenReturn(kc);
+        org.mockito.Mockito.doThrow(new KeycloakUserService.KeycloakOperationException("boom"))
+                .when(kc).updateProfile(anyString(), anyString(), any(), any());
+
+        assertThatThrownBy(() -> service.update("u1", new UserDto.UpdateRequest(
+                "alice-new@example.com", null, null, null)))
+                .isInstanceOf(KeycloakUserService.KeycloakOperationException.class);
+
+        verify(userMapper, never()).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    void updateOwnProfile_syncsToKeycloak() {
+        // RequestContext userId is "tester" (seeded above) — the Profile page
+        // edits the caller's OWN row.
+        UserEntity me = user("tester", "tester");
+        me.setKeycloakId("kc-me");
+        when(userMapper.selectById("tester")).thenReturn(me);
+        KeycloakUserService kc = org.mockito.Mockito.mock(KeycloakUserService.class);
+        when(keycloakProvider.getIfAvailable()).thenReturn(kc);
+
+        service.updateOwnProfile(new UserDto.ProfileUpdateRequest("me-new@example.com", "Me New"));
+
+        verify(kc).updateProfile("acme", "kc-me", "me-new@example.com", "Me New");
+        verify(userMapper).updateById(me);
+    }
+
     @Test
     void delete_refusesLastSuperAdmin() {
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));

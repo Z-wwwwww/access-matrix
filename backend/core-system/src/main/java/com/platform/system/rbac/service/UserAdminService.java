@@ -252,6 +252,7 @@ public class UserAdminService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required");
         }
         UserEntity u = require(me);
+        syncKeycloakProfile(u, req.email(), req.displayName());
         if (req.email() != null) u.setEmail(req.email());
         if (req.displayName() != null) u.setDisplayName(req.displayName());
         userMapper.updateById(u);
@@ -279,6 +280,7 @@ public class UserAdminService {
                 throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.adminContactOnly");
             }
         }
+        syncKeycloakProfile(u, req.email(), req.displayName());
         if (req.email() != null) u.setEmail(req.email());
         // userNo は採番（read-only）。クライアントから来ても無視（DTO にも無い）。
         if (req.displayName() != null) u.setDisplayName(req.displayName());
@@ -527,6 +529,27 @@ public class UserAdminService {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR,
                     "Cannot " + op + " the last active SUPER_ADMIN user");
         }
+    }
+
+    /**
+     * Mirror an email / displayName change into Keycloak (same as the
+     * platform-user console's {@code kc.updateProfile}): email stays
+     * verified, first/last name re-derived. Without this, KC keeps the
+     * OLD values — its account console shows them, and worse, the
+     * "forgot password" flow mails the OLD address.
+     *
+     * <p>Called BEFORE the local write, KC-first like {@code create}: a KC
+     * failure propagates (mapped to {@code error.keycloak.operationFailed})
+     * and the DB row stays untouched, so the two never diverge. No-op when
+     * KC is off, the row has no Keycloak link, or both fields are absent.
+     */
+    private void syncKeycloakProfile(UserEntity u, String email, String displayName) {
+        boolean hasEmail   = email != null && !email.isBlank();
+        boolean hasDisplay = displayName != null && !displayName.isBlank();
+        if (!hasEmail && !hasDisplay) return;
+        KeycloakUserService keycloak = keycloakProvider.getIfAvailable();
+        if (keycloak == null || u.getKeycloakId() == null || u.getKeycloakId().isBlank()) return;
+        keycloak.updateProfile(RequestContext.tenantIdOrDefault(), u.getKeycloakId(), email, displayName);
     }
 
     private UserEntity require(String id) {
