@@ -698,7 +698,7 @@ export default {
   user: {
     search: {
       placeholder: { keyword: '登入 ID / 信箱 / 使用者名稱' },
-      label: { deptId: '部門' }
+      label: { deptId: '部門', roleId: '角色' }
     },
     column: {
       username: '登入 ID',

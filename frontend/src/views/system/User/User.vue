@@ -5,6 +5,7 @@ import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Drawer from '@/components/ui/Drawer.vue'
+import Select from '@/components/ui/Select.vue'
 import DeptPicker from '@/components/shared/DeptPicker.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
@@ -17,6 +18,7 @@ import {
   getUserListApi, deleteUserApi, changeUserStatusApi, forceLogoutApi, resetUserPasswordApi
 } from '@/services/user'
 import { getDeptTreeApi } from '@/services/dept'
+import { getRoleListApi } from '@/services/role'
 import UserEdit from './UserEdit.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -57,7 +59,20 @@ const list = ref([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
-const search = reactive({ keyword: '', deptId: '' })
+const search = reactive({ keyword: '', deptId: '', roleId: '' })
+
+// 角色筛选の選択肢。ロールは租户内せいぜい数十件想定なので 1 ページで取り切る
+// (UserEdit のロール割当と同じ取り方)。失敗しても検索自体は使える(非致命)。
+const roleOptions = ref([])
+
+async function loadRoleOptions() {
+  try {
+    const res = await getRoleListApi({ page: 1, size: 100 })
+    if (res.data.code === 0) {
+      roleOptions.value = (res.data.data.records || []).map(r => ({ label: r.name, value: r.id }))
+    }
+  } catch { /* 非致命:下拉为空即可 */ }
+}
 
 const showEdit = ref(false)
 const current = ref(null)
@@ -117,6 +132,7 @@ async function fetchData() {
 function resetSearch() {
   search.keyword = ''
   search.deptId = ''
+  search.roleId = ''
   page.value = 1
   fetchData()
 }
@@ -200,6 +216,7 @@ async function handleForceLogout(row) {
 onMounted(() => {
   fetchData()
   loadDeptMap()
+  loadRoleOptions()
 })
 </script>
 
@@ -214,6 +231,10 @@ onMounted(() => {
         <div class="w-60">
           <label class="text-xs text-muted-foreground block mb-1">{{ t('user.search.label.deptId') }}</label>
           <DeptPicker v-model="search.deptId" :placeholder="t('common.placeholder.deptId')" />
+        </div>
+        <div class="w-60">
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('user.search.label.roleId') }}</label>
+          <Select v-model="search.roleId" :options="roleOptions" />
         </div>
         <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                 @click="() => { page = 1; fetchData() }">

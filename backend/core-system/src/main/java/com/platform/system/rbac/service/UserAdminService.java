@@ -83,7 +83,7 @@ public class UserAdminService {
         this.mailProps = mailProps;
     }
 
-    public PageResult<UserDto.View> list(long page, long size, String keyword, String deptId) {
+    public PageResult<UserDto.View> list(long page, long size, String keyword, String deptId, String roleId) {
         Page<UserEntity> p = new Page<>(page, size);
         QueryWrapper<UserEntity> w = new QueryWrapper<UserEntity>().eq("mark", 1).orderByDesc("create_time");
         if (keyword != null && !keyword.isBlank()) {
@@ -91,6 +91,16 @@ public class UserAdminService {
         }
         if (deptId != null && !deptId.isBlank()) {
             w.eq("dept_id", deptId);
+        }
+        if (roleId != null && !roleId.isBlank()) {
+            // Users holding the role via an active link. {0}/{1} are bound
+            // parameters (no string concat — roleId is client input). The
+            // outer column must be table-qualified: the subquery's own `id`
+            // would shadow it. tenant_id is bound explicitly so the filter
+            // doesn't depend on the tenant interceptor rewriting subqueries.
+            w.exists("SELECT 1 FROM core_rbac_user_role ur WHERE ur.user_id = core_auth_user.id "
+                    + "AND ur.role_id = {0} AND ur.tenant_id = {1} AND ur.mark = 1",
+                    roleId, RequestContext.tenantIdOrDefault());
         }
         Page<UserEntity> result = userMapper.selectPage(p, w);
         Set<String> superIds = superAdminUserIds();

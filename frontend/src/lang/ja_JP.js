@@ -708,7 +708,7 @@ export default {
   user: {
     search: {
       placeholder: { keyword: 'ログインID / メール / ユーザー名' },
-      label: { deptId: '部署' }
+      label: { deptId: '部署', roleId: 'ロール' }
     },
     column: {
       username: 'ログインID',

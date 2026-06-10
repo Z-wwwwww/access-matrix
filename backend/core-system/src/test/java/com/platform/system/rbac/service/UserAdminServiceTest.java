@@ -1,6 +1,7 @@
 package com.platform.system.rbac.service;
 
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
@@ -141,6 +142,26 @@ class UserAdminServiceTest {
         service.create(req);
 
         verify(numberingService).next("USER", "demo");
+    }
+
+    @Test
+    void list_withRoleFilter_addsParameterizedExistsClause() {
+        // The role filter must be a BOUND subquery (no string concat — roleId
+        // is client input) against active user_role links, with the outer id
+        // table-qualified so the link table's own `id` doesn't shadow it.
+        Page<UserEntity> page = new Page<>(1, 20);
+        page.setRecords(List.of());
+        when(userMapper.selectPage(any(), any())).thenReturn(page);
+        when(userRoleMapper.findUserIdsByRoleId(BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(List.of());
+
+        service.list(1, 20, null, null, "role-1");
+
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<UserEntity>> cap =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class);
+        verify(userMapper).selectPage(any(), cap.capture());
+        assertThat(cap.getValue().getSqlSegment()).contains("EXISTS");
+        assertThat(cap.getValue().getSqlSegment()).contains("ur.user_id = core_auth_user.id");
+        assertThat(cap.getValue().getParamNameValuePairs().values()).contains("role-1", "acme");
     }
 
     @Test

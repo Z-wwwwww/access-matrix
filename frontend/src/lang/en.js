@@ -698,7 +698,7 @@ export default {
   user: {
     search: {
       placeholder: { keyword: 'Login ID / Email / Username' },
-      label: { deptId: 'Department' }
+      label: { deptId: 'Department', roleId: 'Role' }
     },
     column: {
       username: 'Login ID',

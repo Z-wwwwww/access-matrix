@@ -698,7 +698,7 @@ export default {
   user: {
     search: {
       placeholder: { keyword: '登录ID / 邮箱 / 用户名' },
-      label: { deptId: '部门' }
+      label: { deptId: '部门', roleId: '角色' }
     },
     column: {
       username: '登录ID',

@@ -28,8 +28,9 @@ public class UserAdminController {
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "20") long size,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String deptId) {
-        return JsonResult.ok(service.list(page, size, keyword, deptId));
+            @RequestParam(required = false) String deptId,
+            @RequestParam(required = false) String roleId) {
+        return JsonResult.ok(service.list(page, size, keyword, deptId, roleId));
     }
 
     @GetMapping("/{id}")

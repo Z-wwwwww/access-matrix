@@ -698,7 +698,7 @@ export default {
   user: {
     search: {
       placeholder: { keyword: '로그인 ID / 이메일 / 사용자명' },
-      label: { deptId: '부서' }
+      label: { deptId: '부서', roleId: '역할' }
     },
     column: {
       username: '로그인 ID',
