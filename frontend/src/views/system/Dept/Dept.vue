@@ -170,7 +170,20 @@ async function save() {
         status: editForm.status
       }
       const r = await updateDeptApi(editForm.id, body)
-      if (r.data.code !== 0) { toast.error(r.data.msg || t('dept.edit.message.updateFailed')); return }
+      // IN_USE (703) — 停用しようとした部署が SCOPE_CUSTOM ロールのデータ範囲に
+      // 含まれている。確認の上 force=true で再送信（削除と同じハンドシェイク）。
+      if (r.data.code === 703) {
+        const roles = r.data.data?.roles ?? 0
+        const forceOk = await confirm({
+          title: t('common.confirm.forceTitle'),
+          message: t('dept.confirm.disableInUseMessage', { roles }),
+          variant: 'destructive',
+          confirmText: t('common.button.confirm')
+        })
+        if (!forceOk) return
+        const r2 = await updateDeptApi(editForm.id, body, { force: true })
+        if (r2.data.code !== 0) { toast.error(r2.data.msg || t('dept.edit.message.updateFailed')); return }
+      } else if (r.data.code !== 0) { toast.error(r.data.msg || t('dept.edit.message.updateFailed')); return }
     } else {
       const body = {
         parentId: editForm.parentId || null,

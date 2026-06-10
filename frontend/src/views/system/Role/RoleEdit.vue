@@ -8,7 +8,7 @@ import Switch from '@/components/ui/Switch.vue'
 import Checkbox from '@/components/ui/Checkbox.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import { TabsContent } from 'radix-vue'
-import { ChevronRight, ChevronDown } from 'lucide-vue-next'
+import { ChevronRight, ChevronDown, X } from 'lucide-vue-next'
 import { deptIconFor as deptIcon } from '@/utils/dept-icons'
 import LucideIcon from '@/components/shared/LucideIcon.vue'
 import { toast } from '@/composables/useToast'
@@ -212,6 +212,36 @@ function toggleDept(id) {
 function toggleDeptExpand(id) {
   if (expandedDeptIds.value.has(id)) expandedDeptIds.value.delete(id)
   else expandedDeptIds.value.add(id)
+}
+
+// ---- 失効バインド（幽霊選択）の可視化 ----
+// 部署ツリー（findAllForTenant）は status=1 のみ返すので、「バインド済みなのに
+// ツリーに存在しない」dept id = 停用 or 削除済み。ツリーに描画されない＝画面では
+// 見えないのに保存のたび原様に書き戻される幽霊選択になるため、明示的に列挙して
+// 外せるようにする。ツリー取得失敗時（deptTree 空）は誤判定するので出さない。
+const treeDeptIds = computed(() => {
+  const ids = new Set()
+  ;(function walk(nodes) {
+    for (const n of nodes) {
+      ids.add(String(n.id))
+      if (n.children?.length) walk(n.children)
+    }
+  })(deptTree.value)
+  return ids
+})
+
+const invalidDeptIds = computed(() => {
+  if (!deptTree.value.length) return []
+  return selectedDeptIds.value.filter((id) => !treeDeptIds.value.has(String(id)))
+})
+
+function removeInvalidDept(id) {
+  selectedDeptIds.value = selectedDeptIds.value.filter((v) => String(v) !== String(id))
+}
+
+function clearInvalidDepts() {
+  const inv = new Set(invalidDeptIds.value.map(String))
+  selectedDeptIds.value = selectedDeptIds.value.filter((v) => !inv.has(String(v)))
 }
 
 // ---- Permissions two-pane: module ごとのカウント + 全選択トグル ----
@@ -571,6 +601,29 @@ async function save() {
       </TabsContent>
 
       <TabsContent v-if="form.dataScope === 5" value="depts" force-mount>
+        <!-- 失効バインド（停用/削除済みの部署がまだバインドされている）警告 -->
+        <div v-if="invalidDeptIds.length"
+             class="mx-4 mt-3 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-sm space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-medium text-amber-700 dark:text-amber-400">{{ t('role.edit.invalidDepts.title') }}</span>
+            <button v-if="!isLocked" type="button"
+                    class="text-xs px-2 py-1 rounded border border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                    @click="clearInvalidDepts">
+              {{ t('role.edit.invalidDepts.clear') }}
+            </button>
+          </div>
+          <p class="text-xs text-muted-foreground">{{ t('role.edit.invalidDepts.hint') }}</p>
+          <div class="flex flex-wrap gap-1.5">
+            <span v-for="id in invalidDeptIds" :key="id"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted font-mono text-xs">
+              {{ id }}
+              <button v-if="!isLocked" type="button" class="text-muted-foreground hover:text-destructive"
+                      :title="t('role.edit.invalidDepts.remove')" @click="removeInvalidDept(id)">
+                <X class="size-3" />
+              </button>
+            </span>
+          </div>
+        </div>
         <div class="p-4 max-h-96 overflow-y-auto bg-muted/20" :class="isLocked && 'opacity-60 pointer-events-none'">
           <div v-if="flatDeptTree.length" class="space-y-0.5">
             <div

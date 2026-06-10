@@ -875,6 +875,12 @@ export default {
         impliedTag: '（自動）',
         impliedTooltip: '親部署の選択により自動的に含まれます。外すには上位の選択を解除してください。'
       },
+      invalidDepts: {
+        title: '失効した部署バインド',
+        hint: '以下の部署は停止または削除済みのため、データ可視性を付与せず、下のツリーでも編集できません。除去して保存することを推奨します。',
+        clear: 'すべて除去',
+        remove: '除去'
+      },
       tooltip: {
         locked: '内蔵ロールは編集不可'
       }
@@ -905,6 +911,7 @@ export default {
     confirm: {
       deleteTitle: '部署削除',
       deleteMessage: '「{name}」を削除しますか？',
+      disableInUseMessage: '{roles} 件のロールがこの部署をカスタムデータ範囲に指定しています。停止すると、これらのロールはこの部署のデータを参照できなくなります（有効な子部署は影響を受けません）。停止しますか？',
       inUseMessage: 'この部署には：子部署 {children} 件、所属ユーザー {users} 名、参照ロール {roles} 件（SCOPE_CUSTOM データ範囲）があります。\n\n強制削除すると、この部署と全子部署をまとめてソフト削除し、所属ユーザーの部署設定をクリア、参照ロールのカスタムデータ範囲からも除外します。続行しますか？'
     },
     edit: {

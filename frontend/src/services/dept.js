@@ -10,9 +10,13 @@ export function addDeptApi(data) {
   return request.post('/admin/dept', data)
 }
 
-/** 部署更新 */
-export function updateDeptApi(id, data) {
-  return request.put('/admin/dept/' + id, data)
+/**
+ * 部署更新。停用（status 1→0）時に SCOPE_CUSTOM ロールから参照されていると
+ * backend が IN_USE (code=703, data.roles=件数) を返すので、呼び出し側で
+ * 再確認 → {force:true} で再送信する想定（削除と同じハンドシェイク）。
+ */
+export function updateDeptApi(id, data, opts = {}) {
+  return request.put('/admin/dept/' + id, data, opts.force ? { params: { force: true } } : {})
 }
 
 /**

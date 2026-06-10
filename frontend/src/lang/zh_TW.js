@@ -865,6 +865,12 @@ export default {
         impliedTag: '（包含）',
         impliedTooltip: '勾選父部門時自動包含。若需移除，請先取消上級勾選。'
       },
+      invalidDepts: {
+        title: '已失效的部門綁定',
+        hint: '以下部門已被停用或刪除，不再賦予任何資料可見性，且無法在下方樹中編輯。建議移除後儲存。',
+        clear: '全部移除',
+        remove: '移除'
+      },
       tooltip: {
         locked: '內建角色不可編輯'
       }
@@ -895,6 +901,7 @@ export default {
     confirm: {
       deleteTitle: '刪除部門',
       deleteMessage: '刪除「{name}」嗎？',
+      disableInUseMessage: '有 {roles} 個角色把該部門設為自訂資料範圍。停用後，這些角色將看不到該部門的資料（仍啟用的子部門不受影響）。仍要停用嗎？',
       inUseMessage: '該部門有：子部門 {children} 個、所屬使用者 {users} 個、角色參照 {roles} 個（含其 SCOPE_CUSTOM 範圍）。\n\n強制刪除將級聯軟刪該部門及所有子部門，所屬使用者的部門設定會被清空，相關角色的自訂資料範圍中也會移除該部門。是否繼續？'
     },
     edit: {

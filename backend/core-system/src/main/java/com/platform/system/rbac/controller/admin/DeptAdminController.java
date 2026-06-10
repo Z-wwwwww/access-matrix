@@ -29,8 +29,10 @@ public class DeptAdminController {
     @PutMapping("/{id}")
     @RequiresPermission(SystemPermissions.DEPT_UPDATE)
     @OpLog(module = "system", action = "dept.update", targetType = "dept")
-    public JsonResult<Void> update(@PathVariable String id, @Valid @RequestBody DeptAdminDto.UpdateRequest req) {
-        service.update(id, req);
+    public JsonResult<Void> update(@PathVariable String id,
+                                   @Valid @RequestBody DeptAdminDto.UpdateRequest req,
+                                   @RequestParam(defaultValue = "false") boolean force) {
+        service.update(id, req, force);
         return JsonResult.ok();
     }
 

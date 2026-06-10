@@ -865,6 +865,12 @@ export default {
         impliedTag: '(자동)',
         impliedTooltip: '상위 부서 선택에 의해 자동 포함됩니다. 제외하려면 상위 선택을 해제하세요.'
       },
+      invalidDepts: {
+        title: '무효화된 부서 바인딩',
+        hint: '다음 부서는 비활성화 또는 삭제되어 데이터 가시성을 부여하지 않으며, 아래 트리에서 편집할 수 없습니다. 제거 후 저장하는 것을 권장합니다.',
+        clear: '모두 제거',
+        remove: '제거'
+      },
       tooltip: {
         locked: '기본 제공 역할은 편집할 수 없습니다'
       }
@@ -895,6 +901,7 @@ export default {
     confirm: {
       deleteTitle: '부서 삭제',
       deleteMessage: '「{name}」을(를) 삭제하시겠습니까?',
+      disableInUseMessage: '{roles}개의 역할이 이 부서를 사용자 지정 데이터 범위로 지정하고 있습니다. 비활성화하면 해당 역할은 이 부서의 데이터를 볼 수 없게 됩니다(활성 상태인 하위 부서는 영향 없음). 그래도 비활성화하시겠습니까?',
       inUseMessage: '이 부서에는: 하위 부서 {children}개, 소속 사용자 {users}명, 참조 역할 {roles}개(SCOPE_CUSTOM 데이터 범위)가 있습니다.\n\n강제 삭제하면 이 부서와 모든 하위 부서를 함께 소프트 삭제하며, 소속 사용자의 부서 설정 및 참조 역할의 커스텀 데이터 범위에서도 해제됩니다. 계속하시겠습니까?'
     },
     edit: {

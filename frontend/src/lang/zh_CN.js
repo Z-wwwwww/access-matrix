@@ -865,6 +865,12 @@ export default {
         impliedTag: '（包含）',
         impliedTooltip: '勾选父部门时自动包含。若需移除，请先取消上级勾选。'
       },
+      invalidDepts: {
+        title: '已失效的部门绑定',
+        hint: '以下部门已被停用或删除，不再赋予任何数据可见性，且无法在下方树中编辑。建议移除后保存。',
+        clear: '全部移除',
+        remove: '移除'
+      },
       tooltip: {
         locked: '内置角色不可编辑'
       }
@@ -895,6 +901,7 @@ export default {
     confirm: {
       deleteTitle: '删除部门',
       deleteMessage: '删除「{name}」吗？',
+      disableInUseMessage: '有 {roles} 个角色把该部门设为自定义数据范围。停用后，这些角色将看不到该部门的数据（仍启用的子部门不受影响）。仍要停用吗？',
       inUseMessage: '该部门有：子部门 {children} 个、所属用户 {users} 个、角色引用 {roles} 个（含其 SCOPE_CUSTOM 范围）。\n\n强制删除将级联软删该部门及所有子部门，所属用户的部门设置会被清空，相关角色的自定义数据范围中也会移除该部门。是否继续？'
     },
     edit: {

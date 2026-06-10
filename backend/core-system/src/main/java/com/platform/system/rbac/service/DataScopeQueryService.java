@@ -105,9 +105,15 @@ public class DataScopeQueryService implements UserDataScopeLookup {
                 case SCOPE_CUSTOM -> {
                     List<String> explicit = roleDeptMapper.findDeptIdsByRoleId(role.getId(), tenantId);
                     for (String d : explicit) {
-                        // Each explicit dept also includes its subtree.
+                        // Each explicit dept also includes its subtree. A dept whose
+                        // row is gone (mark=0 — possible via manual SQL; the delete
+                        // flow cascades role_dept) contributes NOTHING: adding the
+                        // raw id would keep rows stamped with a deleted dept visible,
+                        // the opposite of the fail-closed rule a disabled dept gets
+                        // (findSubtreeIds filters status=1, excluding it).
                         DeptEntity dept = deptMapper.selectById(d);
-                        if (dept != null && dept.getPath() != null) {
+                        if (dept == null) continue;
+                        if (dept.getPath() != null) {
                             visibleDeptIds.addAll(deptMapper.findSubtreeIds(dept.getPath(), tenantId));
                         } else {
                             visibleDeptIds.add(d);

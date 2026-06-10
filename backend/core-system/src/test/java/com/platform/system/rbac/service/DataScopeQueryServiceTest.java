@@ -209,6 +209,27 @@ class DataScopeQueryServiceTest {
     }
 
     @Test
+    void customScope_skipsDeletedDept_failClosed() {
+        // A role_dept binding whose dept row is GONE (mark=0 — e.g. manual SQL;
+        // the delete flow normally cascades the binding) must contribute
+        // NOTHING. The old behaviour added the raw id, keeping rows stamped
+        // with a deleted dept visible — the opposite of the fail-closed rule
+        // a disabled dept gets.
+        when(permissionQueryService.loadUserPermissions("u1")).thenReturn(Set.of("user:read"));
+        when(roleMapper.findRolesByUserId("u1", "acme")).thenReturn(List.of(
+                role("r1", DataScopeQueryService.SCOPE_CUSTOM)));
+        when(userMapper.selectById("u1")).thenReturn(userInDept("u1", "d99"));
+        when(deptMapper.selectById("d99")).thenReturn(dept("d99", "/d99"));
+        when(roleDeptMapper.findDeptIdsByRoleId("r1", "acme")).thenReturn(List.of("gone"));
+        when(deptMapper.selectById("gone")).thenReturn(null);   // deleted
+
+        DataScopeDecision d = service.loadDecision("u1");
+
+        assertThat(d.visibleDeptIds()).isEmpty();
+        assertThat(d.hasNoAccess()).isTrue();
+    }
+
+    @Test
     void multiRoleUnion_combinesDeptAndSelf() {
         // A user with both a DEPT role and a SELF role sees the UNION: their dept's rows
         // OR rows they created. The OR is intentional — UNION across modes, not intersection.

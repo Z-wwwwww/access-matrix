@@ -70,6 +70,61 @@ class DeptAdminServiceDeleteTest {
         return d;
     }
 
+    // ─── disable guard (update status 1→0) ─────────────────────────────
+    // Disabling a dept silently shrinks every SCOPE_CUSTOM role referencing
+    // it (findSubtreeIds filters status=1), and the role-edit tree hides
+    // disabled depts so the binding turns into an invisible ghost. The
+    // update path therefore runs the same IN_USE + force handshake as delete.
+
+    @Test
+    void disableWithoutForce_throwsInUseWhenRoleRefsExist() {
+        DeptEntity d = dept("d1", "/d1");
+        d.setStatus(1);
+        when(deptMapper.selectById("d1")).thenReturn(d);
+        when(roleDeptMapper.selectCount(any())).thenReturn(2L);
+
+        assertThatThrownBy(() -> service.update("d1",
+                new com.platform.system.rbac.dto.DeptAdminDto.UpdateRequest(null, null, null, null, 0), false))
+                .isInstanceOfSatisfying(BusinessException.class, ex -> {
+                    assertThat(ex.errorCode()).isEqualTo(ErrorCode.IN_USE);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> detail = (Map<String, Object>) ex.detail();
+                    assertThat(detail).containsEntry("roles", 2L);
+                });
+
+        verify(deptMapper, never()).updateById(any(DeptEntity.class));
+    }
+
+    @Test
+    void disableWithForce_proceeds() {
+        DeptEntity d = dept("d1", "/d1");
+        d.setStatus(1);
+        when(deptMapper.selectById("d1")).thenReturn(d);
+
+        service.update("d1",
+                new com.platform.system.rbac.dto.DeptAdminDto.UpdateRequest(null, null, null, null, 0), true);
+
+        // force skips the ref count entirely and writes the new status.
+        verify(roleDeptMapper, never()).selectCount(any());
+        assertThat(d.getStatus()).isEqualTo(0);
+        verify(deptMapper).updateById(d);
+    }
+
+    @Test
+    void enable_neverChecksRoleRefs() {
+        // Only the disable direction can shrink a CUSTOM scope — re-enabling
+        // (or re-asserting enabled) must not trip the guard.
+        DeptEntity d = dept("d1", "/d1");
+        d.setStatus(0);
+        when(deptMapper.selectById("d1")).thenReturn(d);
+
+        service.update("d1",
+                new com.platform.system.rbac.dto.DeptAdminDto.UpdateRequest(null, null, null, null, 1), false);
+
+        verify(roleDeptMapper, never()).selectCount(any());
+        assertThat(d.getStatus()).isEqualTo(1);
+    }
+
     @Test
     void deleteWithoutForce_throwsInUseWhenRoleRefsExist_evenIfNoChildrenNoUsers() {
         // Specific regression: role_dept refs alone (no children, no direct user.dept_id)

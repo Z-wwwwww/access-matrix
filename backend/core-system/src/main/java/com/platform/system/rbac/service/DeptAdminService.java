@@ -67,7 +67,7 @@ public class DeptAdminService {
     }
 
     @Transactional
-    public void update(String id, DeptAdminDto.UpdateRequest req) {
+    public void update(String id, DeptAdminDto.UpdateRequest req, boolean force) {
         DeptEntity d = require(id);
         if (req.parentId() != null && !req.parentId().isBlank() && !req.parentId().equals(d.getParentId())) {
             if (req.parentId().equals(id)) {
@@ -98,6 +98,23 @@ public class DeptAdminService {
         }
         if (req.status() != null) {
             DictEnum.requireValid(CommonStatus.class, req.status(), "status");
+            // Disabling silently shrinks every SCOPE_CUSTOM role that references
+            // this dept: findSubtreeIds filters status=1, so the dept's own rows
+            // drop out of those roles' visible set with no signal anywhere (the
+            // role-edit dept tree hides disabled depts, so the binding becomes
+            // an invisible ghost). Same IN_USE + force handshake as delete so
+            // the admin disables with eyes open.
+            boolean disabling = req.status() == CommonStatus.DISABLED.code()
+                    && d.getStatus() != null && d.getStatus() == CommonStatus.ENABLED.code();
+            if (disabling && !force) {
+                long roles = countNonNull(roleDeptMapper.selectCount(
+                        new QueryWrapper<RoleDeptEntity>().eq("mark", 1).eq("dept_id", id)));
+                if (roles > 0) {
+                    throw new BusinessException(ErrorCode.IN_USE,
+                            "Department is set as custom data scope by " + roles + " role(s)",
+                            java.util.Map.of("roles", roles));
+                }
+            }
             d.setStatus(req.status());
         }
         deptMapper.updateById(d);

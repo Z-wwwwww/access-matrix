@@ -865,6 +865,12 @@ export default {
         impliedTag: '(included)',
         impliedTooltip: 'Automatically included via a selected parent department. To remove, uncheck the parent.'
       },
+      invalidDepts: {
+        title: 'Stale department bindings',
+        hint: 'These bound departments are no longer in the tree (disabled or deleted), so they grant no visibility and cannot be edited below. Remove them and save.',
+        clear: 'Remove all',
+        remove: 'Remove'
+      },
       tooltip: {
         locked: 'Built-in role is not editable'
       }
@@ -895,6 +901,7 @@ export default {
     confirm: {
       deleteTitle: 'Delete department',
       deleteMessage: 'Delete "{name}"?',
+      disableInUseMessage: '{roles} role(s) use this department as their custom data scope. Once disabled, those roles will no longer see this department’s data (still-enabled sub-departments are unaffected). Disable anyway?',
       inUseMessage: 'This department has {children} sub-department(s), {users} member(s), and {roles} role(s) referencing it (in their SCOPE_CUSTOM data range).\n\nForce delete will soft-delete this department and the entire subtree, clear affected users\'\' department assignment, and remove the department from the referencing roles\'\' custom data scope. Continue?'
     },
     edit: {
