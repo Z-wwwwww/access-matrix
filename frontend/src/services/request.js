@@ -3,8 +3,9 @@
  *
  *   - baseURL `/proxy_url` is routed by Vite to the new backend (port 9135).
  *   - Access token attached as `Authorization: Bearer <jwt>` from the auth store.
- *   - Refresh token rides as an HttpOnly cookie (Set by the backend on /auth/login);
- *     `withCredentials: true` ships it on /auth/refresh and /auth/logout.
+ *   - Refresh: SSO mode renews against KC's token endpoint with the stored
+ *     refresh_token (stores/auth.js); password mode rides the HttpOnly cookie
+ *     set on /auth/login (`withCredentials: true` ships it on /auth/refresh).
  *   - On 401 we run a single-flight refresh and replay the failed request; if the
  *     refresh fails the user is bounced to /login.
  */

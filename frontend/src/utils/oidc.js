@@ -360,3 +360,53 @@ export async function handleCallback(query) {
     expiresIn:    json.expires_in
   }
 }
+
+/**
+ * Renew the KC tokens with the refresh_token grant — the SSO-mode
+ * counterpart of the backend /auth/refresh cookie flow (password mode).
+ * Besides renewing the Bearer, each call resets Keycloak's SSO-session
+ * idle clock; without that, an actively working user is still thrown at
+ * the KC login form when ssoSessionIdleTimeout (= accessTokenLifespan,
+ * 30 min) runs out, because the SPA never otherwise talks to KC after
+ * login. stores/auth.js persists the rotated refresh_token and calls
+ * this both proactively (shortly before exp) and from the 401 path.
+ *
+ * Multi-tab note: safe while the realm keeps `revokeRefreshToken: false`
+ * (rotation doesn't invalidate the previous token, so concurrent tabs
+ * can't race each other out of a session).
+ *
+ * Throws on failure. `err.invalidGrant === true` means KC explicitly
+ * rejected the token (session idle/max reached, or logged out server-side)
+ * — the caller should drop the stored token and start a fresh login.
+ * Network errors / 5xx don't set the flag (the token may still be good).
+ */
+export async function refreshTokens(refreshToken) {
+  const cfg = oidcConfig()
+  if (!cfg.enabled) throw new Error('OIDC disabled (VITE_OIDC_ENABLED=false)')
+
+  const body = new URLSearchParams({
+    grant_type:    'refresh_token',
+    client_id:     cfg.clientId,
+    refresh_token: refreshToken
+  })
+
+  const res = await fetch(`${cfg.issuer}/protocol/openid-connect/token`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body
+  })
+  if (!res.ok) {
+    let detail = ''
+    try { detail = (await res.json()).error_description || '' } catch { /* noop */ }
+    const err = new Error(`OIDC token refresh failed (${res.status}) ${detail}`)
+    err.invalidGrant = res.status === 400 || res.status === 401
+    throw err
+  }
+  const json = await res.json()
+  return {
+    accessToken:  json.access_token,
+    idToken:      json.id_token,
+    refreshToken: json.refresh_token,
+    expiresIn:    json.expires_in
+  }
+}

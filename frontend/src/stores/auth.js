@@ -9,20 +9,26 @@
  *   - idToken     : OIDC id_token from the /token exchange. ONLY needed
  *                   for the RP-Initiated Logout call so Keycloak can wipe
  *                   its session cookie. Not used elsewhere.
- *   - refresh     : opaque token in HttpOnly cookie; never visible to JS
- *                   (password mode only — OIDC refresh lives in Keycloak's
- *                   session cookie, not in our app).
+ *   - refresh     : two modes. Password mode: opaque token in HttpOnly
+ *                   cookie, renewed via the backend /auth/refresh. OIDC
+ *                   mode: KC's refresh_token in localStorage, renewed
+ *                   directly against KC's token endpoint — proactively
+ *                   ~2 min before the access token expires (also resets
+ *                   KC's SSO-session idle clock so an open tab is never
+ *                   bounced to the KC login form mid-work) and reactively
+ *                   from the 401 interceptor.
  *   - userInfo    : profile + roles + authorities from GET /user/me.
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { loginApi, refreshApi, logoutApi, getMeApi } from '@/services/auth'
 import { decodeJwt } from '@/utils/jwt-decode'
-import { keycloakLogoutUrl, oidcConfig, isSsoReachable } from '@/utils/oidc'
+import { keycloakLogoutUrl, oidcConfig, isSsoReachable, refreshTokens } from '@/utils/oidc'
 import { clearTenantCache } from '@/utils/tenant'
 
 const ACCESS_KEY = 'access_token'
 const ID_TOKEN_KEY = 'id_token'
+const KC_REFRESH_KEY = 'kc_refresh_token'
 
 // Platform-ops "support session" — these slots hold the ORIGINAL ops
 // token + tenant_id while a support session is active. On terminate we
@@ -35,9 +41,10 @@ const SUPPORT_SESSION_KEY = 'support_session_info'   // { sessionId, tenantCode,
 const TENANT_LS_KEY = 'tenant_id'
 
 export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref(localStorage.getItem(ACCESS_KEY) || '')
-  const idToken     = ref(localStorage.getItem(ID_TOKEN_KEY) || '')
-  const userInfo    = ref(null)
+  const accessToken    = ref(localStorage.getItem(ACCESS_KEY) || '')
+  const idToken        = ref(localStorage.getItem(ID_TOKEN_KEY) || '')
+  const kcRefreshToken = ref(localStorage.getItem(KC_REFRESH_KEY) || '')
+  const userInfo       = ref(null)
 
   // --- JWT-derived ---
   const isAuthenticated = computed(() => !!accessToken.value)
@@ -65,10 +72,18 @@ export const useAuthStore = defineStore('auth', () => {
     else               localStorage.removeItem(ID_TOKEN_KEY)
   }
 
+  function setKcRefreshToken(t) {
+    kcRefreshToken.value = t || ''
+    if (kcRefreshToken.value) localStorage.setItem(KC_REFRESH_KEY, kcRefreshToken.value)
+    else                      localStorage.removeItem(KC_REFRESH_KEY)
+    scheduleKcRefresh()
+  }
+
   function clearAuth() {
     accessToken.value = ''
     idToken.value     = ''
     userInfo.value    = null
+    setKcRefreshToken('')   // also cancels the proactive refresh timer
     localStorage.removeItem(ACCESS_KEY)
     localStorage.removeItem(ID_TOKEN_KEY)
     sessionStorage.removeItem('access_matrix_tabs')
@@ -87,10 +102,69 @@ export const useAuthStore = defineStore('auth', () => {
     return res
   }
 
-  async function refresh() {
+  // Single-flight: the proactive timer and the 401 interceptor can both call
+  // refresh() — share one in-flight attempt instead of burning the (rotating)
+  // refresh token twice.
+  let refreshing = null
+
+  function refresh() {
+    refreshing = refreshing || doRefresh().finally(() => { refreshing = null })
+    return refreshing
+  }
+
+  async function doRefresh() {
+    // In a support session the live access token is the HS256 support token;
+    // a KC refresh would silently swap it back to the ops identity while
+    // tenant_id still points at the support tenant. Fail instead — the 401
+    // path then bounces to login, same as an expired support session always did.
+    if (isSupportSession.value) throw new Error('support session expired')
+
+    if (kcRefreshToken.value && oidcConfig().enabled) {
+      let t
+      try {
+        t = await refreshTokens(kcRefreshToken.value)
+      } catch (e) {
+        // KC explicitly rejected the token (SSO session over) — drop it so
+        // the bounce to /login → auto-SSO starts a clean login instead of
+        // retrying a dead token. Transient errors keep it for the next try.
+        if (e.invalidGrant) setKcRefreshToken('')
+        throw e
+      }
+      setAccessToken(t.accessToken)
+      if (t.idToken) setIdToken(t.idToken)
+      setKcRefreshToken(t.refreshToken || kcRefreshToken.value)   // reschedules the timer
+      return
+    }
+
     const res = await refreshApi()
     if (res.data.code === 0) setAccessToken(res.data.data.access_token)
     else throw new Error(res.data.msg || 'refresh failed')
+  }
+
+  // ─── Proactive KC refresh ─────────────────────────────────────────
+  // KC's ssoSessionIdleTimeout equals accessTokenLifespan (30 min) and the
+  // SPA never talks to KC between logins, so waiting for a 401 is a race
+  // the user usually loses — the refresh token idles out together with the
+  // access token. Refreshing ~2 min early renews the Bearer AND resets the
+  // SSO idle clock, keeping an open tab alive until ssoSessionMaxLifespan.
+  const KC_REFRESH_LEAD_MS = 120_000
+  let kcRefreshTimer = null
+
+  function scheduleKcRefresh() {
+    if (kcRefreshTimer) { clearTimeout(kcRefreshTimer); kcRefreshTimer = null }
+    if (!kcRefreshToken.value || !accessToken.value) return
+    if (isSupportSession.value) return
+    if (!oidcConfig().enabled) return
+    const exp = claims.value.exp
+    if (!exp) return
+    // 30 s floor so a stale/expired token can't hot-loop. A failed attempt
+    // does NOT reschedule — the 401 interceptor is the fallback (and a
+    // successful refresh there re-arms the timer via setKcRefreshToken).
+    const delay = Math.max(exp * 1000 - Date.now() - KC_REFRESH_LEAD_MS, 30_000)
+    kcRefreshTimer = setTimeout(() => {
+      kcRefreshTimer = null
+      refresh().catch((e) => console.warn('[auth] proactive KC refresh failed:', e?.message || e))
+    }, delay)
   }
 
   /**
@@ -214,6 +288,10 @@ export const useAuthStore = defineStore('auth', () => {
     // reload. The tab bar rebuilds from the support landing route instead.
     sessionStorage.removeItem('access_matrix_tabs')
     supportSessionBump.value++
+    // The proactive KC refresh must not fire mid-session (it would swap the
+    // support token back to the ops identity); the schedule call below sees
+    // isSupportSession and just cancels the timer.
+    scheduleKcRefresh()
   }
 
   /**
@@ -243,12 +321,18 @@ export const useAuthStore = defineStore('auth', () => {
     // tabs once we're back on the ops menu. Rebuilt from the ops landing route.
     sessionStorage.removeItem('access_matrix_tabs')
     supportSessionBump.value++
+    scheduleKcRefresh()   // ops token restored — re-arm the proactive refresh
     return true
   }
+
+  // Page (re)load with tokens restored from localStorage — arm the proactive
+  // refresh so a long-lived tab keeps its KC session alive across reloads.
+  scheduleKcRefresh()
 
   return {
     accessToken,
     idToken,
+    kcRefreshToken,
     userInfo,
     isAuthenticated,
     claims,
@@ -259,6 +343,7 @@ export const useAuthStore = defineStore('auth', () => {
     authorities,
     setAccessToken,
     setIdToken,
+    setKcRefreshToken,
     clearAuth,
     login,
     refresh,

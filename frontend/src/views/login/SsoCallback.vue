@@ -26,12 +26,16 @@ const errorMsg = ref('')
 
 onMounted(async () => {
   try {
-    const { accessToken, idToken } = await handleCallback(route.query)
+    const { accessToken, idToken, refreshToken } = await handleCallback(route.query)
     authStore.setAccessToken(accessToken)
     // id_token is required for RP-Initiated Logout — Keycloak uses it to
     // confirm which session to end. Stash it now even though nothing
     // reads it until the user signs out.
     authStore.setIdToken(idToken)
+    // KC's refresh_token powers in-app session renewal (stores/auth.js
+    // refresh + proactive timer); without it the session dies with the
+    // 30-min access token and the user is bounced to the KC login form.
+    authStore.setKcRefreshToken(refreshToken)
 
     // Same post-login cleanup as the password path — old menus / tabs /
     // dynamic routes can carry stale permissions across re-logins.

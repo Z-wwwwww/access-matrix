@@ -17,7 +17,7 @@
 | **Break-glass 密码登录** | SSO 不可用时的应急通道(`AdminAuthController` HS256)。`mode=oidc` 下 `/auth/login` 成功即视为 break-glass,会写审计 `system/auth.breakGlass` + 给本人发告警邮件。仅 super-admin 的 `password_hash` 被保留。 |
 | **安全模式** | `app.security.mode` = `oidc`(默认) / `jwt`(legacy 密码) / `permit-all`(裸跑无 IdP)。 |
 | **租户解析** | `utils/tenant.js`:子域名 → `?tenant=` → localStorage → `default` 的优先级。 |
-| **会话维持** | access token(Bearer)+ refresh token(HttpOnly cookie);401 时单飞刷新并重放;刷新失败踢回登录。 |
+| **会话维持** | 双模式。SSO 模式:KC access token(30 min)+ KC refresh_token(SPA 持有,`kc_refresh_token`),到期前 ~2 min 主动续期(`stores/auth.js` 定时器,直打 KC token endpoint,同时重置 KC SSO 空闲计时——开着的标签页不再 30 分钟被踢回 KC 登录页,直到 `ssoSessionMaxLifespan` 才需重登);密码/break-glass 模式:refresh token HttpOnly cookie 走后端 `/auth/refresh`。两条路都受 401 单飞刷新 + 原请求重放兜底;刷新失败(KC 会话真正结束 / 被踢)踢回登录。支持会话(impersonation)期间不续期(避免覆盖 support token)。依赖 realm `revokeRefreshToken=false`(多标签页并发续期不互踢)。 |
 | **入驻** | 业务租户管理员:邀请邮件 + 落地页设密;平台运维用户:一次性临时密码(KC 强制首登改密)。 |
 
 **测试点**
@@ -25,6 +25,7 @@
 - [ ] SSO 不可达时,登录页出现"使用应急密码登录"通道;break-glass 登录成功。
 - [ ] break-glass 登录后:`core_oplog` 有 `system/auth.breakGlass` 记录;安全面板"break-glass(7天)"+1;本人收到告警邮件(或日志)。
 - [ ] access token 过期后自动刷新、原请求重放成功;刷新失败被踢回 `/login`。
+- [ ] **SSO 长会话不被踢(bug 修复)**:SSO 登录后保持页面打开/持续操作超过 30 分钟(access token 寿命),**不**跳回 KC 登录页——前台在到期前 ~2 min 自动用 KC refresh_token 续期(Network 可见对 `/protocol/openid-connect/token` 的 `grant_type=refresh_token` 请求);KC 管理台该用户 Sessions 的 idle 时间被刷新。管理员踢下线/禁用后,续期立即失败(invalid_grant)→ 正常踢回登录,强制登出不受影响。
 - [ ] 会话失效(被踢下线 / 停用 / 过期且刷新失败)→ 下次请求(如 `/menu/me`)跳 `/login` 并显示友好「会话已过期或已被登出,请重新登录」,**不**再显示技术性的「Menu load failed — 401」(router 守卫把 401 与真正的 menu 加载错误 5xx/坏数据 分开处理,后者才带 detail 供排障)。
 - [ ] **已登录用户被删除后刷新页面 → 直接登出到 `/login`(bug 修复)**,而非 404。删除后其 token 解析不出可用菜单(角色已解绑;且旧业务行 `mark=0`),`/menu/me` 返回空菜单 → router 守卫检测到「无 home / 无可用路由」即 `clearAuth` + 跳 `/login`,不再注册空 layout 让刷新路径落到 404 兜底页。
 - [ ] 多 realm:在 A 租户的账号无法登录 B 租户。
