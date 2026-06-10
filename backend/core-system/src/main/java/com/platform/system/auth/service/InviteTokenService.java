@@ -16,7 +16,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Base64;
 
 /**
@@ -77,7 +77,7 @@ public class InviteTokenService {
         row.setUserId(userId);
         row.setKeycloakId(keycloakId);
         row.setTokenHash(sha256Hex(cleartext));
-        row.setExpiresAt(LocalDateTime.now().plus(ttl));
+        row.setExpiresAt(OffsetDateTime.now().plus(ttl));
         inviteMapper.insert(row);
         log.info("[invite] minted token for user {} (tenant {}) expires {}", userId, tenantId, row.getExpiresAt());
         return cleartext;
@@ -93,7 +93,7 @@ public class InviteTokenService {
     public UserInviteEntity peek(String cleartextToken) {
         UserInviteEntity row = inviteMapper.findActiveByTokenHash(sha256Hex(cleartextToken));
         if (row == null) return null;
-        if (row.getExpiresAt() == null || row.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (row.getExpiresAt() == null || row.getExpiresAt().isBefore(OffsetDateTime.now())) {
             return null;
         }
         return row;
@@ -111,7 +111,7 @@ public class InviteTokenService {
         if (row == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "error.invite.notFoundOrUsed");
         }
-        if (row.getExpiresAt() == null || row.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (row.getExpiresAt() == null || row.getExpiresAt().isBefore(OffsetDateTime.now())) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.invite.expired");
         }
         // Atomic single-use claim: only the FIRST caller flips used_at NULL → now.
@@ -119,7 +119,7 @@ public class InviteTokenService {
         // (or lost a concurrent race), so we reject. The previous SELECT-then-
         // UpdateWrapper version didn't check the row count and could silently let
         // a token be re-used; this hand-written UPDATE + count check is the fix.
-        LocalDateTime now = LocalDateTime.now();
+        OffsetDateTime now = OffsetDateTime.now();
         if (inviteMapper.markUsed(row.getId(), now) == 0) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "error.invite.notFoundOrUsed");
         }

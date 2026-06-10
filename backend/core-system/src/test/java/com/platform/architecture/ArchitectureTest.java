@@ -234,6 +234,42 @@ public class ArchitectureTest {
                 .isEmpty();
     }
 
+    // ─── time model ───────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("Timestamps are instants: no java.time.LocalDateTime in entities/DTOs/services/controllers")
+    void timestamps_must_be_instants_not_local_date_time() {
+        List<Class<?>> corpus = new ArrayList<>();
+        corpus.addAll(entities);
+        corpus.addAll(serviceClasses);
+        corpus.addAll(controllers);
+        corpus.addAll(findByPackageFragment(".dto."));
+
+        List<String> offenders = new ArrayList<>();
+        for (Class<?> c : corpus) {
+            for (Class<?> dep : declaredTypeDependencies(c)) {
+                if (dep == java.time.LocalDateTime.class) {
+                    offenders.add(c.getSimpleName());
+                }
+            }
+            // DTO containers hold their records as nested classes (JobDto.View etc.)
+            for (Class<?> nested : c.getDeclaredClasses()) {
+                for (Class<?> dep : declaredTypeDependencies(nested)) {
+                    if (dep == java.time.LocalDateTime.class) {
+                        offenders.add(c.getSimpleName() + "." + nested.getSimpleName());
+                    }
+                }
+            }
+        }
+        assertThat(offenders)
+                .as("LocalDateTime is a zone-less wall clock — its meaning silently depends on the "
+                        + "writing JVM's default timezone (the pre-V58 bug class). Timestamps must be "
+                        + "OffsetDateTime (timestamptz column, ISO-with-offset on the wire). LocalDate/"
+                        + "LocalTime stay fine for true calendar concepts; wall-clock decisions go "
+                        + "through AppTime.ZONE.")
+                .isEmpty();
+    }
+
     // ─── helpers ──────────────────────────────────────────────────────
 
     private static List<Class<?>> findByAnnotation(Class<? extends Annotation> ann) {

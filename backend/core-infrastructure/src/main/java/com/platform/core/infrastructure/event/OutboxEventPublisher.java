@@ -7,7 +7,7 @@ import com.platform.core.infrastructure.event.mapper.DomainEventMapper;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * Default {@link EventPublisher}: synchronously inserts the event into
@@ -47,7 +47,7 @@ public class OutboxEventPublisher implements EventPublisher {
         e.setActor(RequestContext.userId());
         e.setActorType(event.actorType().code());
         e.setTraceId(ctx == null ? null : ctx.getTraceId());
-        e.setOccurredAt(LocalDateTime.now());
+        e.setOccurredAt(OffsetDateTime.now());
         e.setDispatchState(0);
         e.setDispatchAttempts(0);
 

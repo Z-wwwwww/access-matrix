@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Map;
 
 /**
@@ -141,7 +141,7 @@ public class BreakGlassController {
                         .eq("tenant_id", tenantId)
                         .set("password_hash", hash)
                         .set("update_user", "self-break-glass-set")
-                        .set("update_time", LocalDateTime.now()));
+                        .set("update_time", OffsetDateTime.now()));
 
         log.info("[break-glass] super-admin {} (tenant {}) rotated their break-glass password",
                 userId, tenantId);

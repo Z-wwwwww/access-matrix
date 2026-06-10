@@ -1,5 +1,6 @@
 package com.platform.business.demo.startup;
 
+import com.platform.core.common.time.AppTime;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.dict.CommonStatus;
@@ -219,7 +220,7 @@ public class DemoSeeder {
         t.setContent("デモタスク — 「" + title + "」のデータスコープ可視性を確認");
         t.setStatus(status);
         t.setPriority(priority);
-        t.setDueDate(LocalDate.now().plusDays(7));
+        t.setDueDate(LocalDate.now(AppTime.ZONE).plusDays(7));
         // BaseEntity audit fields: tenantId / createUser / updateUser are normally
         // filled by AuditMetaObjectHandler; for seeded rows where no request
         // context is active we set them explicitly so the rows do not look like

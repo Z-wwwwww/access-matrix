@@ -10,7 +10,7 @@ import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * One option inside a managed dictionary. GLOBAL set (no {@code tenant_id}),
@@ -40,14 +40,14 @@ public class DictItemEntity {
     private String createUser;
 
     @TableField(value = "create_time", fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    private OffsetDateTime createTime;
 
     @TableField(value = "update_user", fill = FieldFill.INSERT_UPDATE)
     private String updateUser;
 
     @Version
     @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    private OffsetDateTime updateTime;
 
     // ── business fields ──────────────────────────────────────────────
 

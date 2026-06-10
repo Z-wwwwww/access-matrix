@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -46,8 +46,8 @@ public final class TenantDto {
             String contactEmail,
             Integer status,
             long userCount,
-            LocalDateTime createTime,
-            LocalDateTime updateTime
+            OffsetDateTime createTime,
+            OffsetDateTime updateTime
     ) {}
 
     /**

@@ -7,7 +7,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Mapper
 public interface UserInviteMapper extends BaseMapper<UserInviteEntity> {
@@ -53,5 +53,5 @@ public interface UserInviteMapper extends BaseMapper<UserInviteEntity> {
                AND used_at IS NULL
                AND mark = 1
             """)
-    int markUsed(@Param("id") String id, @Param("now") LocalDateTime now);
+    int markUsed(@Param("id") String id, @Param("now") OffsetDateTime now);
 }

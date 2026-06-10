@@ -2,7 +2,7 @@
 import { reactive, ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from '@/composables/useToast'
-import { toJSTDateTimeDisp, nowJST } from '@/lib/date'
+import { toJST, toJSTDateTimeDisp, nowJST } from '@/lib/date'
 import { getTenantStatsApi, getPlatformDashboardApi } from '@/services/tenant'
 import AreaChart from './AreaChart.vue'
 import Drawer from '@/components/ui/Drawer.vue'
@@ -50,7 +50,7 @@ function reasonOf(raw) {
 const LOCALE_MAP = { zh_CN: 'zh-CN', zh_TW: 'zh-TW', ja_JP: 'ja', ko_KR: 'ko', en: 'en' }
 function relTime(iso) {
   if (!iso) return ''
-  const diffSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000)
+  const diffSec = Math.round((Date.now() - toJST(iso).valueOf()) / 1000)
   const rtf = new Intl.RelativeTimeFormat(LOCALE_MAP[locale.value] || 'en', { numeric: 'auto' })
   const min = diffSec / 60, hr = min / 60, day = hr / 24
   if (Math.abs(diffSec) < 60) return rtf.format(-diffSec, 'second')

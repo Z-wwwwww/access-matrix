@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * Operation audit log row. Insert-only, no mark/audit fields — kept simple
@@ -71,5 +71,5 @@ public class OpLogEntity {
     private Integer costMs;
 
     @TableField("create_time")
-    private LocalDateTime createTime;
+    private OffsetDateTime createTime;
 }

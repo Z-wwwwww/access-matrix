@@ -1,5 +1,6 @@
 package com.platform.core.bootstrap.migration;
 
+import com.platform.core.common.time.AppTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,7 +15,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
@@ -174,7 +175,7 @@ public class PasswordToSsoMigrationRunner implements ApplicationRunner {
     }
 
     private Path writeReport(MigrationReport report, String prefix) {
-        String filename = prefix + "-" + LocalDateTime.now().format(TS) + ".json";
+        String filename = prefix + "-" + OffsetDateTime.now(AppTime.ZONE).format(TS) + ".json";
         Path out = Paths.get(reportDir, filename);
         try {
             Files.createDirectories(out.getParent());

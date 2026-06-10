@@ -1,6 +1,6 @@
 package com.platform.system.job.dto;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 public final class JobLogDto {
 
@@ -13,8 +13,8 @@ public final class JobLogDto {
             Integer triggerType,     // 1=cron 2=manual 3=startup
             Integer status,          // 1=running 2=success 3=fail 4=skipped
             String nodeId,
-            LocalDateTime startTime,
-            LocalDateTime endTime,
+            OffsetDateTime startTime,
+            OffsetDateTime endTime,
             Long durationMs,
             String error,
             String triggeredBy) {}

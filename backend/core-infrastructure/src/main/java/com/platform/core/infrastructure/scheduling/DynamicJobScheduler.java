@@ -3,6 +3,7 @@ package com.platform.core.infrastructure.scheduling;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.scheduling.TriggerType;
+import com.platform.core.common.time.AppTime;
 import com.platform.core.infrastructure.scheduling.entity.CoreJobEntity;
 import com.platform.core.infrastructure.scheduling.mapper.CoreJobMapper;
 import org.slf4j.Logger;
@@ -14,7 +15,8 @@ import org.springframework.scheduling.support.CronExpression;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -116,11 +118,13 @@ public class DynamicJobScheduler {
         taskScheduler.execute(() -> wrapper.execute(jobCode, tenantId, TriggerType.MANUAL, triggeredBy));
     }
 
-    /** UI 表示用：cron 式から次回発火時刻を即時計算（DB には保存しない）。 */
-    public LocalDateTime nextFireTime(String cron) {
+    /** UI 表示用：cron 式から次回発火時刻を即時計算（DB には保存しない）。
+     *  cron のフィールドは業務時間（{@link AppTime#ZONE}）の壁時計として解釈する。 */
+    public OffsetDateTime nextFireTime(String cron) {
         try {
             CronExpression expr = CronExpression.parse(cron);
-            return expr.next(LocalDateTime.now());
+            ZonedDateTime next = expr.next(ZonedDateTime.now(AppTime.ZONE));
+            return next == null ? null : next.toOffsetDateTime();
         } catch (Exception e) {
             return null;
         }
@@ -154,7 +158,7 @@ public class DynamicJobScheduler {
         try {
             ScheduledFuture<?> f = taskScheduler.schedule(
                     () -> wrapper.execute(jobCode, tenantId, TriggerType.CRON, null),
-                    new CronTrigger(cron));
+                    new CronTrigger(cron, AppTime.ZONE));
             if (f == null) {
                 log.warn("[scheduler] schedule rejected for {} (cron {})", key, cron);
                 return false;

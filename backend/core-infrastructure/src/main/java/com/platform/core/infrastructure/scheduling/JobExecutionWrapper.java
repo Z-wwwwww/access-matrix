@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -99,7 +99,7 @@ public class JobExecutionWrapper {
         // OutboxDispatcher と同じ）。tenantId は設定行の租户(='system')。
         RequestContext.set(SYSTEM_TENANT, triggeredBy, "job:" + jobCode, Locale.ROOT, "job-" + IdGenerator.ulid());
 
-        LocalDateTime start = LocalDateTime.now();
+        OffsetDateTime start = OffsetDateTime.now();
         String logId = insertRunning(jobCode, triggerType, start, triggeredBy);
         int finalStatus = STATUS_SUCCESS;
         String error = null;
@@ -110,7 +110,7 @@ public class JobExecutionWrapper {
             error = stringify(t);
             log.warn("[scheduler] job '{}' (tenant {}) failed: {}", jobCode, tenantId, t.toString());
         } finally {
-            LocalDateTime end = LocalDateTime.now();
+            OffsetDateTime end = OffsetDateTime.now();
             long durationMs = Duration.between(start, end).toMillis();
             finalizeLog(logId, finalStatus, end, durationMs, error);
             updateLastResult(jobCode, tenantId, end, finalStatus, durationMs);
@@ -136,7 +136,7 @@ public class JobExecutionWrapper {
     }
 
     private String insertRunning(String jobCode, TriggerType triggerType,
-                                 LocalDateTime start, String triggeredBy) {
+                                 OffsetDateTime start, String triggeredBy) {
         CoreJobLogEntity row = new CoreJobLogEntity();
         row.setId(IdGenerator.ulid());
         row.setJobCode(jobCode);
@@ -150,7 +150,7 @@ public class JobExecutionWrapper {
         return row.getId();
     }
 
-    private void finalizeLog(String logId, int status, LocalDateTime end, long durationMs, String error) {
+    private void finalizeLog(String logId, int status, OffsetDateTime end, long durationMs, String error) {
         // @Version (update_time) を踏まないよう UpdateWrapper で明示更新。id は PK 一意。
         logMapper.update(null, new UpdateWrapper<CoreJobLogEntity>()
                 .eq("id", logId)
@@ -161,7 +161,7 @@ public class JobExecutionWrapper {
                 .set("update_time", end));
     }
 
-    private void updateLastResult(String jobCode, String tenantId, LocalDateTime end,
+    private void updateLastResult(String jobCode, String tenantId, OffsetDateTime end,
                                   int status, long durationMs) {
         jobMapper.update(null, new UpdateWrapper<CoreJobEntity>()
                 .eq("job_code", jobCode)

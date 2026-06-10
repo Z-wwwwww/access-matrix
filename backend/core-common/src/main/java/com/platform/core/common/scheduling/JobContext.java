@@ -1,6 +1,6 @@
 package com.platform.core.common.scheduling;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * 1 回の実行に渡される実行コンテキスト（純粋型 — Spring / DB に依存しない）。
@@ -16,5 +16,5 @@ public record JobContext(
         String jobCode,
         String tenantId,
         TriggerType triggerType,
-        LocalDateTime fireTime) {
+        OffsetDateTime fireTime) {
 }

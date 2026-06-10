@@ -6,7 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * 分布式ロックの薄いサービス。クラスタで「1 回の発火を 1 ノードだけが実行する」ことを保証する。
@@ -36,8 +36,8 @@ public class JobLockService {
      * @param maxRunSeconds  リース時間（= クラッシュ時の自動失効までの猶予）
      */
     public boolean tryAcquire(String lockName, int maxRunSeconds) {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime until = now.plusSeconds(Math.max(1, maxRunSeconds));
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime until = now.plusSeconds(Math.max(1, maxRunSeconds));
         try {
             return mapper.tryAcquire(lockName, now, until, nodeId) == 1;
         } catch (Exception e) {

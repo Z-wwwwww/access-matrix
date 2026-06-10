@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 public final class JobDto {
 
@@ -34,11 +34,11 @@ public final class JobDto {
             Integer enabled,         // 1=有効 0=停止
             Integer concurrent,
             Integer maxRunSeconds,
-            LocalDateTime lastFireTime,
+            OffsetDateTime lastFireTime,
             Integer lastStatus,      // 2=成功 3=失敗
             Long lastDurationMs,
-            LocalDateTime nextFireTime,
+            OffsetDateTime nextFireTime,
             String remark,
-            LocalDateTime createTime,
-            LocalDateTime updateTime) {}
+            OffsetDateTime createTime,
+            OffsetDateTime updateTime) {}
 }

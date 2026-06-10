@@ -6,7 +6,7 @@ import com.platform.core.infrastructure.persistence.BaseEntity;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * 定時任務の設定行。{@code core_job} (V37)。動的スケジューラの「可変設定」側で、
@@ -45,7 +45,7 @@ public class CoreJobEntity extends BaseEntity {
     private Integer maxRunSeconds;
 
     @TableField("last_fire_time")
-    private LocalDateTime lastFireTime;
+    private OffsetDateTime lastFireTime;
 
     /** 直近実行の結果。core_job_log.status に同じ（2=成功 3=失敗）。 */
     @TableField("last_status")

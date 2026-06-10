@@ -10,7 +10,7 @@ import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * Navigation menu row. A single GLOBAL set (V41/V43) — NOT tenant-scoped — so,
@@ -37,14 +37,14 @@ public class MenuEntity {
     private String createUser;
 
     @TableField(value = "create_time", fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    private OffsetDateTime createTime;
 
     @TableField(value = "update_user", fill = FieldFill.INSERT_UPDATE)
     private String updateUser;
 
     @Version
     @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    private OffsetDateTime updateTime;
 
     // ── business fields ──────────────────────────────────────────────
 

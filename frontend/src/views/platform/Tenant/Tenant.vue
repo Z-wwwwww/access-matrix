@@ -5,7 +5,7 @@ import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useDict } from '@/composables/useDict'
 import { useAuthStore } from '@/stores/auth'
-import { toJSTDateTimeDisp } from '@/lib/date'
+import { toJST, toJSTDateTimeDisp } from '@/lib/date'
 import {
   Plus, Search, RotateCcw, LayoutGrid, List, Info, X, Building2,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
@@ -101,7 +101,7 @@ function statusDot(status) {
 const LOCALE_MAP = { zh_CN: 'zh-CN', zh_TW: 'zh-TW', ja_JP: 'ja', ko_KR: 'ko', en: 'en' }
 function relTime(iso) {
   if (!iso) return ''
-  const diffSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000)
+  const diffSec = Math.round((Date.now() - toJST(iso).valueOf()) / 1000)
   const rtf = new Intl.RelativeTimeFormat(LOCALE_MAP[locale.value] || 'en', { numeric: 'auto' })
   const min = diffSec / 60, hr = min / 60, day = hr / 24, mo = day / 30
   if (Math.abs(diffSec) < 60) return rtf.format(-diffSec, 'second')

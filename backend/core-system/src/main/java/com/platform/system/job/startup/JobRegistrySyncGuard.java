@@ -16,7 +16,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -84,7 +84,7 @@ public class JobRegistrySyncGuard {
             List<CoreJobEntity> rows = jobMapper.selectList(new QueryWrapper<CoreJobEntity>()
                     .select("id", "job_code").eq("mark", 1));
             int removed = 0;
-            LocalDateTime now = LocalDateTime.now();
+            OffsetDateTime now = OffsetDateTime.now();
             for (CoreJobEntity row : rows) {
                 if (!known.contains(row.getJobCode())) {
                     jobMapper.update(null, new UpdateWrapper<CoreJobEntity>()

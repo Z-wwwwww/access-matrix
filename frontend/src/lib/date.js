@@ -1,10 +1,12 @@
 /**
- * 統一日期処理 — 強制使用 Asia/Tokyo (JST/UTC+9)
+ * 統一日期処理 — 顯示強制使用 Asia/Tokyo (JST/UTC+9)
  *
- * 本系統為日本酒店管理系統，所有日期顯示和儲存均按 JST 解讀。
- * - DatePicker 內部用 YYYY-MM-DD 字符串
- * - 後端要求 yyyy-MM-dd HH:mm:ssZZ 格式（如 2026-04-11 00:00:00+0900）
- * - 後端可能返回 UTC 表示（如 2026-04-10 15:00:00+0000）— 需轉換為 JST 顯示
+ * 本系統為日本酒店管理系統。時間戳在存儲（timestamptz）與傳輸層均為**帶偏移量的
+ * 絕對時刻**，時區只在顯示的一刻出現：
+ * - 後端返回 ISO-8601 帶偏移量字符串（如 2026-06-10T17:38:33+09:00 / ...Z）
+ *   — 偏移量是權威信息，解析後轉 JST 顯示，與瀏覽器時區無關
+ * - 發往後端同樣用 ISO-8601 帶偏移量（toBackendDate，+09:00）
+ * - DatePicker 內部用 YYYY-MM-DD 純日期字符串（日曆概念，不帶時區）
  */
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
@@ -77,21 +79,23 @@ export function toJST(val) {
   return dayjs(val).tz(TZ)
 }
 
-/** 任意日期字符串 → 後端要求的 yyyy-MM-dd HH:mm:ssZZ 格式（JST） */
+/** 任意日期字符串 → 發往後端的 ISO-8601 帶偏移量格式（如 2026-04-11T00:00:00+09:00）。
+ *  後端以 OffsetDateTime 接收，偏移量保證語義無歧義。 */
+const BACKEND_FMT = 'YYYY-MM-DD[T]HH:mm:ssZ'
 export function toBackendDate(val) {
   if (!val || typeof val !== 'string') return val
   // 純日期 → 當作 JST 0 時
   if (val.length === 10) {
-    return dayjs.tz(val + ' 00:00:00', TZ).format('YYYY-MM-DD HH:mm:ssZZ')
+    return dayjs.tz(val + ' 00:00:00', TZ).format(BACKEND_FMT)
   }
   // YYYY-MM-DD HH:mm[:ss] → 當作 JST 時刻
   if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(val)) {
     const normalized = val.replace('T', ' ')
     const withSec = normalized.length === 16 ? normalized + ':00' : normalized
-    return dayjs.tz(withSec, TZ).format('YYYY-MM-DD HH:mm:ssZZ')
+    return dayjs.tz(withSec, TZ).format(BACKEND_FMT)
   }
   // 含時區的完整格式（後端返回的）→ 轉為 JST 重新格式化
   const d = dayjs(val.replace(' ', 'T'))
   if (!d.isValid()) return val
-  return d.tz(TZ).format('YYYY-MM-DD HH:mm:ssZZ')
+  return d.tz(TZ).format(BACKEND_FMT)
 }

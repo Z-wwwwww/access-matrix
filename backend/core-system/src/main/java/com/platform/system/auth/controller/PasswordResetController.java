@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Map;
 
 /**
@@ -141,7 +141,7 @@ public class PasswordResetController {
                         .set("password_hash", newHash)
                         .set("keycloak_id",   null)
                         .set("update_user",   "password-reset")
-                        .set("update_time",   LocalDateTime.now()));
+                        .set("update_time",   OffsetDateTime.now()));
 
         // 3. Disable the KC user so the IdP side can no longer issue
         //    tokens for this identity. Best-effort: if KC is unreachable

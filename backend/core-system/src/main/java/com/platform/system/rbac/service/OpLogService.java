@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * Persists audit log rows asynchronously. {@code @EnableAsync} is already on
@@ -51,7 +51,7 @@ public class OpLogService implements OpLogSink {
             e.setErrorMsg(record.errorMsg());
             e.setErrorCode(record.errorCode());
             e.setCostMs(record.costMs());
-            e.setCreateTime(LocalDateTime.now());
+            e.setCreateTime(OffsetDateTime.now());
             mapper.insert(e);
         } catch (Exception ex) {
             log.warn("OpLogService: failed to persist audit row action={}: {}",

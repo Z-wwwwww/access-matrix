@@ -5,7 +5,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * 分布式ロック ({@code core_job_lock}) のハンドSQL mapper。グローバルテーブルなので
@@ -32,8 +32,8 @@ public interface JobLockMapper {
              WHERE core_job_lock.lock_until <= #{now}
             """)
     int tryAcquire(@Param("lockName") String lockName,
-                   @Param("now") LocalDateTime now,
-                   @Param("lockUntil") LocalDateTime lockUntil,
+                   @Param("now") OffsetDateTime now,
+                   @Param("lockUntil") OffsetDateTime lockUntil,
                    @Param("nodeId") String nodeId);
 
     /**

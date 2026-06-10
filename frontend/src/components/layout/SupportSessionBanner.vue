@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { LifeBuoy, X } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
+import { toJST } from '@/lib/date'
 import { toast } from '@/composables/useToast'
 import { terminateSupportSessionApi } from '@/services/tenant'
 
@@ -32,7 +33,7 @@ const visible = computed(() => auth.isSupportSession && !!info.value)
 
 const expiresAtMs = computed(() => {
   const iso = info.value?.expiresAt
-  return iso ? Date.parse(iso) : 0
+  return iso ? toJST(iso).valueOf() : 0
 })
 
 const remainingSec = computed(() => {

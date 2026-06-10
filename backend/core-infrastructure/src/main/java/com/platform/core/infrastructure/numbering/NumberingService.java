@@ -1,5 +1,6 @@
 package com.platform.core.infrastructure.numbering;
 
+import com.platform.core.common.time.AppTime;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.platform.core.common.error.BusinessException;
@@ -319,12 +320,12 @@ public class NumberingService {
 
     private static String computeDatePart(int recycleDivision, String dateFormatSentence) {
         if (dateFormatSentence != null && !dateFormatSentence.isBlank()) {
-            return LocalDate.now().format(DateTimeFormatter.ofPattern(dateFormatSentence));
+            return LocalDate.now(AppTime.ZONE).format(DateTimeFormatter.ofPattern(dateFormatSentence));
         }
         return switch (recycleDivision) {
-            case 1 -> LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-            case 2 -> LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-            case 3 -> LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy"));
+            case 1 -> LocalDate.now(AppTime.ZONE).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            case 2 -> LocalDate.now(AppTime.ZONE).format(DateTimeFormatter.ofPattern("yyyyMM"));
+            case 3 -> LocalDate.now(AppTime.ZONE).format(DateTimeFormatter.ofPattern("yyyy"));
             default -> "";
         };
     }

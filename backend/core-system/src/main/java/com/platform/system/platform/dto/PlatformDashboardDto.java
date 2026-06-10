@@ -1,6 +1,6 @@
 package com.platform.system.platform.dto;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -47,8 +47,8 @@ public final class PlatformDashboardDto {
             String tenantCode,
             String displayName,
             String contactEmail,
-            LocalDateTime invitedAt,
-            LocalDateTime expiresAt,
+            OffsetDateTime invitedAt,
+            OffsetDateTime expiresAt,
             boolean expired
     ) {}
 
@@ -68,7 +68,7 @@ public final class PlatformDashboardDto {
             String tenantId,
             String tenantCode,
             String displayName,
-            LocalDateTime lastLoginAt   // nullable: never logged in
+            OffsetDateTime lastLoginAt   // nullable: never logged in
     ) {}
 
     public record DailyCount(
@@ -98,14 +98,14 @@ public final class PlatformDashboardDto {
     public record BacklogEvent(
             String aggregateType,
             String eventType,
-            LocalDateTime occurredAt,
+            OffsetDateTime occurredAt,
             int dispatchState,   // 0=pending, 2=failed
             int attempts
     ) {}
 
     public record JobFailure(
             String jobCode,
-            LocalDateTime startTime,
+            OffsetDateTime startTime,
             Long durationMs,
             String error
     ) {}
@@ -116,7 +116,7 @@ public final class PlatformDashboardDto {
             String action,
             String username,
             String errorMsg,
-            LocalDateTime time
+            OffsetDateTime time
     ) {}
 
     // ── 5. Security & privileged-access monitoring ─────────────────────────
@@ -138,7 +138,7 @@ public final class PlatformDashboardDto {
             String operator,
             String targetTenantCode,
             String targetDisplayName,
-            LocalDateTime startedAt,
+            OffsetDateTime startedAt,
             String reason,
             boolean active        // ended_at IS NULL AND expires_at > now()
     ) {}
@@ -151,7 +151,7 @@ public final class PlatformDashboardDto {
     public record BreakGlassUse(
             String operator,
             String tenantCode,
-            LocalDateTime usedAt,
+            OffsetDateTime usedAt,
             String clientIp
     ) {}
 }

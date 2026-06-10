@@ -1,6 +1,6 @@
 package com.platform.system.platform.dto;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * DTO container for the platform domain-event console (read + redrive over
@@ -22,10 +22,10 @@ public final class EventDto {
             String actor,
             Integer actorType,
             String traceId,
-            LocalDateTime occurredAt,
+            OffsetDateTime occurredAt,
             Integer dispatchState,      // 0 pending / 1 dispatched / 2 failed
             Integer dispatchAttempts,
-            LocalDateTime dispatchedAt
+            OffsetDateTime dispatchedAt
     ) {}
 
     /** Full event including the JSONB payload — returned by GET /platform/events/{id}. */
@@ -39,9 +39,9 @@ public final class EventDto {
             String actor,
             Integer actorType,
             String traceId,
-            LocalDateTime occurredAt,
+            OffsetDateTime occurredAt,
             Integer dispatchState,
             Integer dispatchAttempts,
-            LocalDateTime dispatchedAt
+            OffsetDateTime dispatchedAt
     ) {}
 }

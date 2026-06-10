@@ -6,7 +6,7 @@ import com.platform.core.common.id.IdGenerator;
 import org.apache.ibatis.reflection.MetaObject;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Component
 public class AuditMetaObjectHandler implements MetaObjectHandler {
@@ -15,7 +15,7 @@ public class AuditMetaObjectHandler implements MetaObjectHandler {
 
     @Override
     public void insertFill(MetaObject metaObject) {
-        LocalDateTime now = LocalDateTime.now();
+        OffsetDateTime now = OffsetDateTime.now();
         String user = currentUser();
         String tenantId = RequestContext.tenantId();
 
@@ -26,14 +26,14 @@ public class AuditMetaObjectHandler implements MetaObjectHandler {
         strictInsertFill(metaObject, "mark", Integer.class, 1);
         strictInsertFill(metaObject, "createUser", String.class, user);
         strictInsertFill(metaObject, "updateUser", String.class, user);
-        strictInsertFill(metaObject, "createTime", LocalDateTime.class, now);
-        strictInsertFill(metaObject, "updateTime", LocalDateTime.class, now);
+        strictInsertFill(metaObject, "createTime", OffsetDateTime.class, now);
+        strictInsertFill(metaObject, "updateTime", OffsetDateTime.class, now);
     }
 
     @Override
     public void updateFill(MetaObject metaObject) {
         strictUpdateFill(metaObject, "updateUser", String.class, currentUser());
-        strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
+        strictUpdateFill(metaObject, "updateTime", OffsetDateTime.class, OffsetDateTime.now());
     }
 
     private String currentUser() {

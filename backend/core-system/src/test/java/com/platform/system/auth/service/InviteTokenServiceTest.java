@@ -17,7 +17,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -77,8 +77,8 @@ class InviteTokenServiceTest {
         assertThat(row.getUserId()).isEqualTo("ulid-user");
         assertThat(row.getKeycloakId()).isEqualTo("kc-uuid");
         assertThat(row.getTenantId()).isEqualTo("acme");
-        assertThat(row.getExpiresAt()).isAfter(LocalDateTime.now().plusDays(6));
-        assertThat(row.getExpiresAt()).isBefore(LocalDateTime.now().plusDays(8));
+        assertThat(row.getExpiresAt()).isAfter(OffsetDateTime.now().plusDays(6));
+        assertThat(row.getExpiresAt()).isBefore(OffsetDateTime.now().plusDays(8));
         assertThat(row.getUsedAt()).isNull();
     }
 
@@ -88,7 +88,7 @@ class InviteTokenServiceTest {
         UserInviteEntity stored = new UserInviteEntity();
         stored.setId("ulid-row");
         stored.setTokenHash(sha256(cleartext));
-        stored.setExpiresAt(LocalDateTime.now().minusMinutes(1)); // expired
+        stored.setExpiresAt(OffsetDateTime.now().minusMinutes(1)); // expired
         when(inviteMapper.findActiveByTokenHash(sha256(cleartext))).thenReturn(stored);
 
         assertThat(service.peek(cleartext)).isNull();
@@ -102,7 +102,7 @@ class InviteTokenServiceTest {
         UserInviteEntity stored = new UserInviteEntity();
         stored.setId("ulid-row");
         stored.setTokenHash(sha256(cleartext));
-        stored.setExpiresAt(LocalDateTime.now().plusDays(1));
+        stored.setExpiresAt(OffsetDateTime.now().plusDays(1));
         when(inviteMapper.findActiveByTokenHash(sha256(cleartext))).thenReturn(stored);
 
         assertThat(service.peek(cleartext)).isSameAs(stored);
@@ -117,14 +117,14 @@ class InviteTokenServiceTest {
         stored.setKeycloakId("kc-uuid");
         stored.setTenantId("acme");
         stored.setTokenHash(sha256(cleartext));
-        stored.setExpiresAt(LocalDateTime.now().plusDays(1));
+        stored.setExpiresAt(OffsetDateTime.now().plusDays(1));
         when(inviteMapper.findActiveByTokenHash(sha256(cleartext))).thenReturn(stored);
-        when(inviteMapper.markUsed(eq("ulid-row"), any(LocalDateTime.class))).thenReturn(1);
+        when(inviteMapper.markUsed(eq("ulid-row"), any(OffsetDateTime.class))).thenReturn(1);
 
         UserInviteEntity consumed = service.consume(cleartext);
 
         assertThat(consumed.getUsedAt()).isNotNull();
-        verify(inviteMapper).markUsed(eq("ulid-row"), any(LocalDateTime.class));
+        verify(inviteMapper).markUsed(eq("ulid-row"), any(OffsetDateTime.class));
     }
 
     @Test
@@ -136,9 +136,9 @@ class InviteTokenServiceTest {
         UserInviteEntity stored = new UserInviteEntity();
         stored.setId("ulid-row");
         stored.setTokenHash(sha256(cleartext));
-        stored.setExpiresAt(LocalDateTime.now().plusDays(1));
+        stored.setExpiresAt(OffsetDateTime.now().plusDays(1));
         when(inviteMapper.findActiveByTokenHash(sha256(cleartext))).thenReturn(stored);
-        when(inviteMapper.markUsed(eq("ulid-row"), any(LocalDateTime.class))).thenReturn(0);
+        when(inviteMapper.markUsed(eq("ulid-row"), any(OffsetDateTime.class))).thenReturn(0);
 
         assertThatThrownBy(() -> service.consume(cleartext))
                 .isInstanceOf(BusinessException.class)
@@ -150,7 +150,7 @@ class InviteTokenServiceTest {
         String cleartext = "expired";
         UserInviteEntity stored = new UserInviteEntity();
         stored.setTokenHash(sha256(cleartext));
-        stored.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        stored.setExpiresAt(OffsetDateTime.now().minusMinutes(1));
         when(inviteMapper.findActiveByTokenHash(sha256(cleartext))).thenReturn(stored);
 
         assertThatThrownBy(() -> service.consume(cleartext))

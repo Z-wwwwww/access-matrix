@@ -17,7 +17,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Base64;
 
 /**
@@ -70,7 +70,7 @@ public class PasswordResetTokenService {
         row.setUserId(userId);
         row.setKeycloakId(keycloakId);
         row.setTokenHash(sha256Hex(cleartext));
-        row.setExpiresAt(LocalDateTime.now().plus(ttl));
+        row.setExpiresAt(OffsetDateTime.now().plus(ttl));
         mapper.insert(row);
         log.info("[reset] minted token for user {} (tenant {}) expires {}", userId, tenantId, row.getExpiresAt());
         return cleartext;
@@ -84,7 +84,7 @@ public class PasswordResetTokenService {
     public PasswordResetTokenEntity peek(String cleartextToken) {
         PasswordResetTokenEntity row = mapper.findActiveByTokenHash(sha256Hex(cleartextToken));
         if (row == null) return null;
-        if (row.getExpiresAt() == null || row.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (row.getExpiresAt() == null || row.getExpiresAt().isBefore(OffsetDateTime.now())) {
             return null;
         }
         return row;
@@ -102,10 +102,10 @@ public class PasswordResetTokenService {
         if (row == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Reset token not found or already used");
         }
-        if (row.getExpiresAt() == null || row.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (row.getExpiresAt() == null || row.getExpiresAt().isBefore(OffsetDateTime.now())) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Reset token has expired");
         }
-        LocalDateTime now = LocalDateTime.now();
+        OffsetDateTime now = OffsetDateTime.now();
         mapper.update(null,
                 new UpdateWrapper<PasswordResetTokenEntity>()
                         .eq("id", row.getId())

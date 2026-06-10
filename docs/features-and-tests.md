@@ -133,13 +133,14 @@
 - [ ] 非平台运维访问 → 看不到菜单 / API 403。
 
 ### 2.4 定时任务(Scheduled jobs)
-`ScheduledJob` SPI → `core_job`,管理台可启停/改 cron/立即执行/看日志。删类重启 → 配置行软删下线。Outbox 保留作业(`core:outbox-retention`,每天 03:30,删已分发的旧事件,V49/V50)。
+`ScheduledJob` SPI → `core_job`,管理台可启停/改 cron/立即执行/看日志。删类重启 → 配置行软删下线。Outbox 保留作业(`core:outbox-retention`,每天 **JST** 03:30,删已分发的旧事件,V49/V50)。cron 表达式一律按业务时区 **Asia/Tokyo**(`AppTime.ZONE`)解释:`CronTrigger` 与「下次执行时间」计算均显式带该时区,与部署机器的系统时区无关。
 **测试点**
 - [ ] 新建的 `ScheduledJob` 重启后出现在管理台并按 cron 执行。
 - [ ] 启停/改 cron/立即执行生效;执行日志可见。
 - [ ] 删除 job 类 + 重启 → 管理台不再显示(`core_job` 软删 mark=0,日志保留)。
 - [ ] 保留作业只删 `dispatch_state=1` 的旧事件,pending/failed 不动。
 - [ ] 「下次执行时间」与执行日志的开始时间按 **JST** 显示(走 `toJSTDateTimeFullDisp`,与领域事件/平台总览一致,不再显示 UTC 裸字符串)。
+- [ ] cron `0 30 3 * * *` 的任务在 **JST 03:30** 触发(而非部署机器时区的 03:30);「下次执行时间」与实际触发一致。
 
 ### 2.5 支持会话 / 模拟登录(Support session / impersonation)
 ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start`);服务端会话表 `core_support_session`(V52)记录 started/expires/**ended_at**。退出调 `/support-session/terminate` 置 ended。
@@ -175,6 +176,7 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 
 ## 3. 共通基盤（Cross-cutting）
 
+- **时间模型(V58)**:全链路**绝对时刻**——DB 列 `timestamptz`、后端 `OffsetDateTime`(实体/DTO/`now()`,禁用 `LocalDateTime`,由 ArchitectureTest 守护)、wire 为 ISO-8601 **带偏移量**字符串(双向,前端发送走 `toBackendDate`)。业务时区 Asia/Tokyo 只出现在边缘:前端显示(`@/lib/date` 的 `toJST*`)与墙钟决策(后端 `AppTime.ZONE`:cron 触发、日/月聚合 SQL 的 `AT TIME ZONE`、取号日期、邮件内时间文案)。显示结果与部署机器/浏览器时区无关。
 - **字典(Dictionary)**:内置枚举字典 + 运行时可编辑的管理字典;前端 `useDict`,下拉/标签均走字典,不硬编码。`/platform/dicts` 管理。
 - **操作审计(oplog)**:`@OpLog` 写 `core_oplog`;失败行带 `error_code`(BusinessException 的 4xx/7xx vs 未预期 500)。
 - **领域事件出箱**:状态变更在同一事务 `EventPublisher.publish(...)` → `core_domain_event` → `OutboxDispatcher` → 可插拔 sink(当前为日志兜底)。详见 backend/AGENTS.md。
@@ -186,6 +188,7 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 **测试点**
 - [ ] 字典:新增/停用管理字典项;被引用的项不可删(报"in use")、枚举项不可删——这些是**业务拒绝**,不计入仪表盘"接口错误"。
 - [ ] 任一带 `@OpLog` 的操作在 `core_oplog` 留痕;失败时 `error_code` 正确;操作日志页时间列按 **JST** 显示(与领域事件页同一时刻显示一致,不差 9 小时)。
+- [ ] 时间模型:API 返回的时间戳都是**带偏移量**的 ISO 串(如 `2026-06-10T17:38:33+09:00`);把浏览器/操作系统改成任意时区,所有页面时间显示不变(仍为 JST);仪表盘 24h/7d/30d 统计窗口及按日/月聚合按 JST 切日。
 - [ ] 访问不存在的 API 路径(如 `GET /api/platform/jobs`)→ HTTP **404**(`JsonResult` code=404),服务端无「Unhandled exception」ERROR 日志,不计入仪表盘「接口错误(24h)」。
 - [ ] 语言切换:5 语言下新功能文案都不出现 key 原文 / `__TODO__`。
 - [ ] 通知:触发后铃铛出现未读、可标记已读。

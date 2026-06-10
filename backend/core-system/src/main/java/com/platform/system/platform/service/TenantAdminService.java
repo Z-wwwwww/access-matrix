@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
+import com.platform.core.common.time.AppTime;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.system.dict.builtin.TenantStatus;
 import com.platform.core.common.result.PageResult;
@@ -27,7 +28,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -216,22 +217,27 @@ public class TenantAdminService {
         long total        = count("SELECT COUNT(*) FROM core_tenant WHERE mark = 1");
         long active       = count("SELECT COUNT(*) FROM core_tenant WHERE mark = 1 AND status = 1");
         long suspended    = count("SELECT COUNT(*) FROM core_tenant WHERE mark = 1 AND status = 0");
+        // Month boundaries are business-time (JST) calendar decisions: bucket the
+        // timestamptz instants in AppTime.ZONE and convert the window edge back
+        // to an instant, so the result is independent of the DB session TimeZone.
+        String tz = AppTime.ZONE.getId();
         long newThisMonth = count("SELECT COUNT(*) FROM core_tenant WHERE mark = 1 "
-                + "AND create_time >= date_trunc('month', CURRENT_DATE)");
+                + "AND create_time >= date_trunc('month', now() AT TIME ZONE '" + tz + "') AT TIME ZONE '" + tz + "'");
 
         // Sparse {month -> count} straight from PG, then densify into a fixed
         // 12-month window so months with zero signups still get a point.
         Map<String, Long> byMonth = new HashMap<>();
         jdbc.queryForList(
-                "SELECT to_char(date_trunc('month', create_time), 'YYYY-MM') AS m, COUNT(*) AS c "
+                "SELECT to_char(create_time AT TIME ZONE '" + tz + "', 'YYYY-MM') AS m, COUNT(*) AS c "
                         + "FROM core_tenant "
                         + "WHERE mark = 1 "
-                        + "  AND create_time >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months' "
+                        + "  AND create_time >= (date_trunc('month', now() AT TIME ZONE '" + tz + "') "
+                        + "                      - INTERVAL '11 months') AT TIME ZONE '" + tz + "' "
                         + "GROUP BY 1")
                 .forEach(r -> byMonth.put((String) r.get("m"), ((Number) r.get("c")).longValue()));
 
         List<TenantDto.MonthlyCount> monthly = new ArrayList<>(12);
-        YearMonth cursor = YearMonth.now().minusMonths(11);
+        YearMonth cursor = YearMonth.now(AppTime.ZONE).minusMonths(11);
         for (int i = 0; i < 12; i++) {
             String label = cursor.toString();   // 'YYYY-MM', matches the to_char above
             monthly.add(new TenantDto.MonthlyCount(label, byMonth.getOrDefault(label, 0L)));
@@ -374,8 +380,8 @@ public class TenantAdminService {
         row.setMark(1);
         row.setCreateUser("platform-admin");
         row.setUpdateUser("platform-admin");
-        row.setCreateTime(LocalDateTime.now());
-        row.setUpdateTime(LocalDateTime.now());
+        row.setCreateTime(OffsetDateTime.now());
+        row.setUpdateTime(OffsetDateTime.now());
         tenantMapper.insert(row);
 
         // ── Per-tenant numbering definitions ────────────────────────
@@ -392,7 +398,7 @@ public class TenantAdminService {
         // pick up RequestContext.tenantId() = 'system' via AuditMetaObjectHandler.
         String userId = IdGenerator.ulid();
         String userNo = numberingService.next(USER_NO_KBN, req.tenantCode());
-        LocalDateTime now = LocalDateTime.now();
+        OffsetDateTime now = OffsetDateTime.now();
         jdbc.update(
                 "INSERT INTO core_auth_user "
                         + "  (id, tenant_id, username, email, user_no, display_name, "
@@ -477,7 +483,7 @@ public class TenantAdminService {
 
         // Correct the email everywhere if a new one was given.
         if (correcting && !targetEmail.equals(currentEmail)) {
-            LocalDateTime now = LocalDateTime.now();
+            OffsetDateTime now = OffsetDateTime.now();
             jdbc.update("UPDATE core_auth_user SET email = ?, update_time = ? WHERE id = ?",
                     targetEmail, now, userId);
             jdbc.update("UPDATE core_tenant SET contact_email = ?, update_time = ? WHERE id = ?",
@@ -491,7 +497,7 @@ public class TenantAdminService {
         // Invalidate any still-open invites so only the freshly-minted link works.
         jdbc.update("UPDATE core_user_invite SET used_at = ? "
                         + "WHERE tenant_id = ? AND user_id = ? AND used_at IS NULL AND mark = 1",
-                LocalDateTime.now(), tenantCode, userId);
+                OffsetDateTime.now(), tenantCode, userId);
 
         String token = inviteTokenService.mint(tenantCode, userId, keycloakId);
         sendInviteMail(username, targetEmail, displayName, tenantCode, token);
@@ -620,7 +626,7 @@ public class TenantAdminService {
                         .set("display_name", req.displayName())
                         .set("contact_email", req.contactEmail())
                         .set("update_user", "platform-admin")
-                        .set("update_time", LocalDateTime.now()));
+                        .set("update_time", OffsetDateTime.now()));
 
         log.info("[tenant] updated tenant '{}' (id={}) — displayName='{}', contactEmail='{}'",
                 row.getTenantCode(), id, req.displayName(), req.contactEmail());
@@ -653,7 +659,7 @@ public class TenantAdminService {
                         .eq("mark", 1)
                         .set("status", TenantStatus.SUSPENDED.code())
                         .set("update_user", "platform-admin")
-                        .set("update_time", LocalDateTime.now()));
+                        .set("update_time", OffsetDateTime.now()));
         // Terminate every active session of the tenant NOW — disabling the realm
         // only blocks NEW logins, but already-issued (self-contained) access tokens
         // keep working until they expire. The tenant-wide kick makes the
@@ -687,7 +693,7 @@ public class TenantAdminService {
                         .eq("mark", 1)
                         .set("status", TenantStatus.ACTIVE.code())
                         .set("update_user", "platform-admin")
-                        .set("update_time", LocalDateTime.now()));
+                        .set("update_time", OffsetDateTime.now()));
         // Lift the tenant-wide kick so the tenant's users can log in again.
         sessionTermination.reactivateTenant(row.getTenantCode());
         log.info("[tenant] resumed tenant '{}' (id={})", row.getTenantCode(), id);

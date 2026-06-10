@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * One row in {@code core_domain_event} (V36). Insert-mostly: business code
@@ -51,7 +51,7 @@ public class DomainEventEntity {
     private String traceId;
 
     @TableField("occurred_at")
-    private LocalDateTime occurredAt;
+    private OffsetDateTime occurredAt;
 
     /** Outbox state: 0 pending / 1 dispatched / 2 failed. Owned by the dispatcher. */
     @TableField("dispatch_state")
@@ -61,5 +61,5 @@ public class DomainEventEntity {
     private Integer dispatchAttempts;
 
     @TableField("dispatched_at")
-    private LocalDateTime dispatchedAt;
+    private OffsetDateTime dispatchedAt;
 }

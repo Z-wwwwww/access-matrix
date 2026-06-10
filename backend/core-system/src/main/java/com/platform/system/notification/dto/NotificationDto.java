@@ -1,6 +1,6 @@
 package com.platform.system.notification.dto;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 public final class NotificationDto {
 
@@ -18,6 +18,6 @@ public final class NotificationDto {
             Integer kind,
             Integer level,
             Integer readFlag,
-            LocalDateTime readTime,
-            LocalDateTime createTime) {}
+            OffsetDateTime readTime,
+            OffsetDateTime createTime) {}
 }

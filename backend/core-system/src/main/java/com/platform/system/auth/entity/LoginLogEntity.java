@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Getter
 @Setter
@@ -39,5 +39,5 @@ public class LoginLogEntity {
     private String failureReason;
 
     @TableField("login_time")
-    private LocalDateTime loginTime;
+    private OffsetDateTime loginTime;
 }

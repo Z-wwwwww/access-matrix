@@ -1,5 +1,6 @@
 package com.platform.system.platform.service;
 
+import com.platform.core.common.time.AppTime;
 import com.platform.system.platform.dto.PlatformDashboardDto;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -139,16 +140,21 @@ public class PlatformDashboardService {
                         rs.getString("display_name"), ts(rs.getObject("last_login"))));
 
         // Dense 14-day login-success trend; gaps filled with 0 in Java.
+        // Day buckets are business-time (JST) calendar decisions: bucket the
+        // timestamptz instants in AppTime.ZONE and convert the window edge back
+        // to an instant, so the result is independent of the DB session TimeZone.
+        String tz = AppTime.ZONE.getId();
         Map<String, Long> byDay = new HashMap<>();
         jdbc.queryForList(
-                "SELECT to_char(date_trunc('day', login_time), 'YYYY-MM-DD') AS d, COUNT(*) AS c "
+                "SELECT to_char(login_time AT TIME ZONE '" + tz + "', 'YYYY-MM-DD') AS d, COUNT(*) AS c "
                         + "FROM core_auth_login_log "
                         + "WHERE success = true AND tenant_id NOT IN ('system') "
-                        + "AND login_time >= date_trunc('day', now()) - INTERVAL '13 days' "
+                        + "AND login_time >= (date_trunc('day', now() AT TIME ZONE '" + tz + "') "
+                        + "                   - INTERVAL '13 days') AT TIME ZONE '" + tz + "' "
                         + "GROUP BY 1")
                 .forEach(r -> byDay.put((String) r.get("d"), ((Number) r.get("c")).longValue()));
         List<PlatformDashboardDto.DailyCount> trend = new ArrayList<>(14);
-        LocalDate cursor = LocalDate.now().minusDays(13);
+        LocalDate cursor = LocalDate.now(AppTime.ZONE).minusDays(13);
         for (int i = 0; i < 14; i++) {
             String label = cursor.toString();   // 'YYYY-MM-DD'
             trend.add(new PlatformDashboardDto.DailyCount(label, byDay.getOrDefault(label, 0L)));
@@ -274,8 +280,8 @@ public class PlatformDashboardService {
         return jdbc.queryForObject(sql, Double.class);
     }
 
-    /** PG TIMESTAMP comes back as java.sql.Timestamp; normalise to LocalDateTime (null-safe). */
-    private static java.time.LocalDateTime ts(Object o) {
-        return o == null ? null : ((java.sql.Timestamp) o).toLocalDateTime();
+    /** PG timestamptz comes back as java.sql.Timestamp (a true instant); normalise to OffsetDateTime (null-safe). */
+    private static java.time.OffsetDateTime ts(Object o) {
+        return o == null ? null : ((java.sql.Timestamp) o).toInstant().atOffset(java.time.ZoneOffset.UTC);
     }
 }

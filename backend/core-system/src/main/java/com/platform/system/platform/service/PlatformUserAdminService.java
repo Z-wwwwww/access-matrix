@@ -22,7 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -111,8 +111,7 @@ public class PlatformUserAdminService {
                         rs.getString("id"), rs.getString("username"), rs.getString("email"),
                         rs.getString("display_name"), (Integer) rs.getObject("status"),
                         rs.getBoolean("platform_admin"),
-                        rs.getObject("create_time") == null ? null
-                                : ((java.sql.Timestamp) rs.getObject("create_time")).toLocalDateTime()),
+                        rs.getObject("create_time", java.time.OffsetDateTime.class)),
                 pageArgs);
         return PageResult.of(rows, totalVal, page, size);
     }
@@ -146,7 +145,7 @@ public class PlatformUserAdminService {
         try {
             String userId = IdGenerator.ulid();
             String userNo = nextSystemUserNo();
-            LocalDateTime now = LocalDateTime.now();
+            OffsetDateTime now = OffsetDateTime.now();
             jdbc.update(
                     "INSERT INTO core_auth_user "
                             + "  (id, tenant_id, username, email, user_no, display_name, "
@@ -190,7 +189,7 @@ public class PlatformUserAdminService {
     public void setEnabled(String id, boolean enabled) {
         Target t = requireManageable(id);
         jdbc.update("UPDATE core_auth_user SET status = ?, update_time = ? WHERE id = ?",
-                enabled ? 1 : 0, LocalDateTime.now(), t.id());
+                enabled ? 1 : 0, OffsetDateTime.now(), t.id());
         // Session + Keycloak side-effects (KC user enable/disable, kick/clear, end
         // session on disable) are owned by SessionTerminationService — the SAME
         // path the business-user console uses, so the two can't drift apart.
@@ -202,7 +201,7 @@ public class PlatformUserAdminService {
     @Transactional
     public void delete(String id) {
         Target t = requireManageable(id);
-        LocalDateTime now = LocalDateTime.now();
+        OffsetDateTime now = OffsetDateTime.now();
         jdbc.update("UPDATE core_rbac_user_role SET mark = 0, update_time = ? "
                 + "WHERE user_id = ? AND tenant_id = ? AND mark = 1", now, t.id(), SYSTEM_TENANT);
         jdbc.update("UPDATE core_auth_user SET mark = 0, update_time = ? WHERE id = ?", now, t.id());
@@ -282,7 +281,7 @@ public class PlatformUserAdminService {
             return false;
         }
         try {
-            LocalDateTime now = LocalDateTime.now();
+            OffsetDateTime now = OffsetDateTime.now();
             jdbc.update("UPDATE core_user_invite SET used_at = ?, update_time = ? "
                             + "WHERE user_id = ? AND tenant_id = ? AND used_at IS NULL",
                     now, now, userId, SYSTEM_TENANT);
@@ -362,7 +361,7 @@ public class PlatformUserAdminService {
             kc.updateProfile(SYSTEM_REALM, t.keycloakId(), req.email(), req.displayName());
         }
         jdbc.update("UPDATE core_auth_user SET email = ?, display_name = ?, update_time = ? WHERE id = ?",
-                req.email(), req.displayName(), LocalDateTime.now(), t.id());
+                req.email(), req.displayName(), OffsetDateTime.now(), t.id());
         log.info("[platform-user] updated ops user '{}' (id={}) email/displayName", t.username(), t.id());
     }
 

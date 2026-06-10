@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * DTO container for the platform-ops user console ({@code /platform/users}):
@@ -24,7 +24,7 @@ public final class PlatformUserDto {
             String displayName,
             Integer status,            // 1 enabled / 0 disabled
             boolean platformAdmin,     // bound to the PLATFORM_ADMIN role
-            LocalDateTime createTime
+            OffsetDateTime createTime
     ) {}
 
     /** Create body. The new user is provisioned in the {@code system} Keycloak realm. */

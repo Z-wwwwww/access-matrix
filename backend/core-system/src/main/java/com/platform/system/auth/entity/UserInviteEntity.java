@@ -6,7 +6,7 @@ import com.platform.core.infrastructure.persistence.BaseEntity;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * Single-use invite token row backing the "admin invites user" provisioning
@@ -30,9 +30,9 @@ public class UserInviteEntity extends BaseEntity {
     private String tokenHash;
 
     @TableField("expires_at")
-    private LocalDateTime expiresAt;
+    private OffsetDateTime expiresAt;
 
     /** Non-null = consumed. Once set, the token cannot be reused. */
     @TableField("used_at")
-    private LocalDateTime usedAt;
+    private OffsetDateTime usedAt;
 }

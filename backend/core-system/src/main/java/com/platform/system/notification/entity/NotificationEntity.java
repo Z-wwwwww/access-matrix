@@ -6,7 +6,7 @@ import com.platform.core.infrastructure.persistence.BaseEntity;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * In-app notification ("站内通知") — one row per recipient. The DB row is the
@@ -60,5 +60,5 @@ public class NotificationEntity extends BaseEntity {
     private Integer readFlag;
 
     @TableField("read_time")
-    private LocalDateTime readTime;
+    private OffsetDateTime readTime;
 }

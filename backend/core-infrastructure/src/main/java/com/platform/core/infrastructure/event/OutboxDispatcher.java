@@ -13,7 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -103,7 +103,7 @@ public class OutboxDispatcher {
         patch.setId(e.getId());
         patch.setDispatchState(1);
         patch.setDispatchAttempts(attempts(e) + 1);
-        patch.setDispatchedAt(LocalDateTime.now());
+        patch.setDispatchedAt(OffsetDateTime.now());
         mapper.updateById(patch);
     }
 

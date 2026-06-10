@@ -24,7 +24,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.Method;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.HashSet;
@@ -222,7 +222,7 @@ public class PermissionConsistencyGuard {
                 new QueryWrapper<PermissionEntity>().eq("code", code));
         if (rows.isEmpty()) return 0;
         int relations = 0;
-        LocalDateTime now = LocalDateTime.now();
+        OffsetDateTime now = OffsetDateTime.now();
         for (PermissionEntity e : rows) {
             if (e.getMark() != null && e.getMark() == 1) {
                 // mark は @TableLogic フィールドのため、BaseMapper.updateById では

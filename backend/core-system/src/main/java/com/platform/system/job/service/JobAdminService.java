@@ -19,7 +19,7 @@ import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -82,7 +82,7 @@ public class JobAdminService {
         UpdateWrapper<CoreJobEntity> u = new UpdateWrapper<CoreJobEntity>()
                 .eq("id", id).eq("mark", 1)
                 .set("cron", req.cron())
-                .set("update_time", LocalDateTime.now());
+                .set("update_time", OffsetDateTime.now());
         if (req.name() != null && !req.name().isBlank()) u.set("name", req.name());
         if (req.maxRunSeconds() != null) u.set("max_run_seconds", req.maxRunSeconds());
         if (req.concurrent() != null) u.set("concurrent", req.concurrent());
@@ -97,7 +97,7 @@ public class JobAdminService {
         jobMapper.update(null, new UpdateWrapper<CoreJobEntity>()
                 .eq("id", id).eq("mark", 1)
                 .set("enabled", enabled ? 1 : 0)
-                .set("update_time", LocalDateTime.now()));
+                .set("update_time", OffsetDateTime.now()));
         reconcile();
     }
 
@@ -128,10 +128,10 @@ public class JobAdminService {
     }
 
     private JobDto.View toView(CoreJobEntity e) {
-        LocalDateTime next = null;
+        OffsetDateTime next = null;
         if (Integer.valueOf(1).equals(e.getEnabled()) && e.getCron() != null
                 && CronExpression.isValidExpression(e.getCron())) {
-            next = CronExpression.parse(e.getCron()).next(LocalDateTime.now());
+            next = CronExpression.parse(e.getCron()).next(OffsetDateTime.now());
         }
         return new JobDto.View(
                 e.getId(), e.getTenantId(), e.getJobCode(), e.getName(),

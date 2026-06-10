@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Service
 public class LoginAuditService {
@@ -41,7 +41,7 @@ public class LoginAuditService {
             entity.setUserAgent(userAgent);
             entity.setSuccess(success);
             entity.setFailureReason(failureReason);
-            entity.setLoginTime(LocalDateTime.now());
+            entity.setLoginTime(OffsetDateTime.now());
             mapper.insert(entity);
         } catch (Exception e) {
             log.warn("Failed to record login audit: {}", e.getMessage());

@@ -21,7 +21,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Locale;
 
 @Component
@@ -77,7 +77,7 @@ public class LocalAdminSeeder {
     private UserEntity ensureAdminUser() {
         UserEntity existing = userMapper.findByIdentifier("demo", "demo-admin");
         String adminHash = encoder.encode("demo-admin");
-        LocalDateTime now = LocalDateTime.now();
+        OffsetDateTime now = OffsetDateTime.now();
 
         if (existing == null) {
             UserEntity u = new UserEntity();

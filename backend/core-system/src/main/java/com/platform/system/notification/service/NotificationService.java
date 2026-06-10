@@ -13,7 +13,7 @@ import com.platform.system.notification.mapper.NotificationMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Service
@@ -79,7 +79,7 @@ public class NotificationService {
         }
         if (n.getReadFlag() != null && n.getReadFlag() == 1) return;   // idempotent
         n.setReadFlag(1);
-        n.setReadTime(LocalDateTime.now());
+        n.setReadTime(OffsetDateTime.now());
         mapper.updateById(n);                            // @Version on update_time guards races
     }
 
@@ -99,7 +99,7 @@ public class NotificationService {
                 .eq(NotificationEntity::getBizId, bizId)
                 .eq(NotificationEntity::getReadFlag, 0)
                 .set(NotificationEntity::getReadFlag, 1)
-                .set(NotificationEntity::getReadTime, LocalDateTime.now());
+                .set(NotificationEntity::getReadTime, OffsetDateTime.now());
         mapper.update(null, u);   // tenant interceptor scopes (RequestContext set by listener)
         return recipients;
     }
@@ -111,7 +111,7 @@ public class NotificationService {
                 .eq(NotificationEntity::getRecipientUserId, userId)
                 .eq(NotificationEntity::getReadFlag, 0)
                 .set(NotificationEntity::getReadFlag, 1)
-                .set(NotificationEntity::getReadTime, LocalDateTime.now());
+                .set(NotificationEntity::getReadTime, OffsetDateTime.now());
         mapper.update(null, u);   // tenant interceptor scopes the UPDATE
     }
 

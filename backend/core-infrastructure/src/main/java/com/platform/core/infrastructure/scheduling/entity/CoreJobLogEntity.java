@@ -6,7 +6,7 @@ import com.platform.core.infrastructure.persistence.BaseEntity;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * 1 回の実行の履歴行。{@code core_job_log} (V38)。RUNNING で挿入し、終了時に
@@ -33,10 +33,10 @@ public class CoreJobLogEntity extends BaseEntity {
     private String nodeId;
 
     @TableField("start_time")
-    private LocalDateTime startTime;
+    private OffsetDateTime startTime;
 
     @TableField("end_time")
-    private LocalDateTime endTime;
+    private OffsetDateTime endTime;
 
     @TableField("duration_ms")
     private Long durationMs;

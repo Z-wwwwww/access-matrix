@@ -1,7 +1,7 @@
 # Access Matrix — Backend AI Development Guide
 
 > Companion frontend: `../frontend/` (Vue 3 + Vite + Tailwind v4). This repo is a monorepo; for the root-level cross-stack conventions see [../AGENTS.md](../AGENTS.md).
-> Backend listens on `:9135` by default, context-path `/api`, dev profile forces `Asia/Tokyo` timezone.
+> Backend listens on `:9135` by default, context-path `/api`. Time is stored/transported as timezone-agnostic instants (`timestamptz` / `OffsetDateTime`); `Asia/Tokyo` (`AppTime.ZONE`) applies only to wall-clock decisions.
 
 ## Project Overview
 
@@ -27,7 +27,7 @@
 | Password | BCrypt (cost = 12) |
 | Rate limit | bucket4j |
 | ID | ULID Creator (CHAR(26) PK) |
-| Timezone | `Asia/Tokyo` |
+| Timezone | Instants end-to-end (`timestamptz` + `OffsetDateTime` + offset-bearing ISO wire format); business timezone `Asia/Tokyo` via `AppTime.ZONE` (wall-clock decisions only) |
 
 ## Module Boundaries (the most important rule)
 
@@ -294,7 +294,7 @@ If you prefer (or need) to do it by hand, the DO / DON'T below is the spec.
 | Audit | Annotate write endpoints with `@OpLog(module, action, targetType)`; rows land in `core_oplog` automatically |
 | Pagination | `page` (1-based) + `size` (max 500); returns `PageResult<T>(records, total, page, limit)` |
 | Response | All wrapped in `JsonResult<T>`: `{ code, msg, data }`; errors via `BusinessException(ErrorCode.X, msg)` |
-| Time | `LocalDateTime`; Jackson configured to write ISO + `Asia/Tokyo` timezone |
+| Time | `OffsetDateTime` everywhere (entities/DTOs/`now()`); columns are `timestamptz` (V58); Jackson writes ISO-8601 with offset. **Never** use `LocalDateTime` for timestamps. Wall-clock/calendar decisions (cron, day/month bucketing in SQL via `AT TIME ZONE`, date parts in numbering, email-facing formatting) go through `AppTime.ZONE` (`Asia/Tokyo`) |
 
 ## Multi-tenant
 

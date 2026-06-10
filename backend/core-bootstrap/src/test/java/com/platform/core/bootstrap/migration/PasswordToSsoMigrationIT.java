@@ -199,8 +199,8 @@ class PasswordToSsoMigrationIT {
         u.setMark(1);
         u.setCreateUser("test");
         u.setUpdateUser("test");
-        u.setCreateTime(java.time.LocalDateTime.now());
-        u.setUpdateTime(java.time.LocalDateTime.now());
+        u.setCreateTime(java.time.OffsetDateTime.now());
+        u.setUpdateTime(java.time.OffsetDateTime.now());
         userMapper.insert(u);
     }
 
