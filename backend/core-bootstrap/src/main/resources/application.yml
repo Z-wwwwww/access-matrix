@@ -20,7 +20,8 @@ spring:
     # 本地开发必须显式 SPRING_PROFILES_ACTIVE=dev（profile 配置见 application-dev.yml）。
     active: ${SPRING_PROFILES_ACTIVE:dev}   # 可填 prod|dev|test
   jackson:
-    time-zone: Asia/Tokyo         # JSON 序列化时间所用时区
+    # 不配 time-zone：OffsetDateTime 自带偏移量（DB 读出为 UTC → 形如 ...Z），
+    # 序列化偏移量只是同一时刻的不同写法，消费方解析结果与之无关。
     datatype:
       datetime:
         write-dates-as-timestamps: false   # false=日期序列化为 ISO 字符串 | true=序列化为数字时间戳

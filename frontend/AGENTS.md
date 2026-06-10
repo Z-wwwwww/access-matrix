@@ -104,7 +104,7 @@ Rules:
 | Me-endpoints | `GET /api/menu/me` for the current user's menu tree; `GET /api/permission/me` for the current user's permission-code Set |
 | User permission codes | JWT scope claim: `*:*` (super admin) or `__compact__` (others, triggers backend cache lookup) — the frontend should not parse `scope`; use `/permission/me` uniformly |
 | Force logout | The backend `ForceLogoutFilter` checks globally; the axios 401 interceptor clears tokens and redirects to login |
-| Date format | Timestamps travel as ISO-8601 **with offset** (backend returns e.g. `2026-06-10T17:38:33+09:00`; send via `toBackendDate(val)` from `@/lib/date`). Display is forced Asia/Tokyo through the `toJST*` helpers — never parse/format timestamps with raw `new Date()` / `Date.parse` / string slicing |
+| Date format | Timestamps travel as ISO-8601 **with offset** (backend typically returns UTC, e.g. `2026-06-10T08:38:33Z`; send via `toBackendDate(val)` from `@/lib/date`). Display is forced Asia/Tokyo through the `toJST*` helpers — never parse/format timestamps with raw `new Date()` / `Date.parse` / string slicing |
 
 ## Tree table (Dept / Menu template)
 
