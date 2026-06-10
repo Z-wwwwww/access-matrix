@@ -713,17 +713,12 @@ export default {
       self: 'You'
     },
     tooltip: {
-      editDisabledAdmin: 'Admin accounts cannot be edited here (the admin edits their own details on the Profile page)',
       edit: 'Edit',
       resetPassword: 'Reset password',
-      resetPasswordDisabledAdmin: 'Admin account passwords cannot be reset from this console',
-      statusChangeDisabled: 'Admin account status cannot be changed',
       toggleStatus: 'Enable / Disable',
       disable: 'Disable',
       enable: 'Enable',
       forceLogout: 'Force logout',
-      forceLogoutDisabled: 'Admin account cannot be forced to log out',
-      deleteDisabled: 'Admin account cannot be deleted',
       selfManaged: 'Manage your own account on the Profile page'
     },
     confirm: {

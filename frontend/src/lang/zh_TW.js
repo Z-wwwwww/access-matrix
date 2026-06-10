@@ -713,17 +713,12 @@ export default {
       self: '本人'
     },
     tooltip: {
-      editDisabledAdmin: '管理員帳號不可在此編輯（本人在「個人資料」頁修改）',
       edit: '編輯',
       resetPassword: '重設密碼',
-      resetPasswordDisabledAdmin: '管理員帳號的密碼不能在此重設',
-      statusChangeDisabled: '管理員帳號狀態不可變更',
       toggleStatus: '啟用/停用',
       disable: '停用',
       enable: '啟用',
       forceLogout: '強制登出',
-      forceLogoutDisabled: '管理員帳號不可被強制登出',
-      deleteDisabled: '管理員帳號不可刪除',
       selfManaged: '請在「個人資料」頁管理自己的帳號'
     },
     confirm: {

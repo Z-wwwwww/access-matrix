@@ -713,17 +713,12 @@ export default {
       self: '本人'
     },
     tooltip: {
-      editDisabledAdmin: '管理员账号不可在此编辑（本人在「个人资料」页修改）',
       edit: '编辑',
       resetPassword: '重置密码',
-      resetPasswordDisabledAdmin: '管理员账号的密码不能在此重置',
-      statusChangeDisabled: '管理员账号状态不可变更',
       toggleStatus: '启用/禁用',
       disable: '停用',
       enable: '启用',
       forceLogout: '强制登出',
-      forceLogoutDisabled: '管理员账号不可被强制登出',
-      deleteDisabled: '管理员账号不可删除',
       selfManaged: '请在「个人资料」页管理自己的账号'
     },
     confirm: {

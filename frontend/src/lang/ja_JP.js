@@ -723,17 +723,12 @@ export default {
       self: '本人'
     },
     tooltip: {
-      editDisabledAdmin: '管理者アカウントはこの画面から編集できません（本人がプロフィール画面で編集）',
       edit: '編集',
       resetPassword: 'パスワードリセット',
-      resetPasswordDisabledAdmin: '管理者アカウントのパスワードはこの画面からリセットできません',
-      statusChangeDisabled: '管理者アカウントは状態変更不可',
       toggleStatus: '有効/無効',
       disable: '停止',
       enable: '再開',
       forceLogout: '強制ログアウト',
-      forceLogoutDisabled: '管理者アカウントは強制ログアウト不可',
-      deleteDisabled: '管理者アカウントは削除不可',
       selfManaged: '自分のアカウントはプロフィール画面で管理してください'
     },
     confirm: {

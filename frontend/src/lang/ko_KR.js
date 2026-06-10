@@ -713,17 +713,12 @@ export default {
       self: '본인'
     },
     tooltip: {
-      editDisabledAdmin: '관리자 계정은 여기서 편집할 수 없습니다(본인이 프로필 페이지에서 수정)',
       edit: '편집',
       resetPassword: '비밀번호 재설정',
-      resetPasswordDisabledAdmin: '관리자 계정의 비밀번호는 여기서 재설정할 수 없습니다',
-      statusChangeDisabled: '관리자 계정 상태는 변경할 수 없습니다',
       toggleStatus: '활성/비활성',
       disable: '비활성',
       enable: '활성',
       forceLogout: '강제 로그아웃',
-      forceLogoutDisabled: '관리자 계정은 강제 로그아웃할 수 없습니다',
-      deleteDisabled: '관리자 계정은 삭제할 수 없습니다',
       selfManaged: '본인 계정은 프로필 페이지에서 관리하세요'
     },
     confirm: {
