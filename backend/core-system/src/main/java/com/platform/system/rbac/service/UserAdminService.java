@@ -274,34 +274,21 @@ public class UserAdminService {
     public void update(String id, UserDto.UpdateRequest req) {
         assertNotSelf(id);
         UserEntity u = require(id);
-        // "Protected admin" = the built-in admin OR the tenant's singular
-        // SUPER_ADMIN. Both are partially editable: contact fields (email,
-        // displayName) are allowed because break-glass alerts need a reachable
-        // inbox and a recognisable sender name. Structural fields (deptId,
-        // status) stay locked — changing them would break invariants the rest
-        // of the codebase depends on (e.g. disabling the only super-admin would
-        // lock everyone out). Roles are gated in assignRoles; delete /
-        // changeStatus / force-logout block these accounts wholesale.
-        boolean locked = isBuiltInAdmin(u) || isTenantSuperAdmin(u);
-        if (locked) {
-            if (req.deptId() != null && !java.util.Objects.equals(req.deptId(), u.getDeptId())) {
-                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.adminContactOnly");
-            }
-            if (req.status() != null && !java.util.Objects.equals(req.status(), u.getStatus())) {
-                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.adminContactOnly");
-            }
-        }
+        // Protected admins (built-in admin / tenant SUPER_ADMIN) are fully
+        // read-only in this console — holding user:update does NOT extend to
+        // the tenant's administrator account. The admin edits their own
+        // contact info via the Profile page (updateOwnProfile); structural
+        // fields (dept / status / roles) never change through any path.
+        assertNotProtectedAdmin(u);
         assertEmailAvailable(req.email(), id);
         syncKeycloakProfile(u, req.email(), req.displayName());
         if (req.email() != null) u.setEmail(req.email());
         // userNo は採番（read-only）。クライアントから来ても無視（DTO にも無い）。
         if (req.displayName() != null) u.setDisplayName(req.displayName());
-        if (!locked) {
-            if (req.deptId() != null) u.setDeptId(req.deptId());
-            if (req.status() != null) {
-                DictEnum.requireValid(CommonStatus.class, req.status(), "status");
-                u.setStatus(req.status());
-            }
+        if (req.deptId() != null) u.setDeptId(req.deptId());
+        if (req.status() != null) {
+            DictEnum.requireValid(CommonStatus.class, req.status(), "status");
+            u.setStatus(req.status());
         }
         userMapper.updateById(u);
         cacheService.evictUser(id);
@@ -311,8 +298,7 @@ public class UserAdminService {
     public void delete(String id) {
         assertNotSelf(id);
         UserEntity u = require(id);
-        assertNotBuiltInAdmin(u, "delete");
-        assertNotLastSuperAdmin(id, "delete");
+        assertNotProtectedAdmin(u);
         // mark は @TableLogic — BaseMapper.updateById では SET 句から除外されるので UpdateWrapper で明示。
         userMapper.update(null,
                 new UpdateWrapper<UserEntity>().eq("id", id).eq("mark", 1)
@@ -353,24 +339,16 @@ public class UserAdminService {
     public void assignRoles(String userId, List<String> roleIds) {
         assertNotSelf(userId);
         UserEntity u = require(userId);
-        assertNotBuiltInAdmin(u, "assign roles");
-        // SUPER_ADMIN is singular and locked to the user invited at tenant
-        // creation. Two directions are enforced so the UI can't bypass either:
-        //  - it can NEVER be granted to a second user (no transfer) — the tenant
-        //    keeps exactly one super admin, the original invitee;
-        //  - the sole holder can never have it stripped (would strand the tenant
-        //    with zero super admins) — same invariant delete/disable enforce.
+        // The SUPER_ADMIN holder is a protected admin → fully read-only here,
+        // which already covers the "never strip SUPER_ADMIN from the sole
+        // holder" direction. The remaining direction: SUPER_ADMIN can never be
+        // granted to a second user (no transfer) — the tenant keeps exactly
+        // one super admin, the original invitee.
+        assertNotProtectedAdmin(u);
         String tid = RequestContext.tenantIdOrDefault();
         String superRoleId = roleLookup.superAdminRoleId(tid);
-        if (superRoleId != null) {
-            boolean alreadyHolds = userRoleMapper.existsActiveLink(userId, superRoleId, tid) != null;
-            boolean wantsSuper = roleIds != null && roleIds.contains(superRoleId);
-            if (wantsSuper && !alreadyHolds) {
-                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.superAdminSingleton");
-            }
-            if (alreadyHolds && !wantsSuper) {
-                assertNotLastSuperAdmin(userId, "strip SUPER_ADMIN from");
-            }
+        if (superRoleId != null && roleIds != null && roleIds.contains(superRoleId)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.superAdminSingleton");
         }
         userRoleMapper.update(null,
                 new UpdateWrapper<UserRoleEntity>().eq("user_id", userId).eq("mark", 1)
@@ -395,9 +373,7 @@ public class UserAdminService {
     public void forceLogout(String userId) {
         assertNotSelf(userId);
         UserEntity u = require(userId);
-        if (isBuiltInAdmin(u) || isTenantSuperAdmin(u)) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.adminProtected");
-        }
+        assertNotProtectedAdmin(u);
         sessionTermination.terminateUser(userId);
     }
 
@@ -421,9 +397,7 @@ public class UserAdminService {
     public UserDto.ResetPwResponse resetPassword(String id) {
         assertNotSelf(id);
         UserEntity u = require(id);
-        if (isBuiltInAdmin(u) || isTenantSuperAdmin(u)) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.adminProtected");
-        }
+        assertNotProtectedAdmin(u);
         String tempPassword = TempPasswords.generate();
         KeycloakUserService keycloak = keycloakProvider.getIfAvailable();
         if (keycloak != null) {
@@ -482,7 +456,7 @@ public class UserAdminService {
     public void changeDept(String userId, String deptId) {
         assertNotSelf(userId);
         UserEntity u = require(userId);
-        assertNotBuiltInAdmin(u, "change dept");
+        assertNotProtectedAdmin(u);
         u.setDeptId(deptId);
         userMapper.updateById(u);
         cacheService.evictUser(userId);
@@ -493,13 +467,8 @@ public class UserAdminService {
         assertNotSelf(userId);
         DictEnum.requireValid(CommonStatus.class, status, "status");
         UserEntity u = require(userId);
-        assertNotBuiltInAdmin(u, "change status");
+        assertNotProtectedAdmin(u);
         boolean enabling = status == CommonStatus.ENABLED.code();
-        // Only the "disable" direction can strand the platform without a super
-        // admin; enabling a previously-disabled super-admin is always safe.
-        if (!enabling) {
-            assertNotLastSuperAdmin(userId, "disable");
-        }
         u.setStatus(status);
         userMapper.updateById(u);
         cacheService.evictUser(userId);
@@ -511,37 +480,24 @@ public class UserAdminService {
     }
 
     /**
-     * The default {@code admin} user is the project's "built-in" identity: it owns SUPER_ADMIN
-     * and is hardcoded in {@code LocalAdminSeeder}. We refuse to mutate its record / role-binding
-     * / status / dept / password through the admin API — it recovers its own credential via the
-     * KC self-service reset or break-glass.
+     * "Protected admin" = the built-in admin ({@code LocalAdminSeeder}'s
+     * hardcoded identity) OR the tenant's singular SUPER_ADMIN (the user
+     * invited at tenant creation). Both are <b>fully read-only</b> in the
+     * user-management console: no other user — whatever user-management
+     * permission they hold — may edit, re-role, move, disable, delete,
+     * kick, or reset them. The admin manages their own contact info on the
+     * Profile page ({@link #updateOwnProfile}) and recovers credentials via
+     * the KC self-service reset or break-glass. This also subsumes the old
+     * "last active SUPER_ADMIN" guard: the sole super admin can never be
+     * deleted / disabled / stripped, so the tenant always keeps one.
      */
-    private void assertNotBuiltInAdmin(UserEntity u, String op) {
-        if (isBuiltInAdmin(u)) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
-                    "Built-in admin user is read-only — only password reset is allowed (rejected: " + op + ")");
+    private void assertNotProtectedAdmin(UserEntity u) {
+        if (isBuiltInAdmin(u) || isTenantSuperAdmin(u)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.adminProtected");
         }
     }
 
     private static final String BUILTIN_ADMIN_USERNAME = "demo-admin";
-
-    /**
-     * Refuse an operation if {@code userId} is the only active holder of the
-     * {@code SUPER_ADMIN} role <em>in the caller's tenant</em>. Without this
-     * guard a single careless delete / disable / role-strip leaves the
-     * tenant with zero usable super admins and a tedious DB-fix recovery.
-     */
-    private void assertNotLastSuperAdmin(String userId, String op) {
-        String tid = RequestContext.tenantIdOrDefault();
-        String superRoleId = roleLookup.superAdminRoleId(tid);
-        if (superRoleId == null) return; // tenant has no built-in super admin row → nothing to guard
-        if (userRoleMapper.existsActiveLink(userId, superRoleId, tid) == null) return; // not a super admin
-        Long total = userRoleMapper.countActiveHoldersByRoleId(superRoleId, tid);
-        if (total != null && total <= 1L) {
-            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
-                    "Cannot " + op + " the last active SUPER_ADMIN user");
-        }
-    }
 
     /**
      * Same precise duplicate pre-check as {@code create}, excluding the row

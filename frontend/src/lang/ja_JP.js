@@ -36,9 +36,8 @@ export default {
       passwordRequired: '直接設定方式ではパスワードが必須です',
       emailRequired: '招待メール方式ではメールアドレスが必須です',
       superAdminSingleton: 'スーパー管理者ロールはテナント所有者専用で、他のユーザーには付与できません',
-      adminProtected: 'この管理者アカウントは保護されており、強制ログアウト・停止・削除はできません',
+      adminProtected: 'この管理者アカウントは保護されており、他のユーザーによる編集・停止・削除・強制ログアウトはできません。管理者本人がプロフィール画面で自分の情報を編集してください',
       noKeycloakLink: 'このユーザーは Keycloak アカウントと連携していないため、パスワードをリセットできません',
-      adminContactOnly: 'この管理者アカウントは連絡先情報（メール・表示名）のみ編集できます',
       selfManagementForbidden: 'ここでは自分のアカウントを操作できません。自分の情報はプロフィール画面で編集してください'
     },
     role: {
@@ -724,8 +723,7 @@ export default {
       self: '本人'
     },
     tooltip: {
-      editDisabled: '内蔵ユーザーは編集不可',
-      editAdminContactOnly: '管理者アカウント：連絡先情報（メール・表示名）のみ編集可能',
+      editDisabledAdmin: '管理者アカウントはこの画面から編集できません（本人がプロフィール画面で編集）',
       edit: '編集',
       resetPassword: 'パスワードリセット',
       resetPasswordDisabledAdmin: '管理者アカウントのパスワードはこの画面からリセットできません',
@@ -753,7 +751,6 @@ export default {
     edit: {
       titleEdit: 'ユーザー編集',
       titleCreate: 'ユーザー新規',
-      lockedHint: '管理者アカウントは「連絡先のみ編集可能」です。メールアドレスと表示名は変更できます（ブレークグラス通知のため）。部署・状態・ロールは変更できません。',
       label: {
         username: 'ログインID',
         password: 'パスワード',

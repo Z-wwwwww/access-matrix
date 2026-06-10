@@ -29,9 +29,8 @@ export default {
       passwordRequired: '直接设密方式需要填写密码',
       emailRequired: '邀请邮件方式需要填写邮箱',
       superAdminSingleton: '超级管理员角色为租户所有者保留，不能授予其他用户',
-      adminProtected: '该管理员账号受保护，不能被强制登出、停用或删除',
+      adminProtected: '该管理员账号受保护，其他用户不能修改、停用、删除或强制登出；管理员本人可在「个人资料」页修改自己的信息',
       noKeycloakLink: '该用户未关联 Keycloak 账号，无法重置密码',
-      adminContactOnly: '该管理员账号仅可编辑联系信息（邮箱、显示名）',
       selfManagementForbidden: '不能在此管理自己的账号，请在「个人资料」页修改自己的信息'
     },
     role: {
@@ -714,8 +713,7 @@ export default {
       self: '本人'
     },
     tooltip: {
-      editDisabled: '内置用户不可编辑',
-      editAdminContactOnly: '管理员账号：仅可编辑联系信息（邮箱、显示名）',
+      editDisabledAdmin: '管理员账号不可在此编辑（本人在「个人资料」页修改）',
       edit: '编辑',
       resetPassword: '重置密码',
       resetPasswordDisabledAdmin: '管理员账号的密码不能在此重置',
@@ -743,7 +741,6 @@ export default {
     edit: {
       titleEdit: '编辑用户',
       titleCreate: '新增用户',
-      lockedHint: '管理员账号「仅可编辑联系信息」：邮箱和显示名可以修改（应急密码告警需要可达邮箱）。部门、状态、角色保持锁定。',
       label: {
         username: '登录ID',
         password: '密码',

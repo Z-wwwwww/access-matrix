@@ -31,9 +31,10 @@ import { useAuthStore } from '@/stores/auth'
 // menu (KC account console / break-glass for super-admins).
 
 // "Protected admin" = the built-in admin OR the tenant's singular SUPER_ADMIN.
-// Such rows are contact-only (email / display name editable) and cannot be
-// suspended, deleted, or force-logged-out from this console. The backend
-// enforces the same; here we just disable the actions + show why.
+// Such rows are fully read-only in this console — no edit, suspend, delete,
+// reset or force-logout, whoever the caller is. The admin manages their own
+// info on the Profile page. The backend enforces the same; here we just
+// disable the actions + show why.
 function isProtectedAdmin(row) {
   return row?.builtin === true || row?.superAdmin === true
 }
@@ -283,8 +284,8 @@ onMounted(() => {
           <div class="inline-flex items-center gap-1">
             <button v-permission="'user:update'"
                     class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                    :disabled="isSelf(row)"
-                    :title="isSelf(row) ? t('user.tooltip.selfManaged') : (isProtectedAdmin(row) ? t('user.tooltip.editAdminContactOnly') : t('user.tooltip.edit'))"
+                    :disabled="isSelf(row) || isProtectedAdmin(row)"
+                    :title="isSelf(row) ? t('user.tooltip.selfManaged') : (isProtectedAdmin(row) ? t('user.tooltip.editDisabledAdmin') : t('user.tooltip.edit'))"
                     @click="openEdit(row)">
               <Pencil class="size-3.5" />
             </button>

@@ -22,18 +22,9 @@ const props = defineProps({
 const emit = defineEmits(['update:open', 'saved'])
 
 const isEdit = computed(() => !!props.user)
-// Built-in admin: partially editable. Contact fields (email, displayName)
-// are open so break-glass alerts can be delivered to a real inbox.
-// Structural fields (deptId, status, role assignments) stay locked —
-// backend re-enforces this even if the UI is bypassed.
-const isBuiltInAdmin = computed(() => isEdit.value && props.user?.builtin === true)
-// "Protected admin" = the built-in admin OR the tenant's singular SUPER_ADMIN.
-// Both are contact-only: email + display name editable, everything else (dept,
-// status, roles) locked — and suspend / delete / force-logout are blocked in
-// the list. The backend enforces all of this regardless of the UI.
-const isProtectedAdmin = computed(() =>
-  isEdit.value && (props.user?.builtin === true || props.user?.superAdmin === true))
-const isStructuralLocked = computed(() => isProtectedAdmin.value)
+// Protected admins (built-in admin / tenant SUPER_ADMIN) never reach this
+// drawer — the list disables their edit button, and the backend refuses
+// every mutation on them anyway. No special-casing needed here.
 
 const form = reactive({
   username: '',
@@ -91,7 +82,7 @@ watch(() => props.open, async (open) => {
 })
 
 function toggleRole(r) {
-  if (isStructuralLocked.value || roleLocked(r)) return
+  if (roleLocked(r)) return
   const idx = selectedRoleIds.value.indexOf(r.id)
   if (idx >= 0) selectedRoleIds.value.splice(idx, 1)
   else selectedRoleIds.value.push(r.id)
@@ -111,13 +102,7 @@ async function save() {
     let userId
     if (isEdit.value) {
       // userNo は採番（read-only）なので update body に含めない。
-      // For built-in admin, omit deptId/status from the body so the
-      // backend's "cannot change department/status" guards don't trip
-      // even on a no-op echo of the current values (defends against
-      // the form picking up null → "" coercion).
-      const body = isProtectedAdmin.value
-        ? { email: form.email, displayName: form.displayName }
-        : { email: form.email, displayName: form.displayName, deptId: form.deptId, status: form.status }
+      const body = { email: form.email, displayName: form.displayName, deptId: form.deptId, status: form.status }
       const r = await updateUserApi(props.user.id, body)
       if (r.data.code !== 0) { toast.error(r.data.msg || t('user.edit.message.updateFailed')); return }
       userId = props.user.id
@@ -137,13 +122,8 @@ async function save() {
       if (r.data.code !== 0) { toast.error(r.data.msg || t('user.edit.message.createFailed')); return }
       userId = r.data.data
     }
-    // assign roles — skipped for a protected admin (built-in / tenant
-    // SUPER_ADMIN): roles are locked on that row (backend rejects, and the UI
-    // gates the toggles via isStructuralLocked), so there's nothing to persist.
-    if (!isProtectedAdmin.value) {
-      const r2 = await assignUserRolesApi(userId, selectedRoleIds.value)
-      if (r2.data.code !== 0) { toast.error(r2.data.msg || t('user.edit.message.assignRolesFailed')); return }
-    }
+    const r2 = await assignUserRolesApi(userId, selectedRoleIds.value)
+    if (r2.data.code !== 0) { toast.error(r2.data.msg || t('user.edit.message.assignRolesFailed')); return }
     toast.success(t('common.message.saveSuccessful'))
     emit('saved')
     emit('update:open', false)
@@ -160,10 +140,6 @@ async function save() {
     @update:open="(v) => emit('update:open', v)"
   >
     <div class="space-y-4">
-      <div v-if="isStructuralLocked"
-           class="text-xs px-3 py-2 rounded bg-amber-100 border border-amber-300 text-amber-900">
-        {{ t('user.edit.lockedHint') }}
-      </div>
       <div>
         <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.username') }} <span class="text-destructive">*</span></label>
         <Input v-model="form.username" :disabled="isEdit" />
@@ -222,12 +198,12 @@ async function save() {
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.deptId') }}</label>
-          <DeptTreeDialog v-model="form.deptId" :placeholder="t('common.placeholder.deptId')" :disabled="isStructuralLocked" />
+          <DeptTreeDialog v-model="form.deptId" :placeholder="t('common.placeholder.deptId')" />
         </div>
         <div>
           <label class="text-xs text-muted-foreground block mb-1">{{ t('user.edit.label.status') }}</label>
           <div class="h-9 flex items-center gap-2">
-            <Switch v-model="form.status" :checked-value="1" :unchecked-value="0" :disabled="isStructuralLocked" />
+            <Switch v-model="form.status" :checked-value="1" :unchecked-value="0" />
             <span class="text-sm">{{ commonStatus.label(form.status) }}</span>
           </div>
         </div>
@@ -240,12 +216,11 @@ async function save() {
             {{ t('user.edit.label.rolesSelected', { selected: selectedRoleIds.length, total: visibleRoles.length }) }}
           </span>
         </div>
-        <div class="border border-border rounded-lg p-2 max-h-56 overflow-y-auto bg-muted/20"
-             :class="isStructuralLocked && 'opacity-60 pointer-events-none'">
+        <div class="border border-border rounded-lg p-2 max-h-56 overflow-y-auto bg-muted/20">
           <div v-if="visibleRoles.length" class="flex flex-wrap gap-1.5">
             <button v-for="r in visibleRoles" :key="r.id"
                     type="button"
-                    :disabled="isStructuralLocked || roleLocked(r)"
+                    :disabled="roleLocked(r)"
                     :title="r.description || r.name"
                     :class="[
                       'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition cursor-pointer disabled:cursor-not-allowed',

@@ -46,9 +46,10 @@ import static org.mockito.Mockito.when;
  *
  *   1. {@code userNo} numbering is keyed by the *current* tenant — multi-tenant
  *      installs need per-tenant counters (USER + tenantId), not a global one.
- *   2. The "last active SUPER_ADMIN" guard fires on delete / disable /
- *      role-strip and refers to the seeded {@link BuiltInRoles#SUPER_ADMIN_ID}
- *      (not a code/name lookup).
+ *   2. Protected admins (built-in admin / tenant SUPER_ADMIN, resolved via
+ *      the seeded {@link BuiltInRoles#SUPER_ADMIN_ID} — not a code/name
+ *      lookup) are fully read-only in the console: update / role-assign /
+ *      dept / status / delete / reset / kick are all refused, whoever calls.
  *   3. Soft deletes go through {@code UpdateWrapper.set("mark", 0)} — the
  *      historical {@code setMark(0)+updateById} no-op'd because {@code @TableLogic}
  *      strips the field from BaseMapper's SET clause.
@@ -196,84 +197,71 @@ class UserAdminServiceTest {
 
         assertThatThrownBy(() -> service.delete("u1"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Built-in admin");
+                .hasMessageContaining("error.user.adminProtected");
 
         verify(userMapper, never()).update(any(), any());
         verify(sessionTermination, never()).terminateUser(any());
     }
 
-    // ─── built-in admin partial editability ───────────────────────────
-    // Admin can edit contact fields (email, displayName) so break-glass
-    // alerts have a reachable inbox. Structural fields (deptId, status)
-    // stay locked even via this update path.
+    // ─── protected admins are fully read-only in this console ──────────
+    // The built-in admin and the tenant's singular SUPER_ADMIN cannot be
+    // edited by ANY other user, whatever user-management permission they
+    // hold — including contact fields. The admin edits their own info via
+    // the Profile page (updateOwnProfile).
 
     @Test
-    void update_builtInAdmin_allowsEmailAndDisplayNameChange() {
-        UserEntity adminUser = user("u1", "demo-admin");
-        adminUser.setEmail("old@example.com");
-        adminUser.setDisplayName("Admin");
-        when(userMapper.selectById("u1")).thenReturn(adminUser);
+    void update_refusesBuiltInAdmin() {
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "demo-admin"));
 
-        UserDto.UpdateRequest req = new UserDto.UpdateRequest(
-                "admin@platform.local", "Local Admin", null, null);
-        service.update("u1", req);
-
-        assertThat(adminUser.getEmail()).isEqualTo("admin@platform.local");
-        assertThat(adminUser.getDisplayName()).isEqualTo("Local Admin");
-        verify(userMapper).updateById(adminUser);
-        verify(cacheService).evictUser("u1");
-    }
-
-    @Test
-    void update_builtInAdmin_refusesDeptChange() {
-        UserEntity adminUser = user("u1", "demo-admin");
-        adminUser.setDeptId("DEPT-HQ");
-        when(userMapper.selectById("u1")).thenReturn(adminUser);
-
-        UserDto.UpdateRequest req = new UserDto.UpdateRequest(
-                null, null, "DEPT-OTHER", null);
-        assertThatThrownBy(() -> service.update("u1", req))
+        assertThatThrownBy(() -> service.update("u1", new UserDto.UpdateRequest(
+                "admin-new@platform.local", "Local Admin", null, null)))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("error.user.adminContactOnly");
+                .hasMessageContaining("error.user.adminProtected");
 
         verify(userMapper, never()).updateById(any(UserEntity.class));
     }
 
     @Test
-    void update_builtInAdmin_refusesStatusChange() {
-        UserEntity adminUser = user("u1", "demo-admin");
-        adminUser.setStatus(1);
-        when(userMapper.selectById("u1")).thenReturn(adminUser);
+    void update_refusesTenantSuperAdmin() {
+        // The regression this pins: a user holding user:update could edit the
+        // tenant admin's email / display name. Now the SUPER_ADMIN holder is
+        // wholly off-limits, even for contact fields.
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "owner"));
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1);
 
-        UserDto.UpdateRequest req = new UserDto.UpdateRequest(
-                null, null, null, 0);
-        assertThatThrownBy(() -> service.update("u1", req))
+        assertThatThrownBy(() -> service.update("u1", new UserDto.UpdateRequest(
+                "owner-new@example.com", null, null, null)))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("error.user.adminContactOnly");
+                .hasMessageContaining("error.user.adminProtected");
 
         verify(userMapper, never()).updateById(any(UserEntity.class));
     }
 
     @Test
-    void update_builtInAdmin_echoingSameStructuralValues_isAllowedNoOp() {
-        // The frontend form sends the FULL row back on edit, including the
-        // existing deptId and status. Re-asserting the same values must NOT
-        // trip the structural-change guards — otherwise editing email would
-        // 400 unless the UI specifically stripped deptId/status from the
-        // payload (which is the kind of fiddly thing future regressions
-        // would silently break).
-        UserEntity adminUser = user("u1", "demo-admin");
-        adminUser.setDeptId("DEPT-HQ");
-        adminUser.setStatus(1);
-        adminUser.setEmail("admin@platform.local");
-        when(userMapper.selectById("u1")).thenReturn(adminUser);
+    void changeDept_refusesTenantSuperAdmin() {
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "owner"));
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1);
 
-        UserDto.UpdateRequest req = new UserDto.UpdateRequest(
-                "admin-new@platform.local", null, "DEPT-HQ", 1);
-        service.update("u1", req);
+        assertThatThrownBy(() -> service.changeDept("u1", "DEPT-OTHER"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("error.user.adminProtected");
 
-        assertThat(adminUser.getEmail()).isEqualTo("admin-new@platform.local");
-        verify(userMapper).updateById(adminUser);
+        verify(userMapper, never()).updateById(any(UserEntity.class));
+    }
+
+    @Test
+    void changeStatus_refusesTenantSuperAdmin_bothDirections() {
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "owner"));
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1);
+
+        assertThatThrownBy(() -> service.changeStatus("u1", 0))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("error.user.adminProtected");
+        assertThatThrownBy(() -> service.changeStatus("u1", 1))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("error.user.adminProtected");
+
+        verify(sessionTermination, never()).applyEnabled(any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     // ─── KC profile sync on email / displayName edits ──────────────────
@@ -370,30 +358,20 @@ class UserAdminServiceTest {
     }
 
     @Test
-    void delete_refusesLastSuperAdmin() {
+    void delete_refusesTenantSuperAdmin() {
+        // Subsumes the old "last active SUPER_ADMIN" guard: the holder is a
+        // protected admin and can never be deleted, so the tenant always
+        // keeps its one super admin.
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
         when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1);
-        when(userRoleMapper.countActiveHoldersByRoleId(BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1L);
 
         assertThatThrownBy(() -> service.delete("u1"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("last active SUPER_ADMIN");
+                .hasMessageContaining("error.user.adminProtected");
 
         // No soft-delete or token kick when we bail out early.
         verify(userMapper, never()).update(any(), any());
         verify(sessionTermination, never()).terminateUser(any());
-    }
-
-    @Test
-    void delete_allowsSuperAdminWhenNotLast() {
-        when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
-        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1);
-        when(userRoleMapper.countActiveHoldersByRoleId(BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(3L);
-
-        service.delete("u1");
-
-        verify(userMapper).update(eq(null), any(UpdateWrapper.class));
-        verify(sessionTermination).terminateUser("u1");
     }
 
     @Test
@@ -411,8 +389,8 @@ class UserAdminServiceTest {
 
     @Test
     void changeStatus_enable_appliesEnabledState() {
-        // Enabling a disabled super-admin is always safe — no last-admin check.
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
 
         service.changeStatus("u1", 1);
 
@@ -483,29 +461,41 @@ class UserAdminServiceTest {
     }
 
     @Test
-    void assignRoles_refusesStrippingSuperFromLastSuperAdmin() {
-        // The role-strip path must trip the same last-admin guard as delete / disable —
-        // otherwise an admin could silently leave the platform with no super admins.
+    void assignRoles_refusesTenantSuperAdminTarget() {
+        // The SUPER_ADMIN holder is a protected admin: nobody can touch their
+        // role bindings (which also makes stripping the super role impossible).
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
         when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1);
-        when(userRoleMapper.countActiveHoldersByRoleId(BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1L);
 
         assertThatThrownBy(() -> service.assignRoles("u1", List.of("some-other-role-id")))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("strip SUPER_ADMIN");
+                .hasMessageContaining("error.user.adminProtected");
 
         verify(userRoleMapper, never()).update(any(), any(UpdateWrapper.class));
     }
 
     @Test
-    void assignRoles_allowsKeepingSuperRole() {
+    void assignRoles_refusesGrantingSuperToSecondUser() {
+        // SUPER_ADMIN is singular — it can never be granted to a second user.
         when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
-        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(1);
-        // Keeping the super role in the new set — guard should be skipped, no countActiveHoldersByRoleId call.
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
 
-        service.assignRoles("u1", List.of(BuiltInRoles.SUPER_ADMIN_ID, "other-role"));
+        assertThatThrownBy(() -> service.assignRoles("u1", List.of(BuiltInRoles.SUPER_ADMIN_ID)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("error.user.superAdminSingleton");
+
+        verify(userRoleMapper, never()).update(any(), any(UpdateWrapper.class));
+    }
+
+    @Test
+    void assignRoles_allowsNormalUserRoleChange() {
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+
+        service.assignRoles("u1", List.of("other-role"));
 
         verify(userRoleMapper).update(eq(null), any(UpdateWrapper.class)); // unlink-all step
-        verify(userRoleMapper, never()).countActiveHoldersByRoleId(any(), any());
+        verify(userRoleMapper).insert(any(UserRoleEntity.class));
+        verify(cacheService).evictUser("u1");
     }
 }

@@ -29,9 +29,8 @@ export default {
       passwordRequired: 'A password is required for direct provisioning',
       emailRequired: 'An email is required for invite provisioning',
       superAdminSingleton: 'The Super Administrator role is reserved for the tenant owner and cannot be granted to another user',
-      adminProtected: 'This administrator account is protected and cannot be forced to log out, suspended, or deleted',
+      adminProtected: 'This administrator account is protected — no other user can edit, suspend, delete, or force-logout it; the administrator edits their own details on the Profile page',
       noKeycloakLink: 'This user has no linked Keycloak account; the password cannot be reset',
-      adminContactOnly: 'This administrator account allows editing contact details (email, display name) only',
       selfManagementForbidden: 'You cannot manage your own account here — edit your details on the Profile page'
     },
     role: {
@@ -714,8 +713,7 @@ export default {
       self: 'You'
     },
     tooltip: {
-      editDisabled: 'Built-in user is not editable',
-      editAdminContactOnly: 'Admin account: only contact details (email, display name) editable',
+      editDisabledAdmin: 'Admin accounts cannot be edited here (the admin edits their own details on the Profile page)',
       edit: 'Edit',
       resetPassword: 'Reset password',
       resetPasswordDisabledAdmin: 'Admin account passwords cannot be reset from this console',
@@ -743,7 +741,6 @@ export default {
     edit: {
       titleEdit: 'Edit user',
       titleCreate: 'New user',
-      lockedHint: 'Administrator account: only contact info is editable. Email and display name can be changed (needed for break-glass alerts). Department, status, and roles stay locked.',
       label: {
         username: 'Login ID',
         password: 'Password',

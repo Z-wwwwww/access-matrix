@@ -29,9 +29,8 @@ export default {
       passwordRequired: '직접 설정 방식은 비밀번호가 필요합니다',
       emailRequired: '초대 메일 방식은 이메일이 필요합니다',
       superAdminSingleton: '슈퍼 관리자 역할은 테넌트 소유자 전용이며 다른 사용자에게 부여할 수 없습니다',
-      adminProtected: '이 관리자 계정은 보호되어 강제 로그아웃·정지·삭제할 수 없습니다',
+      adminProtected: '이 관리자 계정은 보호되어 다른 사용자가 수정·정지·삭제·강제 로그아웃할 수 없습니다. 관리자 본인이 프로필 페이지에서 자신의 정보를 수정하세요',
       noKeycloakLink: '이 사용자는 Keycloak 계정과 연동되어 있지 않아 비밀번호를 재설정할 수 없습니다',
-      adminContactOnly: '이 관리자 계정은 연락처 정보(이메일·표시명)만 편집할 수 있습니다',
       selfManagementForbidden: '여기서는 본인 계정을 관리할 수 없습니다. 본인 정보는 프로필 페이지에서 수정하세요'
     },
     role: {
@@ -714,8 +713,7 @@ export default {
       self: '본인'
     },
     tooltip: {
-      editDisabled: '기본 제공 사용자는 편집할 수 없습니다',
-      editAdminContactOnly: '관리자 계정: 연락처 정보(이메일·표시명)만 편집 가능',
+      editDisabledAdmin: '관리자 계정은 여기서 편집할 수 없습니다(본인이 프로필 페이지에서 수정)',
       edit: '편집',
       resetPassword: '비밀번호 재설정',
       resetPasswordDisabledAdmin: '관리자 계정의 비밀번호는 여기서 재설정할 수 없습니다',
@@ -743,7 +741,6 @@ export default {
     edit: {
       titleEdit: '사용자 편집',
       titleCreate: '사용자 신규',
-      lockedHint: '관리자 계정은 「연락처 정보만 편집 가능」합니다. 이메일과 표시명은 수정할 수 있습니다(비상용 비밀번호 알림 수신에 필요). 부서·상태·역할은 잠겨 있습니다.',
       label: {
         username: '로그인 ID',
         password: '비밀번호',
