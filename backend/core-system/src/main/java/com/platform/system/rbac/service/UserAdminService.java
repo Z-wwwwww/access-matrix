@@ -252,6 +252,7 @@ public class UserAdminService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required");
         }
         UserEntity u = require(me);
+        assertEmailAvailable(req.email(), me);
         syncKeycloakProfile(u, req.email(), req.displayName());
         if (req.email() != null) u.setEmail(req.email());
         if (req.displayName() != null) u.setDisplayName(req.displayName());
@@ -280,6 +281,7 @@ public class UserAdminService {
                 throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.adminContactOnly");
             }
         }
+        assertEmailAvailable(req.email(), id);
         syncKeycloakProfile(u, req.email(), req.displayName());
         if (req.email() != null) u.setEmail(req.email());
         // userNo は採番（read-only）。クライアントから来ても無視（DTO にも無い）。
@@ -528,6 +530,24 @@ public class UserAdminService {
         if (total != null && total <= 1L) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR,
                     "Cannot " + op + " the last active SUPER_ADMIN user");
+        }
+    }
+
+    /**
+     * Same precise duplicate pre-check as {@code create}, excluding the row
+     * being edited. Email doubles as a login identifier
+     * ({@code findByIdentifier} matches {@code email = ? … LIMIT 1}), so a
+     * duplicate would make the email-login resolution ambiguous — in OIDC
+     * mode Keycloak also rejects it ({@code duplicateEmailsAllowed=false}),
+     * but only with a generic error and not at all in legacy password mode.
+     * The MP tenant interceptor scopes the count to the caller's tenant.
+     */
+    private void assertEmailAvailable(String email, String selfId) {
+        if (email == null || email.isBlank()) return;
+        Long dup = userMapper.selectCount(new QueryWrapper<UserEntity>()
+                .eq("mark", 1).eq("email", email).ne("id", selfId));
+        if (dup != null && dup > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.emailExists");
         }
     }
 

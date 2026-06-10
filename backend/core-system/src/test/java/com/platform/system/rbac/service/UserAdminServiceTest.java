@@ -298,6 +298,41 @@ class UserAdminServiceTest {
     }
 
     @Test
+    void update_refusesDuplicateEmail() {
+        // Email doubles as a login identifier (findByIdentifier … LIMIT 1) —
+        // the edit paths need the same precise pre-check as create, or in
+        // legacy mode a duplicate lands in the DB and email login turns
+        // ambiguous. Checked BEFORE the KC mirror so KC is never touched.
+        UserEntity u = user("u1", "alice");
+        u.setKeycloakId("kc-1");
+        when(userMapper.selectById("u1")).thenReturn(u);
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+        when(userMapper.selectCount(any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.update("u1", new UserDto.UpdateRequest(
+                "taken@example.com", null, null, null)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("error.user.emailExists");
+
+        verify(userMapper, never()).updateById(any(UserEntity.class));
+        verify(keycloakProvider, never()).getIfAvailable();
+    }
+
+    @Test
+    void updateOwnProfile_refusesDuplicateEmail() {
+        UserEntity me = user("tester", "tester");
+        when(userMapper.selectById("tester")).thenReturn(me);
+        when(userMapper.selectCount(any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.updateOwnProfile(
+                new UserDto.ProfileUpdateRequest("taken@example.com", null)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("error.user.emailExists");
+
+        verify(userMapper, never()).updateById(any(UserEntity.class));
+    }
+
+    @Test
     void updateOwnProfile_syncsToKeycloak() {
         // RequestContext userId is "tester" (seeded above) — the Profile page
         // edits the caller's OWN row.

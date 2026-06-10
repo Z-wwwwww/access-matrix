@@ -346,6 +346,17 @@ public class PlatformUserAdminService {
     @Transactional
     public void update(String id, PlatformUserDto.UpdateRequest req) {
         Target t = requireManageable(id);
+        // Same precise duplicate pre-check as create, excluding the row being
+        // edited — email doubles as a login identifier, and KC's own
+        // duplicate rejection only surfaces as a generic operationFailed.
+        if (req.email() != null && !req.email().isBlank()) {
+            Long emailDup = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM core_auth_user WHERE tenant_id = ? AND email = ? AND mark = 1 AND id <> ?",
+                    Long.class, SYSTEM_TENANT, req.email(), t.id());
+            if (emailDup != null && emailDup > 0) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.opsuser.emailExists");
+            }
+        }
         KeycloakUserService kc = userServiceProvider.getIfAvailable();
         if (kc != null && t.keycloakId() != null && !t.keycloakId().isBlank()) {
             kc.updateProfile(SYSTEM_REALM, t.keycloakId(), req.email(), req.displayName());
