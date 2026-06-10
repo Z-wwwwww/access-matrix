@@ -30,6 +30,7 @@ export default {
       emailRequired: '邀请邮件方式需要填写邮箱',
       superAdminSingleton: '超级管理员角色为租户所有者保留，不能授予其他用户',
       adminProtected: '该管理员账号受保护，不能被强制登出、停用或删除',
+      noKeycloakLink: '该用户未关联 Keycloak 账号，无法重置密码',
       adminContactOnly: '该管理员账号仅可编辑联系信息（邮箱、显示名）',
       selfManagementForbidden: '不能在此管理自己的账号，请在「个人资料」页修改自己的信息'
     },
@@ -717,7 +718,7 @@ export default {
       editAdminContactOnly: '管理员账号：仅可编辑联系信息（邮箱、显示名）',
       edit: '编辑',
       resetPassword: '重置密码',
-      resetPasswordDisabledSso: 'SSO 模式下不可用 — 用户在 Keycloak 账号控制台自助修改密码',
+      resetPasswordDisabledAdmin: '管理员账号的密码不能在此重置',
       statusChangeDisabled: '管理员账号状态不可变更',
       toggleStatus: '启用/禁用',
       disable: '停用',
@@ -731,7 +732,9 @@ export default {
       deleteTitle: '删除用户',
       deleteMessage: '删除「{name}」吗？',
       forceLogoutTitle: '强制登出',
-      forceLogoutMessage: '将「{name}」强制登出吗？\n（进行中的 access token 将在下次 API 调用时失效）'
+      forceLogoutMessage: '将「{name}」强制登出吗？\n（进行中的 access token 将在下次 API 调用时失效）',
+      resetTitle: '重置密码',
+      resetMessage: '重置「{name}」的密码吗？\n当前密码将立即失效，该用户的所有会话会被登出。'
     },
     message: {
       deleteFailed: '删除失败',
@@ -776,26 +779,18 @@ export default {
       }
     },
     resetPassword: {
-      title: '重置密码',
-      label: {
-        user: '用户',
-        newPassword: '新密码',
-        confirmPassword: '确认密码'
-      },
-      placeholder: {
-        value: '8 位以上 / 4 种字符类型',
-        confirm: '再次输入相同密码'
-      },
-      hint: '※ 公开泄露密码库（HIBP）中的密码将被拒绝。',
-      button: { reset: '重置' },
-      error: {
-        tooShort: '密码至少 8 个字符',
-        mismatch: '确认密码不一致'
-      },
+      title: '密码已重置',
+      intro: '已为「{username}」生成一次性临时密码，仅本次显示。',
+      emailSent: '新的登录凭证已同时邮件发送至 {email}。',
+      emailNotSent: '通知邮件发送失败，请将临时密码直接告知用户本人。',
+      tempPassword: '临时密码',
+      copy: '复制',
+      hint: '※ 用户使用该临时密码登录后，将被要求设置自己的新密码。',
       message: {
-        saving: '保存中...',
         success: '密码已重置',
-        failed: '失败'
+        failed: '失败',
+        copied: '已复制',
+        copyFailed: '复制失败'
       }
     }
   },

@@ -190,8 +190,9 @@ KC token 不再被接受（`DualModeJwtDecoder` 仅在 mode != oidc 时回落到
 
 - 联系管理员 → 管理员以 `sso-to-password` 模式重跑迁移
   （签发新 token，发新邮件）。
-- 管理员从 `/admin/auth/reset-password` 走相同流程（遗留端点，
-  仍可供超管使用，需要 `*:*` 权限）。
+- 管理员在用户管理控制台重置其密码
+  （`POST /admin/user/{id}/reset-password`，权限 `auth:reset-password`）：
+  password 模式下会生成一次性临时密码写入本地 hash 并一次性回显。
 
 批量重发邮件：
 

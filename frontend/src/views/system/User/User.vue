@@ -4,32 +4,29 @@ import { useI18n } from 'vue-i18n'
 import Card from '@/components/ui/Card.vue'
 import Input from '@/components/ui/Input.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Drawer from '@/components/ui/Drawer.vue'
 import DeptPicker from '@/components/shared/DeptPicker.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import { Plus, Search, RotateCcw, Pencil, Trash2, Pause, Play, Key, LogOut } from 'lucide-vue-next'
+import { Plus, Search, RotateCcw, Pencil, Trash2, Pause, Play, Key, LogOut, Copy } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
 import {
-  getUserListApi, deleteUserApi, changeUserStatusApi, forceLogoutApi
+  getUserListApi, deleteUserApi, changeUserStatusApi, forceLogoutApi, resetUserPasswordApi
 } from '@/services/user'
 import { getDeptTreeApi } from '@/services/dept'
 import UserEdit from './UserEdit.vue'
-import ResetPasswordDialog from './ResetPasswordDialog.vue'
-import { oidcConfig } from '@/utils/oidc'
 import { useAuthStore } from '@/stores/auth'
 
-// In OIDC mode, password resets through this controller path are
-// disabled — the local password_hash write would never propagate to
-// Keycloak (the actual login authority) and would also undo the
-// "as-if-always-OIDC" data invariant that OidcJitUserService maintains.
-// We grey out the trigger here and the backend re-rejects defensively.
-// Super-admins manage their own break-glass credential via the AppHeader
-// "Break-glass" entry; everyone else resets SSO passwords in the KC
-// account console (linked from the "Change password" entry).
-const ssoMode = oidcConfig().enabled
+// Password reset mirrors the platform-user console: the backend rotates a
+// generated temporary password (written to Keycloak with forced change on
+// next login; legacy password mode falls back to the local hash), kicks the
+// user's sessions, best-effort emails the credentials, and returns the temp
+// password ONCE — shown in the drawer below. The admin never types a
+// password. Self-service password changes live solely in the AppHeader user
+// menu (KC account console / break-glass for super-admins).
 
 // "Protected admin" = the built-in admin OR the tenant's singular SUPER_ADMIN.
 // Such rows are contact-only (email / display name editable) and cannot be
@@ -63,8 +60,10 @@ const pageSize = ref(20)
 const search = reactive({ keyword: '', deptId: '' })
 
 const showEdit = ref(false)
-const showResetPwd = ref(false)
 const current = ref(null)
+
+// One-time temp-password drawer (same UX as the platform-user console).
+const secret = ref(null)   // { username, tempPassword, emailSent, email }
 
 // 部署 id → 名称マップ（一覧列の表示用）。/dept/tree はログイン後キャッシュされる前提で
 // 画面ロード時に 1 回だけ取得し、行ごとの解決はこのマップで O(1) で済ませる。
@@ -132,9 +131,31 @@ function openEdit(row) {
   showEdit.value = true
 }
 
-function openResetPwd(row) {
-  current.value = row
-  showResetPwd.value = true
+async function handleResetPwd(row) {
+  const ok = await confirm({
+    title: t('user.confirm.resetTitle'),
+    message: t('user.confirm.resetMessage', { name: row.username }),
+    variant: 'destructive'
+  })
+  if (!ok) return
+  try {
+    const res = await resetUserPasswordApi(row.id)
+    if (res.data.code === 0) {
+      secret.value = { ...res.data.data, email: row.email }
+      toast.success(t('user.resetPassword.message.success'))
+    } else {
+      toast.error(res.data.msg || t('user.resetPassword.message.failed'))
+    }
+  } catch (e) { toast.error(e.message) }
+}
+
+async function copySecret() {
+  try {
+    await navigator.clipboard.writeText(secret.value.tempPassword)
+    toast.success(t('user.resetPassword.message.copied'))
+  } catch {
+    toast.error(t('user.resetPassword.message.copyFailed'))
+  }
 }
 
 async function handleDelete(row) {
@@ -248,9 +269,9 @@ onMounted(() => {
             </button>
             <button v-permission="'auth:reset-password'"
                     class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                    :disabled="ssoMode || isSelf(row)"
-                    :title="isSelf(row) ? t('user.tooltip.selfManaged') : (ssoMode ? t('user.tooltip.resetPasswordDisabledSso') : t('user.tooltip.resetPassword'))"
-                    @click="openResetPwd(row)">
+                    :disabled="isSelf(row) || isProtectedAdmin(row)"
+                    :title="isSelf(row) ? t('user.tooltip.selfManaged') : (isProtectedAdmin(row) ? t('user.tooltip.resetPasswordDisabledAdmin') : t('user.tooltip.resetPassword'))"
+                    @click="handleResetPwd(row)">
               <Key class="size-3.5" />
             </button>
             <button v-if="row.status === 1" v-permission="'user:update'"
@@ -287,6 +308,30 @@ onMounted(() => {
     </Card>
 
     <UserEdit v-model:open="showEdit" :user="current" @saved="fetchData" />
-    <ResetPasswordDialog v-model:open="showResetPwd" :user="current" />
+
+    <!-- One-time temp-password drawer (reset result; mirrors the platform-user console) -->
+    <Drawer :open="!!secret" :title="t('user.resetPassword.title')" width="max-w-md" @close="secret = null">
+      <div v-if="secret" class="space-y-3 text-sm">
+        <p class="text-muted-foreground">{{ t('user.resetPassword.intro', { username: secret.username }) }}</p>
+        <p v-if="secret.emailSent === true" class="text-emerald-600">{{ t('user.resetPassword.emailSent', { email: secret.email }) }}</p>
+        <p v-else class="text-amber-600">{{ t('user.resetPassword.emailNotSent') }}</p>
+        <div>
+          <label class="text-xs text-muted-foreground block mb-1">{{ t('user.resetPassword.tempPassword') }}</label>
+          <div class="flex items-center gap-2">
+            <code class="flex-1 px-3 py-2 rounded bg-muted/60 font-mono text-sm break-all">{{ secret.tempPassword }}</code>
+            <button class="h-9 px-3 rounded border border-border text-sm inline-flex items-center gap-1 shrink-0"
+                    @click="copySecret">
+              <Copy class="size-4" /> {{ t('user.resetPassword.copy') }}
+            </button>
+          </div>
+        </div>
+        <p class="text-xs text-amber-600">{{ t('user.resetPassword.hint') }}</p>
+      </div>
+      <template #footer>
+        <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm" @click="secret = null">
+          {{ t('common.button.close') }}
+        </button>
+      </template>
+    </Drawer>
   </div>
 </template>

@@ -15,6 +15,7 @@ import com.platform.core.infrastructure.mail.MailService;
 import com.platform.core.infrastructure.numbering.NumberingService;
 import com.platform.system.auth.service.SessionTerminationService;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
+import com.platform.core.infrastructure.security.TempPasswords;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
@@ -386,6 +387,83 @@ public class UserAdminService {
         sessionTermination.terminateUser(userId);
     }
 
+    /**
+     * Admin-side password reset — the SAME flow as the platform-user console
+     * ({@code PlatformUserAdminService.resetPassword}): rotate to a generated
+     * single-use temporary password, terminate the user's sessions, best-effort
+     * email the new credentials, and return the temp password ONCE so the admin
+     * can hand it over out-of-band. The admin never types a password.
+     *
+     * <p>In OIDC mode the temp password is written to Keycloak (temporary=true,
+     * so KC forces the user to choose their own on next login) — the local
+     * {@code password_hash} is never touched, preserving the "as-if-always-OIDC"
+     * invariant. In legacy password mode it lands in {@code password_hash}
+     * instead (no force-change mechanism exists there).
+     *
+     * <p>Protected admins (built-in / tenant SUPER_ADMIN) are refused like every
+     * other mutation in this console; they recover their own credential via the
+     * KC self-service reset or break-glass.
+     */
+    public UserDto.ResetPwResponse resetPassword(String id) {
+        assertNotSelf(id);
+        UserEntity u = require(id);
+        if (isBuiltInAdmin(u) || isTenantSuperAdmin(u)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.adminProtected");
+        }
+        String tempPassword = TempPasswords.generate();
+        KeycloakUserService keycloak = keycloakProvider.getIfAvailable();
+        if (keycloak != null) {
+            if (u.getKeycloakId() == null || u.getKeycloakId().isBlank()) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.noKeycloakLink");
+            }
+            keycloak.setPassword(RequestContext.tenantIdOrDefault(), u.getKeycloakId(), tempPassword, true);
+        } else {
+            u.setPasswordHash(encoder.encode(tempPassword));
+            userMapper.updateById(u);
+        }
+        // The reset must evict the (possibly hijacked) current holder: kick
+        // already-issued tokens AND end the KC SSO session, otherwise a login
+        // redirect would silently re-authenticate without the new password.
+        sessionTermination.terminateUser(id);
+        boolean emailSent = sendResetMail(u, tempPassword);
+        return new UserDto.ResetPwResponse(u.getUsername(), tempPassword, emailSent);
+    }
+
+    /**
+     * Best-effort "your password was reset" mail carrying the login URL +
+     * username + temp password — the same shared {@code user-direct-welcome}
+     * template (with {@code reset=true} wording) the platform-user console
+     * sends. A mail failure must not fail the reset: the admin still sees the
+     * temp password once in the UI and can hand it over out-of-band.
+     */
+    private boolean sendResetMail(UserEntity u, String tempPassword) {
+        MailService mail = mailProvider.getIfAvailable();
+        if (mail == null || u.getEmail() == null || u.getEmail().isBlank()) {
+            return false;
+        }
+        try {
+            java.util.Locale locale = RequestContext.locale();
+            if (locale == null) locale = java.util.Locale.JAPAN;
+            Map<String, Object> model = new HashMap<>();
+            model.put("appName",      mailProps.fromName());
+            model.put("username",     u.getUsername());
+            model.put("displayName",  u.getDisplayName());
+            model.put("tenantId",     RequestContext.tenantIdOrDefault());
+            model.put("supportEmail", mailProps.from());
+            model.put("loginUrl",     mailProps.baseUrl() + "/login");
+            model.put("tempPassword", tempPassword);
+            model.put("reset", true);   // template switches headline + body wording on this flag
+            mail.sendHtmlAsync(u.getEmail(), locale,
+                    "user-account-reset.subject", new Object[] { "[" + mailProps.fromName() + "]" },
+                    "user-direct-welcome", model);
+            return true;
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(UserAdminService.class)
+                    .warn("[user] reset-credentials mail to {} failed: {}", u.getEmail(), e.toString());
+            return false;
+        }
+    }
+
     @Transactional
     public void changeDept(String userId, String deptId) {
         assertNotSelf(userId);
@@ -421,8 +499,8 @@ public class UserAdminService {
     /**
      * The default {@code admin} user is the project's "built-in" identity: it owns SUPER_ADMIN
      * and is hardcoded in {@code LocalAdminSeeder}. We refuse to mutate its record / role-binding
-     * / status / dept through the admin API. Password resets are still allowed (they go through
-     * {@code AdminAuthController.resetPassword}, not this service).
+     * / status / dept / password through the admin API — it recovers its own credential via the
+     * KC self-service reset or break-glass.
      */
     private void assertNotBuiltInAdmin(UserEntity u, String op) {
         if (isBuiltInAdmin(u)) {

@@ -30,6 +30,7 @@ export default {
       emailRequired: '초대 메일 방식은 이메일이 필요합니다',
       superAdminSingleton: '슈퍼 관리자 역할은 테넌트 소유자 전용이며 다른 사용자에게 부여할 수 없습니다',
       adminProtected: '이 관리자 계정은 보호되어 강제 로그아웃·정지·삭제할 수 없습니다',
+      noKeycloakLink: '이 사용자는 Keycloak 계정과 연동되어 있지 않아 비밀번호를 재설정할 수 없습니다',
       adminContactOnly: '이 관리자 계정은 연락처 정보(이메일·표시명)만 편집할 수 있습니다',
       selfManagementForbidden: '여기서는 본인 계정을 관리할 수 없습니다. 본인 정보는 프로필 페이지에서 수정하세요'
     },
@@ -717,7 +718,7 @@ export default {
       editAdminContactOnly: '관리자 계정: 연락처 정보(이메일·표시명)만 편집 가능',
       edit: '편집',
       resetPassword: '비밀번호 재설정',
-      resetPasswordDisabledSso: 'SSO 모드에서는 비활성화됩니다 — 사용자는 Keycloak 계정 콘솔에서 직접 비밀번호를 변경합니다',
+      resetPasswordDisabledAdmin: '관리자 계정의 비밀번호는 여기서 재설정할 수 없습니다',
       statusChangeDisabled: '관리자 계정 상태는 변경할 수 없습니다',
       toggleStatus: '활성/비활성',
       disable: '비활성',
@@ -731,7 +732,9 @@ export default {
       deleteTitle: '사용자 삭제',
       deleteMessage: '「{name}」을(를) 삭제하시겠습니까?',
       forceLogoutTitle: '강제 로그아웃',
-      forceLogoutMessage: '「{name}」을(를) 강제 로그아웃하시겠습니까?\n(진행 중인 access token은 다음 API 호출 시점에 무효화됩니다)'
+      forceLogoutMessage: '「{name}」을(를) 강제 로그아웃하시겠습니까?\n(진행 중인 access token은 다음 API 호출 시점에 무효화됩니다)',
+      resetTitle: '비밀번호 재설정',
+      resetMessage: '「{name}」의 비밀번호를 재설정하시겠습니까?\n현재 비밀번호는 즉시 무효화되며 해당 사용자의 모든 세션이 로그아웃됩니다.'
     },
     message: {
       deleteFailed: '삭제 실패',
@@ -776,26 +779,18 @@ export default {
       }
     },
     resetPassword: {
-      title: '비밀번호 재설정',
-      label: {
-        user: '사용자',
-        newPassword: '새 비밀번호',
-        confirmPassword: '비밀번호 확인'
-      },
-      placeholder: {
-        value: '8자 이상 / 4종 문자 유형',
-        confirm: '동일한 비밀번호를 다시 입력'
-      },
-      hint: '※ 공개 유출 코퍼스(HIBP)에 등록된 비밀번호는 거부됩니다.',
-      button: { reset: '재설정' },
-      error: {
-        tooShort: '비밀번호는 8자 이상이어야 합니다',
-        mismatch: '확인 비밀번호가 일치하지 않습니다'
-      },
+      title: '비밀번호 재설정 완료',
+      intro: '「{username}」의 일회용 임시 비밀번호를 발급했습니다. 이번 한 번만 표시됩니다.',
+      emailSent: '새 로그인 정보를 {email} 로도 메일 발송했습니다.',
+      emailNotSent: '알림 메일을 보내지 못했습니다. 임시 비밀번호를 사용자에게 직접 전달해 주세요.',
+      tempPassword: '임시 비밀번호',
+      copy: '복사',
+      hint: '※ 사용자는 이 임시 비밀번호로 로그인한 뒤 새 비밀번호 설정을 요구받습니다.',
       message: {
-        saving: '저장 중...',
         success: '비밀번호가 재설정되었습니다',
-        failed: '실패'
+        failed: '실패',
+        copied: '복사되었습니다',
+        copyFailed: '복사 실패'
       }
     }
   },

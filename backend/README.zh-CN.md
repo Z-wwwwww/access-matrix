@@ -106,7 +106,7 @@ core-common
 | PUT    | `/api/admin/users/{id}/roles`     | `user:update` | 重新分配角色                             |
 | GET    | `/api/admin/roles`                | `role:read` | …                                          |
 | POST   | `/api/admin/auth/unlock`          | `auth:unlock` 或 `*:*` |                                |
-| POST   | `/api/admin/auth/reset-password`  | `auth:reset-password` 或 `*:*` | 强制密码策略 + HIBP |
+| POST   | `/api/admin/user/{id}/reset-password` | `auth:reset-password` 或 `*:*` | 轮换一次性临时密码（OIDC 模式写 KC `temporary=true`）+ 踢下线 |
 | GET    | `/api/swagger-ui.html`            | 开放        | OpenAPI 3 UI                               |
 | GET    | `/api/actuator/health`            | 开放        | 探针已启用                                 |
 | GET    | `/api/v3/api-docs`                | 开放        | OpenAPI 3 JSON                             |

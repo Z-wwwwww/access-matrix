@@ -35,8 +35,9 @@ import static org.mockito.Mockito.when;
  *   2. peek() returns null for expired tokens (vs raising — UI uses null
  *      to render a generic "invite no longer valid" without leaking why).
  *   3. consume() raises BusinessException on expired / not-found / used.
- *   4. consume() sets used_at via UpdateWrapper (NOT setMark+updateById —
- *      we're not changing mark, but the discipline holds across the codebase).
+ *   4. consume() claims single-use atomically: the markUsed UPDATE's
+ *      affected-row count is the claim — 0 rows means already consumed
+ *      (or a lost race) and must reject, never silently allow reuse.
  */
 @ExtendWith(MockitoExtension.class)
 class InviteTokenServiceTest {
@@ -108,7 +109,7 @@ class InviteTokenServiceTest {
     }
 
     @Test
-    void consume_setsUsedAtViaUpdateWrapper() throws Exception {
+    void consume_marksUsedAtomically() throws Exception {
         String cleartext = "to-consume";
         UserInviteEntity stored = new UserInviteEntity();
         stored.setId("ulid-row");
@@ -118,15 +119,30 @@ class InviteTokenServiceTest {
         stored.setTokenHash(sha256(cleartext));
         stored.setExpiresAt(LocalDateTime.now().plusDays(1));
         when(inviteMapper.findActiveByTokenHash(sha256(cleartext))).thenReturn(stored);
+        when(inviteMapper.markUsed(eq("ulid-row"), any(LocalDateTime.class))).thenReturn(1);
 
         UserInviteEntity consumed = service.consume(cleartext);
 
         assertThat(consumed.getUsedAt()).isNotNull();
-        ArgumentCaptor<UpdateWrapper<UserInviteEntity>> cap = ArgumentCaptor.forClass(UpdateWrapper.class);
-        verify(inviteMapper).update(eq(null), cap.capture());
-        // Verify the SET clause writes used_at; value is parameterised so
-        // we just check the column name appears in the rendered SQL set.
-        assertThat(cap.getValue().getSqlSet()).contains("used_at");
+        verify(inviteMapper).markUsed(eq("ulid-row"), any(LocalDateTime.class));
+    }
+
+    @Test
+    void consume_rejectsWhenAlreadyClaimed() throws Exception {
+        // The single-use claim is the markUsed UPDATE's affected-row count: 0
+        // means another request already flipped used_at (race / re-click) —
+        // consume must reject instead of silently letting the token be reused.
+        String cleartext = "raced";
+        UserInviteEntity stored = new UserInviteEntity();
+        stored.setId("ulid-row");
+        stored.setTokenHash(sha256(cleartext));
+        stored.setExpiresAt(LocalDateTime.now().plusDays(1));
+        when(inviteMapper.findActiveByTokenHash(sha256(cleartext))).thenReturn(stored);
+        when(inviteMapper.markUsed(eq("ulid-row"), any(LocalDateTime.class))).thenReturn(0);
+
+        assertThatThrownBy(() -> service.consume(cleartext))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("error.invite.notFoundOrUsed");
     }
 
     @Test
@@ -150,7 +166,7 @@ class InviteTokenServiceTest {
 
         assertThatThrownBy(() -> service.consume("any-cleartext"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("not found");
+                .hasMessageContaining("error.invite.notFoundOrUsed");
 
         verify(inviteMapper, never()).update(any(), any(UpdateWrapper.class));
     }

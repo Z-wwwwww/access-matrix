@@ -9,6 +9,7 @@ import com.platform.core.common.security.BuiltInRoles;
 import com.platform.core.infrastructure.config.properties.AppMailProperties;
 import com.platform.core.infrastructure.mail.MailService;
 import com.platform.core.infrastructure.security.ForceLogoutService;
+import com.platform.core.infrastructure.security.TempPasswords;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.auth.service.InviteTokenService;
 import com.platform.system.auth.service.SessionTerminationService;
@@ -21,7 +22,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +52,6 @@ public class PlatformUserAdminService {
 
     private static final String SYSTEM_TENANT = "system";
     private static final String SYSTEM_REALM  = "system";
-    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final JdbcTemplate jdbc;
     /** KC is only present in oidc mode; ObjectProvider keeps this bootable otherwise. */
@@ -325,7 +324,7 @@ public class PlatformUserAdminService {
         if (t.keycloakId() == null || t.keycloakId().isBlank()) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "User has no Keycloak link");
         }
-        String tempPassword = generateTempPassword();
+        String tempPassword = TempPasswords.generate();
         kc.setPassword(SYSTEM_REALM, t.keycloakId(), tempPassword, true);
         // The new password invalidates existing sessions — force-logout so already
         // issued tokens are rejected (kickOut), AND end the KC SSO session (logoutUser)
@@ -439,18 +438,6 @@ public class PlatformUserAdminService {
                         + "FROM core_auth_user WHERE tenant_id = ? AND user_no ~ '^U[0-9]+$'",
                 Integer.class, SYSTEM_TENANT);
         return String.format("U%08d", (max == null ? 0 : max) + 1);
-    }
-
-    /** 16-char temp password with guaranteed upper/lower/digit to satisfy common KC policies. */
-    private static String generateTempPassword() {
-        String upper = "ABCDEFGHJKLMNPQRSTUVWXYZ", lower = "abcdefghijkmnpqrstuvwxyz", digit = "23456789";
-        String all = upper + lower + digit;
-        StringBuilder sb = new StringBuilder();
-        sb.append(upper.charAt(RANDOM.nextInt(upper.length())));
-        sb.append(lower.charAt(RANDOM.nextInt(lower.length())));
-        sb.append(digit.charAt(RANDOM.nextInt(digit.length())));
-        for (int i = 0; i < 13; i++) sb.append(all.charAt(RANDOM.nextInt(all.length())));
-        return sb.toString();
     }
 
     private static String like(String kw) {

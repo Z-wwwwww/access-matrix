@@ -71,7 +71,7 @@ public class ForceLogoutFilter extends OncePerRequestFilter {
         // CoreRequestContextFilter runs BEFORE this filter (Ordered chain) and
         // has already converted JWT subject → business ULID via OidcUserResolver.
         // Force-logout keys are stored by business ULID (UserAdminService.delete
-        // / changeStatus / AdminAuthController.resetPassword all call
+        // / changeStatus / resetPassword all call
         // forceLogoutService.kickOut(<business-ulid>)). Reading JWT.subject here
         // would key by Keycloak UUID in OIDC mode → permanent kick-out miss.
         String userId = RequestContext.userId();

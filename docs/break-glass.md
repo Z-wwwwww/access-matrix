@@ -123,8 +123,7 @@ Once KC is back, you should:
 
 | Path | OIDC behavior | Reason |
 |---|---|---|
-| `POST /admin/auth/reset-password` | rejects with 400 | Writes local password_hash only; never propagates to KC; can also undo the JIT-bind cleanup invariant on non-super-admin rows. |
-| User management page → "Reset password" button | grey, hover tooltip explains | Same reason; UI gates the trigger so the operator gets feedback without round-tripping to a rejecting endpoint. |
+| User management page → "Reset password" button | active (`POST /admin/user/{id}/reset-password`) | No longer the legacy local-hash write: it rotates a one-time temporary password in Keycloak (`temporary=true`), kicks sessions, and shows the temp password once — the same flow as the platform-user console. Protected admins (built-in / tenant SUPER_ADMIN) and the caller's own row are refused. |
 | `POST /me/break-glass-password` | active, super-admin only | This is the only supported way to set a break-glass credential. |
 
 If you really do need to set a password for a normal user (e.g.

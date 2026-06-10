@@ -116,7 +116,7 @@ full local / Keycloak setup walkthrough.
 | PUT    | `/api/admin/users/{id}/roles`     | `user:update` | reassign roles                           |
 | GET    | `/api/admin/roles`                | `role:read` | …                                          |
 | POST   | `/api/admin/auth/unlock`          | `auth:unlock` or `*:*` |                                |
-| POST   | `/api/admin/auth/reset-password`  | `auth:reset-password` or `*:*` | enforces password policy + HIBP |
+| POST   | `/api/admin/user/{id}/reset-password` | `auth:reset-password` or `*:*` | rotates a one-time temp password (KC `temporary=true` in OIDC mode) + kicks sessions |
 | GET    | `/api/swagger-ui.html`            | open        | OpenAPI 3 UI                               |
 | GET    | `/api/actuator/health`            | open        | probes enabled                             |
 | GET    | `/api/v3/api-docs`                | open        | OpenAPI 3 JSON                             |

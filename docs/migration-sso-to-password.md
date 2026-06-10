@@ -200,8 +200,10 @@ Their options:
 
 - They contact the admin → admin re-runs the migration in
   `sso-to-password` mode (mints a fresh token, sends a fresh email).
-- Admin uses the same flow from `/admin/auth/reset-password` (legacy
-  endpoint, still works for super-admin use, requires `*:*` permission).
+- Admin resets their password from the user-management console
+  (`POST /admin/user/{id}/reset-password`, permission `auth:reset-password`):
+  in password mode it writes a generated one-time temp password to the
+  local hash and shows it once.
 
 To re-fire emails in bulk:
 

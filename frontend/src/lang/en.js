@@ -30,6 +30,7 @@ export default {
       emailRequired: 'An email is required for invite provisioning',
       superAdminSingleton: 'The Super Administrator role is reserved for the tenant owner and cannot be granted to another user',
       adminProtected: 'This administrator account is protected and cannot be forced to log out, suspended, or deleted',
+      noKeycloakLink: 'This user has no linked Keycloak account; the password cannot be reset',
       adminContactOnly: 'This administrator account allows editing contact details (email, display name) only',
       selfManagementForbidden: 'You cannot manage your own account here — edit your details on the Profile page'
     },
@@ -717,7 +718,7 @@ export default {
       editAdminContactOnly: 'Admin account: only contact details (email, display name) editable',
       edit: 'Edit',
       resetPassword: 'Reset password',
-      resetPasswordDisabledSso: 'Disabled in SSO mode — users change their password in the Keycloak account console',
+      resetPasswordDisabledAdmin: 'Admin account passwords cannot be reset from this console',
       statusChangeDisabled: 'Admin account status cannot be changed',
       toggleStatus: 'Enable / Disable',
       disable: 'Disable',
@@ -731,7 +732,9 @@ export default {
       deleteTitle: 'Delete user',
       deleteMessage: 'Delete "{name}"?',
       forceLogoutTitle: 'Force logout',
-      forceLogoutMessage: 'Force logout "{name}"?\n(Any in-flight access token will be invalidated on the next API call.)'
+      forceLogoutMessage: 'Force logout "{name}"?\n(Any in-flight access token will be invalidated on the next API call.)',
+      resetTitle: 'Reset password',
+      resetMessage: 'Reset the password for "{name}"?\nThe current password becomes invalid immediately and the user is signed out everywhere.'
     },
     message: {
       deleteFailed: 'Delete failed',
@@ -776,26 +779,18 @@ export default {
       }
     },
     resetPassword: {
-      title: 'Reset password',
-      label: {
-        user: 'User',
-        newPassword: 'New password',
-        confirmPassword: 'Confirm password'
-      },
-      placeholder: {
-        value: '8+ chars / 4 character types',
-        confirm: 'Re-enter the same password'
-      },
-      hint: '※ Passwords on the public breach corpus (HIBP) will be rejected.',
-      button: { reset: 'Reset' },
-      error: {
-        tooShort: 'Password must be at least 8 characters',
-        mismatch: 'Confirmation password does not match'
-      },
+      title: 'Password reset complete',
+      intro: 'A temporary password was issued for "{username}". It is shown only this once.',
+      emailSent: 'The new credentials were also emailed to {email}.',
+      emailNotSent: 'The notification email could not be sent — hand the temporary password to the user yourself.',
+      tempPassword: 'Temporary password',
+      copy: 'Copy',
+      hint: '※ The user signs in with this temporary password and is then required to set their own.',
       message: {
-        saving: 'Saving...',
         success: 'Password reset',
-        failed: 'Failed'
+        failed: 'Failed',
+        copied: 'Copied',
+        copyFailed: 'Copy failed'
       }
     }
   },

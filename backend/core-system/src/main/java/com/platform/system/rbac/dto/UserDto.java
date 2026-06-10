@@ -87,6 +87,13 @@ public final class UserDto {
 
     public record AssignRolesRequest(@NotNull List<String> roleIds) {}
 
+    /**
+     * One-time response of the admin password reset: the generated temporary
+     * password is shown ONCE to the admin (never persisted / re-readable).
+     * {@code emailSent} tells the UI whether the user was also notified by mail.
+     */
+    public record ResetPwResponse(String username, String tempPassword, boolean emailSent) {}
+
     public record ChangeDeptRequest(String deptId) {}
 
     public record ChangeStatusRequest(@NotNull Integer status) {}

@@ -76,6 +76,19 @@ public class UserAdminController {
         return JsonResult.ok();
     }
 
+    /**
+     * Reset a user's password to a generated single-use temporary one — same
+     * flow as the platform-user console. Gated by the dedicated
+     * {@code auth:reset-password} permission (not plain {@code user:update})
+     * because it evicts the user's sessions and exposes a credential.
+     */
+    @PostMapping("/{id}/reset-password")
+    @RequiresPermission(SystemPermissions.AUTH_RESET_PASSWORD)
+    @OpLog(module = "system", action = "user.resetPassword", targetType = "user")
+    public JsonResult<UserDto.ResetPwResponse> resetPassword(@PathVariable String id) {
+        return JsonResult.ok(service.resetPassword(id));
+    }
+
     @PutMapping("/{id}/dept")
     @RequiresPermission(SystemPermissions.USER_UPDATE)
     @OpLog(module = "system", action = "user.changeDept", targetType = "user")

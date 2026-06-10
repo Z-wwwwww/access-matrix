@@ -22,7 +22,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
@@ -73,10 +72,17 @@ class UserAdminServiceTest {
     @Mock ObjectProvider<MailService> mailProvider;
     AppMailProperties mailProps = new AppMailProperties(false, null, null, null);
 
-    @InjectMocks UserAdminService service;
+    UserAdminService service;
 
     @BeforeEach
     void seedTenant() {
+        // Manual construction instead of @InjectMocks: the three ObjectProvider
+        // mocks share the same erased type, so Mockito's constructor injection
+        // can shuffle them between slots (the keycloak slot silently getting the
+        // invite provider, etc.). Explicit args pin each provider to its slot.
+        service = new UserAdminService(userMapper, userRoleMapper, roleLookup, encoder,
+                passwordPolicy, cacheService, sessionTermination, numberingService,
+                keycloakProvider, inviteProvider, mailProvider, mailProps);
         RequestContext.set("acme", "tester", "tester", Locale.JAPAN, "trace-1");
         // Tests run as tenant=acme; pre-refactor stubs used the constant
         // SUPER_ADMIN_ID directly. After the lookup refactor, the service
@@ -297,6 +303,69 @@ class UserAdminServiceTest {
         service.changeStatus("u1", 1);
 
         verify(sessionTermination).applyEnabled("u1", true);
+    }
+
+    // ─── admin password reset (aligned with the platform-user console) ──
+    // The admin never types a password: the service rotates a generated temp
+    // password (KC temporary=true in OIDC mode / local hash in legacy mode),
+    // terminates the target's sessions, and returns the temp password once.
+
+    @Test
+    void resetPassword_oidc_rotatesKeycloakTempPassword_andTerminatesSessions() {
+        UserEntity u = user("u1", "alice");
+        u.setKeycloakId("kc-1");
+        when(userMapper.selectById("u1")).thenReturn(u);
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+        KeycloakUserService kc = org.mockito.Mockito.mock(KeycloakUserService.class);
+        when(keycloakProvider.getIfAvailable()).thenReturn(kc);
+
+        UserDto.ResetPwResponse res = service.resetPassword("u1");
+
+        assertThat(res.tempPassword()).hasSize(16);
+        assertThat(res.username()).isEqualTo("alice");
+        // OIDC mode: the credential lives in Keycloak (realm = tenant), marked
+        // temporary so KC forces the user to pick their own on next login. The
+        // local password_hash must stay untouched ("as-if-always-OIDC").
+        verify(kc).setPassword(eq("acme"), eq("kc-1"), eq(res.tempPassword()), eq(true));
+        verify(userMapper, never()).updateById(any(UserEntity.class));
+        // Reset must evict the (possibly hijacked) current session holder.
+        verify(sessionTermination).terminateUser("u1");
+    }
+
+    @Test
+    void resetPassword_legacyMode_writesLocalHash() {
+        UserEntity u = user("u1", "alice");
+        when(userMapper.selectById("u1")).thenReturn(u);
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+        when(encoder.encode(anyString())).thenReturn("HASHED");
+
+        UserDto.ResetPwResponse res = service.resetPassword("u1");
+
+        assertThat(res.tempPassword()).hasSize(16);
+        assertThat(u.getPasswordHash()).isEqualTo("HASHED");
+        verify(userMapper).updateById(u);
+        verify(sessionTermination).terminateUser("u1");
+    }
+
+    @Test
+    void resetPassword_refusesProtectedAdmin() {
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "demo-admin"));
+
+        assertThatThrownBy(() -> service.resetPassword("u1"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("error.user.adminProtected");
+
+        verify(sessionTermination, never()).terminateUser(any());
+    }
+
+    @Test
+    void resetPassword_refusesSelf() {
+        // RequestContext userId is "tester" (seeded above) — resetting your own
+        // password from the admin console is a self-management footgun; the
+        // sanctioned self path is the KC account console.
+        assertThatThrownBy(() -> service.resetPassword("tester"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("error.user.selfManagementForbidden");
     }
 
     @Test

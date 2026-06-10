@@ -63,11 +63,11 @@ Never allowed:
 core-system/src/main/java/com/platform/system/
   auth/
     controller/   AuthController (POST /auth/login, /refresh, /logout)
-                  AdminAuthController (POST /admin/auth/unlock, reset-password, force-logout/{id})
+                  AdminAuthController (POST /admin/auth/unlock, force-logout/{id})
     service/      AuthService / LoginAuditService
     mapper/       UserMapper / LoginLogMapper
     entity/       UserEntity / LoginLogEntity
-    dto/          LoginRequest / TokenResponse / RefreshRequest / ResetPasswordRequest / UnlockRequest
+    dto/          LoginRequest / TokenResponse / RefreshRequest / UnlockRequest
   rbac/
     controller/
       admin/      RoleAdminController / UserAdminController / MenuAdminController / DeptAdminController

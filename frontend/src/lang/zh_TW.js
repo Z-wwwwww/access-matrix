@@ -30,6 +30,7 @@ export default {
       emailRequired: '邀請信件方式需要填寫信箱',
       superAdminSingleton: '超級管理員角色為租戶擁有者保留，不能授予其他使用者',
       adminProtected: '該管理員帳號受保護，不能被強制登出、停用或刪除',
+      noKeycloakLink: '該使用者未關聯 Keycloak 帳號，無法重設密碼',
       adminContactOnly: '該管理員帳號僅可編輯連絡資訊（信箱、顯示名稱）',
       selfManagementForbidden: '不能在此管理自己的帳號，請在「個人資料」頁修改自己的資訊'
     },
@@ -717,7 +718,7 @@ export default {
       editAdminContactOnly: '管理員帳號：僅可編輯連絡資訊（信箱、顯示名稱）',
       edit: '編輯',
       resetPassword: '重設密碼',
-      resetPasswordDisabledSso: 'SSO 模式下不可用 — 使用者於 Keycloak 帳號控制台自助修改密碼',
+      resetPasswordDisabledAdmin: '管理員帳號的密碼不能在此重設',
       statusChangeDisabled: '管理員帳號狀態不可變更',
       toggleStatus: '啟用/停用',
       disable: '停用',
@@ -731,7 +732,9 @@ export default {
       deleteTitle: '刪除使用者',
       deleteMessage: '刪除「{name}」嗎？',
       forceLogoutTitle: '強制登出',
-      forceLogoutMessage: '將「{name}」強制登出嗎？\n（進行中的 access token 將在下次 API 呼叫時失效）'
+      forceLogoutMessage: '將「{name}」強制登出嗎？\n（進行中的 access token 將在下次 API 呼叫時失效）',
+      resetTitle: '重設密碼',
+      resetMessage: '重設「{name}」的密碼嗎？\n目前密碼將立即失效，該使用者的所有工作階段會被登出。'
     },
     message: {
       deleteFailed: '刪除失敗',
@@ -776,26 +779,18 @@ export default {
       }
     },
     resetPassword: {
-      title: '重設密碼',
-      label: {
-        user: '使用者',
-        newPassword: '新密碼',
-        confirmPassword: '確認密碼'
-      },
-      placeholder: {
-        value: '8 位以上 / 4 種字元類型',
-        confirm: '再次輸入相同密碼'
-      },
-      hint: '※ 已公開洩漏的密碼庫（HIBP）中的密碼將被拒絕。',
-      button: { reset: '重設' },
-      error: {
-        tooShort: '密碼至少 8 個字元',
-        mismatch: '確認密碼不一致'
-      },
+      title: '密碼已重設',
+      intro: '已為「{username}」產生一次性臨時密碼，僅本次顯示。',
+      emailSent: '新的登入憑證已同時郵件發送至 {email}。',
+      emailNotSent: '通知郵件發送失敗，請將臨時密碼直接告知使用者本人。',
+      tempPassword: '臨時密碼',
+      copy: '複製',
+      hint: '※ 使用者以該臨時密碼登入後，將被要求設定自己的新密碼。',
       message: {
-        saving: '儲存中...',
         success: '密碼已重設',
-        failed: '失敗'
+        failed: '失敗',
+        copied: '已複製',
+        copyFailed: '複製失敗'
       }
     }
   },

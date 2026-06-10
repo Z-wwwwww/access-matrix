@@ -37,6 +37,7 @@ export default {
       emailRequired: '招待メール方式ではメールアドレスが必須です',
       superAdminSingleton: 'スーパー管理者ロールはテナント所有者専用で、他のユーザーには付与できません',
       adminProtected: 'この管理者アカウントは保護されており、強制ログアウト・停止・削除はできません',
+      noKeycloakLink: 'このユーザーは Keycloak アカウントと連携していないため、パスワードをリセットできません',
       adminContactOnly: 'この管理者アカウントは連絡先情報（メール・表示名）のみ編集できます',
       selfManagementForbidden: 'ここでは自分のアカウントを操作できません。自分の情報はプロフィール画面で編集してください'
     },
@@ -727,7 +728,7 @@ export default {
       editAdminContactOnly: '管理者アカウント：連絡先情報（メール・表示名）のみ編集可能',
       edit: '編集',
       resetPassword: 'パスワードリセット',
-      resetPasswordDisabledSso: 'SSO モードでは無効：ユーザーは Keycloak アカウントコンソールで自分のパスワードを変更します',
+      resetPasswordDisabledAdmin: '管理者アカウントのパスワードはこの画面からリセットできません',
       statusChangeDisabled: '管理者アカウントは状態変更不可',
       toggleStatus: '有効/無効',
       disable: '停止',
@@ -741,7 +742,9 @@ export default {
       deleteTitle: 'ユーザー削除',
       deleteMessage: '「{name}」を削除しますか？',
       forceLogoutTitle: '強制ログアウト',
-      forceLogoutMessage: '「{name}」を強制ログアウトしますか？\n（進行中の access token は次回 API 呼び出し時点で無効化されます）'
+      forceLogoutMessage: '「{name}」を強制ログアウトしますか？\n（進行中の access token は次回 API 呼び出し時点で無効化されます）',
+      resetTitle: 'パスワードリセット',
+      resetMessage: '「{name}」のパスワードをリセットしますか？\n現在のパスワードは直ちに無効になり、ユーザーは全セッションからログアウトされます。'
     },
     message: {
       deleteFailed: '削除失敗',
@@ -786,26 +789,18 @@ export default {
       }
     },
     resetPassword: {
-      title: 'パスワードリセット',
-      label: {
-        user: 'ユーザー',
-        newPassword: '新しいパスワード',
-        confirmPassword: '確認用パスワード'
-      },
-      placeholder: {
-        value: '8 文字以上 / 4 種類の文字種',
-        confirm: '同じパスワードを再入力'
-      },
-      hint: '※ 公開侵害コーパス（HIBP）に登録されたパスワードは拒否されます。',
-      button: { reset: 'リセット' },
-      error: {
-        tooShort: 'パスワードは 8 文字以上で入力してください',
-        mismatch: '確認用パスワードが一致しません'
-      },
+      title: 'パスワードリセット完了',
+      intro: '「{username}」の一時パスワードを発行しました。表示は今回限りです。',
+      emailSent: '新しい認証情報を {email} にもメール送信しました。',
+      emailNotSent: '通知メールを送信できませんでした。一時パスワードを直接本人に伝えてください。',
+      tempPassword: '一時パスワード',
+      copy: 'コピー',
+      hint: '※ ユーザーはこの一時パスワードでログイン後、自分のパスワードの設定を求められます。',
       message: {
-        saving: '保存中...',
         success: 'パスワードをリセットしました',
-        failed: '失敗'
+        failed: '失敗',
+        copied: 'コピーしました',
+        copyFailed: 'コピー失敗'
       }
     }
   },

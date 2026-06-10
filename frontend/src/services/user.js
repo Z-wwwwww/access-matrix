@@ -50,9 +50,9 @@ export function forceLogoutApi(id) {
   return request.post('/admin/auth/force-logout/' + id)
 }
 
-/** パスワードリセット（旧パスワード不要） */
-export function resetPasswordApi(payload) {
-  return request.post('/admin/auth/reset-password', payload)
+/** パスワードリセット — サーバー生成の一時パスワードを 1 回だけ返す（プラットフォーム側と同じフロー） */
+export function resetUserPasswordApi(id) {
+  return request.post('/admin/user/' + id + '/reset-password')
 }
 
 /** ロック解除 */
