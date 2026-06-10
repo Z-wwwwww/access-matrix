@@ -27,9 +27,14 @@ dst="$here/realms/${name}-realm.json"
 [[ -f "$dst" ]] && { echo "$dst already exists - delete it first if you really want to overwrite" >&2; exit 1; }
 
 # Use perl rather than sed for cross-platform regex semantics (macOS sed
-# differs from GNU sed on -i and on \s). Two surgical replacements only.
+# differs from GNU sed on -i and on \s). Surgical replacements only — plus
+# the built-in client URLs (account/account-console redirectUris + baseUrl,
+# realm admin console) which embed the realm name; left at "demo" the new
+# realm's account console rejects its own redirect_uri.
 perl -pe 's/"realm":\s*"demo"/"realm":  "'"$name"'"/' "$src" \
   | perl -pe 's/"claim\.value":\s*"demo"/"claim.value":  "'"$name"'"/' \
+  | perl -pe 's{/realms/demo/account/}{/realms/'"$name"'/account/}g' \
+  | perl -pe 's{/admin/demo/console/}{/admin/'"$name"'/console/}g' \
   > "$dst"
 
 echo "Wrote $dst"

@@ -288,7 +288,16 @@ public class KeycloakRealmService {
                 .replaceFirst("\"displayName\"\\s*:\\s*\"Demo Tenant\"",
                         "\"displayName\": " + quote(displayName))
                 .replaceFirst("\"claim\\.value\"\\s*:\\s*\"demo\"",
-                        "\"claim.value\": " + quote(tenantCode));
+                        "\"claim.value\": " + quote(tenantCode))
+                // Built-in client URLs embed the realm name. Left at "demo",
+                // the clone's account console rejects its own redirect
+                // ("invalid redirect_uri" on /realms/<code>/account/) because
+                // the account/account-console clients still allow only
+                // /realms/demo/account/*. Same story for the realm's admin
+                // console under /admin/<realm>/console/. Plain substring
+                // replaces (no regex) — tenantCode is RFC1035-validated.
+                .replace("/realms/demo/account/", "/realms/" + tenantCode + "/account/")
+                .replace("/admin/demo/console/", "/admin/" + tenantCode + "/console/");
         // Give the clone its own entity ids. The template is the demo realm's
         // EXPORT, so it carries demo's realm id + every nested role/client/
         // mapper id. Those are globally-unique primary keys in Keycloak — left

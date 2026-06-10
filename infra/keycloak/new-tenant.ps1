@@ -55,12 +55,17 @@ if (Test-Path $dst) {
     exit 1
 }
 
-# Surgical replace - only the two specific lines we know need to change.
+# Surgical replace - only the specific strings we know need to change.
 # Avoid a blanket s/demo/$Name/ because realm JSON contains lots of
 # unrelated strings (default-roles-*, etc. — leftover from the demo template).
+# The /realms/demo/account/ + /admin/demo/console/ replaces fix the built-in
+# client URLs (redirectUris/baseUrl embed the realm name); left at "demo" the
+# new realm's account console rejects its own redirect_uri.
 $json = Get-Content $src -Raw
 $json = $json -replace '"realm":\s*"demo"',          ('"realm":  "{0}"' -f $Name)
 $json = $json -replace '"claim\.value":\s*"demo"',   ('"claim.value":  "{0}"' -f $Name)
+$json = $json.Replace('/realms/demo/account/',       ('/realms/{0}/account/' -f $Name))
+$json = $json.Replace('/admin/demo/console/',        ('/admin/{0}/console/'  -f $Name))
 
 Set-Content -Path $dst -Value $json -Encoding UTF8 -NoNewline
 

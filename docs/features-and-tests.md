@@ -88,6 +88,7 @@
 - [ ] **停用立即终结现有会话(bug 修复)**:租户被停用后,其用户**正在使用的会话**下一个请求即 401——不只是挡新登录。机制:`suspend` 调 `sessionTermination.terminateTenant(code)` 写**租户级 kick**,`ForceLogoutFilter` 按 `RequestContext.tenantId()` 比对 token `iat`(自包含 JWT 不查 realm 实时状态,光禁用 realm 拦不住已签发 token)。停用期间也无法重新登录:OIDC 被禁用的 realm 挡住;password 模式 `AuthService.login/refresh` 加了租户状态校验(`error.auth.tenantSuspended`)。恢复→`reactivateTenant` 清除 kick,可重新登录。
 - [ ] 硬删除需先停用 + 输入正确 tenantCode;**仅** `system` 不可改/停/删,也不能被新建占名;`demo` 可改/停/删、其名也可被新建。
 - [ ] 新建租户的 numbering 定义从预留模板 `__template__` 克隆(已与 `demo` 解耦);即使删掉 `demo`,新建租户首次取号(U 编号)仍正常。
+- [ ] **新建租户的 KC 账号控制台可用(bug 修复)**:新租户用户在右上角「修改密码」打开 KC 账号控制台 → 正常进入,**不报「无效的参数: redirect_uri」**。realm 克隆(`KeycloakRealmService.renderRealmJson` 及 `infra/keycloak/new-tenant.{ps1,sh}`)现在会把内置客户端 URL 一并替换为新 realm 名(`account`/`account-console` 的 baseUrl + `/realms/<code>/account/*` redirectUris、`security-admin-console` 的 `/admin/<code>/console/*`);此前停留在 `/realms/demo/...`,克隆出的每个租户 realm 都拒绝自己的账号控制台跳转。存量坏 realm 用 KC Admin API 改这三个客户端的 baseUrl/redirectUris 即可修复。
 - [ ] 重发邀请(可改邮箱)。
 - [ ] 状态分段(运行中/已停用)服务端过滤正确、跨分页一致;计数与列表吻合。
 - [ ] 实时搜索(去抖)、表格/卡片切换(刷新后记忆)、详情抽屉(Esc/遮罩/X 关闭)。
