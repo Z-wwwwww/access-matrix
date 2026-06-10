@@ -433,7 +433,7 @@ export default {
         suspend: 'テナントを一時停止（Keycloak realm 無効化、解除可能）',
         resume: '停止中のテナントを再開',
         edit: 'テナント情報を編集',
-        builtInLocked: '組み込みテナント（system / demo）は変更不可'
+        builtInLocked: '組み込みテナント（system）は変更不可'
       },
       hardDelete: {
         title: 'テナントを完全削除',

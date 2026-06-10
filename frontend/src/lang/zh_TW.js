@@ -423,7 +423,7 @@ export default {
         suspend: '停用租戶（停用 Keycloak realm，可恢復）',
         resume: '恢復已停用的租戶',
         edit: '編輯租戶資訊',
-        builtInLocked: '內建租戶（system / demo）不可修改'
+        builtInLocked: '內建租戶（system）不可修改'
       },
       hardDelete: {
         title: '完全刪除租戶',

@@ -20,6 +20,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -111,6 +112,18 @@ public class GlobalExceptionHandler {
         log.warn("Keycloak operation rejected: {}", ex.getMessage());
         return ResponseEntity.ok(new JsonResult<>(
                 ErrorCode.BUSINESS_ERROR.code(), "error.keycloak.operationFailed", null));
+    }
+
+    /**
+     * An unknown path (e.g. a typo'd API URL) falls through to the resource
+     * handler chain and surfaces as a {@link NoResourceFoundException}. Without
+     * this it lands in {@link #handleGeneric}, gets logged as a 500 "Unhandled
+     * exception" and pollutes the error-rate metrics — it is a plain 404.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<JsonResult<Object>> handleNoResourceFound(NoResourceFoundException ex) {
+        log.debug("No resource for path: {}", ex.getResourcePath());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(JsonResult.error(ErrorCode.NOT_FOUND));
     }
 
     @ExceptionHandler(Exception.class)

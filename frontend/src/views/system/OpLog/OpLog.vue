@@ -9,6 +9,7 @@ import Drawer from '@/components/ui/Drawer.vue'
 import { DataTable } from '@/components/shared/DataTable'
 import UserPicker from '@/components/shared/UserPicker.vue'
 import { toast } from '@/composables/useToast'
+import { toJSTDateTimeFullDisp } from '@/lib/date'
 import { Search, RotateCcw, Eye } from 'lucide-vue-next'
 import { getOpLogListApi, getOpLogApi } from '@/services/oplog'
 
@@ -84,8 +85,7 @@ async function openDetail(row) {
 }
 
 function formatTime(iso) {
-  if (!iso) return '-'
-  return iso.replace('T', ' ').slice(0, 19)
+  return toJSTDateTimeFullDisp(iso) || '-'
 }
 
 function prettyJson(s) {

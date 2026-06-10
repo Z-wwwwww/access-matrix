@@ -423,7 +423,7 @@ export default {
         suspend: 'Suspend tenant (disables the Keycloak realm, reversible)',
         resume: 'Resume a suspended tenant',
         edit: 'Edit tenant details',
-        builtInLocked: 'Built-in tenants (system / demo) cannot be changed'
+        builtInLocked: 'Built-in tenant (system) cannot be changed'
       },
       hardDelete: {
         title: 'Permanently delete tenant',

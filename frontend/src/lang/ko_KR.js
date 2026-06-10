@@ -423,7 +423,7 @@ export default {
         suspend: '테넌트 중단(Keycloak realm 비활성화, 되돌릴 수 있음)',
         resume: '중단된 테넌트 재개',
         edit: '테넌트 정보 편집',
-        builtInLocked: '기본 제공 테넌트(system / demo)는 변경할 수 없습니다'
+        builtInLocked: '기본 제공 테넌트(system)는 변경할 수 없습니다'
       },
       hardDelete: {
         title: '테넌트 완전 삭제',

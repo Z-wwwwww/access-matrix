@@ -10,6 +10,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useDict } from '@/composables/useDict'
+import { toJSTDateTimeFullDisp } from '@/lib/date'
 import { Search, RotateCcw, Pencil, Play, ScrollText, HelpCircle } from 'lucide-vue-next'
 import {
   getJobListApi, getJobLogListApi, updateJobApi,
@@ -38,7 +39,7 @@ const columns = computed(() => [
 ])
 
 function fmtTime(s) {
-  return s ? String(s).replace('T', ' ').slice(0, 19) : '—'
+  return toJSTDateTimeFullDisp(s) || '—'
 }
 
 async function fetchData() {

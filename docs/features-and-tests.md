@@ -107,7 +107,7 @@
 - [ ] 状态分段(运行中/已停用)服务端过滤正确、跨分页一致;计数与列表吻合。
 - [ ] 实时搜索(去抖)、表格/卡片切换(刷新后记忆)、详情抽屉(Esc/遮罩/X 关闭)。
 - [ ] 表格/卡片均显示**用户数**;新建用户/删除用户后该数随之变化;system 显示运维用户数、demo 显示其 seed 用户数。
-- [ ] 行操作权限门控与原表一致;悬停显示;仅 `system` 禁用编辑/停用/删除/重发,`demo` 与普通租户一致。
+- [ ] 行操作权限门控与原表一致;悬停显示;仅 `system` 禁用编辑/停用/删除/重发(禁用 tooltip 文案只提 `system`,不再提 `demo`),`demo` 与普通租户一致。
 - [ ] 切换调色板 + 深色模式:徽标、状态点、抽屉、分页样式随主题正常显示。
 
 ### 2.2 平台总览(Platform overview / Ops dashboard)
@@ -139,6 +139,7 @@
 - [ ] 启停/改 cron/立即执行生效;执行日志可见。
 - [ ] 删除 job 类 + 重启 → 管理台不再显示(`core_job` 软删 mark=0,日志保留)。
 - [ ] 保留作业只删 `dispatch_state=1` 的旧事件,pending/failed 不动。
+- [ ] 「下次执行时间」与执行日志的开始时间按 **JST** 显示(走 `toJSTDateTimeFullDisp`,与领域事件/平台总览一致,不再显示 UTC 裸字符串)。
 
 ### 2.5 支持会话 / 模拟登录(Support session / impersonation)
 ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start`);服务端会话表 `core_support_session`(V52)记录 started/expires/**ended_at**。退出调 `/support-session/terminate` 置 ended。
@@ -184,7 +185,8 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 
 **测试点**
 - [ ] 字典:新增/停用管理字典项;被引用的项不可删(报"in use")、枚举项不可删——这些是**业务拒绝**,不计入仪表盘"接口错误"。
-- [ ] 任一带 `@OpLog` 的操作在 `core_oplog` 留痕;失败时 `error_code` 正确。
+- [ ] 任一带 `@OpLog` 的操作在 `core_oplog` 留痕;失败时 `error_code` 正确;操作日志页时间列按 **JST** 显示(与领域事件页同一时刻显示一致,不差 9 小时)。
+- [ ] 访问不存在的 API 路径(如 `GET /api/platform/jobs`)→ HTTP **404**(`JsonResult` code=404),服务端无「Unhandled exception」ERROR 日志,不计入仪表盘「接口错误(24h)」。
 - [ ] 语言切换:5 语言下新功能文案都不出现 key 原文 / `__TODO__`。
 - [ ] 通知:触发后铃铛出现未读、可标记已读。
 - [ ] 邮件 header 显示品牌 logo:在 Gmail/Outlook 等也能显示(因用 **PNG** 而非 SVG);logo 加载不出时下方文字「Access Matrix」兜底。`logoUrl` 指向 `${baseUrl}/access_matrix_logo.png`(前端静态资源,需前端已部署/可访问)。
