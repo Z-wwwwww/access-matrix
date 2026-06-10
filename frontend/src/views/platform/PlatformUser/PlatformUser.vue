@@ -328,9 +328,9 @@ onMounted(fetchData)
           <span class="text-sm">{{ fmtDate(row.createTime) }}</span>
         </template>
         <template #cell-actions="{ row }">
-          <!-- the super 'ops' (platformAdmin) is unmanageable from here -->
-          <span v-if="row.platformAdmin" class="text-xs text-muted-foreground">—</span>
-          <div v-else class="inline-flex items-center gap-0.5">
+          <!-- the super 'ops' (platformAdmin) is unmanageable from here: no buttons,
+               empty cell (same treatment as protected admin rows in User.vue) -->
+          <div v-if="!row.platformAdmin" class="inline-flex items-center gap-0.5">
             <button v-permission="'opsuser:update'"
                     class="h-7 px-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-xs inline-flex items-center"
                     :title="t('platform.user.action.edit')" @click="openEdit(row)">
