@@ -15,6 +15,6 @@ export const updateMyProfileApi = (data) => request.put('/user/me/profile', data
 // Legacy alias (existing callers expect this name); points at the same /user/me.
 export const getUserInfoApi = getMeApi
 
-// Self-service password change + reset live in Keycloak's account console
-// and forgot-password flow — see utils/oidc.js for keycloakAccountUrl() and
-// keycloakForgotPasswordUrl(). We don't proxy them through the backend.
+// Self-service password change + reset live in Keycloak — see utils/oidc.js
+// for beginPasswordUpdate() (UPDATE_PASSWORD application-initiated action)
+// and keycloakForgotPasswordUrl(). We don't proxy them through the backend.

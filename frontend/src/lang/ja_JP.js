@@ -666,9 +666,9 @@ export default {
     oldPassword: '旧パスワード',
     password: '新しいパスワード',
     confirmPassword: 'パスワード（確認）',
-    openConsoleHint: 'パスワードの変更は ID プロバイダ (Keycloak) の自己管理画面で行います。',
-    openConsoleButton: 'Account Console を開く',
-    consoleUnavailable: 'SSO ログインが有効でない環境ではパスワード変更画面はご利用いただけません。',
+    updateHint: 'パスワードの変更は ID プロバイダ (Keycloak) が管理します。クリックすると「パスワード更新」画面に直接移動し、完了後このアプリに自動的に戻ります。',
+    updateButton: 'パスワードを変更',
+    unavailable: 'SSO ログインが有効でない環境ではパスワード変更画面はご利用いただけません。',
     message: {
       inconsistent: '2 回入力したパスワードが一致しません'
     }

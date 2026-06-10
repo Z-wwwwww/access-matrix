@@ -56,18 +56,6 @@ export function oidcConfig() {
 }
 
 /**
- * URL of the Keycloak built-in self-service account console — the user can
- * change their password, email, MFA settings, view sessions, etc. Each realm
- * has its own at /realms/&lt;realm&gt;/account/. We derive the realm from the
- * issuer URL so we don't need a separate VITE_ var.
- */
-export function keycloakAccountUrl() {
-  const cfg = oidcConfig()
-  if (!cfg.enabled || !cfg.issuer) return null
-  return `${cfg.issuer}/account/`
-}
-
-/**
  * RP-Initiated Logout URL (OIDC spec). Hits Keycloak's end_session_endpoint
  * so the IdP wipes its own session cookie; without this, the next
  * "Sign in with SSO" silent-logins via Keycloak's still-valid cookie
@@ -263,8 +251,14 @@ export function popReturnTo() {
 /**
  * Generate PKCE + state, redirect the browser to Keycloak's /authorize.
  * Returns a Promise that never resolves (we navigate away first).
+ *
+ * @param opts.kcAction optional Keycloak Application-Initiated Action
+ *        (e.g. 'UPDATE_PASSWORD'): the user is taken straight to that
+ *        action's screen (their KC session satisfies the login step) and
+ *        then returns through the normal /sso/callback code exchange —
+ *        so the app session is refreshed and the user lands back in-app.
  */
-export async function beginLogin() {
+export async function beginLogin(opts = {}) {
   const cfg = oidcConfig()
   if (!cfg.enabled) throw new Error('OIDC disabled (VITE_OIDC_ENABLED=false)')
   if (!cfg.issuer || !cfg.clientId || !cfg.redirectUri) {
@@ -289,11 +283,24 @@ export async function beginLogin() {
     // Forward the app's light/dark mode so the KC login theme matches it.
     ui_mode:               currentUiMode()
   })
+  if (opts.kcAction) params.append('kc_action', opts.kcAction)
 
   window.location.assign(`${cfg.issuer}/protocol/openid-connect/auth?${params}`)
   // We've left the SPA — return a never-resolving promise so callers don't
   // race with the navigation.
   return new Promise(() => {})
+}
+
+/**
+ * Self-service password change via Keycloak's UPDATE_PASSWORD
+ * Application-Initiated Action. Unlike linking to the account console
+ * root (where the password form hides two levels deep under
+ * Account security → Signing in), this lands the user DIRECTLY on
+ * Keycloak's "update password" screen; on save (or cancel) Keycloak
+ * redirects back through /sso/callback and the user is back in the app.
+ */
+export function beginPasswordUpdate() {
+  return beginLogin({ kcAction: 'UPDATE_PASSWORD' })
 }
 
 /**

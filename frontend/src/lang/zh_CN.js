@@ -656,9 +656,9 @@ export default {
     oldPassword: '原密码',
     password: '新密码',
     confirmPassword: '确认密码',
-    openConsoleHint: '密码修改由身份提供商 (Keycloak) 管理，请打开自助账号控制台修改。',
-    openConsoleButton: '打开账号控制台',
-    consoleUnavailable: '未启用 SSO 时无法在此修改密码。',
+    updateHint: '密码修改由身份提供商 (Keycloak) 管理。点击后将直接进入其「修改密码」页面，完成后自动返回本应用。',
+    updateButton: '修改密码',
+    unavailable: '未启用 SSO 时无法在此修改密码。',
     message: {
       inconsistent: '两次输入的密码不一致'
     }

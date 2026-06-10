@@ -30,6 +30,7 @@
 - [ ] 多 realm:在 A 租户的账号无法登录 B 租户。
 - [ ] 新建运维用户用临时密码首登 → KC「修改密码」页,按钮是通用「提交」(不是「发送重置链接」)。Keycloak 主题 `doSubmit` 必须保持通用(多页面共用),不要写成某页专属文案。
 - [ ] KC 多字段表单(更新账户信息 / 修改密码)排版整齐:必填 `*` 紧跟 label **同一行**,label↔input、字段↔字段间距正常(不因 `.pf-*__label-text` 被设成 block 而拉开)。
+- [ ] **右上角「修改密码」直达 KC 改密表单(UX 修复)**:用户菜单 → 修改密码 → 点击按钮后整页跳转,**直接落在** Keycloak 的「修改密码」页(`kc_action=UPDATE_PASSWORD` 应用发起动作,走带 PKCE 的标准授权流,`oidc.js beginPasswordUpdate()`),保存(或取消)后经 `/sso/callback` 自动回到出发页面、应用会话同时刷新。不再新开账号控制台首页(改密入口藏在「帐户安全 → 登录」两层深,用户找不到)。
 - [ ] **SSO 页跟随应用明暗**:在应用内切到深色(即使系统为亮色)后点登录跳到 KC,登录页为深色;切回亮色则 KC 为亮色;登录失败重渲染后仍保持(sessionStorage `am_ui_mode` 兜底)。亮色保持 navy/gold 品牌入口;**暗黑模式套用应用暖黑配色**——暖近黑背景 + 暖米白文字 + 陶土橙强调(主按钮/输入聚焦环/复选框选中/链接 hover),金色 logo 保留。机制:前端在 `/authorize`(及忘记密码 `reset-credentials`)URL 追加 `ui_mode=dark|light`(`oidc.js`,取自 `<html>.dark`),KC 主题 `login.js` 读取并在 `<html>` 设 `data-theme`(头部同步脚本,无闪烁);KC `access-matrix.css` 的 `[data-theme="dark"]` 重定义 `--am-*` token。改 KC 主题文件需**重启/重同步 KC**(`start-keycloak.bat` 每次启动 xcopy 同步)才生效。
 
 ---

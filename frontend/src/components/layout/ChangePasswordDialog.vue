@@ -1,30 +1,35 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import Dialog from '@/components/ui/Dialog.vue'
 import { KeyRound, ExternalLink } from 'lucide-vue-next'
-import { keycloakAccountUrl, oidcConfig } from '@/utils/oidc'
+import { beginPasswordUpdate, stashReturnTo, oidcConfig } from '@/utils/oidc'
 
 /**
- * Self-service password change is now owned by the IdP — the user goes to
- * Keycloak's built-in account console (one URL per realm) and changes their
- * password there. The backend doesn't even see the new password.
- *
- * <p>This dialog therefore renders no form; it shows a single "open account
- * console" link and explains what to expect.
+ * Self-service password change is owned by the IdP. Instead of dropping the
+ * user at the Keycloak account-console ROOT (where the password form hides
+ * two levels deep under Account security → Signing in), we fire Keycloak's
+ * UPDATE_PASSWORD Application-Initiated Action: a full-page redirect lands
+ * DIRECTLY on the "update password" screen, and on save/cancel Keycloak
+ * returns through /sso/callback — back to the page the user came from.
+ * The backend never sees the new password.
  */
 const { t } = useI18n()
+const route = useRoute()
 
 defineProps({
   open: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update:open'])
 
-const accountUrl = computed(() => keycloakAccountUrl())
 const ssoEnabled = computed(() => oidcConfig().enabled)
 
-function openConsole() {
-  if (accountUrl.value) window.open(accountUrl.value, '_blank', 'noopener')
+function goUpdatePassword() {
+  // Come back to the page the user was on once KC redirects through
+  // /sso/callback (SsoCallback routes to popReturnTo()).
+  stashReturnTo(route.fullPath)
+  beginPasswordUpdate()
 }
 </script>
 
@@ -36,20 +41,20 @@ function openConsole() {
     @update:open="(v) => emit('update:open', v)"
   >
     <div class="space-y-4 text-sm text-foreground">
-      <p>{{ t('password.openConsoleHint') }}</p>
+      <p>{{ t('password.updateHint') }}</p>
 
       <button
-        v-if="ssoEnabled && accountUrl"
+        v-if="ssoEnabled"
         class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
-        @click="openConsole"
+        @click="goUpdatePassword"
       >
         <KeyRound :size="16" />
-        {{ t('password.openConsoleButton') }}
+        {{ t('password.updateButton') }}
         <ExternalLink :size="14" class="opacity-80" />
       </button>
 
       <div v-else class="text-xs text-muted-foreground p-3 rounded bg-muted/40 border border-border">
-        {{ t('password.consoleUnavailable') }}
+        {{ t('password.unavailable') }}
       </div>
     </div>
 

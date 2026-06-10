@@ -656,9 +656,9 @@ export default {
     oldPassword: 'Current password',
     password: 'New password',
     confirmPassword: 'Confirm password',
-    openConsoleHint: 'Password changes are managed by the identity provider (Keycloak). Open the account console to update it.',
-    openConsoleButton: 'Open Account Console',
-    consoleUnavailable: 'Password change is unavailable when SSO is disabled.',
+    updateHint: 'Password changes are managed by the identity provider (Keycloak). You will be taken straight to its "Update password" screen and returned here afterwards.',
+    updateButton: 'Change password',
+    unavailable: 'Password change is unavailable when SSO is disabled.',
     message: {
       inconsistent: 'Passwords do not match'
     }
