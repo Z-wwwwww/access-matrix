@@ -37,7 +37,8 @@ export default {
       emailRequired: '招待メール方式ではメールアドレスが必須です',
       superAdminSingleton: 'スーパー管理者ロールはテナント所有者専用で、他のユーザーには付与できません',
       adminProtected: 'この管理者アカウントは保護されており、強制ログアウト・停止・削除はできません',
-      adminContactOnly: 'この管理者アカウントは連絡先情報（メール・表示名）のみ編集できます'
+      adminContactOnly: 'この管理者アカウントは連絡先情報（メール・表示名）のみ編集できます',
+      selfManagementForbidden: 'ここでは自分のアカウントを操作できません。自分の情報はプロフィール画面で編集してください'
     },
     role: {
       superPermissionReserved: 'テナント全体のスーパー権限は組み込みのスーパー管理者ロール専用で、カスタムロールには割り当てできません'
@@ -689,6 +690,7 @@ export default {
 
   profile: {
     title: 'プロフィール',
+    editHint: '以下で自分の連絡先情報を編集できます。部署・状態・ロールは管理者が管理します。',
     label: {
       deptId: '部署',
       userId: 'ユーザー ID',
@@ -717,7 +719,8 @@ export default {
       actions: '操作'
     },
     badge: {
-      tenantAdmin: 'テナント管理者'
+      tenantAdmin: 'テナント管理者',
+      self: '本人'
     },
     tooltip: {
       editDisabled: '内蔵ユーザーは編集不可',
@@ -731,7 +734,8 @@ export default {
       enable: '再開',
       forceLogout: '強制ログアウト',
       forceLogoutDisabled: '管理者アカウントは強制ログアウト不可',
-      deleteDisabled: '管理者アカウントは削除不可'
+      deleteDisabled: '管理者アカウントは削除不可',
+      selfManaged: '自分のアカウントはプロフィール画面で管理してください'
     },
     confirm: {
       deleteTitle: 'ユーザー削除',

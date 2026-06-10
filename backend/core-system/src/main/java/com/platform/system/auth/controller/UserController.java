@@ -3,14 +3,20 @@ package com.platform.system.auth.controller;
 import com.platform.system.auth.dto.UserInfoResponse;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
+import com.platform.system.rbac.dto.UserDto;
 import com.platform.system.rbac.entity.RoleEntity;
 import com.platform.system.rbac.mapper.RoleMapper;
 import com.platform.system.rbac.service.PermissionQueryService;
+import com.platform.system.rbac.service.UserAdminService;
+import com.platform.core.common.audit.OpLog;
 import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,12 +31,15 @@ public class UserController {
     private final UserMapper userMapper;
     private final RoleMapper roleMapper;
     private final PermissionQueryService permissionQueryService;
+    private final UserAdminService userAdminService;
 
     public UserController(UserMapper userMapper,
-                          RoleMapper roleMapper, PermissionQueryService permissionQueryService) {
+                          RoleMapper roleMapper, PermissionQueryService permissionQueryService,
+                          UserAdminService userAdminService) {
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
         this.permissionQueryService = permissionQueryService;
+        this.userAdminService = userAdminService;
     }
 
     @GetMapping("/me")
@@ -55,7 +64,11 @@ public class UserController {
         // stay stable across admin renames — BuiltInRoles.SUPER_ADMIN_ID is the canonical key.
         List<RoleEntity> roles = roleMapper.findRolesByUserId(userId, u.getTenantId());
         List<String> roleIds = new ArrayList<>(roles.size());
-        for (RoleEntity r : roles) roleIds.add(r.getId());
+        List<String> roleNames = new ArrayList<>(roles.size());
+        for (RoleEntity r : roles) {
+            roleIds.add(r.getId());
+            roleNames.add(r.getName());
+        }
         Set<String> perms = permissionQueryService.loadUserPermissions(userId);
 
         UserInfoResponse resp = new UserInfoResponse(
@@ -67,8 +80,21 @@ public class UserController {
                 u.getTenantId(),
                 u.getDeptId(),
                 roleIds,
+                roleNames,
                 new ArrayList<>(perms)
         );
         return JsonResult.ok(resp);
+    }
+
+    /**
+     * Self-service profile edit (Profile page). Login-only — no fine-grained
+     * permission: a user may always edit their OWN contact fields. The admin
+     * user-management console, by contrast, refuses any self-targeted change.
+     */
+    @PutMapping("/me/profile")
+    @OpLog(module = "system", action = "profile.update", targetType = "user")
+    public JsonResult<Void> updateMyProfile(@Valid @RequestBody UserDto.ProfileUpdateRequest req) {
+        userAdminService.updateOwnProfile(req);
+        return JsonResult.ok();
     }
 }

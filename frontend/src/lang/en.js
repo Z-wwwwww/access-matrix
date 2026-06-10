@@ -30,7 +30,8 @@ export default {
       emailRequired: 'An email is required for invite provisioning',
       superAdminSingleton: 'The Super Administrator role is reserved for the tenant owner and cannot be granted to another user',
       adminProtected: 'This administrator account is protected and cannot be forced to log out, suspended, or deleted',
-      adminContactOnly: 'This administrator account allows editing contact details (email, display name) only'
+      adminContactOnly: 'This administrator account allows editing contact details (email, display name) only',
+      selfManagementForbidden: 'You cannot manage your own account here — edit your details on the Profile page'
     },
     role: {
       superPermissionReserved: 'The tenant-wide super permission is reserved for the built-in Super Administrator role and cannot be assigned to a custom role'
@@ -679,6 +680,7 @@ export default {
 
   profile: {
     title: 'Profile',
+    editHint: 'Edit your own contact details below. Department, status, and roles are managed by an administrator.',
     label: {
       deptId: 'Department',
       userId: 'User ID',
@@ -707,7 +709,8 @@ export default {
       actions: 'Actions'
     },
     badge: {
-      tenantAdmin: 'Tenant admin'
+      tenantAdmin: 'Tenant admin',
+      self: 'You'
     },
     tooltip: {
       editDisabled: 'Built-in user is not editable',
@@ -721,7 +724,8 @@ export default {
       enable: 'Enable',
       forceLogout: 'Force logout',
       forceLogoutDisabled: 'Admin account cannot be forced to log out',
-      deleteDisabled: 'Admin account cannot be deleted'
+      deleteDisabled: 'Admin account cannot be deleted',
+      selfManaged: 'Manage your own account on the Profile page'
     },
     confirm: {
       deleteTitle: 'Delete user',

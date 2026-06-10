@@ -8,6 +8,10 @@ export const refreshApi = ()     => request.post('/auth/refresh')
 export const logoutApi  = ()     => request.post('/auth/logout')
 export const getMeApi   = ()     => request.get('/user/me')
 
+// Self-service profile edit (Profile page) — contact fields only (email,
+// displayName). The admin user console refuses self-targeted changes.
+export const updateMyProfileApi = (data) => request.put('/user/me/profile', data)
+
 // Legacy alias (existing callers expect this name); points at the same /user/me.
 export const getUserInfoApi = getMeApi
 

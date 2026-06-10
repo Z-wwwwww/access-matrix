@@ -30,7 +30,8 @@ export default {
       emailRequired: '邀請信件方式需要填寫信箱',
       superAdminSingleton: '超級管理員角色為租戶擁有者保留，不能授予其他使用者',
       adminProtected: '該管理員帳號受保護，不能被強制登出、停用或刪除',
-      adminContactOnly: '該管理員帳號僅可編輯連絡資訊（信箱、顯示名稱）'
+      adminContactOnly: '該管理員帳號僅可編輯連絡資訊（信箱、顯示名稱）',
+      selfManagementForbidden: '不能在此管理自己的帳號，請在「個人資料」頁修改自己的資訊'
     },
     role: {
       superPermissionReserved: '租戶級超級權限為內建超級管理員角色保留，不能指派給自訂角色'
@@ -679,6 +680,7 @@ export default {
 
   profile: {
     title: '個人資料',
+    editHint: '在下方修改你的連絡資訊。部門、狀態、角色由管理員管理。',
     label: {
       deptId: '部門',
       userId: '使用者 ID',
@@ -707,7 +709,8 @@ export default {
       actions: '操作'
     },
     badge: {
-      tenantAdmin: '租戶管理員'
+      tenantAdmin: '租戶管理員',
+      self: '本人'
     },
     tooltip: {
       editDisabled: '內建使用者不可編輯',
@@ -721,7 +724,8 @@ export default {
       enable: '啟用',
       forceLogout: '強制登出',
       forceLogoutDisabled: '管理員帳號不可被強制登出',
-      deleteDisabled: '管理員帳號不可刪除'
+      deleteDisabled: '管理員帳號不可刪除',
+      selfManaged: '請在「個人資料」頁管理自己的帳號'
     },
     confirm: {
       deleteTitle: '刪除使用者',

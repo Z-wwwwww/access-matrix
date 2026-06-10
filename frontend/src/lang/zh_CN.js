@@ -30,7 +30,8 @@ export default {
       emailRequired: '邀请邮件方式需要填写邮箱',
       superAdminSingleton: '超级管理员角色为租户所有者保留，不能授予其他用户',
       adminProtected: '该管理员账号受保护，不能被强制登出、停用或删除',
-      adminContactOnly: '该管理员账号仅可编辑联系信息（邮箱、显示名）'
+      adminContactOnly: '该管理员账号仅可编辑联系信息（邮箱、显示名）',
+      selfManagementForbidden: '不能在此管理自己的账号，请在「个人资料」页修改自己的信息'
     },
     role: {
       superPermissionReserved: '租户级超级权限为内置超级管理员角色保留，不能分配给自定义角色'
@@ -679,6 +680,7 @@ export default {
 
   profile: {
     title: '个人资料',
+    editHint: '在下方修改你的联系信息。部门、状态、角色由管理员管理。',
     label: {
       deptId: '部门',
       userId: '用户 ID',
@@ -707,7 +709,8 @@ export default {
       actions: '操作'
     },
     badge: {
-      tenantAdmin: '租户管理员'
+      tenantAdmin: '租户管理员',
+      self: '本人'
     },
     tooltip: {
       editDisabled: '内置用户不可编辑',
@@ -721,7 +724,8 @@ export default {
       enable: '启用',
       forceLogout: '强制登出',
       forceLogoutDisabled: '管理员账号不可被强制登出',
-      deleteDisabled: '管理员账号不可删除'
+      deleteDisabled: '管理员账号不可删除',
+      selfManaged: '请在「个人资料」页管理自己的账号'
     },
     confirm: {
       deleteTitle: '删除用户',

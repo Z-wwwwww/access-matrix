@@ -98,7 +98,8 @@ public class RbacSeederService {
      * tenant. Wildcards (e.g. the {@code tenant:*} super perm, seeded above) are
      * skipped too — they are not assignable units.
      */
-    private void seedPermissionCatalog(String tenant) {
+    @Transactional
+    public void seedPermissionCatalog(String tenant) {
         for (PermissionRegistry.Entry e : PermissionRegistry.allEntries().values()) {
             if (PermissionRegistry.isWildcard(e.code())) continue;
             if ("platform".equals(e.module())) continue;

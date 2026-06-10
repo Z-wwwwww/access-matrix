@@ -19,6 +19,7 @@ import { getDeptTreeApi } from '@/services/dept'
 import UserEdit from './UserEdit.vue'
 import ResetPasswordDialog from './ResetPasswordDialog.vue'
 import { oidcConfig } from '@/utils/oidc'
+import { useAuthStore } from '@/stores/auth'
 
 // In OIDC mode, password resets through this controller path are
 // disabled — the local password_hash write would never propagate to
@@ -36,6 +37,22 @@ const ssoMode = oidcConfig().enabled
 // enforces the same; here we just disable the actions + show why.
 function isProtectedAdmin(row) {
   return row?.builtin === true || row?.superAdmin === true
+}
+
+// You cannot manage your own account from the admin console — edit your own
+// info on the Profile page instead. Blocking self here prevents self
+// privilege-escalation (granting yourself roles) and self-lockout (disabling /
+// deleting / kicking yourself). The backend enforces the same on every path.
+const authStore = useAuthStore()
+function isSelf(row) {
+  // NOTE: authStore.userId is the JWT `sub`, which in OIDC mode is the
+  // Keycloak UUID — NOT the business ULID — so it never equals row.id.
+  // The business id comes from /me (userInfo.userId === core_auth_user.id),
+  // which matches the list row's id. Fall back to the login username (always
+  // present in the JWT) for the brief window before /me is cached.
+  const meId = authStore.userInfo?.userId
+  if (meId) return row?.id === meId
+  return !!row?.username && row.username === authStore.username
 }
 
 const loading = ref(false)
@@ -208,6 +225,7 @@ onMounted(() => {
       >
         <template #cell-username="{ row }">
           <span>{{ row.username }}</span>
+          <Badge v-if="isSelf(row)" variant="secondary" class="ml-2 text-[10px]">{{ t('user.badge.self') }}</Badge>
           <Badge v-if="row.builtin === true" variant="outline" class="ml-2 text-[10px]">{{ t('common.status.builtIn') }}</Badge>
           <Badge v-else-if="row.superAdmin === true" variant="outline" class="ml-2 text-[10px]">{{ t('user.badge.tenantAdmin') }}</Badge>
         </template>
@@ -222,43 +240,44 @@ onMounted(() => {
         <template #cell-actions="{ row }">
           <div class="inline-flex items-center gap-1">
             <button v-permission="'user:update'"
-                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
-                    :title="isProtectedAdmin(row) ? t('user.tooltip.editAdminContactOnly') : t('user.tooltip.edit')"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    :disabled="isSelf(row)"
+                    :title="isSelf(row) ? t('user.tooltip.selfManaged') : (isProtectedAdmin(row) ? t('user.tooltip.editAdminContactOnly') : t('user.tooltip.edit'))"
                     @click="openEdit(row)">
               <Pencil class="size-3.5" />
             </button>
             <button v-permission="'auth:reset-password'"
                     class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                    :disabled="ssoMode"
-                    :title="ssoMode ? t('user.tooltip.resetPasswordDisabledSso') : t('user.tooltip.resetPassword')"
+                    :disabled="ssoMode || isSelf(row)"
+                    :title="isSelf(row) ? t('user.tooltip.selfManaged') : (ssoMode ? t('user.tooltip.resetPasswordDisabledSso') : t('user.tooltip.resetPassword'))"
                     @click="openResetPwd(row)">
               <Key class="size-3.5" />
             </button>
             <button v-if="row.status === 1" v-permission="'user:update'"
                     class="h-7 px-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                    :disabled="isProtectedAdmin(row)"
-                    :title="isProtectedAdmin(row) ? t('user.tooltip.statusChangeDisabled') : t('user.tooltip.disable')"
+                    :disabled="isProtectedAdmin(row) || isSelf(row)"
+                    :title="isSelf(row) ? t('user.tooltip.selfManaged') : (isProtectedAdmin(row) ? t('user.tooltip.statusChangeDisabled') : t('user.tooltip.disable'))"
                     @click="toggleStatus(row)">
               <Pause class="size-3.5" />
             </button>
             <button v-else v-permission="'user:update'"
                     class="h-7 px-2 rounded hover:bg-emerald-500/10 text-emerald-600 text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                    :disabled="isProtectedAdmin(row)"
-                    :title="isProtectedAdmin(row) ? t('user.tooltip.statusChangeDisabled') : t('user.tooltip.enable')"
+                    :disabled="isProtectedAdmin(row) || isSelf(row)"
+                    :title="isSelf(row) ? t('user.tooltip.selfManaged') : (isProtectedAdmin(row) ? t('user.tooltip.statusChangeDisabled') : t('user.tooltip.enable'))"
                     @click="toggleStatus(row)">
               <Play class="size-3.5" />
             </button>
             <button v-permission="'*:*'"
                     class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                    :disabled="isProtectedAdmin(row)"
-                    :title="isProtectedAdmin(row) ? t('user.tooltip.forceLogoutDisabled') : t('user.tooltip.forceLogout')"
+                    :disabled="isProtectedAdmin(row) || isSelf(row)"
+                    :title="isSelf(row) ? t('user.tooltip.selfManaged') : (isProtectedAdmin(row) ? t('user.tooltip.forceLogoutDisabled') : t('user.tooltip.forceLogout'))"
                     @click="handleForceLogout(row)">
               <LogOut class="size-3.5" />
             </button>
             <button v-permission="'user:delete'"
                     class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                    :disabled="isProtectedAdmin(row)"
-                    :title="isProtectedAdmin(row) ? t('user.tooltip.deleteDisabled') : t('common.button.delete')"
+                    :disabled="isProtectedAdmin(row) || isSelf(row)"
+                    :title="isSelf(row) ? t('user.tooltip.selfManaged') : (isProtectedAdmin(row) ? t('user.tooltip.deleteDisabled') : t('common.button.delete'))"
                     @click="handleDelete(row)">
               <Trash2 class="size-3.5" />
             </button>

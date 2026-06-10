@@ -30,7 +30,8 @@ export default {
       emailRequired: '초대 메일 방식은 이메일이 필요합니다',
       superAdminSingleton: '슈퍼 관리자 역할은 테넌트 소유자 전용이며 다른 사용자에게 부여할 수 없습니다',
       adminProtected: '이 관리자 계정은 보호되어 강제 로그아웃·정지·삭제할 수 없습니다',
-      adminContactOnly: '이 관리자 계정은 연락처 정보(이메일·표시명)만 편집할 수 있습니다'
+      adminContactOnly: '이 관리자 계정은 연락처 정보(이메일·표시명)만 편집할 수 있습니다',
+      selfManagementForbidden: '여기서는 본인 계정을 관리할 수 없습니다. 본인 정보는 프로필 페이지에서 수정하세요'
     },
     role: {
       superPermissionReserved: '테넌트 전체 슈퍼 권한은 내장 슈퍼 관리자 역할 전용이며 사용자 정의 역할에 할당할 수 없습니다'
@@ -679,6 +680,7 @@ export default {
 
   profile: {
     title: '프로필',
+    editHint: '아래에서 본인의 연락처 정보를 수정할 수 있습니다. 부서·상태·역할은 관리자가 관리합니다.',
     label: {
       deptId: '부서',
       userId: '사용자 ID',
@@ -707,7 +709,8 @@ export default {
       actions: '작업'
     },
     badge: {
-      tenantAdmin: '테넌트 관리자'
+      tenantAdmin: '테넌트 관리자',
+      self: '본인'
     },
     tooltip: {
       editDisabled: '기본 제공 사용자는 편집할 수 없습니다',
@@ -721,7 +724,8 @@ export default {
       enable: '활성',
       forceLogout: '강제 로그아웃',
       forceLogoutDisabled: '관리자 계정은 강제 로그아웃할 수 없습니다',
-      deleteDisabled: '관리자 계정은 삭제할 수 없습니다'
+      deleteDisabled: '관리자 계정은 삭제할 수 없습니다',
+      selfManaged: '본인 계정은 프로필 페이지에서 관리하세요'
     },
     confirm: {
       deleteTitle: '사용자 삭제',

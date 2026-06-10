@@ -57,6 +57,15 @@ public final class UserDto {
             String deptId,
             Integer status) {}
 
+    /**
+     * Self-service profile edit (the Profile page). Contact fields only —
+     * a user can never change their own dept / status / roles this way; those
+     * are admin-only and the admin console additionally refuses self-edits.
+     */
+    public record ProfileUpdateRequest(
+            @Email @Size(max = 255) String email,
+            @Size(max = 128) String displayName) {}
+
     public record View(
             String id,
             String username,

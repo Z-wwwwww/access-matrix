@@ -236,8 +236,30 @@ public class UserAdminService {
         }
     }
 
+    /**
+     * Self-service profile edit from the Profile page — the caller updates
+     * their OWN contact fields (email / display name) only. This is the
+     * sanctioned path for self-edit: the admin user-management console refuses
+     * any operation on your own account (see {@link #assertNotSelf}), so this
+     * is the one place a user changes their own info. Dept / status / roles are
+     * never touched here.
+     */
+    @Transactional
+    public void updateOwnProfile(UserDto.ProfileUpdateRequest req) {
+        String me = RequestContext.userId();
+        if (me == null || me.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authentication required");
+        }
+        UserEntity u = require(me);
+        if (req.email() != null) u.setEmail(req.email());
+        if (req.displayName() != null) u.setDisplayName(req.displayName());
+        userMapper.updateById(u);
+        cacheService.evictUser(me);
+    }
+
     @Transactional
     public void update(String id, UserDto.UpdateRequest req) {
+        assertNotSelf(id);
         UserEntity u = require(id);
         // "Protected admin" = the built-in admin OR the tenant's singular
         // SUPER_ADMIN. Both are partially editable: contact fields (email,
@@ -272,6 +294,7 @@ public class UserAdminService {
 
     @Transactional
     public void delete(String id) {
+        assertNotSelf(id);
         UserEntity u = require(id);
         assertNotBuiltInAdmin(u, "delete");
         assertNotLastSuperAdmin(id, "delete");
@@ -313,6 +336,7 @@ public class UserAdminService {
 
     @Transactional
     public void assignRoles(String userId, List<String> roleIds) {
+        assertNotSelf(userId);
         UserEntity u = require(userId);
         assertNotBuiltInAdmin(u, "assign roles");
         // SUPER_ADMIN is singular and locked to the user invited at tenant
@@ -354,6 +378,7 @@ public class UserAdminService {
      * here so the guard lives in the service (Hard Rule 12), not the controller.
      */
     public void forceLogout(String userId) {
+        assertNotSelf(userId);
         UserEntity u = require(userId);
         if (isBuiltInAdmin(u) || isTenantSuperAdmin(u)) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.adminProtected");
@@ -363,6 +388,7 @@ public class UserAdminService {
 
     @Transactional
     public void changeDept(String userId, String deptId) {
+        assertNotSelf(userId);
         UserEntity u = require(userId);
         assertNotBuiltInAdmin(u, "change dept");
         u.setDeptId(deptId);
@@ -372,6 +398,7 @@ public class UserAdminService {
 
     @Transactional
     public void changeStatus(String userId, int status) {
+        assertNotSelf(userId);
         DictEnum.requireValid(CommonStatus.class, status, "status");
         UserEntity u = require(userId);
         assertNotBuiltInAdmin(u, "change status");
@@ -442,6 +469,20 @@ public class UserAdminService {
     /** Whether {@code u} is the platform's read-only built-in admin row. */
     private static boolean isBuiltInAdmin(UserEntity u) {
         return BUILTIN_ADMIN_USERNAME.equalsIgnoreCase(u.getUsername());
+    }
+
+    /**
+     * Refuse any admin-console mutation that targets the caller's OWN account.
+     * Self-service edits go through the Profile page ({@link #updateOwnProfile})
+     * instead. This blocks two footguns at once: self privilege-escalation
+     * (granting yourself roles) and self-lockout (disabling / deleting / kicking
+     * yourself).
+     */
+    private void assertNotSelf(String targetUserId) {
+        String me = RequestContext.userId();
+        if (me != null && me.equals(targetUserId)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.selfManagementForbidden");
+        }
     }
 
     /** Ids of the user(s) holding the tenant's SUPER_ADMIN role — singular by design. */
