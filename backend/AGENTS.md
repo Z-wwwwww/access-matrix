@@ -206,9 +206,11 @@ If you prefer (or need) to do it by hand, the DO / DON'T below is the spec.
   mark          smallint     NOT NULL DEFAULT 1,
   create_user   varchar(64),
   update_user   varchar(64),
-  create_time   timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  update_time   timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP
+  create_time   timestamptz  NOT NULL DEFAULT now(),
+  update_time   timestamptz  NOT NULL DEFAULT now()
   ```
+  Time columns are **`timestamptz`, never `timestamp`** (V58 converted the legacy ones; don't reintroduce zone-less wall clocks). True calendar concepts (check-in date, business date) use `date` — they are not instants and must not be converted.
+- **A property/site table gets a `timezone` column on day one** (IANA id, e.g. `Asia/Tokyo`, `NOT NULL`). It anchors every wall-clock decision for that physical site — night audit / business-date rollover, per-property cron, date parts in generated numbers, guest-facing "15:00 check-in" semantics. It is the cheapest column to add at design time and the hardest to retrofit; until it exists, the single business timezone lives in `AppTime.ZONE`.
 - **Unique indexes lead with `tenant_id`**: `CREATE UNIQUE INDEX uk_xxx_yyy ON xxx (tenant_id, business_key) WHERE mark = 1;` — never a single-column `(business_key)` unique.
 - **Entity extends `BaseEntity`**: never redeclare `id` / `tenantId` / `mark` / audit fields. `@TableName("business_xxx")` + business fields only. `BaseEntity` + `AuditMetaObjectHandler` auto-fill the rest on INSERT.
 - **Mapper extends `BaseMapper<XxxEntity>`** and lives under `..mapper..` package. Custom queries via `@Select` MUST include `tenant_id = #{...}` predicate.
