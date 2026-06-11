@@ -121,9 +121,11 @@ public class AuthService {
         String clientIp = clientIp(req);
         String userAgent = req.getHeader("User-Agent");
         // CoreRequestContextFilter has already resolved the tenant for this
-        // pre-auth request from X-Tenant-Id (or filled in "demo"). We must
-        // pass it through the hand-written @Select since the MyBatis-Plus
-        // tenant interceptor does not rewrite raw SQL.
+        // pre-auth request from X-Tenant-Id (or filled in "demo"). We pass it
+        // explicitly to findByIdentifier; the tenant interceptor scopes that
+        // query to the same tenant. The separate core_tenant registry lookup
+        // in assertTenantActive must NOT be scoped this way — see
+        // TenantMapper.findActiveByCode (@InterceptorIgnore) for why.
         String tenantId = currentTenantOrDefault();
 
         UserEntity user = userMapper.findByIdentifier(tenantId, identifier);
