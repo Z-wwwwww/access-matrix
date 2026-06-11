@@ -1,69 +1,68 @@
 # Development
 
-**English** · [中文](development.zh-CN.md)
 
-For **developers**: project layout, adding new features (menus / permissions / migrations), test conventions, and code style.
+面向**开发者**：项目结构、加新功能（菜单/权限/迁移）、测试规范、代码风格。
 
-> A working local environment is a prerequisite — see [Getting Started](getting-started.md).
+> 安装好本地环境是前提，见 [Getting Started](getting-started.md)。
 
 ---
 
-## 1. Project layout
+## 1. 项目结构
 
 ```
 access-matrix/
-├── backend/                       Spring Boot 4 multi-module (Java 25)
-│   ├── core-common/              Error codes / Result / RequestContext / ULID
+├── backend/                       Spring Boot 4 多模块 (Java 25)
+│   ├── core-common/              错误码 / Result / RequestContext / ULID
 │   ├── core-infrastructure/      Security / Web filters / Persistence / Mail / Keycloak admin
 │   ├── core-system/              Auth / RBAC / Dept / Menu / OpLog
-│   ├── business-demo/            Sample business module (task), demonstrates data scope
-│   └── core-bootstrap/           Spring Boot entry point, application.yml, Flyway migrations, startup seeder
+│   ├── business-demo/            示例业务模块（task），演示 data scope
+│   └── core-bootstrap/           Spring Boot 入口、application.yml、Flyway 迁移、启动 seeder
 │
 ├── frontend/                      Vue 3 + Vite 6 (JavaScript)
 │   ├── src/
-│   │   ├── views/                Pages (grouped by business domain)
-│   │   ├── components/           UI components (ui/ + shared/ + layout/)
-│   │   ├── composables/          Reusable hooks (usePermission / useToast / …)
+│   │   ├── views/                页面（按业务领域分包）
+│   │   ├── components/           UI 组件 (ui/ + shared/ + layout/)
+│   │   ├── composables/          复用 hook (usePermission / useToast / …)
 │   │   ├── directives/           v-permission / v-role / v-any-permission
 │   │   ├── stores/               Pinia (auth / menu / tabs / theme)
 │   │   ├── utils/                permission / oidc / pkce / jwt-decode
-│   │   ├── router/               Routes + guards
-│   │   └── lang/                 i18n for 5 languages
-│   ├── services/                 axios endpoints (named by business domain)
-│   └── tests/                    vitest unit tests + Playwright e2e
+│   │   ├── router/               路由 + 守卫
+│   │   └── lang/                 5 语言 i18n
+│   ├── services/                 axios endpoints（按业务命名）
+│   └── tests/                    vitest 单测 + Playwright e2e
 │
-├── infra/                         Local infrastructure
-│   └── keycloak/                 Startup scripts + realm export JSON
+├── infra/                         本地基础设施
+│   └── keycloak/                 启动脚本 + realm export JSON
 │
-└── docs/                          Documentation (the directory you're reading)
+└── docs/                          文档（你正在看的目录）
 ```
 
-### 1.1 Backend module dependency direction (strict)
+### 1.1 后端模块依赖方向（严格）
 
 ```
 core-bootstrap
    ↓ depends on
-core-system, business-demo          (siblings; do not depend on each other)
+core-system, business-demo          (siblings; 互相不依赖)
    ↓ depends on
 core-infrastructure
    ↓ depends on
 core-common
 ```
 
-**Violating the direction = compile failure**. This is intentional — it prevents business modules from becoming tightly coupled to one another.
+**违反方向 = 编译失败**。这是有意的 —— 防止业务模块互相紧耦合。
 
 ---
 
-## 2. Adding a new menu + page
+## 2. 加一个新菜单 + 页面
 
-End-to-end example: add a "Dictionary" page underneath the "System" menu.
+完整路径示例：在 "系统" 菜单下加一个 "字典管理" 页面。
 
-### 2.1 Backend: insert the menu row (Flyway migration)
+### 2.1 后端：加菜单数据（Flyway 迁移）
 
-Create `backend/core-bootstrap/src/main/resources/db/migration/V23__add_dict_menu.sql`:
+新建 `backend/core-bootstrap/src/main/resources/db/migration/V23__add_dict_menu.sql`：
 
 ```sql
--- Note: the V number must be strictly increasing and unique
+-- 注意：V 编号必须递增且唯一
 INSERT INTO core_rbac_menu (
     id, tenant_id, parent_id, name, path, component,
     icon, sort_order, menu_type, status, mark
@@ -72,7 +71,7 @@ INSERT INTO core_rbac_menu (
     -- migrations we hand-pick stable 26-char strings.
     '01HXXXXXXXXXXXXXXXMENU01',  -- new menu id
     'demo',
-    '00000000000000000000MENU05', -- parent = System
+    '00000000000000000000MENU05', -- parent = 系统
     'dict',
     '/system/dict',
     'system/Dict/Dict',
@@ -83,15 +82,15 @@ INSERT INTO core_rbac_menu (
     1
 );
 
--- Also add an i18n title (the menu_title_i18n column was introduced in V17)
+-- 同时加 i18n title (V17 引入的 menu_title_i18n 列)
 UPDATE core_rbac_menu
    SET title_i18n = '{"ja_JP":"辞書管理","en":"Dictionary","zh_CN":"字典管理","zh_TW":"字典管理","ko_KR":"사전 관리"}'::jsonb
  WHERE id = '01HXXXXXXXXXXXXXXXMENU01';
 
--- Attach the menu to the SUPER_ADMIN role (otherwise even the super-admin won't see it)
+-- 把菜单挂到 SUPER_ADMIN 角色上（不然超管也看不到）
 INSERT INTO core_rbac_role_menu (id, tenant_id, role_id, menu_id, mark)
 VALUES (
-    IdGenerator.ulid_placeholder(),  -- in practice use a UUID or a fixed ULID
+    IdGenerator.ulid_placeholder(),  -- 实际用 UUID 或固定 ULID
     'demo',
     '00000000000000000000ROLE01', -- SUPER_ADMIN
     '01HXXXXXXXXXXXXXXXMENU01',
@@ -99,9 +98,9 @@ VALUES (
 );
 ```
 
-### 2.2 Frontend: add the page component
+### 2.2 前端：加页面组件
 
-`frontend/src/views/system/Dict/Dict.vue`:
+`frontend/src/views/system/Dict/Dict.vue`：
 
 ```vue
 <script setup>
@@ -126,11 +125,11 @@ onMounted(async () => {
 </template>
 ```
 
-**You don't write the route by hand** — when the backend returns menu data, the `beforeEach` guard in `router/index.js` calls `addRoute()` dynamically. The `component` field points at `frontend/src/views/<path>.vue`.
+**路由不需要手写** —— 后端菜单数据返回时，前端 `router/index.js` 的 beforeEach 守卫会动态 `addRoute()`。`component` 字段指向 `frontend/src/views/<path>.vue`。
 
-### 2.3 Add i18n keys
+### 2.3 加 i18n key
 
-Add an entry to all 5 lang files:
+5 个 lang 文件都要加：
 
 ```js
 // frontend/src/lang/ja_JP.js
@@ -143,20 +142,20 @@ export default {
 }
 ```
 
-### 2.4 Restart + verify
+### 2.4 重启 + 验证
 
-Restart the backend → Flyway runs V23 → the menu row appears in the table → refresh the frontend → "Dictionary" appears under the System menu.
+后端重启 → Flyway 跑 V23 → 菜单进表 → 前端刷新 → 在系统菜单下看到 "字典管理"。
 
 ---
 
-## 3. Adding a new permission
+## 3. 加一个新权限
 
-Permission code format: `<resource>:<action>`, lowercase with hyphens.
+权限编码格式：`<resource>:<action>`，全小写 + 连字符。
 
-### 3.1 Backend: register the permission code + guard with an annotation
+### 3.1 后端：注册权限码 + 注解保护
 
 ```java
-// SystemPermissions.java (or the business module's own PermissionCode class)
+// SystemPermissions.java (或者业务模块自己的 PermissionCode 类)
 public final class SystemPermissions {
     public static final String DICT_READ   = PermissionCode.register("dict:read",   "system");
     public static final String DICT_CREATE = PermissionCode.register("dict:create", "system");
@@ -165,13 +164,13 @@ public final class SystemPermissions {
 }
 ```
 
-Once registered, codes are collected by `PermissionRegistry`. At startup, `PermissionConsistencyGuard` will:
-- Auto-INSERT any permission code that's present in code but missing from the DB
-- Auto-soft-delete any DB row whose code has been removed from source, and revoke its role_permission bindings
+注册后会被 `PermissionRegistry` 收集。`PermissionConsistencyGuard` 在启动时会：
+- 没在 DB 里的权限码 → 自动 INSERT
+- DB 有但代码删了的 → 自动 soft-delete + 撤销 role_permission 绑定
 
-**So adding a permission code = editing code + restarting.** No hand-written SQL required.
+**所以加权限码 = 改代码 + 重启**。不需要手写 SQL。
 
-### 3.2 Use it in a controller
+### 3.2 在 Controller 里用
 
 ```java
 @RestController
@@ -188,28 +187,28 @@ public class DictAdminController {
 }
 ```
 
-The `PermissionAspect` aspect checks automatically and returns 403 when the permission is missing.
+`PermissionAspect` 切面自动校验，没权限返回 403。
 
-### 3.3 Frontend: hide buttons with v-permission
+### 3.3 前端：v-permission 隐藏按钮
 
 ```html
-<button v-permission="'dict:create'">Create</button>
-<button v-permission="'dict:delete'">Delete</button>
+<button v-permission="'dict:create'">新建</button>
+<button v-permission="'dict:delete'">删除</button>
 ```
 
-### 3.4 Bind to a role
+### 3.4 给角色绑定
 
-After startup, go to System → Roles → select a role → Permissions tab → tick dict:read / dict:create → Save.
+启动后进系统 → 角色 → 选角色 → 权限 tab → 勾选 dict:read / dict:create → 保存。
 
 ---
 
-## 4. Adding a new Flyway migration
+## 4. 加一个新 Flyway 迁移
 
-### 4.1 Numbering rules
+### 4.1 编号规则
 
 - `V<N>__<snake_name>.sql`
-- N must be strictly increasing, unique, and free of colons
-- Use snake_case for a short, descriptive name
+- N 必须递增、不重复、有冒号会出错
+- 名字用 snake_case，简短描述
 
 ```
 V23__add_dict_menu.sql
@@ -217,11 +216,11 @@ V24__core_dict_table.sql
 V25__demo_dict_data.sql
 ```
 
-### 4.2 Content conventions
+### 4.2 内容规范
 
-- **Always use IF NOT EXISTS / IF EXISTS** — so re-runs don't error out
-- **Never modify a migration that's already been released** (it has already run elsewhere); to change it, add a new V file with an ALTER
-- **Every new table must have a `tenant_id` column + index** (required for multi-tenancy):
+- **只用 IF NOT EXISTS / IF EXISTS** —— 重复跑也不报错
+- **不要改已发布的迁移**（已经在别的环境跑过）；要改只能加新 V 文件做 ALTER
+- **每个新表都要有 `tenant_id` 列 + 索引**（多租户必需）：
 
 ```sql
 CREATE TABLE IF NOT EXISTS core_dict (
@@ -238,33 +237,33 @@ CREATE TABLE IF NOT EXISTS core_dict (
 CREATE INDEX IF NOT EXISTS idx_core_dict_tenant ON core_dict (tenant_id) WHERE mark = 1;
 ```
 
-### 4.3 Soft-delete conventions
+### 4.3 Soft-delete 约定
 
-- All business tables use `mark SMALLINT NOT NULL DEFAULT 1` (1 = alive, 0 = deleted)
-- Partial unique indexes must include `WHERE mark = 1` — otherwise a soft-deleted row holds the unique slot forever
-- Add `@TableLogic(value="1", delval="0")` on the entity
-- **Delete rows via `UpdateWrapper.set("mark", 0)`**, never `setMark(0) + updateById` (`@TableLogic` strips `mark` from the SET clause, causing a silent no-op) — see [memory/tablelogic_updatebyid_gotcha](../memory/tablelogic_updatebyid_gotcha.md)
+- 所有业务表都用 `mark SMALLINT NOT NULL DEFAULT 1`（1=alive, 0=deleted）
+- 部分唯一索引必须加 `WHERE mark = 1` —— 否则软删后唯一约束会永久占位
+- Entity 上加 `@TableLogic(value="1", delval="0")`
+- **删行用 `UpdateWrapper.set("mark", 0)`**，不要 `setMark(0) + updateById`（@TableLogic 会把 mark 从 SET 子句剔除，导致 silent no-op）—— 见 [memory/tablelogic_updatebyid_gotcha](../memory/tablelogic_updatebyid_gotcha.md)
 
-### 4.4 Run it once you've written it
+### 4.4 写完跑一遍
 
 ```bash
 ./mvnw -DskipTests install
 ./mvnw -pl core-bootstrap spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-Seeing `Successfully applied migration V23` in the startup log means you're good.
+启动 log 看到 `Successfully applied migration V23` 就 OK。
 
 ---
 
-## Adding a new business module (end-to-end checklist)
+## 加一个新业务模块（端到端 checklist）
 
-The single canonical recipe for "add an orders / inventory / billing module". Follows every convention enforced by `TenantSchemaGuard`, `PermissionConsistencyGuard`, and the ArchitectureTest in `core-system`. Use [`backend/business-demo/`](../backend/business-demo/) as the reference shape.
+"加订单模块 / 库存模块 / 计费模块" 的标准配方。完全跟 `TenantSchemaGuard` / `PermissionConsistencyGuard` / `core-system` 里 ArchitectureTest 的约定一致。参考实现：[`backend/business-demo/`](../backend/business-demo/)。
 
-### 0. Recommended: run the scaffold tool
+### 0. 推荐：用 scaffold 工具自动生成
 
-The fastest way — generates all 6 files below with the conventions baked in. Two modes:
+最快路径 —— 一条命令生成下面 6 个文件，conventions 全部内置。两种模式：
 
-**A. New module** (the typical case for a real business domain — orders, billing, etc.):
+**A. 新建模块**（生产用法 —— 订单、计费等独立业务域）：
 
 ```bash
 ./mvnw -pl core-bootstrap exec:java \
@@ -272,17 +271,17 @@ The fastest way — generates all 6 files below with the conventions baked in. T
     -Dexec.args="<resource> --new-module=<module-name>"
 ```
 
-Example: `--Dexec.args="order --new-module=orders"` creates `backend/business-orders/` containing:
+例：`--Dexec.args="order --new-module=orders"` 会创建 `backend/business-orders/`，包含：
 
-- Module `pom.xml`
-- `security/OrdersPermissions.java` with 4 constants auto-registered
+- 模块 `pom.xml`
+- `security/OrdersPermissions.java`（4 个权限常量自动注册）
 - `order/{controller,dto,entity,mapper,service}/Order*.java`
 - `db/migration/V1000__create_business_order.sql`
-- Wires the module into `backend/pom.xml` (`<modules>` + `<dependencyManagement>`) and `backend/core-bootstrap/pom.xml` (`<dependency>`)
+- 自动把模块写入 `backend/pom.xml`（`<modules>` + `<dependencyManagement>`）和 `backend/core-bootstrap/pom.xml`（`<dependency>`）
 
-The new module is fully self-contained — its permissions are auto-registered, its migration is picked up via the classpath Flyway scan.
+新模块完全自包含 —— 权限自动注册，迁移通过 Flyway 的 classpath 扫描自动接入。
 
-**B. Legacy mode** (adds a second resource to the existing `business-demo` module — useful for tutorials / playgrounds):
+**B. 旧模式**（在现有 `business-demo` 模块里加第二个资源 —— 适合教学 / playground）：
 
 ```bash
 ./mvnw -pl core-bootstrap exec:java \
@@ -290,34 +289,34 @@ The new module is fully self-contained — its permissions are auto-registered, 
     -Dexec.args="<resource>"
 ```
 
-In legacy mode the tool also injects 4 perm constants (`<RESOURCE>_READ/CREATE/UPDATE/DELETE`) into `business-demo/.../security/DemoPermissions.java` automatically.
+旧模式下工具还会自动把 4 个权限常量（`<RESOURCE>_READ/CREATE/UPDATE/DELETE`）注入到 `business-demo/.../security/DemoPermissions.java`。
 
-In both modes:
+两种模式都会：
 
-- `<resource>` must match `[a-z][a-z0-9]*` (e.g. `order`, `invoice`, `salesreport`).
-- `<module-name>` (new-module mode) must match `[a-z][a-z0-9-]*`.
-- Clones the `business-demo/task/*` template with identifier substitution (`Task` → `Order`, `task` → `order`, `demo_task` → `business_order`).
-- Picks the next free Flyway version ≥ 1000 — for `--new-module` this scans both the existing core-bootstrap migration dir and the new module's own (which starts empty, so the first migration is `V1000`).
-- Writes the migration with `tenant_id` + audit columns + tenant-prefixed unique index.
-- Refuses to overwrite — delete the resource directory first to regenerate.
+- `<resource>` 必须匹配 `[a-z][a-z0-9]*`（如 `order`、`invoice`、`salesreport`）
+- `<module-name>`（new-module 模式）必须匹配 `[a-z][a-z0-9-]*`
+- 克隆 `business-demo/task/*` 模板并替换标识符（`Task` → `Order`、`task` → `order`、`demo_task` → `business_order`）
+- 自动选下一个空闲 Flyway 版本号 ≥ 1000 —— `--new-module` 模式同时扫 core-bootstrap 现有迁移目录 + 新模块自己的目录（后者刚创建是空的，所以第一条是 `V1000`）
+- 生成迁移：含 `tenant_id` + 审计列 + tenant 打头的唯一索引
+- 不覆盖已有目录 —— 想重新生成先把目录删掉
 
-Then jump to step 5 ("permission constants") and onward (skip step 5 if you used new-module mode — the permissions class was generated). The remaining steps describe the manual path if you'd rather not use the scaffold.
+然后跳到第 5 步（加权限码）继续（new-module 模式下可以跳过第 5 步 —— 权限类已经生成了）。下面的步骤是不用 scaffold 时的手动路径。
 
-### 1. Pick a version range and create the migration
+### 1. 选版本号 + 写迁移
 
-Business modules use **V1000+** (V1-V999 reserved for the framework). Pick the next free V number within your module's range:
+业务模块从 **V1000+** 起跳（V1-V999 给框架保留）。在你的模块号段里选下一个空号：
 
 ```
 backend/business-<module>/src/main/resources/db/migration/V1000__create_business_xxx.sql
 ```
 
-Mandatory shape for every per-tenant business table:
+每个 per-tenant 业务表必备字段：
 
 ```sql
 CREATE TABLE business_xxx (
     id            CHAR(26)     NOT NULL PRIMARY KEY,
-    tenant_id     VARCHAR(64)  NOT NULL,                   -- required; TenantSchemaGuard fail-fasts otherwise
-    -- ... business fields ...
+    tenant_id     VARCHAR(64)  NOT NULL,                   -- 必给；漏写 TenantSchemaGuard 启动期 fail-fast
+    -- ... 业务字段 ...
     mark          SMALLINT     NOT NULL DEFAULT 1,
     create_user   VARCHAR(64),
     update_user   VARCHAR(64),
@@ -325,41 +324,41 @@ CREATE TABLE business_xxx (
     update_time   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Unique indexes lead with tenant_id so two tenants can each have a 'foo':
+-- 业务唯一约束必须 tenant_id 打头，让多个租户能各自有同名行：
 CREATE UNIQUE INDEX uk_xxx_code
     ON business_xxx (tenant_id, code) WHERE mark = 1;
 ```
 
-### 2. Entity extends BaseEntity
+### 2. Entity 继承 BaseEntity
 
 ```java
 @TableName("business_xxx")
 @Getter @Setter
 public class XxxEntity extends BaseEntity {
-    // DO NOT redeclare id / tenantId / mark / create_user / create_time
-    // / update_user / update_time — BaseEntity owns those.
+    // 不要再声明 id / tenantId / mark / create_user / create_time
+    // / update_user / update_time — BaseEntity 已经有了
     private String code;
     private String name;
-    // ... business fields only
+    // ... 仅业务字段
 }
 ```
 
-`AuditMetaObjectHandler` auto-fills `tenant_id` from `RequestContext.tenantId()` on INSERT.
+INSERT 时 `AuditMetaObjectHandler` 自动从 `RequestContext.tenantId()` 填 `tenant_id`。
 
-### 3. Mapper extends BaseMapper
+### 3. Mapper 继承 BaseMapper
 
 ```java
 @Mapper
 public interface XxxMapper extends BaseMapper<XxxEntity> { }
 ```
 
-Custom `@Select` queries MUST include `tenant_id = #{tenantId}` predicates explicitly.
+自定义 `@Select` 查询**必须显式写** `tenant_id = #{tenantId}` 条件。
 
 ### 4. Service + Controller
 
 ```java
 @Service
-public class XxxService { /* business logic */ }
+public class XxxService { /* 业务逻辑 */ }
 
 @RestController
 @RequestMapping("/business-xxx")
@@ -368,12 +367,12 @@ public class XxxController {
     private final XxxService service;
 
     @GetMapping
-    @RequiresPermission(XxxPermissions.XXX_READ)   // constant from a *Permissions class
+    @RequiresPermission(XxxPermissions.XXX_READ)   // 来自 *Permissions 常量类
     public JsonResult<PageResult<XxxDto.View>> list(...) { ... }
 }
 ```
 
-### 5. Permission constants
+### 5. 权限常量
 
 ```java
 @Component
@@ -388,28 +387,28 @@ public final class XxxPermissions {
 }
 ```
 
-`PermissionConsistencyGuard` will auto-insert these rows into `core_rbac_permission` at startup and fail-fast if any `@RequiresPermission("xxx:yyy")` references a code that isn't registered.
+启动期 `PermissionConsistencyGuard` 自动把这些 code 写进 `core_rbac_permission`；如果哪个 `@RequiresPermission("xxx:yyy")` 用了未注册的字符串，fail-fast 拒绝启动。
 
-### 6. Boot — guards do the rest
+### 6. 启动 — 后面 guard 接管
 
 ```bash
 ./mvnw -DskipTests install
 ./mvnw -pl core-bootstrap spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-Three layers catch deviations:
+三层防线兜底：
 
-| Layer | Catches |
+| 层 | 抓什么 |
 |---|---|
-| Compile (`./mvnw test`) | ArchUnit: entity without BaseEntity, controller without @RequiresPermission, mapper outside the mapper package |
-| Boot | `TenantSchemaGuard` (missing tenant_id), `PermissionConsistencyGuard` (literal/unregistered codes), `FlywayMigration` (syntax errors) |
-| Runtime | `TenantLineInnerInterceptor` (auto-injects `WHERE tenant_id=?`), `@DataScope` AOP (department scoping) |
+| 编译 (`./mvnw test`) | ArchUnit：entity 漏继承 BaseEntity、controller 漏 @RequiresPermission、mapper 不在 mapper 包 |
+| 启动 | `TenantSchemaGuard`（漏 tenant_id 列）、`PermissionConsistencyGuard`（字面量/未注册 code）、`FlywayMigration`（SQL 语法错） |
+| 运行时 | `TenantLineInnerInterceptor`（自动注入 `WHERE tenant_id=?`）、`@DataScope` 切面（部门范围过滤） |
 
-If all three are green, the module is correctly wired into the multi-tenant + RBAC framework.
+三层都绿即说明模块正确接入了多租户 + RBAC 框架。
 
-### Reference implementation
+### 参考实现
 
-Copy the shape of `backend/business-demo/task/`:
+抄 `backend/business-demo/task/` 的结构：
 - `entity/TaskEntity.java`
 - `mapper/TaskMapper.java`
 - `service/TaskService.java`
@@ -419,80 +418,80 @@ Copy the shape of `backend/business-demo/task/`:
 
 ---
 
-## 5. Test conventions
+## 5. 测试规范
 
-### 5.1 Backend unit tests (Mockito)
+### 5.1 后端单测（Mockito）
 
-Place under `<module>/src/test/java/<package>/`, file name `*Test.java`, JUnit 5 + Mockito 5.
+放 `<module>/src/test/java/<package>/`，文件名 `*Test.java`，用 JUnit 5 + Mockito 5。
 
-**Pattern**:
-- `@Mock` the mapper, `@InjectMocks` the service
-- Stub the mocked mapper with `@Mock` + `when().thenReturn()`
-- Assert SQL → captor + `UpdateWrapper.getSqlSet()` / `getParamNameValuePairs()`
+**模式**：
+- @Mock mapper，@InjectMocks service
+- mock 的 mapper 用 @Mock + when().thenReturn()
+- 验证 SQL → captor + UpdateWrapper.getSqlSet() / getParamNameValuePairs()
 
-Reference: [`RoleAdminServiceDeleteTest.java`](../backend/core-system/src/test/java/com/platform/system/rbac/service/RoleAdminServiceDeleteTest.java)
+参考：[`RoleAdminServiceDeleteTest.java`](../backend/core-system/src/test/java/com/platform/system/rbac/service/RoleAdminServiceDeleteTest.java)
 
-### 5.2 Backend integration tests (Testcontainers)
+### 5.2 后端集成测（Testcontainers）
 
-Place under `<module>/src/test/java/<package>/it/`, file name `*IT.java`, annotate with `@Testcontainers(disabledWithoutDocker = true)`.
+放 `<module>/src/test/java/<package>/it/`，文件名 `*IT.java`，加 `@Testcontainers(disabledWithoutDocker = true)`。
 
-When Docker isn't available they're **skipped automatically** — the build won't fail.
+无 Docker 时**自动跳过**，不会让 build 失败。
 
-Reference: [`OidcJitProvisioningIT.java`](../backend/core-bootstrap/src/test/java/com/platform/core/bootstrap/it/OidcJitProvisioningIT.java)
+参考：[`OidcJitProvisioningIT.java`](../backend/core-bootstrap/src/test/java/com/platform/core/bootstrap/it/OidcJitProvisioningIT.java)
 
-### 5.3 Frontend unit tests (Vitest)
+### 5.3 前端单测（Vitest）
 
-Place either as `<src file>.test.js` (co-located) or under `tests/components/*.test.js`.
+放 `<src 文件>.test.js`（co-located）或 `tests/components/*.test.js`。
 
-- Pure logic (util / composable) → call directly
-- Vue components → mount with `@vue/test-utils`
-- Pinia stores → `vi.mock('@/stores/auth')` and provide a minimal stub
+- 纯逻辑（util / composable）→ 直接调用
+- 涉及 Vue 组件 → `@vue/test-utils` mount
+- 涉及 Pinia store → `vi.mock('@/stores/auth')` 提供最小 stub
 
-### 5.4 Frontend e2e (Playwright)
+### 5.4 前端 e2e（Playwright）
 
-Place under `tests/e2e/*.spec.js`.
+放 `tests/e2e/*.spec.js`。
 
-- Assumes by default that both the frontend and backend are running (5273 + 9135)
-- When the stack isn't up, tests skip automatically (the `/actuator/health` probe fixture)
-- Set `E2E_REQUIRE_STACK=1` in CI to force them to pass
+- 默认假设前后端都在跑（5273 + 9135）
+- 没启动时自动 skip（`/actuator/health` 探针 fixture）
+- 在 CI 里设 `E2E_REQUIRE_STACK=1` 强制必须通
 
-### 5.5 Running tests
+### 5.5 跑测试
 
 ```bash
-# All backend tests
+# 后端全跑
 ./mvnw test
 
-# A single test class
+# 单个测试类
 ./mvnw -pl core-system test -Dtest='RoleAdminServiceDeleteTest'
 
-# Frontend vitest
+# 前端 vitest
 cd frontend && npm run test
 
-# Frontend e2e (requires the full stack running)
+# 前端 e2e（需前后端都在跑）
 cd frontend && npm run test:e2e
 ```
 
 ---
 
-## 6. Code style
+## 6. 代码风格
 
 ### 6.1 Java
 
-- Use records, not classes, for DTOs
-- ULID primary keys (`CHAR(26)`); no auto-increment longs
-- Avoid `static` fields with `@Value` injection (Spring anti-pattern)
-- Soft-delete via `UpdateWrapper.set("mark", 0)`; **never** `setMark + updateById`
-- SQL in `@Select` annotations must explicitly include `tenant_id = #{tenantId}` (hand-written SQL is not auto-rewritten by the MP interceptor)
+- 用 records 而非 class for DTOs
+- ULID 主键 (`CHAR(26)`)，不用自增 long
+- 避免 static field + `@Value` 注入（Spring anti-pattern）
+- 软删用 UpdateWrapper.set("mark", 0)，**绝不**用 setMark + updateById
+- @Select 注解的 SQL 必须显式带 `tenant_id = #{tenantId}`（手写 SQL 不被 MP 拦截器自动 rewrite）
 
 ### 6.2 Vue
 
 - Composition API + `<script setup>`
-- Business page components live under `views/<domain>/`
-- Generic UI components live under `components/ui/` (no business logic)
-- Shared business components live under `components/shared/` (e.g. DeptTreeDialog / UserPicker)
-- Service files are named `services/<resource>.js` and contain axios calls
+- 业务页面组件挂在 `views/<domain>/`
+- 通用 UI 组件在 `components/ui/`（不掺业务）
+- 共享业务组件在 `components/shared/`（如 DeptTreeDialog / UserPicker）
+- service 文件命名 `services/<resource>.js`，里面是 axios 调用
 
-### 6.3 Commit conventions (Conventional Commits)
+### 6.3 提交规范（Conventional Commits）
 
 ```
 <type>(<scope>): <short summary>
@@ -502,43 +501,43 @@ cd frontend && npm run test:e2e
 <footer with breaking changes / refs>
 ```
 
-type: `feat` / `fix` / `chore` / `docs` / `test` / `refactor` / `perf` / `style`
+type：`feat` / `fix` / `chore` / `docs` / `test` / `refactor` / `perf` / `style`
 
-scope: `backend` / `frontend` / `infra` / `docs` / `repo`
+scope：`backend` / `frontend` / `infra` / `docs` / `repo`
 
 ---
 
-## 7. Adding a new Keycloak protocol mapper
+## 7. 加一个新 Keycloak protocol mapper
 
-Example: also surface the user's `dept_id` in the JWT so the SPA can use it directly without calling `/me` every time.
+例：把用户的 `dept_id` 也加进 JWT 让 SPA 直接用，不需要每次调 `/me`。
 
 1. Keycloak admin → realm → Clients → `access-matrix-backend`
-2. Client scopes tab → find the dedicated scope, or create a new one
-3. Add mapper → "User Attribute" type
-4. Set User Attribute = `dept_id`, Token Claim Name = `dept_id`, tick "Add to access token"
-5. Export the realm → replace `infra/keycloak/realms/default-realm.json`
-6. Commit
+2. Client scopes tab → 找 dedicated scope 或建一个新 scope
+3. Add mapper → "User Attribute" 类型
+4. User Attribute 选 `dept_id`，Token Claim Name 写 `dept_id`，勾选 "Add to access token"
+5. 导出 realm → 替换 `infra/keycloak/realms/default-realm.json`
+6. commit
 
-Frontend reads it as `useAuthStore().claims.dept_id` (already unpacked via `decodeJwt`).
+前端读：`useAuthStore().claims.dept_id`（已经通过 `decodeJwt` 拆开）。
 
-Backend reads it as `jwt.getClaimAsString("dept_id")`; you can write it through to `core_auth_user.dept_id` inside `OidcJitUserService`.
-
----
-
-## 8. Roadmap (short-term TODOs)
-
-- [ ] Add a "Resend invitation email" button to User.vue
-- [ ] SAML 2.0 support (Keycloak already supports it; we just need the business side not to insist on JWT)
-- [ ] Self-service account request page (public sign-up, optional)
-- [ ] Extend the `@OpLog` annotation to every business write operation
-- [ ] Allow per-locale email templates to override the default SMTP templates
-
-PRs welcome.
+后端读：`jwt.getClaimAsString("dept_id")`，可以在 `OidcJitUserService` 把它写到 `core_auth_user.dept_id`。
 
 ---
 
-## 9. Development resources
+## 8. 路线图（短期 TODO）
 
-- Backend: [backend/AGENTS.md](../backend/AGENTS.md) — AI collaboration conventions + module constraints
-- Frontend: [frontend/AGENTS.md](../frontend/AGENTS.md) — component layering + services conventions
-- Deployment: [Deployment](deployment.md)
+- [ ] User.vue 加"重发邀请邮件"按钮
+- [ ] SAML 2.0 支持（Keycloak 已经支持，只需要业务侧不卡 JWT）
+- [ ] 自助账号申请页面（公开注册，可选）
+- [ ] @OpLog 注解扩到所有业务写操作
+- [ ] 国际化邮件模板支持自定义 SMTP 模板覆盖
+
+欢迎 PR。
+
+---
+
+## 9. 开发资源
+
+- 后端：[backend/AGENTS.md](../backend/AGENTS.md) — AI 协作约定 + 模块约束
+- 前端：[frontend/AGENTS.md](../frontend/AGENTS.md) — 组件分层 + services 约定
+- 部署：[Deployment](deployment.md)

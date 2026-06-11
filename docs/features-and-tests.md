@@ -24,6 +24,8 @@
 - [ ] SSO 正常登录(各租户 + system),登录后能进对应首页。
 - [ ] SSO 不可达时,登录页出现"使用应急密码登录"通道;break-glass 登录成功。
 - [ ] break-glass 登录后:`core_oplog` 有 `system/auth.breakGlass` 记录;安全面板"break-glass(7天)"+1;本人收到告警邮件(或日志)。
+- [ ] **break-glass 密钥强制(所有模式)**:`CORE_JWT_SECRET` 必须 ≥32 字节且不含任何已知模板标记——`JwtSecretValidator` 对 `dev-placeholder`/`dev-local`/`throwaway`/`change-in-prod`/`do-not-use` 做大小写不敏感的**子串**匹配(不只前缀),故照抄 `.env.example` 的占位密钥(任何环境,含 dev)启动即 fail-fast;oidc 模式下应急通道(HS256)解码器同样挂载,缺失/占位同样拒绝(不再只有 mode=jwt 才校验)。设置合法强随机值(`openssl rand -base64 48`)后,break-glass `/auth/login` 各租户均可用(业务租户登录不再误报 `tenantSuspended`)。
+- [ ] **业务租户 break-glass 不误报停用(bug 修复)**:对业务租户(非 system)用应急密码 `/auth/login` 成功,不再因 `core_tenant` 注册表被租户拦截器误加 `tenant_id` 过滤而返回 `error.auth.tenantSuspended`(`TenantMapper.findActiveByCode` 标 `@InterceptorIgnore`)。
 - [ ] access token 过期后自动刷新、原请求重放成功;刷新失败被踢回 `/login`。
 - [ ] **SSO 长会话不被踢(bug 修复)**:SSO 登录后保持页面打开/持续操作超过 30 分钟(access token 寿命),**不**跳回 KC 登录页——前台在到期前 ~2 min 自动用 KC refresh_token 续期(Network 可见对 `/protocol/openid-connect/token` 的 `grant_type=refresh_token` 请求);KC 管理台该用户 Sessions 的 idle 时间被刷新。管理员踢下线/禁用后,续期立即失败(invalid_grant)→ 正常踢回登录,强制登出不受影响。
 - [ ] 会话失效(被踢下线 / 停用 / 过期且刷新失败)→ 下次请求(如 `/menu/me`)跳 `/login` 并显示友好「会话已过期或已被登出,请重新登录」,**不**再显示技术性的「Menu load failed — 401」(router 守卫把 401 与真正的 menu 加载错误 5xx/坏数据 分开处理,后者才带 detail 供排障)。
@@ -80,6 +82,7 @@
 - [ ] **无归属数据 fail-closed**:`dept_id=NULL` 或 `create_user='system'` 的行,部门/SELF 范围用户都看不到,仅 ALL 范围/超管可见。
 - [ ] **调部门即时生效**:管理员把用户换部门后,该用户**下次请求**即按新部门过滤(`userDataScope` 缓存被即时清除,无需等 5min);旧部门数据默认不再可见,但 SELF 角色下自己创建的行仍可见。
 - [ ] **防遗忘切面**:`@DataScope` 标注的方法若忘记 `DataScopeHelper.apply`,dev/test 环境请求直接被拒(prod 记 WARN),不会静默放出全表。
+- [ ] **单对象端点也受数据范围约束(IDOR 修复)**:以 DEPT/SELF 范围用户登录,拿同租户**其他部门**的 task id 直接 `GET/PUT/DELETE /demo/task/{id}` → 返回 `NOT_FOUND`(不能越部门读/改/删);本部门内的 id 仍正常。机制:`get/update/delete` 经 `TaskService.loadVisibleOr404` 用 `DataScopeHelper.isVisible` 校验(列表过滤之外,单对象 `selectById` 路径单独把关);跨租户按 id 仍被租户拦截器挡。新业务模块按 backend/AGENTS.md Hard Rule 14 照此实现。
 - [ ] **停用被 CUSTOM 引用的部门有提示**:把某个被自定义数据范围角色引用的部门停用 → 弹「N 个角色把该部门设为自定义数据范围,停用后这些角色将看不到该部门数据」确认;确认后才停用(force 重发);未被引用的部门停用无打扰;**启用方向**不触发检查。
 - [ ] **RoleEdit 显示失效的部门绑定**:把某 CUSTOM 角色绑定的部门停用(或手工删)后打开该角色编辑的「数据部门」tab → 顶部出现琥珀色「已失效的部门绑定」区块,列出失效 id,可单个 × 移除或「全部移除」后保存;正常绑定不受影响。
 - [ ] **已删除部门的绑定不再放行数据**:绑定指向 `mark=0` 部门的 CUSTOM 条目解析时被跳过(此前会把裸 id 加进可见集,使盖该部门章的行仍可见)。
@@ -188,6 +191,8 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 **测试点**
 - [ ] 字典:新增/停用管理字典项;被引用的项不可删(报"in use")、枚举项不可删——这些是**业务拒绝**,不计入仪表盘"接口错误"。
 - [ ] 任一带 `@OpLog` 的操作在 `core_oplog` 留痕;失败时 `error_code` 正确;操作日志页时间列按 **JST** 显示(与领域事件页同一时刻显示一致,不差 9 小时)。
+- [ ] **Actuator 暴露面收紧**:未认证访问 `/api/actuator/metrics` / `/prometheus` / `/caches` / `/info` 返回 **401**;`/api/actuator/health/**`(含 liveness/readiness 探针)始终公开;持有效 token 访问 metrics 返回 200。仅 `/actuator/health/**` 在 `PERMIT_PATHS`。
+- [ ] **客户端 IP 不默认信任 XFF**:默认 `CORE_FORWARD_HEADERS_STRATEGY=none` + `CORE_TRUST_FORWARDED_HEADERS=false` 下,轮换 `X-Forwarded-For` 不能绕过 `/auth/*` 按 IP 限流(都落到真实 socket IP),且 `core_auth_login_log.client_ip` 记录真实对端而非伪造头值。反代部署时两者**成对**设 `framework`/`true`,取 XFF 最右一跳。
 - [ ] 时间模型:API 返回的时间戳都是**带偏移量**的 ISO 串(通常为 UTC 形如 `2026-06-10T08:38:33Z`;偏移量数值不承载语义,仅标注本次投影用的钟);把浏览器/操作系统改成任意时区,所有页面时间显示不变(仍为 JST);仪表盘 24h/7d/30d 统计窗口及按日/月聚合按 JST 切日。
 - [ ] 访问不存在的 API 路径(如 `GET /api/platform/jobs`)→ HTTP **404**(`JsonResult` code=404),服务端无「Unhandled exception」ERROR 日志,不计入仪表盘「接口错误(24h)」。
 - [ ] 语言切换:5 语言下新功能文案都不出现 key 原文 / `__TODO__`。

@@ -54,10 +54,11 @@ psql -h 127.0.0.1 -U postgres \
   -c "CREATE DATABASE access_matrix_db WITH ENCODING 'UTF8' TEMPLATE template0;"
 
 # 3. 后端 —— dev profile 的 DB/Redis 连接走环境变量（无默认值）。
-#    先加载 backend/.env.dev（已提交的本地 throwaway 值），否则启动会因
+#    复制 backend/.env.example 为 backend/.env 并按需填值后加载，否则启动会因
 #    缺 CORE_DB_URL 报错。自动建表 + 种 demo-admin。
 cd backend
-set -a; . ./.env.dev; set +a   # PowerShell / IDE 运行配置：见 docs/getting-started.zh-CN.md §3
+cp .env.example .env           # 复制模板，按需编辑
+set -a; . ./.env; set +a       # PowerShell / IDE 运行配置：见 docs/getting-started.md §3
 ./mvnw -DskipTests install
 ./mvnw -pl core-bootstrap spring-boot:run -Dspring-boot.run.profiles=dev
 
@@ -68,8 +69,8 @@ npm install && npm run dev
 
 浏览器开 http://localhost:5273/login → 用 `demo-admin` / `demo-admin` 登录 → 进入系统。
 
-> `dev` profile 默认走 **OIDC（Keycloak）**，登录会跳转 Keycloak —— 先用 `infra/keycloak/start-keycloak.{sh,bat}` 启动它（会自动导入 `demo` + `system` realm），完整步骤见 [完整启动指南 §5](docs/getting-started.zh-CN.md#5-启用-sso-keycloak-模式)。想免 IdP 裸跑，把 `application.yml` 的 `dev` 段改成 `mode: permit-all`。
-> **已有 password 项目要切 SSO**？走自动化迁移：[docs/migration-password-to-sso.md](docs/migration-password-to-sso.zh-CN.md)，改一行 yml + 重启搞定，业务数据零损失。
+> `dev` profile 默认走 **OIDC（Keycloak）**，登录会跳转 Keycloak —— 先用 `infra/keycloak/start-keycloak.{sh,bat}` 启动它（会自动导入 `demo` + `system` realm），完整步骤见 [完整启动指南 §5](docs/getting-started.md#5-启用-sso-keycloak-模式)。想免 IdP 裸跑，把 `application.yml` 的 `dev` 段改成 `mode: permit-all`。
+> **已有 password 项目要切 SSO**？走自动化迁移：[docs/migration.md](docs/migration.md)，改一行 yml + 重启搞定，业务数据零损失。
 
 ---
 
@@ -95,7 +96,7 @@ npm install && npm run dev
 | **硬删除** | 删光所有 per-tenant 业务表行 + KC realm + 注册行。**只对 suspended 行可调**，必须输入 tenant_code 二次确认 | **不可** — 永久 |
 | **支持会话** | 铸造 30 分钟 JWT 让 ops 以租户 SUPER_ADMIN 身份操作；用户名带 `[support]` 前缀 + JWT 内嵌 RFC 8693 `act` claim 双重留痕 | 横幅 Terminate 即终止 |
 
-完整设计（审计姿态、KC/DB 操作顺序、支持会话机制）见 [docs/system-realm.md](docs/system-realm.zh-CN.md)。
+完整设计（审计姿态、KC/DB 操作顺序、支持会话机制）见 [docs/system-realm.md](docs/system-realm.md)。
 
 ---
 
@@ -103,20 +104,19 @@ npm install && npm run dev
 
 | 文档 | 内容 |
 |---|---|
-| [**Getting Started**](docs/getting-started.zh-CN.md) | 详细安装引导（PG / Redis / Keycloak / 排错） |
-| [**User Guide**](docs/user-guide.zh-CN.md) | 使用手册（登录 / 用户管理 / 角色 / 权限 / 数据范围 / 多租户） |
-| [**Development**](docs/development.zh-CN.md) | 开发指南（项目结构 / 加菜单 / 加权限 / 测试规范） |
-| [**Deployment**](docs/deployment.zh-CN.md) | 生产部署（环境变量 / Keycloak / Postgres / Redis） |
-| [data-scope demo](docs/data-scope-demo.zh-CN.md) | 5 种数据范围实际效果演示（5 个 demo 用户） |
-| [Keycloak setup](infra/keycloak/README.zh-CN.md) | 本地 Keycloak 启动 + realm 配置 |
-| [**`system` realm（平台运维）**](docs/system-realm.zh-CN.md) | 平台运营专用的隐形 realm + 租户生命周期 + 支持会话 |
-| [**Break-Glass 应急凭据**](docs/break-glass.zh-CN.md) | super-admin 独立应急密码 |
-| [**password → SSO 迁移**](docs/migration-password-to-sso.zh-CN.md) | password 项目零数据损失切到 SSO 的 runbook |
-| [**SSO → password 迁移**](docs/migration-sso-to-password.zh-CN.md) | 反向 runbook |
+| [**Getting Started**](docs/getting-started.md) | 详细安装引导（PG / Redis / Keycloak / 排错） |
+| [**User Guide**](docs/user-guide.md) | 使用手册（登录 / 用户管理 / 角色 / 权限 / 数据范围 / 多租户） |
+| [**Development**](docs/development.md) | 开发指南（项目结构 / 加菜单 / 加权限 / 测试规范） |
+| [**Deployment**](docs/deployment.md) | 生产部署（环境变量 / Keycloak / Postgres / Redis） |
+| [data-scope demo](docs/data-scope-demo.md) | 5 种数据范围实际效果演示（5 个 demo 用户） |
+| [Keycloak setup](infra/keycloak/README.md) | 本地 Keycloak 启动 + realm 配置 |
+| [**`system` realm（平台运维）**](docs/system-realm.md) | 平台运营专用的隐形 realm + 租户生命周期 + 支持会话 |
+| [**Break-Glass 应急凭据**](docs/break-glass.md) | super-admin 独立应急密码 |
+| [**鉴权迁移 (password ↔ SSO)**](docs/migration.md) | 双向、零数据损失迁移 runbook |
 
 模块级（给开发者看）：
-- [backend/AGENTS.md](backend/AGENTS.zh-CN.md) — 模块边界 / Flyway / 安全 / API 约定
-- [frontend/AGENTS.md](frontend/AGENTS.zh-CN.md) — 组件分层 / 共享组件 / services 约定
+- [backend/AGENTS.md](backend/AGENTS.md) — 模块边界 / Flyway / 安全 / API 约定
+- [frontend/AGENTS.md](frontend/AGENTS.md) — 组件分层 / 共享组件 / services 约定
 
 ---
 
@@ -233,9 +233,7 @@ app:
 
 重启 → 后端为每个 `core_auth_user` 在对应 Keycloak realm 建一个无密码用户（或反过来），触发 KC `executeActionsEmail(UPDATE_PASSWORD)`（或 mint reset token + 发自家 5 语言邮件），首次 SSO 登录走 bind path 把 `keycloak_id` 写回原行 + 清掉 `password_hash`（或相反）。整个过程**幂等**、**可回滚**、**留 logs/migration-*.json 审计报告**。
 
-完整 runbook：
-- [docs/migration-password-to-sso.md](docs/migration-password-to-sso.zh-CN.md)
-- [docs/migration-sso-to-password.md](docs/migration-sso-to-password.zh-CN.md)
+完整 runbook（双向）：[docs/migration.md](docs/migration.md)
 
 ---
 

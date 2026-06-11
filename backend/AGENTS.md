@@ -477,12 +477,25 @@ Resolution: `DictQueryService.read()` checks `DictRegistry` first (→ ②), els
 - Validation: `@Valid` + `@NotBlank` / `@Size` / `@Email`; DTOs use Java records
 - **User-facing error messages are localized on the FRONTEND, not the backend.** For a business error the user will see, pass a stable **i18n key** as the message — e.g. `throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.dict.itemInUse")` — defined in `frontend/src/lang/*.js` under the `error.*` namespace. The axios interceptor runs every error message through `t()` (key → localized; legacy prose → passed through unchanged), so keys localize and old prose still works. Keep these messages **parameter-free** (don't append ids/values — the dynamic part can't survive the key). Internal/never-shown errors may keep prose.
 
-## Tests
+## Tests & runtime
 
-There is no `src/test` yet. Conventions for adding tests:
+```bash
+./mvnw test                                                     # full suite
+./mvnw -pl core-system test -Dtest='RoleAdminServiceDeleteTest'
+./mvnw -pl core-bootstrap test -Dtest='OidcJitProvisioningIT'   # needs Docker
+```
+
+Conventions:
 - Unit: `{Module}ServiceTest` in that module's `src/test/java/`, covering core services
-- Integration: `@SpringBootTest` against the `test` profile + Testcontainers PostgreSQL/Redis
-- ArchUnit: write module boundary guards in `core-bootstrap/src/test/java/` (forbid reverse deps, forbid `business-pms` from using `core_*` table Mappers, etc.)
+- Integration: `@SpringBootTest` against the `test` profile + Testcontainers PostgreSQL/Redis, gated by `@Testcontainers(disabledWithoutDocker = true)` — no Docker → auto-skip, build stays green
+- ArchUnit: module boundary guards live in `core-system/src/test/.../architecture/ArchitectureTest.java` (forbid reverse deps, forbid `business-*` from using `core_*` Mappers, forbid `@InterceptorIgnore` in business code, etc.)
+
+**JVM flags** — the Spring Boot Maven plugin wires these into `mvn spring-boot:run`; keep them for prod `java -jar`:
+
+```
+-XX:+UseZGC  -XX:MaxRAMPercentage=75.0  -Xms512m  -XX:+AlwaysPreTouch
+-Dfile.encoding=UTF-8  --enable-native-access=ALL-UNNAMED  -XX:+EnableDynamicAgentLoading
+```
 
 ## Naming conventions
 
@@ -508,30 +521,4 @@ There is no `src/test` yet. Conventions for adding tests:
 
 ## Behavioral Guidelines
 
-### 1. Think Before Coding
-- State your assumptions first; ask when unsure
-- When there are multiple solutions, lay out the options instead of silently picking one
-- If you spot an existing simple approach, suggest it
-- If something is unclear or naming is confusing, stop and ask
-
-### 2. Simplicity First
-- Solve the problem with the least code
-- Do not abstract for single-use cases
-- Do not add unrequested "flexibility"
-- Do not write error handling for impossible scenarios
-- If 200 lines could have been 50 → rewrite
-
-### 3. Surgical Changes
-- Touch only what needs to change
-- Do not casually "improve" nearby code
-- Do not refactor what isn't broken
-- Clean up orphan code you produced; do not proactively delete pre-existing dead code
-
-### 4. Goal-Driven Execution
-- "Add validation" → "write a test for the invalid input, make it pass"
-- "Fix the bug" → "write a reproducing test, then fix"
-- For multi-step tasks, give a verifiable step plan
-
----
-
-**Signs these conventions are taking hold**: clean module boundaries, new features that land on the existing aspects (@RequiresPermission/@OpLog/@DataScope), and an append-only Flyway history.
+Cross-stack — see [../AGENTS.md § Behavioral guidelines (both stacks)](../AGENTS.md#behavioral-guidelines-both-stacks) (Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven Execution).

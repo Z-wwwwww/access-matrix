@@ -1,7 +1,7 @@
 # =============================================================================
 # dev｜开发(development)：oidc(连本地 Keycloak)；cors 全开；cookie 非 https；
 # @Profile("dev") 的 seeder 全开。连接值与 prod/test 一样走环境变量——
-# 本地值见 backend/.env.dev（交给 IDE 运行配置加载）。
+# 本地值见 backend/.env.example（复制为 backend/.env 后交给 IDE 运行配置加载）。
 # 启动：-Dspring-boot.run.profiles=dev 或 SPRING_PROFILES_ACTIVE=dev。
 # 只覆盖与 base(application.yml) 不同的键。
 # =============================================================================

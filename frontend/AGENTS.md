@@ -6,6 +6,14 @@
 ## Project Overview
 This project is the admin frontend for **Access Matrix** (RBAC / permission matrix): system features such as users, roles, permissions, menus, departments, and op log, plus business modules (e.g. PMS) that can be plugged in later.
 
+```bash
+npm install
+npm run dev      # dev server (:5273, proxies /api → backend :9135)
+npm run build    # production build → dist/
+npm run lint     # ESLint
+npm run test     # Vitest
+```
+
 ## Tech Stack (MANDATORY)
 - Vue 3.5+ (Composition API, `<script setup>`)
 - **JavaScript ONLY** (TypeScript forbidden)
@@ -172,31 +180,4 @@ Check these before creating a component / service; when you add one, append it h
 
 ## Behavioral Guidelines
 
-### 1. Think Before Coding
-- State your assumptions first; ask when unsure
-- When there are multiple solutions, lay out the options instead of silently picking one
-- If a simpler approach exists, raise it
-- If something is unclear or naming is confusing, stop and ask
-
-### 2. Simplicity First
-- Solve the problem with the least code
-- Do not abstract for single-use cases
-- Do not add unrequested "flexibility"
-- Do not write error handling for impossible scenarios
-- If 200 lines could have been 50 → rewrite
-
-### 3. Surgical Changes
-- Touch only what needs to change
-- Do not casually "improve" nearby code
-- Do not refactor what isn't broken
-- Stay consistent with the existing style
-- Clean up orphan code you produced; do not proactively delete pre-existing dead code
-
-### 4. Goal-Driven Execution
-- "Add validation" → "write a test for the invalid input, make it pass"
-- "Fix the bug" → "write a reproducing test, then fix"
-- For multi-step tasks, give a verifiable step plan
-
----
-
-**Signs these conventions are taking hold**: fewer incidental changes in diffs, fewer rewrites caused by over-complication, and questions raised before action rather than after errors.
+Cross-stack — see [../AGENTS.md § Behavioral guidelines (both stacks)](../AGENTS.md#behavioral-guidelines-both-stacks) (Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven Execution).

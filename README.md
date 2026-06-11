@@ -54,10 +54,11 @@ psql -h 127.0.0.1 -U postgres \
   -c "CREATE DATABASE access_matrix_db WITH ENCODING 'UTF8' TEMPLATE template0;"
 
 # 3. Backend — the dev profile reads DB/Redis from env vars (no defaults).
-#    Load backend/.env.dev first (committed throwaway local values), or
+#    Copy backend/.env.example to backend/.env and load it first, or
 #    startup fails on a missing CORE_DB_URL. Auto-migrates + seeds demo-admin.
 cd backend
-set -a; . ./.env.dev; set +a   # PowerShell / IDE run config: see docs/getting-started.md §3
+cp .env.example .env           # then edit if needed
+set -a; . ./.env; set +a       # PowerShell / IDE run config: see docs/getting-started.md §3
 ./mvnw -DskipTests install
 ./mvnw -pl core-bootstrap spring-boot:run -Dspring-boot.run.profiles=dev
 
@@ -68,7 +69,7 @@ npm install && npm run dev
 
 Open http://localhost:5273/login → sign in as `demo-admin` / `demo-admin` → you're in.
 
-> The `dev` profile defaults to **OIDC (Keycloak)**, so sign-in goes through Keycloak — start it first via `infra/keycloak/start-keycloak.{sh,bat}` (auto-imports the `demo` + `system` realms); full walkthrough in [Getting Started §5](docs/getting-started.md#5-enable-sso-keycloak-mode). For an IdP-free boot, set `mode: permit-all` in the `dev` section of `application.yml`. To migrate a deploy between password and SSO without data loss: [docs/migration-password-to-sso.md](docs/migration-password-to-sso.md).
+> The `dev` profile defaults to **OIDC (Keycloak)**, so sign-in goes through Keycloak — start it first via `infra/keycloak/start-keycloak.{sh,bat}` (auto-imports the `demo` + `system` realms); full walkthrough in [Getting Started §5](docs/getting-started.md#5-enable-sso-keycloak-mode). For an IdP-free boot, set `mode: permit-all` in the `dev` section of `application.yml`. To migrate a deploy between password and SSO without data loss: [docs/migration.md](docs/migration.md).
 
 ---
 
@@ -110,8 +111,7 @@ See [docs/system-realm.md](docs/system-realm.md) for the full design — audit p
 | [Keycloak setup](infra/keycloak/README.md) | Local Keycloak launcher + realm config |
 | [**`system` realm**](docs/system-realm.md) | The hidden platform-ops realm; tenant lifecycle + support sessions |
 | [**Break-glass**](docs/break-glass.md) | Super-admin emergency credential model |
-| [**password → SSO migration**](docs/migration-password-to-sso.md) | Zero-data-loss password→SSO runbook |
-| [**SSO → password migration**](docs/migration-sso-to-password.md) | Reverse migration runbook |
+| [**Auth migration (password ↔ SSO)**](docs/migration.md) | Bidirectional, zero-data-loss migration runbook |
 
 Module-level (for developers):
 - [backend/AGENTS.md](backend/AGENTS.md) — module boundaries, Flyway, security, API conventions
@@ -232,7 +232,7 @@ app:
 
 Restart → the backend mirrors each `core_auth_user` into the right Keycloak realm (or the reverse), fires `executeActionsEmail(UPDATE_PASSWORD)` (or mints reset tokens + sends self-hosted reset mail), and binds the rows on first SSO login (or NULLs `keycloak_id` after password reset). Idempotent + reversible + audited.
 
-Detail in [docs/migration-password-to-sso.md](docs/migration-password-to-sso.md) and [docs/migration-sso-to-password.md](docs/migration-sso-to-password.md).
+Detail in [docs/migration.md](docs/migration.md).
 
 ---
 

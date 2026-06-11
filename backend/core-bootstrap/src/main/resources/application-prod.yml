@@ -1,6 +1,6 @@
 # =============================================================================
 # prod｜生产(production)：oidc 鉴权；连接/密钥走环境变量；关 Swagger；收紧 actuator。
-# 必填环境变量见 backend/.env.prod.example。只覆盖与 base(application.yml) 不同的键。
+# 必填环境变量及「本地|上线」取值见 backend/.env.example。只覆盖与 base(application.yml) 不同的键。
 # =============================================================================
 spring:
   datasource:

@@ -132,20 +132,32 @@ After scaffolding, edit the placeholder columns in the generated `V1000__create_
 
 ## Behavioral guidelines (both stacks)
 
+Single source for both stacks — `backend/AGENTS.md` and `frontend/AGENTS.md` point here.
+
 ### 1. Think Before Coding
 - State your assumptions first; ask when unsure
 - When there are multiple solutions, lay out the options instead of silently picking one
+- If you spot an existing / simpler approach, suggest it
+- If something is unclear or naming is confusing, stop and ask
 
 ### 2. Simplicity First
 - Solve the problem with the least code
 - Do not abstract for single-use cases
 - Do not add unrequested "flexibility"
+- Do not write error handling for impossible scenarios
+- If 200 lines could have been 50 → rewrite
 
 ### 3. Surgical Changes
 - Touch only what needs to change
 - Do not casually "improve" nearby code
+- Do not refactor what isn't broken
 - Stay consistent with the existing style
+- Clean up orphan code you produced; do not proactively delete pre-existing dead code
 
 ### 4. Goal-Driven Execution
 - Turn the task into a verifiable goal
 - For multi-step tasks, give a verifiable step plan
+- "Add validation" → "write a test for the invalid input, make it pass"
+- "Fix the bug" → "write a reproducing test, then fix"
+
+**Signs these conventions are taking hold**: fewer incidental changes in diffs, fewer over-complication rewrites, questions raised before action rather than after errors; new features land on the existing aspects (`@RequiresPermission` / `@OpLog` / `@DataScope`) with clean module boundaries and an append-only Flyway history.

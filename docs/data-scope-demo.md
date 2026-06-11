@@ -1,6 +1,5 @@
-# Data Scope Walkthrough — `business-demo`
+# 数据范围演练 —— `business-demo`
 
-**English** · [中文](data-scope-demo.zh-CN.md)
 
 `business-demo` 模块演示 access-matrix 的 5 种 **数据范围**（`role.data_scope`）实际效果：同一张表、同一条 SQL，不同身份登录看到的行数不同。
 
@@ -83,6 +82,8 @@ Page<TaskEntity> result = taskMapper.selectPage(p, w);
 ```
 
 `@DataScope` 注解只是**门禁**：service 忘了调 `apply` 时，dev/test profile 会抛 `INTERNAL_ERROR` 把问题在第一次集成时暴露出来；prod 仅 WARN 不中断业务。
+
+- **单对象端点也必须受约束**（`get/update/delete by id`）：`apply` 只过滤**列表**；按 id 取行用的 `selectById` 只受租户拦截器约束、**不**受数据范围约束。若不另行校验，DEPT/SELF 用户可猜 id 越部门读/改/删（IDOR）。范式见 `TaskService.loadVisibleOr404`：`selectById` 后用 `DataScopeHelper.isVisible(decision, deptId, createUser)` 判定，不可见即抛 `NOT_FOUND`（而非 `FORBIDDEN`，避免泄露 id 是否存在）。详见 backend/AGENTS.md Hard Rule 14。
 
 ## 复位
 

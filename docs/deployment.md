@@ -1,20 +1,18 @@
 # Deployment
 
-**English** · [中文](deployment.zh-CN.md)
 
-Production deployment guide — taking access-matrix to staging / prod environments.
+生产部署指南 —— 把 access-matrix 部到 staging / prod 环境。
 
-> For the local development setup, see [Getting Started](getting-started.md).
+> 本地开发环境见 [Getting Started](getting-started.md)。
 
 ---
 
-## 1. Recommended deployment architecture
+## 1. 部署架构推荐
 
 ```
                        ┌──────────────────┐
-                       │  CDN / static    │  index.html + assets
-                       │  hosting         │  (vite build → dist/)
-                       │  (Cloudflare /   │
+                       │  CDN / 静态托管    │  index.html + assets
+                       │  (Cloudflare /   │  (vite build → dist/)
                        │   AWS CloudFront)│
                        └────────┬─────────┘
                                 │
@@ -41,50 +39,52 @@ Production deployment guide — taking access-matrix to staging / prod environme
         │  replicas) │ │  / HA)   │      │  "keycloak"  │
         └────────────┘ └──────────┘      └──────────────┘
             ▲                                    │
-            └──────── same PG cluster ───────────┘
-                (separate schemas; can scale independently)
+            └────────── 同一个 PG 集群 ──────────┘
+                (不同 schema; 可独立扩缩)
 ```
 
-The backend is stateless and scales horizontally. Sessions, refresh tokens, and forced-logout sets all live in Redis, so the pods are interchangeable.
+后端无状态 → 水平扩。Session / refresh-token / 强制下线 都在 Redis，pod 之间无差异。
 
 ---
 
-## 2. Environment variable reference
+## 2. 环境变量清单
 
-### 2.1 Backend
+### 2.1 后端
 
-| Variable | Required | Description | Example |
+| 变量 | 必需 | 说明 | 例 |
 |---|---|---|---|
-| `SPRING_PROFILES_ACTIVE` | Required | `prod` / `dev` / `test`. Defaults to `prod` (fail-closed) | `prod` |
-| `CORE_DB_URL` | Required | JDBC URL | `jdbc:postgresql://pg-prod:5432/access_matrix?stringtype=unspecified` |
-| `CORE_DB_USERNAME` | Required | DB username | `access_matrix_app` |
-| `CORE_DB_PASSWORD` | Required | DB password (inject via a secret manager) | |
-| `CORE_REDIS_HOST` | Required | Redis host | `redis-prod.svc.cluster.local` |
-| `CORE_REDIS_PORT` | Defaults to 6379 | | |
-| `CORE_REDIS_PASSWORD` | Recommended | Redis AUTH password | |
-| `CORE_REDIS_DB` | Defaults to 0 | DB index | |
-| `CORE_JWT_SECRET` | Required in jwt mode | HS256 key, >= 32 bytes | 32+ character random string |
-| `CORE_OIDC_ISSUER_URI` | Required in oidc mode | Keycloak realm URL | `https://sso.example.com/realms/acme` |
-| `CORE_KEYCLOAK_SERVER_URL` | Required in oidc mode | Keycloak root URL | `https://sso.example.com` |
-| `CORE_KEYCLOAK_ADMIN_REALM` | oidc mode | Realm holding the admin credentials | `master` |
-| `CORE_KEYCLOAK_ADMIN_CLIENT_ID` | oidc mode | Service account client | `access-matrix-admin` |
-| `CORE_KEYCLOAK_ADMIN_CLIENT_SECRET` | Required in oidc mode (production) | Service account secret | |
-| `CORE_KEYCLOAK_ADMIN_USERNAME` | Dev only | Not recommended for production | |
-| `CORE_KEYCLOAK_ADMIN_PASSWORD` | Dev only | Same as above | |
-| `CORE_MAIL_HOST` | When email is enabled | SMTP host | `smtp.exmail.qq.com` or `email-smtp.ap-northeast-1.amazonaws.com` |
-| `CORE_MAIL_PORT` | When email is enabled | 465 (SSL) or 587 (STARTTLS) | |
-| `CORE_MAIL_USERNAME` | When email is enabled | SMTP user | |
-| `CORE_MAIL_PASSWORD` | When email is enabled | SMTP password / app password | |
-| `CORE_MAIL_ENABLED` | Defaults to false | Master switch | `true` |
-| `CORE_MAIL_FROM` | When email is enabled | From address (must be on the same domain as the SMTP user) | `noreply@your-domain.com` |
-| `CORE_MAIL_FROM_NAME` | Recommended | Display name for the sender | `Access Matrix` |
-| `CORE_APP_BASE_URL` | When email is enabled | External URL of the app, used for links in emails | `https://app.example.com` |
-| `CORE_INVITE_TOKEN_TTL` | Defaults to 7d | Invitation token lifetime | `7d` / `48h` |
-| `CORE_CORS_ALLOWED_ORIGINS` | Required | Comma-separated list of allowed CORS origins | `https://app.example.com` |
+| `SPRING_PROFILES_ACTIVE` | 必需 | `prod` / `dev` / `test`。默认 `prod`（fail-closed） | `prod` |
+| `CORE_DB_URL` | 必需 | JDBC URL | `jdbc:postgresql://pg-prod:5432/access_matrix?stringtype=unspecified` |
+| `CORE_DB_USERNAME` | 必需 | DB 用户名 | `access_matrix_app` |
+| `CORE_DB_PASSWORD` | 必需 | DB 密码（推荐 secret manager 注入） | |
+| `CORE_REDIS_HOST` | 必需 | Redis 主机 | `redis-prod.svc.cluster.local` |
+| `CORE_REDIS_PORT` | 默认 6379 | | |
+| `CORE_REDIS_PASSWORD` | 推荐 | Redis AUTH 密码 | |
+| `CORE_REDIS_DB` | 默认 0 | DB index | |
+| `CORE_JWT_SECRET` | **所有模式必需** | HS256 break-glass 密钥，>= 32 字节、非占位。oidc 模式下应急通道解码器也依赖它，缺失/占位会启动 fail-fast | `openssl rand -base64 48` |
+| `CORE_FORWARD_HEADERS_STRATEGY` | 反代后 | Spring 是否用 X-Forwarded-* 重建 URL / getRemoteAddr。直连用 `none`(默认)，可信反代后用 `framework` | `none` |
+| `CORE_TRUST_FORWARDED_HEADERS` | 反代后 | 限流/审计是否采信 X-Forwarded-For 判定客户端 IP。默认 `false`；反代后与上一项**成对**设 `true`(取最右一跳) | `false` |
+| `CORE_OIDC_ISSUER_URI` | oidc 模式必需 | Keycloak realm URL | `https://sso.example.com/realms/acme` |
+| `CORE_KEYCLOAK_SERVER_URL` | oidc 模式必需 | Keycloak 根 URL | `https://sso.example.com` |
+| `CORE_KEYCLOAK_ADMIN_REALM` | oidc 模式 | admin 凭据所在 realm | `master` |
+| `CORE_KEYCLOAK_ADMIN_CLIENT_ID` | oidc 模式 | service account client | `access-matrix-admin` |
+| `CORE_KEYCLOAK_ADMIN_CLIENT_SECRET` | oidc 模式必需（生产） | service account secret | |
+| `CORE_KEYCLOAK_ADMIN_USERNAME` | dev 用 | 不推荐生产使用 | |
+| `CORE_KEYCLOAK_ADMIN_PASSWORD` | dev 用 | 同上 | |
+| `CORE_MAIL_HOST` | 启用邮件时 | SMTP 主机 | `smtp.exmail.qq.com` 或 `email-smtp.ap-northeast-1.amazonaws.com` |
+| `CORE_MAIL_PORT` | 启用邮件时 | 465 (SSL) 或 587 (STARTTLS) | |
+| `CORE_MAIL_USERNAME` | 启用邮件时 | SMTP 用户 | |
+| `CORE_MAIL_PASSWORD` | 启用邮件时 | SMTP 密码 / app password | |
+| `CORE_MAIL_ENABLED` | 默认 false | 主开关 | `true` |
+| `CORE_MAIL_FROM` | 启用邮件时 | 发件人地址（必须跟 SMTP user 在同一域） | `noreply@your-domain.com` |
+| `CORE_MAIL_FROM_NAME` | 推荐 | 发件人显示名 | `Access Matrix` |
+| `CORE_APP_BASE_URL` | 启用邮件时 | 业务系统外部 URL，邮件链接用 | `https://app.example.com` |
+| `CORE_INVITE_TOKEN_TTL` | 默认 7d | 邀请 token 有效期 | `7d` / `48h` |
+| `CORE_CORS_ALLOWED_ORIGINS` | 必需 | 允许 CORS 的来源（逗号分隔） | `https://app.example.com` |
 
-### 2.2 Frontend (build time)
+### 2.2 前端（构建时）
 
-Configure these via `.env.production` when building the frontend:
+构建前端时通过 `.env.production` 设置：
 
 ```dotenv
 # frontend/.env.production
@@ -97,21 +97,21 @@ VITE_OIDC_REDIRECT_URI=https://app.example.com/sso/callback
 VITE_OIDC_SCOPES=openid profile email
 ```
 
-Build:
+构建：
 
 ```bash
 cd frontend
 npm ci
-npm run build           # output in dist/
+npm run build           # 产物在 dist/
 ```
 
-Upload `dist/` to a CDN or drop it into nginx's static directory.
+把 `dist/` 上传 CDN 或扔进 nginx 静态目录。
 
 ---
 
-## 3. Database preparation
+## 3. 数据库准备
 
-### 3.1 Create a dedicated DB user (don't use the `postgres` superuser)
+### 3.1 创建专用 DB user（不要用 postgres 超管）
 
 ```sql
 CREATE USER access_matrix_app WITH PASSWORD '<long-random>';
@@ -125,46 +125,46 @@ GRANT ALL PRIVILEGES ON DATABASE access_matrix TO access_matrix_app;
 ```sql
 \c access_matrix
 CREATE SCHEMA IF NOT EXISTS keycloak;
-ALTER SCHEMA keycloak OWNER TO keycloak_user;  -- a dedicated DB user for KC
+ALTER SCHEMA keycloak OWNER TO keycloak_user;  -- 单独的 DB user 给 KC
 ```
 
-For the cleanest isolation: Keycloak gets its own DB user that can only access the `keycloak` schema. The business user has no access to the `keycloak` schema.
+最干净的隔离：Keycloak 用独立 DB user，只能 access keycloak schema。业务 user 不能访问 keycloak schema。
 
-### 3.3 Flyway runs automatically
+### 3.3 Flyway 自动跑
 
-The first backend startup runs every `V*.sql` migration automatically. No manual schema initialisation is needed.
+后端首次启动会自动跑所有 V*.sql 迁移。无需手动 schema 初始化。
 
-**Caveat**: the business DB user needs DDL permissions (CREATE TABLE / ALTER). The production-preferred pattern is to run DDL with a separate privileged account (as a CI step) and grant only DML to the runtime user:
+**注意**：业务 DB user 需要 DDL 权限（CREATE TABLE / ALTER）。生产偏好把 DDL 用单独高权账号跑（CI 步骤），业务运行时 user 只有 DML 权限：
 
 ```yaml
 spring:
   flyway:
-    enabled: false                  # turn off auto-migration
-    # run `mvn flyway:migrate -D flyway.user=ddl_user -D ...` as a CI step instead
+    enabled: false                  # 关掉自动迁移
+    # 用 CI 步骤跑 mvn flyway:migrate -D flyway.user=ddl_user -D ...
 ```
 
-### 3.4 Startup order (read this for OIDC mode)
+### 3.4 启动顺序(oidc 模式必看)
 
-In OIDC mode the backend **hard-depends on Keycloak being reachable at boot**. The correct order is:
+oidc 模式下后端**强依赖 Keycloak 在启动时可达**,正确顺序是:
 
-1. **Create the DB + the `keycloak` schema** (§3.1 / §3.2).
-2. **Start Keycloak first**, and wait until the realms are imported and the admin console is reachable.
-3. **Then start the backend** (the first boot runs Flyway to create the business tables).
+1. **建库 + 建 `keycloak` schema**(§3.1 / §3.2)。
+2. **先启动 Keycloak**,等 realm 导入完成、admin console 可访问。
+3. **再启动后端**(首次启动 Flyway 自动建业务表)。
 
-Why not the other way around: on startup in OIDC mode the backend provisions/verifies its built-in accounts in Keycloak (`demo-admin` / `ops`, via the `*KeycloakAdminSeeder` beans on `ApplicationReadyEvent`). **If Keycloak is unreachable they throw `IllegalStateException` and the backend fails to boot** (log: `Start Keycloak ... then restart`).
+为什么不能反过来:后端在 oidc 模式启动期会向 KC 建/校验内置账号(`demo-admin` / `ops` 等,由 `*KeycloakAdminSeeder` 在 `ApplicationReadyEvent` 执行)。**KC 不可达会直接抛 `IllegalStateException` 让后端启动失败**(日志:`Start Keycloak ... then restart`)。
 
-> JWT verification itself is lazy (`MultiRealmJwtDecoder` fetches JWKS on the first token, not at boot), so it never blocks startup; the hard dependency is the seeders above. `password` / `permit-all` mode has no such dependency — the backend boots standalone.
+> JWT 校验本身是懒加载(`MultiRealmJwtDecoder`,首个 token 到达才拉 JWKS),不在启动时阻塞;硬依赖来自上述 seeder。`password` / `permit-all` 模式无此依赖,后端可独立启动。
 
 ---
 
-## 4. Keycloak production deployment
+## 4. Keycloak 生产部署
 
-### 4.1 Don't use dev mode
+### 4.1 不要用 dev mode
 
-Start with `start` (not `start-dev`):
+启动用 `start`（不是 `start-dev`）：
 
 ```bash
-kc.sh build                         # one-off optimised build
+kc.sh build                         # 一次性优化构建
 kc.sh start --optimized \
   --hostname=sso.example.com \
   --hostname-strict=true \
@@ -176,7 +176,7 @@ kc.sh start --optimized \
   --https-certificate-key-file=/path/to/privkey.pem
 ```
 
-Alternatively, terminate TLS at the reverse proxy and run Keycloak over plain HTTP behind it:
+或者反代终止 TLS、Keycloak 内部 HTTP：
 
 ```bash
 kc.sh start --optimized \
@@ -187,7 +187,7 @@ kc.sh start --optimized \
   --http-port=8180
 ```
 
-### 4.2 Use PostgreSQL, not the embedded H2
+### 4.2 用 PG 而非内置 H2
 
 ```bash
 KC_DB=postgres \
@@ -197,45 +197,45 @@ KC_DB_PASSWORD=<secret> \
 kc.sh start --optimized ...
 ```
 
-### 4.3 Service account (production admin credentials)
+### 4.3 service account（生产管理凭据）
 
-Don't use `admin-cli + admin/admin`. The production approach:
+不要用 `admin-cli + admin/admin`。生产做法：
 
-1. In the master realm (or whichever realm you want to manage), create a client `access-matrix-admin`
-2. Set Client authentication = ON and grab the secret
-3. Set Service accounts roles = ON
-4. Grant this service account only the `realm-management/manage-users` role (least privilege)
-5. Inject the secret into the backend:
+1. 在 master realm（或要管理的 realm）建一个 client `access-matrix-admin`
+2. Client authentication = ON，拿到 secret
+3. Service accounts roles = ON
+4. 给这个 service account 绑 `realm-management/manage-users` 这一个 role（最小权限）
+5. 把 secret 注入 backend：
 
 ```yaml
-CORE_KEYCLOAK_ADMIN_REALM=acme        # or master — wherever you created the client
+CORE_KEYCLOAK_ADMIN_REALM=acme        # 或 master，看你 client 建在哪
 CORE_KEYCLOAK_ADMIN_CLIENT_ID=access-matrix-admin
 CORE_KEYCLOAK_ADMIN_CLIENT_SECRET=<secret>
-# leave username / password unset → KeycloakUserService falls back to client_credentials grant
+# username / password 不设 → KeycloakUserService 自动走 client_credentials grant
 ```
 
-### 4.4 Version-control the realm configuration
+### 4.4 Realm 配置版本化
 
-Keep `infra/keycloak/realms/<env>-realm.json` in the repo and load it on startup with `--import-realm`:
+`infra/keycloak/realms/<env>-realm.json` 跟 repo 走，用 `--import-realm` 启动时灌：
 
 ```bash
 kc.sh start --optimized --import-realm
 ```
 
-Make sure the file name matches what gets deployed into `$KEYCLOAK_HOME/data/import/`.
+import 文件名要确保跟 deploy 进 `$KEYCLOAK_HOME/data/import/` 的一致。
 
-### 4.5 SMTP configuration (so Keycloak can send its own emails)
+### 4.5 SMTP 配置（让 Keycloak 自己发邮件）
 
-Go to Realm settings → Email:
+到 Realm settings → Email：
 - Host, Port, From, Username, Password
-- Enable "Enable SSL" or "Enable StartTLS"
-- Enable all actions (reset password / verify email / …)
+- 启用 "Enable SSL" 或 "Enable StartTLS"
+- 启用所有 actions（reset password / verify email / …）
 
-The user "Forgot password" flow relies on this SMTP. It's independent of the business-side `MailService` SMTP (they can share an account or be different ones).
+用户的 "忘记密码" 流程就靠这个 SMTP。跟业务侧 MailService 是独立 SMTP（可以同一个，也可以分开）。
 
 ---
 
-## 5. Backend JVM configuration
+## 5. 后端 JVM 配置
 
 ```
 -XX:+UseZGC
@@ -250,13 +250,13 @@ The user "Forgot password" flow relies on this SMTP. It's independent of the bus
 -XX:HeapDumpPath=/var/dumps/access-matrix
 ```
 
-The Spring Boot Maven plugin already writes the first six lines into the `repackage` manifest, so `java -jar` picks them up automatically.
+Spring Boot Maven plugin 已经把头 6 行写进 `repackage` 的 manifest。`java -jar` 启动会自动用。
 
-In containers, set `MaxRAMPercentage` to 75% so the Kubernetes / Docker resource limits actually take effect.
+容器化时建议把 `MaxRAMPercentage` 设 75%，让 Kubernetes / Docker 资源限制生效。
 
 ---
 
-## 6. Sample Nginx configuration
+## 6. Nginx 配置示例
 
 ```nginx
 upstream access_matrix_backend {
@@ -316,17 +316,19 @@ server {
 
 ---
 
-## 7. Health checks / observability
+## 7. 健康检查 / 可观测
 
-| Endpoint | Purpose |
+| 端点 | 用途 |
 |---|---|
-| `GET /api/health` | Business-level; returns profile + timestamp |
-| `GET /api/actuator/health` | Spring Boot standard, includes DB / Redis / Mail status |
+| `GET /api/health` | 业务级，简单返回 profile + timestamp |
+| `GET /api/actuator/health` | Spring Boot 标准，含 DB / Redis / Mail 状态 |
 | `GET /api/actuator/health/liveness` | K8s liveness probe |
 | `GET /api/actuator/health/readiness` | K8s readiness probe |
-| `GET /api/actuator/prometheus` | Prometheus metrics |
+| `GET /api/actuator/prometheus` | Prometheus 指标（**需鉴权**） |
 
-Example K8s probes:
+> Actuator 暴露面：仅 `/actuator/health/**`（含 liveness/readiness 探针）公开；`/actuator/metrics`、`/actuator/prometheus`、`/actuator/caches`、`/actuator/info` 需鉴权(未认证 401)。若要让 Prometheus 公网/无凭据抓取，应绑独立的 `management.server.port` 走内网，而非放开鉴权。
+
+K8s probe 示例：
 
 ```yaml
 livenessProbe:
@@ -345,63 +347,65 @@ readinessProbe:
 
 ---
 
-## 8. Security checklist (verify before go-live)
+## 8. 安全清单（上线前必查）
 
-- [ ] `SPRING_PROFILES_ACTIVE=prod` (don't skip — the default is `prod`, but confirm)
-- [ ] `CORE_JWT_SECRET` is >= 32 bytes random (jwt mode)
-- [ ] In oidc mode, `CORE_OIDC_ISSUER_URI` uses HTTPS
-- [ ] DB uses a dedicated business user with a strong password (not the `postgres` superuser)
-- [ ] Keycloak is backed by PostgreSQL, not the embedded H2
-- [ ] Keycloak uses a service account (client_credentials), not admin/admin
-- [ ] Keycloak Realm settings → Brute Force Detection is enabled
-- [ ] `CORE_CORS_ALLOWED_ORIGINS` lists origins strictly (no `*`)
-- [ ] Reverse proxy adds `X-Frame-Options: SAMEORIGIN`, `Content-Security-Policy`, and HSTS
-- [ ] `application.yml` contains **no** hard-coded *production* SMTP / DB / JWT secrets (the `dev` section's throwaway dev creds are fine; prod/dev sections use no-default `${VAR}`)
-- [ ] Redis has AUTH enabled and isn't reachable from the public internet
-- [ ] PG `pg_hba.conf` restricts methods to `md5` / `scram-sha-256`; `trust` is not allowed
-- [ ] All logs ship to a centralised log system (don't go disk-only — a full disk leaves you blind)
-- [ ] DB / Redis backups are scheduled and restore-tested (untested backups don't exist)
-
----
-
-## 9. Upgrade process
-
-1. Run the tests: `./mvnw test && cd frontend && npm run test && npm run test:e2e`
-2. Back up the DB: `pg_dump access_matrix > backup-YYYYMMDD.sql`
-3. Back up the Keycloak realm: admin console → realm → Action → Partial export
-4. Pull the latest code: `git fetch && git checkout v1.2.3`
-5. Run the new migrations: `./mvnw -pl core-bootstrap flyway:migrate`, or restart the backend (which runs them automatically)
-6. Rolling-restart the backend pods (on K8s: `kubectl rollout restart deployment/backend`)
-7. Publish the new frontend `dist` to the CDN
-8. Health-check + smoke test: log in, view menus, walk through the critical business paths
-9. On failure → rollback: restore the DB from backup, redeploy code via `git checkout v1.2.2`
+- [ ] `SPRING_PROFILES_ACTIVE=prod`（不要漏，默认就是 prod 但要确认）
+- [ ] `CORE_JWT_SECRET` >= 32 字节随机（**所有模式必需**，含 oidc；缺失/占位启动 fail-fast）
+- [ ] OIDC 模式下 `CORE_OIDC_ISSUER_URI` 用 HTTPS
+- [ ] Actuator：仅 `/actuator/health/**` 公开，metrics/prometheus/caches/info 需鉴权（默认已如此，勿放开）
+- [ ] 反代部署：`CORE_FORWARD_HEADERS_STRATEGY=framework` 与 `CORE_TRUST_FORWARDED_HEADERS=true` **成对**开启，且反代确实会覆盖入站 `X-Forwarded-For`；直连部署两者都保持默认
+- [ ] DB 用专用业务 user，密码强（不用 `postgres` 超管）
+- [ ] Keycloak 用 PG 后端，不用内置 H2
+- [ ] Keycloak 用 service account（client_credentials），不用 admin/admin
+- [ ] Keycloak Realm settings → Brute Force Detection 启用
+- [ ] CORS `CORE_CORS_ALLOWED_ORIGINS` 严格列举（不要用 `*`）
+- [ ] 反代加 `X-Frame-Options: SAMEORIGIN`、`Content-Security-Policy`、HSTS
+- [ ] `application.yml` 里**没有**硬编码的*生产* SMTP / DB / JWT 密钥（`dev` 段的本地一次性凭据无所谓；prod/dev 段用无默认 `${VAR}`）
+- [ ] Redis 启 AUTH，外网不可达
+- [ ] PG `pg_hba.conf` 限制 `md5` / `scram-sha-256`，不允许 `trust`
+- [ ] 全套日志 → 集中日志系统（不要 disk-only，磁盘满了你瞎了）
+- [ ] DB / Redis 定时备份验证（不验证 = 没备份）
 
 ---
 
-## 10. Troubleshooting (production-specific)
+## 9. 升级流程
 
-### 10.1 Users get 401 immediately after logging in
-
-- Check Redis connectivity (forced-logout sets and refresh tokens live in Redis)
-- Check JWT clock skew (a > 5-minute drift between the OIDC issuer and the backend host triggers rejection)
-
-### 10.2 RBAC cache is "poisoned" — role changes don't reflect for users
-
-- Quick fix: `DEL access_matrix:user:permissions:*` (via Redis CLI)
-- Root cause: check whether the role-edit endpoint forgot to call `cacheService.evictRole(...)`
-
-### 10.3 Multi-tenant data leaks across tenants
-
-- Immediately fail over to the previous version
-- Confirm `app.mybatis.tenant.enabled` is `true` in `application.yml`
-- Audit every hand-written `@Select` SQL to ensure each one explicitly includes `tenant_id = #{tenantId}`
-- Read the comments in the [V20 migration](../backend/core-bootstrap/src/main/resources/db/migration/V20__core_auth_user_tenant_unique.sql)
+1. 跑测试：`./mvnw test && cd frontend && npm run test && npm run test:e2e`
+2. 备份 DB：`pg_dump access_matrix > backup-YYYYMMDD.sql`
+3. 备份 Keycloak realm：admin console → realm → Action → Partial export
+4. Pull 最新代码：`git fetch && git checkout v1.2.3`
+5. 跑新迁移：`./mvnw -pl core-bootstrap flyway:migrate` 或重启后端（自动跑）
+6. 滚动重启后端 pod（K8s `kubectl rollout restart deployment/backend`）
+7. 上 CDN 新前端 dist
+8. 健康检查 + 烟雾测试：登录、看菜单、操作业务关键路径
+9. 异常 → rollback：DB 用 backup，代码用 `git checkout v1.2.2` 重部署
 
 ---
 
-## 11. Containerisation (Docker)
+## 10. 故障排查（生产专用）
 
-Backend:
+### 10.1 用户登录后立刻报 401
+
+- 检查 Redis 连不连得通（强制下线集合 / refresh token 都在 Redis）
+- 检查 JWT 时钟偏差（OIDC issuer 跟后端服务器时间差 > 5 分钟会拒绝）
+
+### 10.2 RBAC 缓存"中毒"，改了角色用户还是看老权限
+
+- 临时：`DEL access_matrix:user:permissions:*` （Redis CLI）
+- 根因：检查改角色 endpoint 是不是漏调 `cacheService.evictRole(...)`
+
+### 10.3 多租户串了数据
+
+- 立刻把流量切回上一个版本
+- 检查 `application.yml` 的 `app.mybatis.tenant.enabled` 是不是 true
+- 检查所有手写 `@Select` SQL 是不是都有显式 `tenant_id = #{tenantId}`
+- 看 [V20 migration](../backend/core-bootstrap/src/main/resources/db/migration/V20__core_auth_user_tenant_unique.sql) 注释
+
+---
+
+## 11. 容器化（Docker）
+
+后端：
 
 ```dockerfile
 FROM eclipse-temurin:25-jre-alpine
@@ -418,7 +422,7 @@ ENTRYPOINT ["java", \
   "-jar", "/app/app.jar"]
 ```
 
-Frontend:
+前端：
 
 ```dockerfile
 FROM nginx:1.27-alpine
@@ -426,11 +430,11 @@ COPY dist/ /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 ```
 
-A K8s Helm chart is not included in the repo (the project itself isn't tied to K8s). Community PRs welcome if you need one.
+K8s Helm chart 不在仓库（项目本身不绑定 K8s）。需要的话社区贡献 PR 欢迎。
 
 ---
 
-## Next steps
+## 下一步
 
-- Business-side usage: [User Guide](user-guide.md)
-- Building new features: [Development](development.md)
+- 业务侧使用：[User Guide](user-guide.md)
+- 开发新功能：[Development](development.md)
