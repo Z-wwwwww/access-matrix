@@ -20,6 +20,11 @@ import static org.mockito.Mockito.when;
 class JwtSecretValidatorTest {
 
     private static final String PLACEHOLDER = "dev-placeholder-secret-please-override-32bytes!";
+    /** The committed .env.example value — >=32 bytes and not the placeholder prefix, so it
+     *  slipped past the original prefix-only check; copying the template into prod verbatim
+     *  produced a forgeable-token deployment. */
+    private static final String ENV_EXAMPLE_THROWAWAY =
+            "dev-local-hs256-break-glass-key-32B+throwaway-do-not-use-in-prod";
     private static final String VALID = "a-real-strong-secret-of-at-least-32-bytes-long";
 
     private JwtSecretValidator validator(String mode, String secret) {
@@ -54,6 +59,40 @@ class JwtSecretValidatorTest {
         assertThatThrownBy(() -> validator("oidc", "short").validate())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(">=32 bytes");
+    }
+
+    @Test
+    @DisplayName("oidc mode rejects the committed .env.example throwaway key (template-copied-to-prod)")
+    void oidc_rejectsEnvExampleThrowaway() {
+        assertThatThrownBy(() -> validator("oidc", ENV_EXAMPLE_THROWAWAY).validate())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("template value");
+    }
+
+    @Test
+    @DisplayName("jwt mode rejects the committed .env.example throwaway key too")
+    void jwt_rejectsEnvExampleThrowaway() {
+        assertThatThrownBy(() -> validator("jwt", ENV_EXAMPLE_THROWAWAY).validate())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("template value");
+    }
+
+    @Test
+    @DisplayName("weak markers are caught anywhere in the secret, not only as a prefix")
+    void rejectsMarkerInMiddle() {
+        assertThatThrownBy(() -> validator("oidc",
+                "padding-padding-padding-change-in-prod-padding-padding").validate())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("change-in-prod");
+    }
+
+    @Test
+    @DisplayName("weak markers are matched case-insensitively")
+    void rejectsMarkerCaseInsensitive() {
+        assertThatThrownBy(() -> validator("oidc",
+                "SOME-LONG-ENOUGH-SECRET-VALUE-THROWAWAY-1234567890").validate())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("throwaway");
     }
 
     @Test

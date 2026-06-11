@@ -12,6 +12,17 @@ import java.util.List;
 @Component
 public class JwtSecretValidator {
 
+    // Substrings that mark a secret as a committed/template value, matched
+    // case-insensitively ANYWHERE in the secret — not just as a prefix. The
+    // prefix-only "dev-placeholder" check let the .env.example throwaway key
+    // ("dev-local-hs256-break-glass-key-32B+throwaway-do-not-use-in-prod")
+    // through: it isn't the placeholder and is >=32 bytes, so copying the env
+    // template into prod verbatim yielded a forgeable-token deployment that
+    // only ops discipline prevented. A real secret is `openssl rand -base64`
+    // output and can never contain these words, so false positives are moot.
+    private static final List<String> WEAK_SECRET_MARKERS = List.of(
+            "dev-placeholder", "dev-local", "throwaway", "change-in-prod", "do-not-use");
+
     private final AppSecurityProperties props;
     private final Environment env;
 
@@ -43,12 +54,16 @@ public class JwtSecretValidator {
                     + "app.security.jwt.secret is missing. Set CORE_JWT_SECRET environment "
                     + "variable (>=32 bytes).");
         }
-        if (secret.startsWith("dev-placeholder")) {
-            throw new IllegalStateException(
-                    "app.security.mode=" + mode + " uses the HS256 break-glass decoder but "
-                    + "jwt.secret is still the dev placeholder — anyone with the source could "
-                    + "forge tokens. Set CORE_JWT_SECRET environment variable. Active profiles: "
-                    + activeProfiles);
+        String lower = secret.toLowerCase(java.util.Locale.ROOT);
+        for (String marker : WEAK_SECRET_MARKERS) {
+            if (lower.contains(marker)) {
+                throw new IllegalStateException(
+                        "app.security.mode=" + mode + " uses the HS256 break-glass decoder but "
+                        + "jwt.secret contains the placeholder marker \"" + marker + "\" — it is a "
+                        + "committed template value, so anyone with the source could forge tokens. "
+                        + "Set CORE_JWT_SECRET to a fresh random value (openssl rand -base64 48), "
+                        + "in dev too. Active profiles: " + activeProfiles);
+            }
         }
         int len = secret.getBytes(StandardCharsets.UTF_8).length;
         if (len < 32) {
