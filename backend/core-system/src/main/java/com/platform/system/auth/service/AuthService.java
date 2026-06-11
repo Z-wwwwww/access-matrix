@@ -62,6 +62,7 @@ public class AuthService {
     private final ForceLogoutService forceLogoutService;
     private final TenantMapper tenantMapper;
     private final MailService mailService;
+    private final com.platform.core.infrastructure.security.ClientIpResolver clientIpResolver;
     private final AppMailProperties mailProps;
     /** Async best-effort audit sink — used to record break-glass logins (see {@link #recordBreakGlassUse}). */
     private final OpLogSink opLogSink;
@@ -86,7 +87,8 @@ public class AuthService {
                        TenantMapper tenantMapper,
                        MailService mailService,
                        AppMailProperties mailProps,
-                       OpLogSink opLogSink) {
+                       OpLogSink opLogSink,
+                       com.platform.core.infrastructure.security.ClientIpResolver clientIpResolver) {
         this.userMapper = userMapper;
         this.encoder = encoder;
         this.jwtIssuer = jwtIssuer;
@@ -101,6 +103,7 @@ public class AuthService {
         this.mailService = mailService;
         this.mailProps = mailProps;
         this.opLogSink = opLogSink;
+        this.clientIpResolver = clientIpResolver;
     }
 
     /**
@@ -118,7 +121,7 @@ public class AuthService {
     }
 
     public LoginResult login(String identifier, String password, HttpServletRequest req) {
-        String clientIp = clientIp(req);
+        String clientIp = clientIpResolver.resolve(req);
         String userAgent = req.getHeader("User-Agent");
         // CoreRequestContextFilter has already resolved the tenant for this
         // pre-auth request from X-Tenant-Id (or filled in "demo"). We pass it
@@ -363,16 +366,6 @@ public class AuthService {
         return (tid == null || tid.isBlank()) ? "demo" : tid;
     }
 
-    public static String clientIp(HttpServletRequest req) {
-        String xff = req.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            int comma = xff.indexOf(',');
-            return (comma > 0 ? xff.substring(0, comma) : xff).trim();
-        }
-        String xrip = req.getHeader("X-Real-IP");
-        if (xrip != null && !xrip.isBlank()) return xrip.trim();
-        return req.getRemoteAddr();
-    }
 
     public record LoginResult(UserEntity user, TokenResponse tokens) {}
 }

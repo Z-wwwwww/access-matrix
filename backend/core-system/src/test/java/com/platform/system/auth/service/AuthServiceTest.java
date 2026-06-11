@@ -77,6 +77,7 @@ class AuthServiceTest {
     @Mock MailService mailService;
     @Mock AppMailProperties mailProps;
     @Mock com.platform.core.infrastructure.audit.OpLogSink opLogSink;
+    @Mock com.platform.core.infrastructure.security.ClientIpResolver clientIpResolver;
 
     @InjectMocks AuthService service;
 
@@ -87,6 +88,7 @@ class AuthServiceTest {
         req = mock(HttpServletRequest.class);
         when(req.getHeader("User-Agent")).thenReturn("test-agent/1.0");
         when(req.getRemoteAddr()).thenReturn("10.0.0.1");
+        when(clientIpResolver.resolve(org.mockito.ArgumentMatchers.any())).thenReturn("10.0.0.1");
         when(mailProps.fromName()).thenReturn("Access Matrix");
         when(mailProps.from()).thenReturn("noreply@example.com");
         when(mailProps.baseUrl()).thenReturn("https://app.example.com");

@@ -10,7 +10,11 @@ server:
     context-path: /api            # 所有接口统一前缀；改这里前端的 baseURL 也要同步
   compression:
     enabled: true                 # true=对响应做 gzip 压缩 | false=不压缩
-  forward-headers-strategy: framework   # framework=信任反代的 X-Forwarded-* (部署在 nginx/网关后用这个) | native | none
+  # 默认 none：不信任客户端发来的 X-Forwarded-*，getRemoteAddr() 取真实 socket 对端，
+  # 避免伪造 XFF 改写客户端 IP(绕过按 IP 限流 / 伪造审计 IP)。仅当部署在你掌控、会覆盖
+  # 该头的反向代理(nginx/网关)后时设为 framework，并同时把 app.security.trust-forwarded-headers
+  # 设为 true(见 ClientIpResolver)——两者要一起开。
+  forward-headers-strategy: ${CORE_FORWARD_HEADERS_STRATEGY:none}   # none(默认/直连) | framework(可信反代后) | native
 
 spring:
   application:
@@ -128,8 +132,12 @@ app:
     # base 默认 oidc（fail-closed：即使某 profile 漏配 mode，也默认带鉴权而非放行）。
     # permit-all 只应在显式需要时(test / 冒烟)由对应 profile 覆盖。
     mode: oidc                          # 可填 permit-all|jwt|oidc
-    jwt:                                # 仅 mode=jwt 时生效
-      secret: ${CORE_JWT_SECRET:dev-placeholder-secret-please-override-32bytes!}   # HS256 密钥(≥32字节)；占位值会被 JwtSecretValidator 拒绝启动
+    # 是否信任 X-Forwarded-For / X-Real-IP 头来判定客户端 IP（限流 + 审计 + break-glass 告警）。
+    # 默认 false：忽略客户端头、用真实 socket 对端，防止伪造 XFF 绕过按 IP 限流 / 伪造审计 IP。
+    # 仅当部署在你掌控、会覆盖该头的反向代理之后时设 true（届时取 XFF 最右一跳）。见 ClientIpResolver。
+    trust-forwarded-headers: ${CORE_TRUST_FORWARDED_HEADERS:false}
+    jwt:                                # secret 在 oidc 与 jwt 模式都需要(HS256 break-glass 解码器始终挂载)
+      secret: ${CORE_JWT_SECRET:dev-placeholder-secret-please-override-32bytes!}   # HS256 密钥(≥32字节)；oidc/jwt 模式下占位值/缺失会被 JwtSecretValidator 拒绝启动
       tenant-claim: tid                 # 从 token 取租户 id 的 claim 名
       user-id-claim: sub                # 取用户 id 的 claim 名
       username-claim: preferred_username   # 取用户名的 claim 名

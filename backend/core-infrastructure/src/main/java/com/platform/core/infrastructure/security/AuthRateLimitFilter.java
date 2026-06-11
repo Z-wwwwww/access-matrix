@@ -30,12 +30,15 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     private final AppSecurityProperties.RateLimit cfg;
     private final JsonMapper mapper;
+    private final ClientIpResolver clientIpResolver;
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
 
     @Autowired
-    public AuthRateLimitFilter(AppSecurityProperties props, JsonMapper mapper) {
+    public AuthRateLimitFilter(AppSecurityProperties props, JsonMapper mapper,
+                               ClientIpResolver clientIpResolver) {
         this.cfg = props.rateLimit();
         this.mapper = mapper;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @Override
@@ -47,7 +50,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse resp, FilterChain chain)
             throws ServletException, IOException {
-        String ip = clientIp(req);
+        String ip = clientIpResolver.resolve(req);
         Bucket bucket = buckets.computeIfAbsent(ip, k -> newBucket());
         ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1L);
 
@@ -70,16 +73,5 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         Bandwidth limit = Bandwidth.classic(cfg.requestsPerMinute(),
                 Refill.intervally(cfg.requestsPerMinute(), refill));
         return Bucket.builder().addLimit(limit).build();
-    }
-
-    static String clientIp(HttpServletRequest req) {
-        String xff = req.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            int comma = xff.indexOf(',');
-            return (comma > 0 ? xff.substring(0, comma) : xff).trim();
-        }
-        String xrip = req.getHeader("X-Real-IP");
-        if (xrip != null && !xrip.isBlank()) return xrip.trim();
-        return req.getRemoteAddr();
     }
 }

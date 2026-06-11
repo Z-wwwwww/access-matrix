@@ -43,9 +43,12 @@ public class OpLogAspect {
 
     private final ObjectProvider<OpLogSink> sinkProvider;
     private final JsonMapper jsonMapper;
+    private final com.platform.core.infrastructure.security.ClientIpResolver clientIpResolver;
 
-    public OpLogAspect(ObjectProvider<OpLogSink> sinkProvider, JsonMapper jsonMapper) {
+    public OpLogAspect(ObjectProvider<OpLogSink> sinkProvider, JsonMapper jsonMapper,
+                       com.platform.core.infrastructure.security.ClientIpResolver clientIpResolver) {
         this.sinkProvider = sinkProvider;
+        this.clientIpResolver = clientIpResolver;
         // Re-derive a mapper that won't blow up on circular refs in arbitrary controller arg objects.
         this.jsonMapper = jsonMapper.rebuild()
                 .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
@@ -92,7 +95,7 @@ public class OpLogAspect {
         String body    = serialiseArgs(pjp.getArgs());
         String uri     = req == null ? null : req.getRequestURI();
         String method  = req == null ? null : req.getMethod();
-        String ip      = clientIp(req);
+        String ip      = clientIpResolver.resolve(req);
         String ua      = req == null ? null : req.getHeader("User-Agent");
         boolean ok     = thrown == null;
         String errMsg  = thrown == null ? null : safe(thrown.getMessage(), 500);
@@ -139,17 +142,6 @@ public class OpLogAspect {
         return json;
     }
 
-    private static String clientIp(HttpServletRequest req) {
-        if (req == null) return null;
-        String xff = req.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            int comma = xff.indexOf(',');
-            return (comma > 0 ? xff.substring(0, comma) : xff).trim();
-        }
-        String xrip = req.getHeader("X-Real-IP");
-        if (xrip != null && !xrip.isBlank()) return xrip.trim();
-        return req.getRemoteAddr();
-    }
 
     private static String safe(String s, int max) {
         if (s == null) return null;
