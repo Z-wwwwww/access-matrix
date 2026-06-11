@@ -6,6 +6,7 @@ import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.dict.CommonStatus;
 import com.platform.business.demo.task.entity.TaskEntity;
 import com.platform.business.demo.task.mapper.TaskMapper;
+import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.core.infrastructure.security.rbac.DataScopeContext;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
@@ -13,6 +14,7 @@ import com.platform.system.rbac.entity.UserRoleEntity;
 import com.platform.system.rbac.mapper.UserRoleMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
@@ -82,17 +84,41 @@ public class DemoSeeder {
     private static final String DEPT_OSAKA = "00000000000000000000DEPT03";
     private static final String DEPT_KYOTO = "00000000000000000000DEPT04";
 
+    /** Single source of truth for the 5 data-scope demo users — drives the
+     *  local {@code core_auth_user} seed, the role binding, AND the Keycloak
+     *  sync below, so the three never drift. */
+    private record DemoUser(String id, String username, String displayName,
+                            String email, String userNo, String deptId, String roleId) {}
+
+    private static final List<DemoUser> DEMO_USERS = List.of(
+            new DemoUser(USER_DEMO_ALL,     "tanaka_taro",        "田中 太郎", "tanaka.taro@demo.local",        "U00000011", DEPT_HQ,    ROLE_DEMO_ALL),
+            new DemoUser(USER_DEMO_DEPTSUB, "yamada_hanako",      "山田 花子", "yamada.hanako@demo.local",      "U00000012", DEPT_TOKYO, ROLE_DEMO_DEPTSUB),
+            new DemoUser(USER_DEMO_DEPT,    "sato_ken",           "佐藤 健",   "sato.ken@demo.local",           "U00000013", DEPT_OSAKA, ROLE_DEMO_DEPT),
+            new DemoUser(USER_DEMO_SELF,    "suzuki_misaki",      "鈴木 美咲", "suzuki.misaki@demo.local",      "U00000014", DEPT_TOKYO, ROLE_DEMO_SELF),
+            new DemoUser(USER_DEMO_CUSTOM,  "takahashi_shinichi", "高橋 慎一", "takahashi.shinichi@demo.local", "U00000015", DEPT_HQ,    ROLE_DEMO_CUSTOM));
+
     private final UserMapper userMapper;
     private final UserRoleMapper userRoleMapper;
     private final TaskMapper taskMapper;
     private final PasswordEncoder encoder;
+    /**
+     * Optional: only present when {@code app.security.mode=oidc} (the
+     * {@link KeycloakUserService} bean is {@code @ConditionalOnProperty} on
+     * that mode). In password / permit-all mode the provider yields null and
+     * we skip the KC sync — the local BCrypt password seeded below is enough
+     * to log in there. Injected via {@link ObjectProvider} so DemoSeeder still
+     * wires cleanly when the bean is absent.
+     */
+    private final ObjectProvider<KeycloakUserService> keycloakUserServiceProvider;
 
     public DemoSeeder(UserMapper userMapper, UserRoleMapper userRoleMapper,
-                      TaskMapper taskMapper, PasswordEncoder encoder) {
+                      TaskMapper taskMapper, PasswordEncoder encoder,
+                      ObjectProvider<KeycloakUserService> keycloakUserServiceProvider) {
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
         this.taskMapper = taskMapper;
         this.encoder = encoder;
+        this.keycloakUserServiceProvider = keycloakUserServiceProvider;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -103,19 +129,22 @@ public class DemoSeeder {
         // hardcoded "demo" fallback (see MybatisPlusConfig / SystemAdminSeeder).
         RequestContext.set(DEMO_TENANT, "system", "system", Locale.JAPAN, "demo-seeder");
         try {
-            ensureUser(USER_DEMO_ALL,     "tanaka_taro",        "田中 太郎", "tanaka.taro@demo.local",        "U00000011", DEPT_HQ);
-            ensureUser(USER_DEMO_DEPTSUB, "yamada_hanako",      "山田 花子", "yamada.hanako@demo.local",      "U00000012", DEPT_TOKYO);
-            ensureUser(USER_DEMO_DEPT,    "sato_ken",           "佐藤 健",   "sato.ken@demo.local",           "U00000013", DEPT_OSAKA);
-            ensureUser(USER_DEMO_SELF,    "suzuki_misaki",      "鈴木 美咲", "suzuki.misaki@demo.local",      "U00000014", DEPT_TOKYO);
-            ensureUser(USER_DEMO_CUSTOM,  "takahashi_shinichi", "高橋 慎一", "takahashi.shinichi@demo.local", "U00000015", DEPT_HQ);
-
-            ensureUserRole(USER_DEMO_ALL,     ROLE_DEMO_ALL);
-            ensureUserRole(USER_DEMO_DEPTSUB, ROLE_DEMO_DEPTSUB);
-            ensureUserRole(USER_DEMO_DEPT,    ROLE_DEMO_DEPT);
-            ensureUserRole(USER_DEMO_SELF,    ROLE_DEMO_SELF);
-            ensureUserRole(USER_DEMO_CUSTOM,  ROLE_DEMO_CUSTOM);
+            for (DemoUser du : DEMO_USERS) {
+                ensureUser(du.id(), du.username(), du.displayName(), du.email(), du.userNo(), du.deptId());
+                ensureUserRole(du.id(), du.roleId());
+            }
 
             seedTasks();
+
+            // Mirror the 5 users into the Keycloak 'demo' realm so they can
+            // actually SSO in (OIDC mode). Without this they exist only as
+            // local core_auth_user rows and — since they are not super-admins —
+            // can neither SSO (no KC account) nor break-glass, leaving the
+            // data-scope walkthrough unusable in the default dev (oidc) mode.
+            // First SSO login binds the KC account to the seeded row by
+            // (tenant, username) — see OidcJitUserService.
+            syncUsersToKeycloak();
+
             log.info("DemoSeeder: ✓ data-scope demo data ready (5 users, 15 tasks)");
         } catch (Exception e) {
             log.warn("DemoSeeder: skipped — {}", e.getMessage());
@@ -163,6 +192,38 @@ public class DemoSeeder {
         link.setUserId(userId);
         link.setRoleId(roleId);
         userRoleMapper.insert(link);
+    }
+
+    /**
+     * Ensure each demo user also exists in the Keycloak {@code demo} realm
+     * with the shared {@link #DEMO_PASSWORD} (permanent), so they can SSO.
+     * No-op when the {@link KeycloakUserService} bean is absent (non-oidc
+     * mode) — the local BCrypt hash already covers password-mode login.
+     *
+     * <p>Best-effort per user: a single KC hiccup (or a user already present
+     * from a previous boot) must not abort the rest of the demo seed. Mirrors
+     * {@code LocalKeycloakAdminSeeder}'s create-then-set-permanent idiom so the
+     * dev default doesn't trip a first-login password-change required action.
+     */
+    private void syncUsersToKeycloak() {
+        KeycloakUserService kc = keycloakUserServiceProvider.getIfAvailable();
+        if (kc == null) {
+            log.info("DemoSeeder: Keycloak sync skipped (not oidc mode) — demo users are local-only");
+            return;
+        }
+        for (DemoUser du : DEMO_USERS) {
+            try {
+                if (kc.userExists(DEMO_TENANT, du.username())) continue;
+                String kcId = kc.createUser(DEMO_TENANT, du.username(), du.email(),
+                        du.displayName(), DEMO_PASSWORD);
+                kc.setPassword(DEMO_TENANT, kcId, DEMO_PASSWORD, /* temporary= */ false);
+                log.info("DemoSeeder: provisioned KC user '{}' (kcId={}) in realm '{}'",
+                        du.username(), kcId, DEMO_TENANT);
+            } catch (Exception e) {
+                log.warn("DemoSeeder: KC sync for '{}' failed (continuing): {}",
+                        du.username(), e.toString());
+            }
+        }
     }
 
     private void seedTasks() {
