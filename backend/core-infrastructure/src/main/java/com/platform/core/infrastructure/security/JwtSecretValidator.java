@@ -23,18 +23,32 @@ public class JwtSecretValidator {
     @PostConstruct
     void validate() {
         List<String> activeProfiles = Arrays.asList(env.getActiveProfiles());
-        if (!"jwt".equalsIgnoreCase(props.mode())) return;
+        String mode = props.mode();
+
+        // The HS256 / shared-secret decoder is wired whenever the mode is NOT
+        // permit-all: it is the sole decoder in `jwt` mode AND the break-glass
+        // branch of DualModeJwtDecoder in `oidc` mode (see SecurityBeansConfig).
+        // So the secret MUST be enforced in both — not just `jwt`. Skipping the
+        // check in `oidc` (the default prod mode) let the decoder silently fall
+        // back to the committed placeholder secret, so anyone with the repo
+        // could forge an HS256 token and impersonate any user / tenant. Only
+        // `permit-all` (no auth at all, dev-only naked run) is exempt.
+        boolean hs256Active = "jwt".equalsIgnoreCase(mode) || "oidc".equalsIgnoreCase(mode);
+        if (!hs256Active) return;
 
         String secret = props.jwt().secret();
         if (secret == null || secret.isBlank()) {
             throw new IllegalStateException(
-                    "app.security.mode=jwt but app.security.jwt.secret is missing. " +
-                    "Set CORE_JWT_SECRET environment variable (>=32 bytes).");
+                    "app.security.mode=" + mode + " uses the HS256 break-glass decoder but "
+                    + "app.security.jwt.secret is missing. Set CORE_JWT_SECRET environment "
+                    + "variable (>=32 bytes).");
         }
         if (secret.startsWith("dev-placeholder")) {
             throw new IllegalStateException(
-                    "app.security.mode=jwt but jwt.secret is still the dev placeholder. " +
-                    "Set CORE_JWT_SECRET environment variable. Active profiles: " + activeProfiles);
+                    "app.security.mode=" + mode + " uses the HS256 break-glass decoder but "
+                    + "jwt.secret is still the dev placeholder — anyone with the source could "
+                    + "forge tokens. Set CORE_JWT_SECRET environment variable. Active profiles: "
+                    + activeProfiles);
         }
         int len = secret.getBytes(StandardCharsets.UTF_8).length;
         if (len < 32) {
