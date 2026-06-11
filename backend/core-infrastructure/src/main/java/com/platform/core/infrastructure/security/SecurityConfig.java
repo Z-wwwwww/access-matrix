@@ -16,14 +16,23 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 public class SecurityConfig {
 
-    private static final String[] PERMIT_PATHS = {
+    // Package-private so SecurityConfigPermitPathsTest can assert we never
+    // re-open the whole actuator surface unauthenticated.
+    static final String[] PERMIT_PATHS = {
             "/health/**",
             "/auth/**",
             // SSE notification stream: EventSource can't send a Bearer header,
             // so this path authenticates via a one-time ticket (minted by the
             // authenticated POST /notification/sse-ticket) instead of JWT.
             "/notification/stream",
-            "/actuator/**",
+            // ONLY the health endpoint (incl. liveness/readiness probes) is
+            // public. Do NOT widen this to "/actuator/**": metrics / prometheus
+            // / caches / info leak route templates, cache structure, HikariCP +
+            // JVM internals to anonymous callers (info disclosure). Those stay
+            // behind auth; for an unauthenticated Prometheus scrape in prod,
+            // bind actuator to an internal-only management port instead
+            // (management.server.port) rather than re-opening it here.
+            "/actuator/health/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html"
