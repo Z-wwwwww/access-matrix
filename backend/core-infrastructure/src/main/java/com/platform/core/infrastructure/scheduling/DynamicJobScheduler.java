@@ -119,11 +119,11 @@ public class DynamicJobScheduler {
     }
 
     /** UI 表示用：cron 式から次回発火時刻を即時計算（DB には保存しない）。
-     *  cron のフィールドは業務時間（{@link AppTime#ZONE}）の壁時計として解釈する。 */
+     *  cron のフィールドは業務時間（{@link AppTime#zone()}）の壁時計として解釈する。 */
     public OffsetDateTime nextFireTime(String cron) {
         try {
             CronExpression expr = CronExpression.parse(cron);
-            ZonedDateTime next = expr.next(ZonedDateTime.now(AppTime.ZONE));
+            ZonedDateTime next = expr.next(ZonedDateTime.now(AppTime.zone()));
             return next == null ? null : next.toOffsetDateTime();
         } catch (Exception e) {
             return null;
@@ -158,7 +158,7 @@ public class DynamicJobScheduler {
         try {
             ScheduledFuture<?> f = taskScheduler.schedule(
                     () -> wrapper.execute(jobCode, tenantId, TriggerType.CRON, null),
-                    new CronTrigger(cron, AppTime.ZONE));
+                    new CronTrigger(cron, AppTime.zone()));
             if (f == null) {
                 log.warn("[scheduler] schedule rejected for {} (cron {})", key, cron);
                 return false;

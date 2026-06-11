@@ -1,7 +1,7 @@
 # Access Matrix — Backend AI Development Guide
 
 > Companion frontend: `../frontend/` (Vue 3 + Vite + Tailwind v4). This repo is a monorepo; for the root-level cross-stack conventions see [../AGENTS.md](../AGENTS.md).
-> Backend listens on `:9135` by default, context-path `/api`. Time is stored/transported as timezone-agnostic instants (`timestamptz` / `OffsetDateTime`); `Asia/Tokyo` (`AppTime.ZONE`) applies only to wall-clock decisions.
+> Backend listens on `:9135` by default, context-path `/api`. Time is stored/transported as timezone-agnostic instants (`timestamptz` / `OffsetDateTime`); the business timezone (`AppTime.zone()`, per-deployment config `app.timezone` / `CORE_TIMEZONE`, default `Asia/Tokyo`) applies only to wall-clock decisions.
 
 ## Project Overview
 
@@ -27,7 +27,7 @@
 | Password | BCrypt (cost = 12) |
 | Rate limit | bucket4j |
 | ID | ULID Creator (CHAR(26) PK) |
-| Timezone | Instants end-to-end (`timestamptz` + `OffsetDateTime` + offset-bearing ISO wire format); business timezone `Asia/Tokyo` via `AppTime.ZONE` (wall-clock decisions only) |
+| Timezone | Instants end-to-end (`timestamptz` + `OffsetDateTime` + offset-bearing ISO wire format); business timezone via `AppTime.zone()` (wall-clock decisions only; per-deployment `app.timezone` / `CORE_TIMEZONE`, default `Asia/Tokyo`, invalid id fails the boot) |
 
 ## Module Boundaries (the most important rule)
 
@@ -210,7 +210,7 @@ If you prefer (or need) to do it by hand, the DO / DON'T below is the spec.
   update_time   timestamptz  NOT NULL DEFAULT now()
   ```
   Time columns are **`timestamptz`, never `timestamp`** (V58 converted the legacy ones; don't reintroduce zone-less wall clocks). True calendar concepts (check-in date, business date) use `date` — they are not instants and must not be converted.
-- **A property/site table gets a `timezone` column on day one** (IANA id, e.g. `Asia/Tokyo`, `NOT NULL`). It anchors every wall-clock decision for that physical site — night audit / business-date rollover, per-property cron, date parts in generated numbers, guest-facing "15:00 check-in" semantics. It is the cheapest column to add at design time and the hardest to retrofit; until it exists, the single business timezone lives in `AppTime.ZONE`.
+- **A property/site table gets a `timezone` column on day one** (IANA id, e.g. `Asia/Tokyo`, `NOT NULL`). It anchors every wall-clock decision for that physical site — night audit / business-date rollover, per-property cron, date parts in generated numbers, guest-facing "15:00 check-in" semantics. It is the cheapest column to add at design time and the hardest to retrofit; until it exists, the single business timezone lives in `AppTime.zone()` (`app.timezone`).
 - **Unique indexes lead with `tenant_id`**: `CREATE UNIQUE INDEX uk_xxx_yyy ON xxx (tenant_id, business_key) WHERE mark = 1;` — never a single-column `(business_key)` unique.
 - **Entity extends `BaseEntity`**: never redeclare `id` / `tenantId` / `mark` / audit fields. `@TableName("business_xxx")` + business fields only. `BaseEntity` + `AuditMetaObjectHandler` auto-fill the rest on INSERT.
 - **Mapper extends `BaseMapper<XxxEntity>`** and lives under `..mapper..` package. Custom queries via `@Select` MUST include `tenant_id = #{...}` predicate.
@@ -296,7 +296,7 @@ If you prefer (or need) to do it by hand, the DO / DON'T below is the spec.
 | Audit | Annotate write endpoints with `@OpLog(module, action, targetType)`; rows land in `core_oplog` automatically |
 | Pagination | `page` (1-based) + `size` (max 500); returns `PageResult<T>(records, total, page, limit)` |
 | Response | All wrapped in `JsonResult<T>`: `{ code, msg, data }`; errors via `BusinessException(ErrorCode.X, msg)` |
-| Time | `OffsetDateTime` everywhere (entities/DTOs/`now()`); columns are `timestamptz` (V58); Jackson writes ISO-8601 with offset. **Never** use `LocalDateTime` for timestamps. Wall-clock/calendar decisions (cron, day/month bucketing in SQL via `AT TIME ZONE`, date parts in numbering, email-facing formatting) go through `AppTime.ZONE` (`Asia/Tokyo`) |
+| Time | `OffsetDateTime` everywhere (entities/DTOs/`now()`); columns are `timestamptz` (V58); Jackson writes ISO-8601 with offset. **Never** use `LocalDateTime` for timestamps. Wall-clock/calendar decisions (cron, day/month bucketing in SQL via `AT TIME ZONE`, date parts in numbering, email-facing formatting) go through `AppTime.zone()` (per-deployment `app.timezone` / `CORE_TIMEZONE`, default `Asia/Tokyo`; bound at boot by `AppTimeConfigurer`, invalid id fails fast) |
 
 ## Multi-tenant
 

@@ -218,9 +218,9 @@ public class TenantAdminService {
         long active       = count("SELECT COUNT(*) FROM core_tenant WHERE mark = 1 AND status = 1");
         long suspended    = count("SELECT COUNT(*) FROM core_tenant WHERE mark = 1 AND status = 0");
         // Month boundaries are business-time (JST) calendar decisions: bucket the
-        // timestamptz instants in AppTime.ZONE and convert the window edge back
+        // timestamptz instants in AppTime.zone() and convert the window edge back
         // to an instant, so the result is independent of the DB session TimeZone.
-        String tz = AppTime.ZONE.getId();
+        String tz = AppTime.zone().getId();
         long newThisMonth = count("SELECT COUNT(*) FROM core_tenant WHERE mark = 1 "
                 + "AND create_time >= date_trunc('month', now() AT TIME ZONE '" + tz + "') AT TIME ZONE '" + tz + "'");
 
@@ -237,7 +237,7 @@ public class TenantAdminService {
                 .forEach(r -> byMonth.put((String) r.get("m"), ((Number) r.get("c")).longValue()));
 
         List<TenantDto.MonthlyCount> monthly = new ArrayList<>(12);
-        YearMonth cursor = YearMonth.now(AppTime.ZONE).minusMonths(11);
+        YearMonth cursor = YearMonth.now(AppTime.zone()).minusMonths(11);
         for (int i = 0; i < 12; i++) {
             String label = cursor.toString();   // 'YYYY-MM', matches the to_char above
             monthly.add(new TenantDto.MonthlyCount(label, byMonth.getOrDefault(label, 0L)));

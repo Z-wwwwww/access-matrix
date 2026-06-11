@@ -222,7 +222,7 @@ public class AuthService {
             model.put("displayName",  user.getDisplayName() == null ? user.getUsername() : user.getDisplayName());
             model.put("tenantId",     user.getTenantId());
             model.put("supportEmail", mailProps.from());
-            model.put("loginAt",      OffsetDateTime.now(AppTime.ZONE).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            model.put("loginAt",      OffsetDateTime.now(AppTime.zone()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
             model.put("clientIp",     clientIp == null || clientIp.isBlank() ? "unknown" : clientIp);
             model.put("userAgent",    userAgent == null || userAgent.isBlank() ? "unknown" : userAgent);
             model.put("rotateUrl",    mailProps.baseUrl() + "/");   // SPA → user menu → Break-glass

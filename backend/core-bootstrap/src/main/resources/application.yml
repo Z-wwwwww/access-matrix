@@ -118,6 +118,10 @@ springdoc:
     operations-sorter: alpha            # 同上，作用于操作列表
 
 app:
+  # 业务时区（部署级）。一套独立部署服务一个国家/市场：cron 触发、按日/月聚合、
+  # 取号日期、邮件内时间文案都按这个钟。存储/传输是带偏移量的绝对时刻，与此无关。
+  # 非法 IANA id 会在启动时 fail-fast（AppTimeConfigurer）。
+  timezone: ${CORE_TIMEZONE:Asia/Tokyo}
   security:
     # 鉴权模式。permit-all=不校验(仅测试/冒烟) | jwt=legacy HS256，由 AdminAuthController 签发
     #          | oidc=Keycloak/外部 IdP，首登时由 OidcJitUserService 即时建 core_auth_user 行。

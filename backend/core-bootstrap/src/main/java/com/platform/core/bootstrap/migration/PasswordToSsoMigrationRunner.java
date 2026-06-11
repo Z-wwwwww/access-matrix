@@ -175,7 +175,7 @@ public class PasswordToSsoMigrationRunner implements ApplicationRunner {
     }
 
     private Path writeReport(MigrationReport report, String prefix) {
-        String filename = prefix + "-" + OffsetDateTime.now(AppTime.ZONE).format(TS) + ".json";
+        String filename = prefix + "-" + OffsetDateTime.now(AppTime.zone()).format(TS) + ".json";
         Path out = Paths.get(reportDir, filename);
         try {
             Files.createDirectories(out.getParent());

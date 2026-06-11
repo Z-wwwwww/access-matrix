@@ -127,7 +127,7 @@ After scaffolding, edit the placeholder columns in the generated `V1000__create_
 | Pagination params | **`page` + `size`** (not `pageSize` / `limit`) |
 | Response shape | `{ code: 0, msg: "", data: {...} }`; for pagination `data = { records, total, page, limit }` |
 | Date format | Timestamps cross the wire as ISO-8601 **with offset** in both directions (backend typically emits UTC, e.g. `2026-06-10T08:38:33Z`; the offset value carries no meaning — only the instant does); the frontend converts via `toBackendDate` in `frontend/src/lib/date.js` |
-| Timezone | Storage/wire are timezone-agnostic instants (`timestamptz` / `OffsetDateTime` / offset-bearing ISO). `Asia/Tokyo` is the **business timezone**, applied only at the edges: display (`frontend/src/lib/date.js`) and wall-clock decisions (`AppTime.ZONE` — cron, day/month bucketing, numbering dates) |
+| Timezone | Storage/wire are timezone-agnostic instants (`timestamptz` / `OffsetDateTime` / offset-bearing ISO). `Asia/Tokyo` is the **business timezone**, applied only at the edges: display (`frontend/src/lib/date.js`) and wall-clock decisions (`AppTime.zone()` — cron, day/month bucketing, numbering dates). The business timezone is per-deployment config: `app.timezone` (`CORE_TIMEZONE` env, default `Asia/Tokyo`) — one standalone installation serves one country/market |
 | Static vs dynamic routes | The frontend registers public pages statically only; business routes are driven by the backend `/api/menu/me` via `addRoute()` |
 
 ## Behavioral guidelines (both stacks)

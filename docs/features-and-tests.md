@@ -133,7 +133,7 @@
 - [ ] 非平台运维访问 → 看不到菜单 / API 403。
 
 ### 2.4 定时任务(Scheduled jobs)
-`ScheduledJob` SPI → `core_job`,管理台可启停/改 cron/立即执行/看日志。删类重启 → 配置行软删下线。Outbox 保留作业(`core:outbox-retention`,每天 **JST** 03:30,删已分发的旧事件,V49/V50)。cron 表达式一律按业务时区 **Asia/Tokyo**(`AppTime.ZONE`)解释:`CronTrigger` 与「下次执行时间」计算均显式带该时区,与部署机器的系统时区无关。
+`ScheduledJob` SPI → `core_job`,管理台可启停/改 cron/立即执行/看日志。删类重启 → 配置行软删下线。Outbox 保留作业(`core:outbox-retention`,每天 **JST** 03:30,删已分发的旧事件,V49/V50)。cron 表达式一律按**业务时区**(`AppTime.zone()`,部署级配置 `app.timezone`/`CORE_TIMEZONE`,默认 Asia/Tokyo)解释:`CronTrigger` 与「下次执行时间」计算均显式带该时区,与部署机器的系统时区无关。
 **测试点**
 - [ ] 新建的 `ScheduledJob` 重启后出现在管理台并按 cron 执行。
 - [ ] 启停/改 cron/立即执行生效;执行日志可见。
@@ -176,7 +176,7 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 
 ## 3. 共通基盤（Cross-cutting）
 
-- **时间模型(V58)**:全链路**绝对时刻**——DB 列 `timestamptz`、后端 `OffsetDateTime`(实体/DTO/`now()`,禁用 `LocalDateTime`,由 ArchitectureTest 守护)、wire 为 ISO-8601 **带偏移量**字符串(双向,前端发送走 `toBackendDate`)。业务时区 Asia/Tokyo 只出现在边缘:前端显示(`@/lib/date` 的 `toJST*`)与墙钟决策(后端 `AppTime.ZONE`:cron 触发、日/月聚合 SQL 的 `AT TIME ZONE`、取号日期、邮件内时间文案)。显示结果与部署机器/浏览器时区无关。
+- **时间模型(V58)**:全链路**绝对时刻**——DB 列 `timestamptz`、后端 `OffsetDateTime`(实体/DTO/`now()`,禁用 `LocalDateTime`,由 ArchitectureTest 守护)、wire 为 ISO-8601 **带偏移量**字符串(双向,前端发送走 `toBackendDate`)。业务时区只出现在边缘:前端显示(`@/lib/date` 的 `toJST*`,`VITE_DEFAULT_TIMEZONE`)与墙钟决策(后端 `AppTime.zone()`:cron 触发、日/月聚合 SQL 的 `AT TIME ZONE`、取号日期、邮件内时间文案)。面向**多国独立部署**:业务时区为部署级配置 `app.timezone`(env `CORE_TIMEZONE`),默认 `Asia/Tokyo`,非法 IANA id 启动即失败(`AppTimeConfigurer`);前后端两个时区配置应配成同一个值。显示结果与部署机器/浏览器时区无关。
 - **字典(Dictionary)**:内置枚举字典 + 运行时可编辑的管理字典;前端 `useDict`,下拉/标签均走字典,不硬编码。`/platform/dicts` 管理。
 - **操作审计(oplog)**:`@OpLog` 写 `core_oplog`;失败行带 `error_code`(BusinessException 的 4xx/7xx vs 未预期 500)。
 - **领域事件出箱**:状态变更在同一事务 `EventPublisher.publish(...)` → `core_domain_event` → `OutboxDispatcher` → 可插拔 sink(当前为日志兜底)。详见 backend/AGENTS.md。

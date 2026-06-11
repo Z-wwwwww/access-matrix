@@ -266,7 +266,7 @@ public class ArchitectureTest {
                         + "writing JVM's default timezone (the pre-V58 bug class). Timestamps must be "
                         + "OffsetDateTime (timestamptz column, ISO-with-offset on the wire). LocalDate/"
                         + "LocalTime stay fine for true calendar concepts; wall-clock decisions go "
-                        + "through AppTime.ZONE.")
+                        + "through AppTime.zone().")
                 .isEmpty();
     }
 

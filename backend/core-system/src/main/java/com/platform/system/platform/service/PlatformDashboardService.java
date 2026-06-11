@@ -141,9 +141,9 @@ public class PlatformDashboardService {
 
         // Dense 14-day login-success trend; gaps filled with 0 in Java.
         // Day buckets are business-time (JST) calendar decisions: bucket the
-        // timestamptz instants in AppTime.ZONE and convert the window edge back
+        // timestamptz instants in AppTime.zone() and convert the window edge back
         // to an instant, so the result is independent of the DB session TimeZone.
-        String tz = AppTime.ZONE.getId();
+        String tz = AppTime.zone().getId();
         Map<String, Long> byDay = new HashMap<>();
         jdbc.queryForList(
                 "SELECT to_char(login_time AT TIME ZONE '" + tz + "', 'YYYY-MM-DD') AS d, COUNT(*) AS c "
@@ -154,7 +154,7 @@ public class PlatformDashboardService {
                         + "GROUP BY 1")
                 .forEach(r -> byDay.put((String) r.get("d"), ((Number) r.get("c")).longValue()));
         List<PlatformDashboardDto.DailyCount> trend = new ArrayList<>(14);
-        LocalDate cursor = LocalDate.now(AppTime.ZONE).minusDays(13);
+        LocalDate cursor = LocalDate.now(AppTime.zone()).minusDays(13);
         for (int i = 0; i < 14; i++) {
             String label = cursor.toString();   // 'YYYY-MM-DD'
             trend.add(new PlatformDashboardDto.DailyCount(label, byDay.getOrDefault(label, 0L)));
