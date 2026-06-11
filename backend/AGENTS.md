@@ -172,6 +172,7 @@ core-bootstrap/
 11. **NEVER modify an already-shipped `V*__*.sql`** — adding/changing columns means creating `V{N+1}__*.sql`. `FlywayRepairConfig` tolerates checksum drift, but schema-history readability still relies on append-only.
 12. **NO state change outside a `@Service`** — controllers/aspects/utilities must not write business tables directly. Mutations live in a service so audit + domain-event emission have exactly one seam (and so an AI actor can later be plugged in there). See "Domain events & state-change conventions".
 13. **NO mutated current-value-only column for revenue-relevant fields** (price / status / availability) — keep an append-only history (change events or history rows). This data is non-back-fillable and is the substrate for future AI / revenue management.
+14. **NO data-scoped get/update/delete-by-id without a row-level visibility gate** — `selectById` is tenant-scoped (interceptor) but **NOT** data-scoped, so a DEPT/SELF-scoped caller can otherwise read or mutate any row in the tenant by guessing its id (broken object-level authorization / IDOR). On any entity that participates in data scope (`@DataScope` lists, `dept_id`/`create_user` columns), every by-id `get`/`update`/`delete` must gate the fetched row through `DataScopeHelper.isVisible(dataScopeResolver.currentDecision(), row.deptId, row.createUser)` and throw `NOT_FOUND` (not `FORBIDDEN`, so the id's existence isn't revealed) when it returns false. Scoping the list query alone is not enough. (Pattern: `TaskService.loadVisibleOr404`.)
 
 ## Business code recipe — adding a new table / endpoint
 
@@ -350,7 +351,21 @@ Five presets:
    ```
 4. `DataScopeAspect` verifies, prior to the Mapper call, that this request invoked `apply()` — **if not, throw 500 in dev/test and log a WARN in prod**.
 
-See: `DataScopeHelper` / `DataScopeContext` / `DataScopeAspect`.
+**Single-object endpoints (get / update / delete by id) — Hard Rule 14**: `apply()` only scopes *list* queries. By-id endpoints fetch with `selectById`, which the tenant interceptor scopes by `tenant_id` but **not** by data scope. Gate the fetched row explicitly, or a DEPT/SELF-scoped caller reads/mutates any row in the tenant by id (IDOR):
+   ```java
+   private Foo loadVisibleOr404(String id) {
+       Foo f = mapper.selectById(id);
+       if (f == null || f.getMark() == null || f.getMark() != 1
+               || !DataScopeHelper.isVisible(dataScopeResolver.currentDecision(),
+                       f.getDeptId(), f.getCreateUser())) {
+           throw new BusinessException(ErrorCode.NOT_FOUND, "Foo not found: " + id);
+       }
+       return f;
+   }
+   ```
+   Call it from `get`/`update`/`delete` instead of a bare `selectById`. Throw `NOT_FOUND` (not `FORBIDDEN`) so an out-of-scope id is indistinguishable from a missing one.
+
+See: `DataScopeHelper` (`apply` for lists, `isVisible` for single objects) / `DataScopeContext` / `DataScopeAspect`. Reference: `TaskService.loadVisibleOr404`.
 
 ## Audit (@OpLog)
 

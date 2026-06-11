@@ -63,4 +63,32 @@ public final class DataScopeHelper {
             }
         });
     }
+
+    /**
+     * Row-level visibility check for <b>single-object</b> access (get / update /
+     * delete by id). {@link #apply} scopes <em>list</em> queries at the SQL
+     * layer; by-id endpoints fetch with {@code selectById} (tenant-scoped but
+     * NOT data-scoped), so they must gate the fetched row through this method —
+     * otherwise a DEPT/SELF-scoped caller can read or mutate any row in the
+     * tenant by guessing its id (broken object-level authorization / IDOR).
+     *
+     * <p>Returns the same verdict {@link #apply}'s SQL would produce for that
+     * row: {@code unrestricted} (or null decision) sees everything; no-access
+     * sees nothing; otherwise visible iff the row's dept is in
+     * {@code visibleDeptIds} OR ({@code selfOnly} and the caller created it).
+     * A row with {@code deptId == null} is invisible to a DEPT-scoped caller
+     * (fail-closed, matching {@code apply}'s {@code IN (...)} behavior).
+     *
+     * <p>On a negative verdict the caller should throw {@code NOT_FOUND} (not
+     * {@code FORBIDDEN}) so the response does not reveal that the id exists.
+     */
+    public static boolean isVisible(DataScopeDecision decision, String deptId, String createUser) {
+        if (decision == null || decision.unrestricted()) return true;
+        if (decision.hasNoAccess()) return false;
+        boolean deptVisible = deptId != null && decision.visibleDeptIds().contains(deptId);
+        boolean selfVisible = decision.selfOnly()
+                && decision.userId() != null
+                && decision.userId().equals(createUser);
+        return deptVisible || selfVisible;
+    }
 }

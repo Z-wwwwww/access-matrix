@@ -128,11 +128,27 @@ public class TaskService {
     }
 
     public TaskDto.View get(String id) {
+        TaskEntity t = loadVisibleOr404(id);
+        return toView(t);
+    }
+
+    /**
+     * Fetch a task by id, enforcing BOTH tenant scope (via the MyBatis tenant
+     * interceptor on {@code selectById}) AND data scope (dept / self) on the
+     * fetched row. {@code selectById} alone is tenant-scoped but NOT
+     * data-scoped, so without the {@link DataScopeHelper#isVisible} gate a
+     * DEPT/SELF-scoped caller could read or mutate any row in the tenant by id
+     * (IDOR). Out-of-scope (and missing) both surface as NOT_FOUND so the
+     * response never reveals that an id the caller may not see exists.
+     */
+    private TaskEntity loadVisibleOr404(String id) {
         TaskEntity t = taskMapper.selectById(id);
-        if (t == null || t.getMark() == null || t.getMark() != 1) {
+        if (t == null || t.getMark() == null || t.getMark() != 1
+                || !DataScopeHelper.isVisible(dataScopeResolver.currentDecision(),
+                        t.getDeptId(), t.getCreateUser())) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Task not found: " + id);
         }
-        return toView(t);
+        return t;
     }
 
     @Transactional
@@ -156,10 +172,7 @@ public class TaskService {
 
     @Transactional
     public void update(String id, TaskDto.UpdateRequest req) {
-        TaskEntity t = taskMapper.selectById(id);
-        if (t == null || t.getMark() == null || t.getMark() != 1) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "Task not found: " + id);
-        }
+        TaskEntity t = loadVisibleOr404(id);
         if (req.deptId() != null && !req.deptId().isBlank()) t.setDeptId(req.deptId());
         if (req.title() != null) t.setTitle(req.title());
         if (req.content() != null) t.setContent(req.content());
@@ -188,10 +201,7 @@ public class TaskService {
 
     @Transactional
     public void delete(String id) {
-        TaskEntity t = taskMapper.selectById(id);
-        if (t == null || t.getMark() == null || t.getMark() != 1) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "Task not found: " + id);
-        }
+        TaskEntity t = loadVisibleOr404(id);
         // mark は @TableLogic — BaseMapper.updateById では SET 句から除外されるので UpdateWrapper で明示。
         taskMapper.update(null,
                 new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<TaskEntity>()
