@@ -131,6 +131,10 @@ jobs:
           CORE_KEYCLOAK_SERVER_URL: http://localhost:8180
           CORE_MAIL_ENABLED: 'false'
         run: |
+          # JwtSecretValidator fail-fasts on the committed placeholder secret in
+          # oidc mode; e2e auth goes through real KC tokens, so a fresh random
+          # per-run HS256 secret is all that's needed (no repo secret required).
+          export CORE_JWT_SECRET="$(openssl rand -base64 48)"
           nohup ./mvnw -B -ntp -pl core-bootstrap spring-boot:run > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
           echo "started backend pid $!"
 
