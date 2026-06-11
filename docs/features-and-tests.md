@@ -182,7 +182,7 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 - **领域事件出箱**:状态变更在同一事务 `EventPublisher.publish(...)` → `core_domain_event` → `OutboxDispatcher` → 可插拔 sink(当前为日志兜底)。详见 backend/AGENTS.md。
 - **通知(铃铛)**:`core_notification` + SSE 心跳(15s)。注意与领域事件是两套东西。
 - **编号(numbering)**:`core_numbering*`,按租户分配 user_no 等。
-- **i18n**:ja_JP / zh_CN / zh_TW / en / ko_KR 五语;权限标签由后端 `I18nPermissionPatcher` 生成占位 `__TODO__`,需人工填 `frontend/src/lang/generated/permissions.*.json`。
+- **i18n**:ja_JP / zh_CN / zh_TW / en / ko_KR 五语;权限标签由后端 `I18nPermissionPatcher`(仅 dev)生成占位 `__TODO__`,需人工填 `frontend/src/lang/generated/permissions.*.json`。frontend 目录从 `user.dir` 向上逐级以 `package.json` 探测定位(兼容 IDEA 模块运行 / `spring-boot:run` 等不同工作目录),找不到时跳过且**不创建任何目录**;另一仓库布局可用 `app.permission.i18n.frontend-dir` 配绝对路径。
 - **邮件品牌 logo**:所有邮件模板(`user-invite` / `user-direct-welcome` / `user-password-reset` / `user-break-glass-used`,各 5 语言)header 含品牌 logo;**外链 PNG** `${baseUrl}/access_matrix_logo.png`(由 `frontend/public/access_matrix_favicon.svg` 渲染成位图——邮件客户端不显示 SVG)。`MailService` 对每封邮件统一注入 `logoUrl`(`putIfAbsent`,调用方可覆盖)。
 
 **测试点**

@@ -46,12 +46,24 @@ public class I18nPermissionPatcher {
     /**
      * frontend ディレクトリへのパス。デフォルトはモノレポ構成（backend と並列に frontend）。
      * 別レポ構成の場合は {@code app.permission.i18n.frontend-dir} で上書き。
+     *
+     * <p>相対パスは {@code user.dir} から親方向へ遡って解決する。起動方法によって
+     * {@code user.dir} が {@code backend/} だったり {@code backend/core-bootstrap/}
+     * （IDEA のモジュール実行や {@code spring-boot:run} のフォーク先）だったりするため、
+     * 単純な resolve だと {@code backend/frontend/} という偽ディレクトリを作ってしまう。
+     * 実在判定は {@code package.json} の有無で行い、見つからなければパッチをスキップする。
      */
     @Value("${app.permission.i18n.frontend-dir:../frontend}")
     private String frontendDir;
 
     public void patch(Set<String> codes) throws IOException {
-        Path generated = resolveFrontendDir().resolve("src/lang/generated");
+        Path frontend = resolveFrontendDir();
+        if (frontend == null) {
+            log.warn("[I18nPatcher] frontend dir not found (user.dir={}, app.permission.i18n.frontend-dir={}) — skipping i18n patch",
+                    System.getProperty("user.dir"), frontendDir);
+            return;
+        }
+        Path generated = frontend.resolve("src/lang/generated");
         if (!Files.exists(generated)) {
             Files.createDirectories(generated);
         }
@@ -72,9 +84,24 @@ public class I18nPermissionPatcher {
         }
     }
 
+    /**
+     * 設定が絶対パスならそのまま信用する。相対パスは {@code user.dir} から親へ遡り、
+     * 各階層で resolve した候補に {@code package.json} が実在する最初のものを採用。
+     * 見つからなければ {@code null}（呼び出し側でスキップ）。
+     */
     private Path resolveFrontendDir() {
         Path raw = Paths.get(frontendDir);
-        return raw.isAbsolute() ? raw : Paths.get(System.getProperty("user.dir")).resolve(raw).normalize();
+        if (raw.isAbsolute()) {
+            return raw.normalize();
+        }
+        Path base = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        for (Path dir = base; dir != null; dir = dir.getParent()) {
+            Path candidate = dir.resolve(raw).normalize();
+            if (Files.isRegularFile(candidate.resolve("package.json"))) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     /** 既存 JSON を緩めにパース。書式エラーや欠損は空 Map で復元する（破壊的に上書きしない）。 */
