@@ -351,7 +351,7 @@ public final class BusinessModuleScaffold {
 
                     <parent>
                         <groupId>com.platform</groupId>
-                        <artifactId>core-parent</artifactId>
+                        <artifactId>AM-backend</artifactId>
                         <version>1.0.0-SNAPSHOT</version>
                         <relativePath>../pom.xml</relativePath>
                     </parent>

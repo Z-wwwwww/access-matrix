@@ -15,7 +15,7 @@
     <artifactId>AM-backend</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
-    <name>core-parent</name>
+    <name>AM-backend</name>
     <description>Platform Foundation - Spring Boot 4 Auth Skeleton</description>
 
     <modules>

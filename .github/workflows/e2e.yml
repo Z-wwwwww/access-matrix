@@ -106,7 +106,7 @@ jobs:
 
       # Build + install all modules to the local repo first. spring-boot:run
       # must then target ONLY core-bootstrap (no -am): with -am the run goal
-      # also fires on upstream modules incl. the core-parent aggregator, which
+      # also fires on upstream modules incl. the AM-backend aggregator, which
       # has no main class → "Unable to find a suitable main class".
       - name: Build backend
         working-directory: backend
