@@ -38,6 +38,11 @@ public record DomainEvent(
         return new DomainEvent(aggregateType, aggregateId, eventType, payload, ActorType.HUMAN);
     }
 
+    /** A change driven by an AI service account (recommendation accepted / autopilot). */
+    public static DomainEvent ai(String aggregateType, String aggregateId, String eventType, Object payload) {
+        return new DomainEvent(aggregateType, aggregateId, eventType, payload, ActorType.AI);
+    }
+
     /** A change driven by an automated/background process (no human actor). */
     public static DomainEvent system(String aggregateType, String aggregateId, String eventType, Object payload) {
         return new DomainEvent(aggregateType, aggregateId, eventType, payload, ActorType.SYSTEM);
