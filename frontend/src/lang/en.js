@@ -184,7 +184,7 @@ export default {
       closeAll: 'Close all tabs'
     },
     footer: {
-      copyright: 'Copyright © 2026 ACME Co.,Ltd.'
+      copyright: 'Copyright © 2026 Access Matrix'
     },
     notification: {
       title: 'Notifications',

@@ -184,7 +184,7 @@ export default {
       closeAll: '모든 탭 닫기'
     },
     footer: {
-      copyright: 'Copyright © 2026 ACME Co.,Ltd.'
+      copyright: 'Copyright © 2026 Access Matrix'
     },
     notification: {
       title: '알림',

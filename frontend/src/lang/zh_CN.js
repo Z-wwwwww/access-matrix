@@ -184,7 +184,7 @@ export default {
       closeAll: '关闭所有标签'
     },
     footer: {
-      copyright: 'Copyright © 2026 ACME Co.,Ltd.'
+      copyright: 'Copyright © 2026 Access Matrix'
     },
     notification: {
       title: '通知',

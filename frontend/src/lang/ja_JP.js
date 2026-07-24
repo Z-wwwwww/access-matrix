@@ -191,7 +191,7 @@ export default {
       closeAll: 'すべてのタブを閉じる'
     },
     footer: {
-      copyright: 'Copyright © 2026 ACME Co.,Ltd.'
+      copyright: 'Copyright © 2026 Access Matrix'
     },
     notification: {
       title: 'お知らせ',
