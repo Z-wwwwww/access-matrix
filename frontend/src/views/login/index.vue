@@ -38,6 +38,16 @@ const hotClicks = ref(0)
 let hotResetTimer = null
 let autoRedirectTimer = null
 const autoRedirecting = ref(false)
+/**
+ * Set the moment the user opts out of the pending SSO auto-redirect (hot-zone
+ * click, break-glass CTA, unmount). Clearing `autoRedirectTimer` alone is NOT
+ * enough: the redirect is armed only AFTER the reachability probe resolves (up
+ * to SSO_PROBE_TIMEOUT_MS = 3s), so during that window there is no timer to
+ * clear and the probe's .then would happily arm one anyway — dragging the user
+ * to Keycloak right after they broke glass. That window is widest on a slow /
+ * degraded KC, which is exactly when break-glass is being used.
+ */
+let autoRedirectCancelled = false
 // SSO server pre-flight probe state. When the probe fails (KC down,
 // network blocked, etc.) we abort the auto-redirect and surface a friendly
 // in-app banner with a "use break-glass" CTA — much better UX than letting
@@ -82,11 +92,7 @@ function onHotZoneClick() {
   // First hot-zone click also cancels the pending auto-redirect — once
   // the user starts trying to break glass, don't yank the rug out from
   // under them by navigating to Keycloak mid-click.
-  if (autoRedirectTimer) {
-    clearTimeout(autoRedirectTimer)
-    autoRedirectTimer = null
-    autoRedirecting.value = false
-  }
+  cancelAutoRedirect()
   if (hotClicks.value >= HOT_CLICKS_REQUIRED) {
     passwordUnlocked.value = true
     sessionStorage.setItem(PASSWORD_UNLOCK_KEY, '1')
@@ -95,6 +101,20 @@ function onHotZoneClick() {
     hotResetTimer = setTimeout(() => { hotClicks.value = 0 }, HOT_RESET_MS)
   }
 }
+/**
+ * Abandon the pending SSO auto-redirect for good — cancels an already-armed
+ * timer AND latches {@link autoRedirectCancelled} so the still-in-flight
+ * reachability probe won't arm a new one when it resolves.
+ */
+function cancelAutoRedirect() {
+  autoRedirectCancelled = true
+  if (autoRedirectTimer) {
+    clearTimeout(autoRedirectTimer)
+    autoRedirectTimer = null
+  }
+  autoRedirecting.value = false
+}
+
 function relockPassword() {
   passwordUnlocked.value = false
   sessionStorage.removeItem(PASSWORD_UNLOCK_KEY)
@@ -194,11 +214,7 @@ function useBreakGlass() {
   passwordUnlocked.value = true
   sessionStorage.setItem(PASSWORD_UNLOCK_KEY, '1')
   ssoUnreachable.value = false
-  if (autoRedirectTimer) {
-    clearTimeout(autoRedirectTimer)
-    autoRedirectTimer = null
-  }
-  autoRedirecting.value = false
+  cancelAutoRedirect()
 }
 
 async function handleForgotPassword() {
@@ -317,6 +333,13 @@ onMounted(() => {
     // page — that page has no way back, so a confused operator would
     // have to hit Back, lose tab state, and rediscover the hot-zone.
     probeWithRecovery().then((reachable) => {
+      // The probe took up to 3s. In the meantime the user may have broken
+      // glass (hot-zone / CTA) or navigated away — re-check before arming,
+      // otherwise we'd override the very opt-out they just performed.
+      if (autoRedirectCancelled || !shouldAutoRedirectToSso()) {
+        autoRedirecting.value = false
+        return
+      }
       if (!reachable) {
         autoRedirecting.value = false
         ssoUnreachable.value = true
@@ -335,7 +358,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearTimeout(hotResetTimer)
-  clearTimeout(autoRedirectTimer)
+  // cancelAutoRedirect (not a bare clearTimeout): a probe still in flight would
+  // otherwise arm a redirect after this component is gone and navigate the user
+  // to Keycloak from whatever page they moved on to.
+  cancelAutoRedirect()
 })
 </script>
 

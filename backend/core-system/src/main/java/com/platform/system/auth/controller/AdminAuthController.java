@@ -49,9 +49,20 @@ public class AdminAuthController {
         if (user == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "User not found");
         }
+        // Clear the lockout ONLY. Lockout lives entirely in Redis
+        // (AccountLockoutService writes auth:fail:* / auth:lock:* and nothing
+        // else) — no code path anywhere sets core_auth_user.status = 0 because
+        // of failed logins, and AuthService.login rejects "locked" and
+        // "disabled" as two independent checks (ACCOUNT_LOCKED vs
+        // ACCOUNT_DISABLED). So a `setStatus(1)` here could never be part of
+        // unlocking: the only state it could ever flip is an account an admin
+        // DELIBERATELY disabled — and it did so bypassing every guard that owns
+        // that field (assertNotSelf / assertNotProtectedAdmin) and, worse,
+        // without SessionTerminationService.applyEnabled, leaving the DB
+        // "enabled" while Keycloak still refuses the login and the force-logout
+        // kick stays in place. Re-enabling is PUT /admin/user/{id}/status
+        // (user:update), not a side effect of auth:unlock.
         lockoutService.reset(tenant(), body.username());
-        user.setStatus(1);
-        userMapper.updateById(user);
         return JsonResult.ok();
     }
 

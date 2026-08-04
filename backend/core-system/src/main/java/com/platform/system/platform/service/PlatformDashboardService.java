@@ -46,16 +46,43 @@ public class PlatformDashboardService {
         return new PlatformDashboardDto.View(activation(), engagement(), reliability(), security());
     }
 
+    /**
+     * Restricts an invite query to the TENANT-ADMIN invite — the one minted at tenant
+     * creation for the holder of that tenant's built-in SUPER_ADMIN role.
+     *
+     * <p>Mandatory for every activation-funnel query. {@code core_user_invite} is
+     * shared: ordinary business users invited by a tenant's own admin
+     * ({@code UserAdminService} INVITE mode) land in the same table under the same
+     * {@code tenant_id}. Counting those as onboarding makes the funnel contradict
+     * itself — verified against the real DB that a single employee invite put
+     * {@code demo} (14 successful logins, i.e. counted as ACTIVATED) simultaneously
+     * into "pending activation", with a drill-down row labelled only with the
+     * tenant's code / display name / contact email, hence indistinguishable from a
+     * tenant that never onboarded. Ops then chases a customer who is already live.
+     *
+     * <p>{@code assignRoles} refuses to grant SUPER_ADMIN to a second user, so the
+     * holder is unique; {@code is_built_in = 1} identifies the role without depending
+     * on its name.
+     */
+    private static final String ADMIN_INVITE_ONLY =
+            "  JOIN core_rbac_user_role ur "
+                    + "    ON ur.user_id = i.user_id AND ur.tenant_id = i.tenant_id AND ur.mark = 1 "
+                    + "  JOIN core_rbac_role r "
+                    + "    ON r.id = ur.role_id AND r.tenant_id = ur.tenant_id "
+                    + "   AND r.mark = 1 AND r.is_built_in = 1 ";
+
     // ── 2. Activation funnel ───────────────────────────────────────────────
     private PlatformDashboardDto.Activation activation() {
         long pending = q1Long(
-                "SELECT COUNT(DISTINCT tenant_id) FROM core_user_invite "
-                        + "WHERE used_at IS NULL AND mark = 1 AND expires_at > now() "
-                        + "AND tenant_id NOT IN ('system')");
+                "SELECT COUNT(DISTINCT i.tenant_id) FROM core_user_invite i "
+                        + ADMIN_INVITE_ONLY
+                        + "WHERE i.used_at IS NULL AND i.mark = 1 AND i.expires_at > now() "
+                        + "AND i.tenant_id NOT IN ('system')");
         long expired = q1Long(
-                "SELECT COUNT(DISTINCT tenant_id) FROM core_user_invite "
-                        + "WHERE used_at IS NULL AND mark = 1 AND expires_at <= now() "
-                        + "AND tenant_id NOT IN ('system')");
+                "SELECT COUNT(DISTINCT i.tenant_id) FROM core_user_invite i "
+                        + ADMIN_INVITE_ONLY
+                        + "WHERE i.used_at IS NULL AND i.mark = 1 AND i.expires_at <= now() "
+                        + "AND i.tenant_id NOT IN ('system')");
 
         long nonBuiltin = q1Long(
                 "SELECT COUNT(*) FROM core_tenant WHERE mark = 1 "
@@ -87,13 +114,19 @@ public class PlatformDashboardService {
         return new PlatformDashboardDto.Activation(pending, expired, rate, medianHours, pendingList, expiredList);
     }
 
-    /** Shared invite-list query for the pending / expired activation cards. */
+    /**
+     * Shared invite-list query for the pending / expired activation cards.
+     * Admin-invite-only, for the reason spelled out on {@link #ADMIN_INVITE_ONLY} —
+     * these rows are labelled with the TENANT's identity, so an employee's invite
+     * appearing here reads as "this customer never activated".
+     */
     private List<PlatformDashboardDto.PendingInvite> invites(String tail, boolean expired) {
         return jdbc.query(
                 "SELECT t.id, t.tenant_code, t.display_name, t.contact_email, "
                         + "       i.create_time AS invited_at, i.expires_at "
                         + "FROM core_user_invite i "
                         + "JOIN core_tenant t ON t.tenant_code = i.tenant_id AND t.mark = 1 "
+                        + ADMIN_INVITE_ONLY
                         + "WHERE i.used_at IS NULL AND i.mark = 1 "
                         + "AND i.tenant_id NOT IN ('system') " + tail + " LIMIT " + LIST_CAP,
                 (rs, n) -> new PlatformDashboardDto.PendingInvite(

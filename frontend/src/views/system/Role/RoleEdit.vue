@@ -418,13 +418,25 @@ async function save() {
       if (r.data.code !== 0) { toast.error(r.data.msg || t('role.edit.message.createFailed')); return }
       roleId = r.data.data
     }
-    await Promise.all([
+    // The three bind calls' response codes MUST be checked. request.js only
+    // rejects on code 401 and 700 — every other business code RESOLVES, so a
+    // NOT_FOUND (404, e.g. the role was deleted while this drawer was open),
+    // VALIDATION_FAILED (701) or IN_USE (703) from a bind endpoint used to sail
+    // through and the user was told "saved" while nothing was bound. The
+    // create/update calls above already check `code !== 0`; these didn't.
+    const bindResults = await Promise.all([
       bindRolePermissionsApi(roleId, selectedPermIds.value),
       bindRoleMenusApi(roleId, selectedMenuIds.value),
       form.dataScope === 5
         ? bindRoleDeptsApi(roleId, selectedDeptIds.value)
-        : Promise.resolve()
+        : Promise.resolve(null)
     ])
+    const failed = bindResults.find((r) => r && r.data?.code !== 0)
+    if (failed) {
+      // msg is already localized by request.js's localizeError.
+      toast.error(failed.data?.msg || t('common.message.saveFailed'))
+      return
+    }
     toast.success(t('common.message.saveSuccessful'))
     emit('saved')
     emit('update:open', false)

@@ -8,6 +8,7 @@ import com.platform.business.demo.task.entity.TaskEntity;
 import com.platform.business.demo.task.mapper.TaskMapper;
 import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
+import com.platform.core.common.error.ConcurrentEdit;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.core.common.notification.NotificationEvent;
@@ -73,7 +74,29 @@ public class TaskService {
      * covers the code-branched subset). Unknown values are rejected; ops-added ones pass.
      */
     private void validateDictValue(String code, Integer value, String field) {
-        if (value != null && !dictQueryService.isValidValue(code, value)) {
+        validateDictValue(code, value, field, null);
+    }
+
+    /**
+     * @param current the value already stored on the row being edited, or null on
+     *                create. A retired (status=0) option is refused for NEW input but
+     *                carried forward unchanged, so editing an unrelated field on an
+     *                old row never fails on a value the operator can no longer pick.
+     */
+    private void validateDictValue(String code, Integer value, String field, Integer current) {
+        if (value == null) return;
+        if (current != null && value.equals(current)) {
+            // Unchanged — must stay acceptable even if the option was retired since.
+            if (dictQueryService.isValidValue(code, value)) return;
+        }
+        // isSelectableValue, not isValidValue: DictAdminService.deleteItem refuses to
+        // hard-delete a branch/referenced value and tells the operator to disable it
+        // (status=0) instead, so status=0 IS the retirement mechanism. isValidValue
+        // ignores status, so retiring an option used to change nothing server-side —
+        // it only stopped fresh UI from offering it (useDict.options filters on
+        // `enabled`), while any client, including a tab holding a pre-disable dict
+        // cache, could still write the retired value.
+        if (!dictQueryService.isSelectableValue(code, value)) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.dict.invalidValue");
         }
     }
@@ -177,18 +200,18 @@ public class TaskService {
         if (req.title() != null) t.setTitle(req.title());
         if (req.content() != null) t.setContent(req.content());
         if (req.status() != null) {
-            validateDictValue("task_status", req.status(), "status");
+            validateDictValue("task_status", req.status(), "status", t.getStatus());
             t.setStatus(req.status());
         }
         if (req.priority() != null) {
-            validateDictValue("task_priority", req.priority(), "priority");
+            validateDictValue("task_priority", req.priority(), "priority", t.getPriority());
             t.setPriority(req.priority());
         }
         boolean assigneeChanged = req.assigneeUserId() != null
                 && !req.assigneeUserId().equals(t.getAssigneeUserId());
         if (req.assigneeUserId() != null) t.setAssigneeUserId(req.assigneeUserId());
         if (req.dueDate() != null) t.setDueDate(req.dueDate());
-        taskMapper.updateById(t);
+        ConcurrentEdit.requireApplied(taskMapper.updateById(t));
         emit("demo.task.updated", t);
         if (assigneeChanged) notifyAssignee(t);
         // 「処理完了」= 完了/取消。この時点で該当タスクの action 通知を既読化する。

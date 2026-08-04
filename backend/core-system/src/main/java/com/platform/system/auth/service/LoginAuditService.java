@@ -34,17 +34,36 @@ public class LoginAuditService {
         try {
             LoginLogEntity entity = new LoginLogEntity();
             entity.setId(IdGenerator.ulid());
-            entity.setTenantId(tid);
+            entity.setTenantId(clamp(tid, 64));
             entity.setUserId(userId);
-            entity.setIdentifier(identifier);
-            entity.setClientIp(clientIp);
-            entity.setUserAgent(userAgent);
+            entity.setIdentifier(clamp(identifier, 128));
+            entity.setClientIp(clamp(clientIp, 64));
+            entity.setUserAgent(clamp(userAgent, 512));
             entity.setSuccess(success);
-            entity.setFailureReason(failureReason);
+            entity.setFailureReason(clamp(failureReason, 128));
             entity.setLoginTime(OffsetDateTime.now());
             mapper.insert(entity);
         } catch (Exception e) {
             log.warn("Failed to record login audit: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Clamps a value to its {@code core_auth_login_log} column width.
+     *
+     * <p>Every argument here is attacker-reachable on an UNAUTHENTICATED request:
+     * {@code identifier} is {@code LoginRequest.username}, which carries only
+     * {@code @NotBlank} (no {@code @Size}); {@code userAgent} is the raw
+     * User-Agent header; {@code tid} is the raw X-Tenant-Id header. Postgres
+     * rejects an over-long value outright (verified against the real DB for
+     * identifier/129, user_agent/513 and tenant_id/65), and the catch above
+     * swallows it so the failed-login row simply never lands — leaving the
+     * account-lockout counter (Redis) incremented with nothing in the audit
+     * trail, i.e. a trivially self-service way to brute-force without a paper
+     * trail. Clamping keeps the row; a truncated audit row beats a missing one.
+     */
+    private static String clamp(String s, int max) {
+        if (s == null || s.length() <= max) return s;
+        return s.substring(0, max);
     }
 }

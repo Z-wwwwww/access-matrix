@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -73,17 +74,29 @@ class SsoToPasswordMigrationServiceTest {
     void happyPath_mintsTokenAndSendsResetEmail() {
         dbUsers.add(row("ULID-A", "alice", "alice@example.com", "kc-uuid-A"));
         when(tokens.mint("demo", "ULID-A", "kc-uuid-A")).thenReturn("CLEARTEXT_TOKEN");
+        // Distinctive TTL so the assertion below can tell a config-derived value
+        // from the old hardcoded "7".
+        when(tokens.ttlDays()).thenReturn(3L);
 
         MigrationReport report = service.run(List.of("demo"));
 
         verify(tokens).mint("demo", "ULID-A", "kc-uuid-A");
+        // The email's stated validity must come from the CONFIGURED
+        // app.password-reset.token-ttl, never a literal — a hardcoded "7" tells the
+        // recipient the link lasts a week even after the TTL is shortened, and they
+        // act on that deadline. The two invite emails already derive it; this one
+        // used to hardcode it.
+        ArgumentCaptor<java.util.Map<String, Object>> model = ArgumentCaptor.forClass(java.util.Map.class);
         verify(mailService).sendHtmlAsync(
                 eq("alice@example.com"),
                 eq(Locale.JAPAN),
                 eq("user-password-reset.subject"),
                 any(Object[].class),
                 eq("user-password-reset"),
-                any());
+                model.capture());
+        assertThat(model.getValue().get("expiresIn"))
+                .as("quoted validity comes from the token service (stubbed to 3), not a literal 7")
+                .isEqualTo("3");
         assertThat(report.tenants).hasSize(1);
         assertThat(report.tenants.get(0).created).hasSize(1);
         MigrationReport.Created c = report.tenants.get(0).created.get(0);

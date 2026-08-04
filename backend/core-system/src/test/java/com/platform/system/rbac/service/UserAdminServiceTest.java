@@ -37,6 +37,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -94,6 +95,18 @@ class UserAdminServiceTest {
         org.mockito.Mockito.lenient()
                 .when(roleLookup.superAdminRoleId("acme"))
                 .thenReturn(BuiltInRoles.SUPER_ADMIN_ID);
+        // Happy-path default for assignRoles' existence guard: every supplied
+        // role id is a live role of this tenant. Tests that care about the guard
+        // override this (see assignRoles_refusesUnknownRoleId).
+        org.mockito.Mockito.lenient()
+                .when(userRoleMapper.countLiveRoles(any(), anyString()))
+                .thenAnswer(inv -> (long) ((java.util.Collection<?>) inv.getArgument(0)).size());
+        // updateById now goes through ConcurrentEdit.requireApplied(...): 0 affected rows
+        // means a concurrent editor advanced the @Version column. Mockito defaults an int
+        // return to 0, so every mocked update would look like a lost update.
+        org.mockito.Mockito.lenient()
+                .when(userMapper.updateById(org.mockito.ArgumentMatchers.any(UserEntity.class)))
+                .thenReturn(1);
     }
 
     @AfterEach
@@ -268,6 +281,48 @@ class UserAdminServiceTest {
     // Both the admin console edit and the self-service Profile page must
     // mirror contact changes into Keycloak — otherwise KC keeps the old
     // email and its "forgot password" flow mails the stale address.
+
+    @Test
+    void create_deletesTheKeycloakUserWhenTheDbInsertFails() {
+        // COMPENSATION. KC is provisioned first so its uuid can be stored on the
+        // row; if the insert then fails this @Transactional method rolls back and
+        // the KC user would survive as an orphan with no business row. The operator
+        // could then never retry from the UI: the DB pre-checks pass (no row), but
+        // KC answers 409 → "Keycloak user already exists". Both sibling flows
+        // (TenantAdminService / PlatformUserAdminService) already compensate.
+        KeycloakUserService kc = org.mockito.Mockito.mock(KeycloakUserService.class);
+        when(keycloakProvider.getIfAvailable()).thenReturn(kc);
+        when(kc.createUser(anyString(), anyString(), any(), any(), any())).thenReturn("kc-new");
+        when(userMapper.selectCount(any())).thenReturn(0L);
+        when(numberingService.next(eq("USER"), anyString())).thenReturn("U00000009");
+        org.mockito.Mockito.doThrow(new IllegalStateException("unique violation"))
+                .when(userMapper).insert(any(UserEntity.class));
+
+        UserDto.CreateRequest req = new UserDto.CreateRequest(
+                "carol", null, "carol@example.com", "Carol", null, 1,
+                UserDto.ProvisionMode.INVITE);
+
+        assertThatThrownBy(() -> service.create(req))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(kc).deleteUser("acme", "kc-new");
+    }
+
+    @Test
+    void create_doesNotCallKeycloakDeleteOnTheHappyPath() {
+        KeycloakUserService kc = org.mockito.Mockito.mock(KeycloakUserService.class);
+        when(keycloakProvider.getIfAvailable()).thenReturn(kc);
+        when(kc.createUser(anyString(), anyString(), any(), any(), any())).thenReturn("kc-new");
+        when(userMapper.selectCount(any())).thenReturn(0L);
+        when(numberingService.next(eq("USER"), anyString())).thenReturn("U00000009");
+
+        service.create(new UserDto.CreateRequest(
+                "carol", null, "carol@example.com", "Carol", null, 1,
+                UserDto.ProvisionMode.INVITE));
+
+        verify(userMapper).insert(any(UserEntity.class));
+        verify(kc, never()).deleteUser(anyString(), anyString());
+    }
 
     @Test
     void update_syncsEmailAndDisplayNameToKeycloak() {
@@ -497,5 +552,110 @@ class UserAdminServiceTest {
         verify(userRoleMapper).update(eq(null), any(UpdateWrapper.class)); // unlink-all step
         verify(userRoleMapper).insert(any(UserRoleEntity.class));
         verify(cacheService).evictUser("u1");
+    }
+
+    @Test
+    void assignRoles_refusesUnknownRoleId() {
+        // Only 1 of the 2 supplied ids is a live role of this tenant. Without
+        // this guard the link insert relied on the DB: an unknown id trips the
+        // role FK → 500 "Unhandled exception"; a soft-deleted or ANOTHER
+        // TENANT's id satisfies the FK (it references core_rbac_role(id) only,
+        // not the tenant) and silently inserts a junk link.
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+        when(userRoleMapper.countLiveRoles(any(), eq("acme"))).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.assignRoles("u1", List.of("live-role", "ghost-role")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("error.user.roleNotFound");
+
+        // Nothing written — not even the unlink-all step.
+        verify(userRoleMapper, never()).update(any(), any(UpdateWrapper.class));
+        verify(userRoleMapper, never()).insert(any(UserRoleEntity.class));
+    }
+
+    // ── malformed roleIds: validated set must equal written set ──────────────
+    //
+    // assertRolesExist used to dedup + drop null/blank internally while the insert
+    // loop iterated the RAW request list, so these three bodies passed validation
+    // and then died at the DB as a 500 (each verified against the real DB):
+    //   ["R1","R1"] → duplicate key value violates uk_core_rbac_user_role
+    //   ["R1",null] → null value in column "role_id" violates not-null constraint
+    //   ["R1",""]   → violates fk_core_rbac_user_role_role
+    // RoleAdminService's three sibling bind methods never had the gap (dedupOrEmpty).
+
+    @Test
+    void assignRoles_duplicateRoleIdIsCollapsed_notInsertedTwice() {
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+
+        service.assignRoles("u1", List.of("dup-role", "dup-role", "dup-role"));
+
+        ArgumentCaptor<UserRoleEntity> cap = ArgumentCaptor.forClass(UserRoleEntity.class);
+        verify(userRoleMapper, times(1)).insert(cap.capture());
+        assertThat(cap.getValue().getRoleId()).isEqualTo("dup-role");
+    }
+
+    @Test
+    void assignRoles_nullAndBlankRoleIdsAreDropped_neverReachTheInsert() {
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+
+        service.assignRoles("u1", java.util.Arrays.asList("real-role", null, "", "   "));
+
+        ArgumentCaptor<UserRoleEntity> cap = ArgumentCaptor.forClass(UserRoleEntity.class);
+        verify(userRoleMapper, times(1)).insert(cap.capture());
+        assertThat(cap.getValue().getRoleId()).isEqualTo("real-role");
+    }
+
+    @Test
+    void assignRoles_existenceGuardSeesTheSanitisedSet_notTheRawList() {
+        // The count the guard compares against must be the size of what will
+        // actually be written. With ["R1","R1"] the DB holds 1 live role, so a
+        // guard fed the raw 2-element list would wrongly reject a valid request.
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+        when(userRoleMapper.countLiveRoles(any(), eq("acme"))).thenReturn(1L);
+
+        service.assignRoles("u1", List.of("dup-role", "dup-role"));
+
+        verify(userRoleMapper).insert(any(UserRoleEntity.class));
+    }
+
+    @Test
+    void assignRoles_allBlankListIsTreatedAsClearAll() {
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+
+        service.assignRoles("u1", java.util.Arrays.asList(null, "", "  "));
+
+        verify(userRoleMapper).update(eq(null), any(UpdateWrapper.class));   // unlink-all still runs
+        verify(userRoleMapper, never()).insert(any(UserRoleEntity.class));
+    }
+
+    @Test
+    void assignRoles_allowsClearingAllRoles() {
+        // An empty list is "strip every role" — the guard must not reject it.
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+
+        service.assignRoles("u1", List.of());
+
+        verify(userRoleMapper).update(eq(null), any(UpdateWrapper.class));
+        verify(userRoleMapper, never()).insert(any(UserRoleEntity.class));
+    }
+
+    @Test
+    void listRoleIds_returnsOnlyLiveTenantRoles() {
+        // Must go through the JOIN-to-role query, not a bare user_role select:
+        // a dangling link (soft-deleted or cross-tenant role) would otherwise
+        // show up as a checked-but-unknown role in the assignment dialog.
+        when(userMapper.selectById("u1")).thenReturn(user("u1", "alice"));
+        when(userRoleMapper.findActiveRoleIdsByUserId("u1", "acme")).thenReturn(List.of("r-live"));
+
+        assertThat(service.listRoleIds("u1")).containsExactly("r-live");
+
+        verify(userRoleMapper).findActiveRoleIdsByUserId("u1", "acme");
+        verify(userRoleMapper, never()).selectList(any());
     }
 }

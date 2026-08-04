@@ -17,7 +17,7 @@ defaults:
 
 jobs:
   build:
-    name: lint + build
+    name: lint + test + build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -34,6 +34,14 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      # Vitest unit tests (src/**/*.test.js + tests/components/**). These are the
+      # frontend counterpart of backend.yml's `mvnw test` and several of them exist
+      # purely as regression guards (e.g. tests/components/buttonGating.test.js pins
+      # the permission codes gating the admin pages' write buttons), so they have to
+      # gate a PR — otherwise a rename silently lands on main.
+      - name: Test
+        run: npm test
 
       - name: Build
         run: npm run build

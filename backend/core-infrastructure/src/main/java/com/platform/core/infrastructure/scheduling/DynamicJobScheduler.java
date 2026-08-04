@@ -132,6 +132,18 @@ public class DynamicJobScheduler {
 
     /** system 租户で横断に enabled=1 行を読み、key→row のマップにする。 */
     private Map<String, CoreJobEntity> loadEnabled() {
+        // reconcileNow() is documented as callable from the admin API, and it runs
+        // SYNCHRONOUSLY on the caller's thread — so this must not damage the caller's
+        // RequestContext. It used to overwrite it with the reconciler identity and then
+        // clear() it outright, which left the rest of the request with no context at
+        // all. That is squarely in the blast radius of @OpLog: OpLogAspect builds its
+        // record in a finally block AFTER the method returns, reading userId / username
+        // / tenantId from RequestContext at that moment — so the audit rows for
+        // job.config / job.enable / job.disable (the three endpoints whose service
+        // methods end with reconcile()) came out with no actor at all. This project's
+        // own standard, from the pre-auth audit work, is that a misattributed audit row
+        // is worse than none. Snapshot and restore instead.
+        RequestContext caller = RequestContext.current();
         RequestContext.set(SYSTEM_TENANT, "system", "job-reconciler", Locale.ROOT, null);
         try {
             List<CoreJobEntity> rows = jobMapper.selectList(new QueryWrapper<CoreJobEntity>()
@@ -142,7 +154,12 @@ public class DynamicJobScheduler {
             }
             return out;
         } finally {
-            RequestContext.clear();
+            if (caller == null) {
+                RequestContext.clear();
+            } else {
+                RequestContext.set(caller.getTenantId(), caller.getUserId(), caller.getUsername(),
+                        caller.getLocale(), caller.getTraceId());
+            }
         }
     }
 

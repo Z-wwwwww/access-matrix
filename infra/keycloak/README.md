@@ -84,16 +84,16 @@ infra/keycloak/start-keycloak.sh
 
 ### 新增租户（推荐方式）
 
-使用仓库中提交的辅助脚本，它会克隆 `demo-realm.json` 并改写 realm 名和 `tid` 硬编码 claim mapper：
+使用仓库中提交的辅助脚本。它会克隆 `demo-realm.json`，改写全部 realm 相关字符串（realm 名、显示名、`tid` 硬编码 claim mapper，以及**内置客户端 URL** `/realms/<code>/account/*` 和 `/admin/<code>/console/*`），并**重新生成文件里的每一个 UUID** —— 模板是 demo realm 的导出文件，那些 id 是 Keycloak 的主键，照抄会和已存在的 demo realm 撞主键。脚本与平台控制台走的 `KeycloakRealmService.renderRealmJson` 做的是同一套处理，两边必须保持同步。
 
 ```powershell
-# Windows
-.\infra\keycloak\new-tenant.ps1 -Name acme
+# Windows（显示名可选，默认取 -Name）
+.\infra\keycloak\new-tenant.ps1 -Name acme -DisplayName "Acme Inc."
 ```
 
 ```bash
-# macOS / Linux
-infra/keycloak/new-tenant.sh acme
+# macOS / Linux（第二个参数为显示名，可选）
+infra/keycloak/new-tenant.sh acme "Acme Inc."
 ```
 
 然后重启 Keycloak —— `start-keycloak.{bat,sh}` 已经传了 `--import-realm`，下次启动时新文件会被自动加载。在管理控制台中（realm 选择器 → `acme`）确认后，再在 Users 标签下开通第一个管理员用户。

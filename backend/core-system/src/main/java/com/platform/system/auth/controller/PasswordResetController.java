@@ -4,13 +4,17 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
+import com.platform.core.infrastructure.audit.OpLogRecord;
+import com.platform.core.infrastructure.audit.OpLogSink;
 import com.platform.core.infrastructure.config.properties.AppMailProperties;
+import com.platform.core.infrastructure.security.ClientIpResolver;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.auth.entity.PasswordResetTokenEntity;
 import com.platform.system.auth.entity.UserEntity;
 import com.platform.system.auth.mapper.UserMapper;
 import com.platform.system.auth.service.PasswordResetTokenService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -71,19 +75,26 @@ public class PasswordResetController {
     private final PasswordPolicyService passwordPolicy;
     private final ObjectProvider<KeycloakUserService> keycloakProvider;
     private final AppMailProperties mailProps;
+    /** Async best-effort audit sink — see recordAudit (this endpoint is pre-auth). */
+    private final OpLogSink opLogSink;
+    private final ClientIpResolver clientIpResolver;
 
     public PasswordResetController(PasswordResetTokenService tokens,
                                    UserMapper userMapper,
                                    PasswordEncoder encoder,
                                    PasswordPolicyService passwordPolicy,
                                    ObjectProvider<KeycloakUserService> keycloakProvider,
-                                   AppMailProperties mailProps) {
+                                   AppMailProperties mailProps,
+                                   OpLogSink opLogSink,
+                                   ClientIpResolver clientIpResolver) {
         this.tokens = tokens;
         this.userMapper = userMapper;
         this.encoder = encoder;
         this.passwordPolicy = passwordPolicy;
         this.keycloakProvider = keycloakProvider;
         this.mailProps = mailProps;
+        this.opLogSink = opLogSink;
+        this.clientIpResolver = clientIpResolver;
     }
 
     /**
@@ -111,7 +122,8 @@ public class PasswordResetController {
      */
     @PostMapping("/{token}")
     public JsonResult<Map<String, Object>> accept(@PathVariable String token,
-                                                  @Valid @RequestBody ResetPasswordRequest req) {
+                                                  @Valid @RequestBody ResetPasswordRequest req,
+                                                  HttpServletRequest req0) {
         passwordPolicy.validate(req.password());
 
         // 1. Consume FIRST so a slow / retried HTTP request can't double-spend
@@ -158,12 +170,46 @@ public class PasswordResetController {
             }
         }
 
+        recordAudit(row.getTenantId(), user.getId(), user.getUsername(), req0);
+
         log.info("[reset] user {} (tenant {}) completed SSO → password reset",
                 user.getId(), row.getTenantId());
 
         return JsonResult.ok(Map.of(
                 "loginUrl", mailProps.baseUrl() + "/login"
         ));
+    }
+
+    /**
+     * Audit the completed reset into {@code core_oplog}.
+     *
+     * <p>Why not just {@code @OpLog}: this endpoint is PRE-AUTH, so the aspect's
+     * {@code RequestContext} carries no user and only whatever {@code X-Tenant-Id}
+     * the caller happened to send — the row would be misattributed, which for a
+     * security audit is worse than no row. So we build it explicitly from the
+     * consumed token, exactly like {@code AuthService.recordBreakGlassUse}.
+     *
+     * <p>This was previously not audited at all: every other credential-changing
+     * endpoint in the project writes an oplog row ({@code auth.breakGlassSet},
+     * the two {@code reset-password} consoles, {@code auth.unlock},
+     * {@code auth.forceLogout}), while the two pre-auth token endpoints that set a
+     * PERMANENT password left no trace — and this one also irreversibly detaches
+     * the Keycloak identity. Best-effort: the sink is {@code @Async} and swallows
+     * its own errors; we guard again so audit can never fail the user's reset.
+     */
+    private void recordAudit(String tenantId, String userId, String username, HttpServletRequest http) {
+        try {
+            opLogSink.record(new OpLogRecord(
+                    tenantId, userId, username,
+                    "system", "auth.passwordResetAccept", "user", userId,
+                    http == null ? null : http.getRequestURI(),
+                    http == null ? null : http.getMethod(),
+                    clientIpResolver.resolve(http),
+                    http == null ? null : http.getHeader("User-Agent"),
+                    null, true, null, null, 0));
+        } catch (Exception e) {
+            log.warn("[reset] could not record audit oplog for user {}: {}", userId, e.toString());
+        }
     }
 
     public record ResetPasswordRequest(

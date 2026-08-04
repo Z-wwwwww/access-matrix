@@ -67,11 +67,17 @@ public class NotificationController {
     /** Long-lived SSE connection. Auth via one-time ticket (consumed on connect). */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@RequestParam("ticket") String ticket) {
-        // Consume the one-time ticket with GET + DELETE rather than GETDEL:
-        // GETDEL needs Redis 6.2+, and some deployments run older servers.
+        // Consume the ticket with an atomic GETDEL (one round trip) so two
+        // concurrent requests carrying the SAME ticket cannot both observe a
+        // non-empty value — at most one wins, exactly like
+        // RefreshTokenStore.rotate. The previous GET-then-DELETE pair left a
+        // window where a replayed ticket opened a second authenticated stream;
+        // that matters here because the ticket travels in the QUERY STRING (an
+        // EventSource can't send headers), so it lands in proxy/access logs and
+        // browser history. GETDEL needs Redis 6.2+, which the documented
+        // requirement already exceeds (docs/getting-started.md: Redis 7+).
         String key = TICKET_PREFIX + ticket;
-        String v = redis.opsForValue().get(key);
-        if (v != null) redis.delete(key);
+        String v = redis.opsForValue().getAndDelete(key);
 
         if (v == null) {
             // Invalid / expired / replayed ticket. Don't throw — the

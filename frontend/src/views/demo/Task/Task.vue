@@ -238,7 +238,8 @@ watch(() => notificationStore.pendingNav, () => { if (drawerNavActive) consumeDr
             {{ t('task.description') }} <code class="text-foreground">docs/data-scope-demo.md</code>
           </p>
         </div>
-        <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
+        <button v-permission="'task:create'"
+                class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                 @click="openCreate">
           <Plus class="size-4" /> {{ t('common.button.new') }}
         </button>
@@ -292,10 +293,12 @@ watch(() => notificationStore.pendingNav, () => { if (drawerNavActive) consumeDr
         <template #cell-dueDate="{ row }">{{ row.dueDate || '-' }}</template>
         <template #cell-actions="{ row }">
           <div class="inline-flex gap-1">
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEdit(row)" :title="t('common.button.edit')">
+            <button v-permission="'task:update'"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEdit(row)" :title="t('common.button.edit')">
               <Pencil class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs" @click="handleDelete(row)" :title="t('common.button.delete')">
+            <button v-permission="'task:delete'"
+                    class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs" @click="handleDelete(row)" :title="t('common.button.delete')">
               <Trash2 class="size-3.5" />
             </button>
           </div>

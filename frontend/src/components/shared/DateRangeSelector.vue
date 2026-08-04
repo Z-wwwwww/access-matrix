@@ -25,7 +25,7 @@ const endDate = ref('')
 const selectedDays = ref([])
 const outputDates = ref([])
 
-const days = t('priceInventory.weekStrings').split(',')
+const days = t('common.weekStrings').split(',')
 
 function calculateDates() {
   if (!startDate.value || !endDate.value || selectedDays.value.length === 0) {

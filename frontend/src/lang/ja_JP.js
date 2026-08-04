@@ -14,6 +14,7 @@ import permissions from './generated/permissions.ja_JP.json'
 
 export default {
   error: {
+    common: { concurrentEdit: '同時に他の人が更新しました。画面を再読み込みしてからやり直してください。' },
     dict: {
       codeExists: '辞書コードは既に存在します',
       codeIsBuiltin: 'このコードは内蔵（enum）辞書のため管理できません',
@@ -36,6 +37,7 @@ export default {
       passwordRequired: '直接設定方式ではパスワードが必須です',
       emailRequired: '招待メール方式ではメールアドレスが必須です',
       superAdminSingleton: 'スーパー管理者ロールはテナント所有者専用で、他のユーザーには付与できません',
+      roleNotFound: '選択されたロールの一部がこのテナントに存在しません。ページを再読み込みしてやり直してください',
       adminProtected: 'この管理者アカウントは保護されており、他のユーザーによる編集・停止・削除・強制ログアウトはできません。管理者本人がプロフィール画面で自分の情報を編集してください',
       noKeycloakLink: 'このユーザーは Keycloak アカウントと連携していないため、パスワードをリセットできません',
       selfManagementForbidden: 'ここでは自分のアカウントを操作できません。自分の情報はプロフィール画面で編集してください'
@@ -95,6 +97,9 @@ export default {
     message: { saveSuccess: '保存しました', runStarted: '実行を開始しました', enabled: '有効にしました', disabled: '停止しました', updateFailed: '保存に失敗しました', runFailed: '実行に失敗しました' }
   },
   common: {
+    // 曜日ラベル。日曜始まり（dayjs .day() の 0=日曜と一致）。カンマ区切りで、
+    // 利用側は split(',') して曜日番号で引く。
+    weekStrings: '日,月,火,水,木,金,土',
     confirm: {
       forceTitle: '強制削除',
       forceMessage: '{detail}\n\n強制削除すると、関連する全リンクをカスケード解除します。続行しますか？'
@@ -131,6 +136,7 @@ export default {
     },
     message: {
       saveSuccessful: '保存しました',
+      saveFailed: '保存に失敗しました',
       deleteSuccessful: '削除しました',
       loading: '読み込み中',
       processing: '処理中...',

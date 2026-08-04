@@ -6,6 +6,7 @@ import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.dict.CommonStatus;
 import com.platform.core.common.dict.DictEnum;
 import com.platform.core.common.error.BusinessException;
+import com.platform.core.common.error.ConcurrentEdit;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.system.auth.entity.UserEntity;
@@ -74,18 +75,34 @@ public class DeptAdminService {
                 throw new BusinessException(ErrorCode.BUSINESS_ERROR, "A department cannot be its own parent");
             }
             // Disallow assigning the parent to one of the dept's own descendants — would create a cycle.
-            for (String descendantId : deptMapper.findSubtreeIds(d.getPath(), RequestContext.tenantIdOrDefault())) {
+            // Must be the ANY-STATUS subtree: findSubtreeIds filters status=1, so a
+            // *disabled* descendant was invisible here and passed the check, while
+            // require() below happily accepts it (it only asserts mark=1). Verified
+            // against the DB that this produced a real parent_id cycle (A→B→A) and a
+            // path containing the dept's own id.
+            for (String descendantId : deptMapper.findSubtreeIdsAnyStatus(
+                    d.getPath(), RequestContext.tenantIdOrDefault())) {
                 if (descendantId.equals(req.parentId())) {
                     throw new BusinessException(ErrorCode.BUSINESS_ERROR,
                             "New parent is a descendant — would create a cycle");
                 }
             }
             DeptEntity newParent = require(req.parentId());
+            String oldPath = d.getPath();
+            int oldLevel = d.getLevel() == null ? 1 : d.getLevel();
             d.setParentId(newParent.getId());
             d.setLevel(newParent.getLevel() + 1);
             d.setPath(newParent.getPath() + "/" + d.getId());
-            // Note: descendants' paths/levels are not auto-refreshed here. That's a more invasive
-            // operation handled by a "rebuild paths" admin command (Stage 5).
+            // Cascade to the descendants IN THE SAME TRANSACTION. path/level are derived
+            // from the parent chain, so rewriting them only on the moved node leaves the
+            // tree self-inconsistent: parent_id (what the admin UI renders) stays right
+            // while path — what the data-scope resolution keys on — still describes the
+            // old position. Verified against the DB that moving a dept with a child made
+            // DEPT_AND_SUB for the moved node return only itself while the child remained
+            // in the old ancestor's subtree. This used to be deferred to a "rebuild paths"
+            // admin command that was never built.
+            deptMapper.reRootDescendants(oldPath, oldPath.length(), d.getPath(),
+                    d.getLevel() - oldLevel, RequestContext.tenantIdOrDefault());
         }
         if (req.name() != null) d.setName(req.name());
         if (req.sortOrder() != null) d.setSortOrder(req.sortOrder());
@@ -117,7 +134,7 @@ public class DeptAdminService {
             }
             d.setStatus(req.status());
         }
-        deptMapper.updateById(d);
+        ConcurrentEdit.requireApplied(deptMapper.updateById(d));
         cacheService.evictAllDepts();
     }
 
@@ -148,9 +165,19 @@ public class DeptAdminService {
         if (force && (children > 0 || users > 0 || roles > 0)) {
             // Subtree force-delete: soft-delete all descendant depts, null user.dept_id
             // for users in the subtree, and cascade role_dept references.
-            java.util.List<String> subtreeIds = deptMapper.findSubtreeIds(d.getPath(), RequestContext.tenantIdOrDefault());
+            // ANY-STATUS subtree. This used to call findSubtreeIds, which filters
+            // status=1 — but the IN_USE pre-check above counts children with no
+            // status filter, so the two disagreed: a DISABLED child made the
+            // pre-check demand force=true and then survived the cascade, left alive
+            // (mark=1) with parent_id pointing at the just-soft-deleted parent, and
+            // with its users' dept_id and its role_dept bindings untouched. Verified
+            // against the DB. The old "empty → fall back to self" guard only caught
+            // the case where the list was entirely empty, never a partial one.
+            java.util.List<String> subtreeIds = deptMapper.findSubtreeIdsAnyStatus(
+                    d.getPath(), RequestContext.tenantIdOrDefault());
             if (subtreeIds == null || subtreeIds.isEmpty()) {
-                // findSubtreeIds filters by status=1; fall back to self if nothing returned.
+                // Defensive: the row itself always matches its own path, so this is
+                // unreachable unless the path column drifted.
                 subtreeIds = java.util.List.of(id);
             }
             userMapper.update(null,

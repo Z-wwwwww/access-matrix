@@ -8,6 +8,9 @@ import { useMenuTitle } from '@/composables/useMenuTitle'
 import { Star, Pin } from 'lucide-vue-next'
 import LucideIcon from '@/components/shared/LucideIcon.vue'
 import AppSidebarItem from './AppSidebarItem.vue'
+import {
+  topLevelLeafsOf, topLevelGroupsOf, adminMenusOf, footerMenusOf
+} from '@/lib/menu-groups'
 
 const props = defineProps({
   collapsed: {
@@ -102,57 +105,19 @@ const displayMenus = computed(() => {
 })
 
 /**
- * Sort 阈值划分：
- * - sort <= 9000：常规一级菜单（顶部区域）
- * - 9000 < sort <= 10000：管理者設定 分组
- * - sort > 10000：固定底部区域
+ * 区域划分（阈值判定见 @/lib/menu-groups，按后端 MenuNode 的真实字段 `sortOrder`）：
+ * - sortOrder <= 9000：常规一级菜单（顶部区域）
+ * - 9000 < sortOrder <= 10000：管理者設定 分组
+ * - sortOrder > 10000：固定底部区域
+ *
+ * 这四个分组曾经读 `m.sort`（后端不存在该字段），于是 `undefined ?? 0 === 0`
+ * 让所有菜单都落进「常规」区域，管理者設定 与固定底部两个区域**永远为空** ——
+ * 模板和 i18n 都在，却一次也渲染不出来。现已抽成纯函数并由单测钉住。
  */
-const ADMIN_GROUP_MIN_SORT = 9000
-const FOOTER_MIN_SORT = 10000
-
-/**
- * 被提升到侧边栏顶部的叶子按钮：
- * 一级菜单中非隐藏、无子项、sort <= 9000、且未被收藏的项
- */
-const topLevelLeafs = computed(() =>
-  displayMenus.value.filter(
-    (m) =>
-      !m.hide &&
-      (!m.children || m.children.length === 0) &&
-      (m.sort ?? 0) <= ADMIN_GROUP_MIN_SORT
-  )
-)
-
-/**
- * 顶部区域中的分组（带子项）一级菜单
- */
-const remainingTopLevel = computed(() =>
-  displayMenus.value.filter((m) => {
-    if (m.hide) return false
-    if ((m.sort ?? 0) > ADMIN_GROUP_MIN_SORT) return false
-    return m.children && m.children.length > 0
-  })
-)
-
-/**
- * 管理者設定 分组：9000 < sort <= 10000 的一级菜单
- */
-const adminMenus = computed(() =>
-  displayMenus.value.filter((m) => {
-    if (m.hide) return false
-    const s = m.sort ?? 0
-    return s > ADMIN_GROUP_MIN_SORT && s <= FOOTER_MIN_SORT
-  })
-)
-
-/**
- * 固定底部菜单：sort > 10000 的一级菜单
- */
-const footerMenus = computed(() =>
-  displayMenus.value.filter(
-    (m) => !m.hide && (m.sort ?? 0) > FOOTER_MIN_SORT
-  )
-)
+const topLevelLeafs = computed(() => topLevelLeafsOf(displayMenus.value))
+const remainingTopLevel = computed(() => topLevelGroupsOf(displayMenus.value))
+const adminMenus = computed(() => adminMenusOf(displayMenus.value))
+const footerMenus = computed(() => footerMenusOf(displayMenus.value))
 
 /**
  * 根据当前路由路径，找到所有需要展开的父级菜单路径

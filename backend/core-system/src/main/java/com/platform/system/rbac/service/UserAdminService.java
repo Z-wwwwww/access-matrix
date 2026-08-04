@@ -7,6 +7,7 @@ import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.dict.CommonStatus;
 import com.platform.core.common.dict.DictEnum;
 import com.platform.core.common.error.BusinessException;
+import com.platform.core.common.error.ConcurrentEdit;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.core.common.result.PageResult;
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -177,7 +179,22 @@ public class UserAdminService {
             u.setKeycloakId(kcId);
         }
 
-        userMapper.insert(u);
+        try {
+            userMapper.insert(u);
+        } catch (RuntimeException e) {
+            // COMPENSATION. The KC user is already created and this @Transactional
+            // method is about to roll back, so without this the KC user survives as
+            // an orphan with NO business row. The operator then can't recover from
+            // the UI: the DB pre-checks pass (no row exists), but KC answers 409 and
+            // surfaces as "Keycloak user already exists (username or email already
+            // in use)" — a confusing error for a user that, as far as the app is
+            // concerned, doesn't exist. Both sibling provisioning flows already do
+            // this (TenantAdminService.create deletes the realm,
+            // PlatformUserAdminService.create deletes the KC user); this was the
+            // only one of the three without it.
+            compensateKeycloakUser(keycloak, tenantId, kcId, req.username(), e);
+            throw e;
+        }
 
         // Side-effect: notification email. INVITE includes the magic link;
         // DIRECT just confirms account opening + reminds of the initial creds.
@@ -186,6 +203,29 @@ public class UserAdminService {
         notifyOnboarding(u, mode, req.password(), tenantId);
 
         return u.getId();
+    }
+
+    /**
+     * Remove the just-created Keycloak user after the DB half of
+     * {@link #create} failed, so a retry isn't blocked by KC's 409. Best-effort:
+     * if compensation itself fails we log LOUDLY with both causes — an orphan KC
+     * user then needs manual cleanup, same posture as
+     * {@code TenantAdminService.create}.
+     */
+    private void compensateKeycloakUser(KeycloakUserService keycloak, String tenantId,
+                                        String kcId, String username, RuntimeException cause) {
+        if (keycloak == null || kcId == null || kcId.isBlank()) return;
+        var log = org.slf4j.LoggerFactory.getLogger(UserAdminService.class);
+        try {
+            keycloak.deleteUser(tenantId, kcId);
+            log.warn("[user] create failed for '{}' — compensated by deleting the orphan KC user {}",
+                    username, kcId, cause);
+        } catch (RuntimeException ce) {
+            log.error("[user] create failed for '{}' AND compensation (KC delete of {}) failed — "
+                    + "manual cleanup of the Keycloak user is required. Original cause below.",
+                    username, kcId, cause);
+            log.error("[user] compensation failure detail", ce);
+        }
     }
 
     private void notifyOnboarding(UserEntity u, UserDto.ProvisionMode mode, String tempPassword, String tenantId) {
@@ -226,7 +266,11 @@ public class UserAdminService {
                 String token = invites.mint(tenantId, u.getId(), u.getKeycloakId());
                 String url = mailProps.baseUrl() + "/invite/" + token;
                 model.put("inviteUrl", url);
-                model.put("expiresIn", "7");
+                // From the configured app.invite.token-ttl, not a literal — the other
+                // two invite emails (TenantAdminService / PlatformUserAdminService)
+                // already derive it, and a stale "7" misstates the deadline the
+                // recipient acts on once the TTL is changed.
+                model.put("expiresIn", String.valueOf(invites.ttlDays()));
                 mail.sendHtmlAsync(u.getEmail(), locale,
                         "user-invite.subject", subjectArgs,
                         "user-invite", model);
@@ -266,7 +310,7 @@ public class UserAdminService {
         syncKeycloakProfile(u, req.email(), req.displayName());
         if (req.email() != null) u.setEmail(req.email());
         if (req.displayName() != null) u.setDisplayName(req.displayName());
-        userMapper.updateById(u);
+        ConcurrentEdit.requireApplied(userMapper.updateById(u));
         cacheService.evictUser(me);
     }
 
@@ -290,7 +334,7 @@ public class UserAdminService {
             DictEnum.requireValid(CommonStatus.class, req.status(), "status");
             u.setStatus(req.status());
         }
-        userMapper.updateById(u);
+        ConcurrentEdit.requireApplied(userMapper.updateById(u));
         cacheService.evictUser(id);
     }
 
@@ -330,9 +374,11 @@ public class UserAdminService {
 
     public List<String> listRoleIds(String userId) {
         require(userId);
-        return userRoleMapper.selectList(
-                new QueryWrapper<UserRoleEntity>().eq("user_id", userId).eq("mark", 1))
-                .stream().map(UserRoleEntity::getRoleId).toList();
+        // JOIN to role.mark=1 + role.tenant_id — never return dangling links to
+        // soft-deleted (or another tenant's) roles, which would otherwise surface
+        // as "ghost selections" in the assignment dialog and trip the existence
+        // check on save. Same rationale as RoleAdminService.listPermissionIds.
+        return userRoleMapper.findActiveRoleIdsByUserId(userId, RequestContext.tenantIdOrDefault());
     }
 
     @Transactional
@@ -350,18 +396,66 @@ public class UserAdminService {
         if (superRoleId != null && roleIds != null && roleIds.contains(superRoleId)) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.superAdminSingleton");
         }
+        // Sanitise ONCE and drive both the validation and the writes off the same
+        // set. Previously assertRolesExist deduped + dropped null/blank internally
+        // while the insert loop below iterated the RAW request list, so the two
+        // disagreed about what was being written and three malformed bodies sailed
+        // past validation straight into a DB error surfaced as a 500 (all verified
+        // against the real DB):
+        //   ["R1","R1"] → duplicate key value violates uk_core_rbac_user_role
+        //   ["R1",null] → null value in column "role_id" violates not-null
+        //   ["R1",""]   → violates fk_core_rbac_user_role_role
+        // The three sibling bind methods in RoleAdminService never had this gap —
+        // they run every id through dedupOrEmpty first.
+        LinkedHashSet<String> dedup = dedupOrEmpty(roleIds);
+        assertRolesExist(dedup, tid);
         userRoleMapper.update(null,
                 new UpdateWrapper<UserRoleEntity>().eq("user_id", userId).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));
-        if (roleIds != null) {
-            for (String roleId : roleIds) {
-                UserRoleEntity link = new UserRoleEntity();
-                link.setUserId(userId);
-                link.setRoleId(roleId);
-                userRoleMapper.insert(link);
-            }
+        for (String roleId : dedup) {
+            UserRoleEntity link = new UserRoleEntity();
+            link.setUserId(userId);
+            link.setRoleId(roleId);
+            userRoleMapper.insert(link);
         }
         cacheService.evictUser(userId);
+    }
+
+    /**
+     * Drop nulls / blanks and collapse duplicates, preserving order. Mirrors
+     * {@code RoleAdminService.dedupOrEmpty} — the junction tables all carry a
+     * {@code (tenant_id, …) WHERE mark = 1} unique index plus NOT NULL and FK
+     * constraints, so a raw caller-supplied list must never reach an insert loop.
+     */
+    private static LinkedHashSet<String> dedupOrEmpty(List<String> ids) {
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        if (ids == null) return out;
+        for (String id : ids) {
+            if (id != null && !id.isBlank()) out.add(id);
+        }
+        return out;
+    }
+
+    /**
+     * Every supplied role id must be a live role <b>of this tenant</b>. Without
+     * this the insert below relies on the DB: a non-existent id trips the
+     * {@code fk_core_rbac_user_role_role} FK and surfaces as a 500 "Unhandled
+     * exception" instead of a clean 400, while a soft-deleted or ANOTHER TENANT's
+     * role id satisfies the FK (it only references {@code core_rbac_role(id)},
+     * not the tenant) and inserts a junk link. Such a link grants nothing — the
+     * permission / menu / data-scope joins are all tenant-scoped and fail closed —
+     * but it lingers in {@code core_rbac_user_role} and shows up as a checked-but-
+     * unknown role in the UI. Same guard, same reasoning as
+     * {@code RoleAdminService.assertAllExist}.
+     */
+    private void assertRolesExist(Set<String> dedup, String tenantId) {
+        // Caller sanitises (see assignRoles) — this method must validate exactly
+        // the set that gets written, never a differently-filtered view of it.
+        if (dedup.isEmpty()) return;
+        Long found = userRoleMapper.countLiveRoles(dedup, tenantId);
+        if (found == null || found.intValue() != dedup.size()) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.roleNotFound");
+        }
     }
 
     /**
@@ -458,7 +552,7 @@ public class UserAdminService {
         UserEntity u = require(userId);
         assertNotProtectedAdmin(u);
         u.setDeptId(deptId);
-        userMapper.updateById(u);
+        ConcurrentEdit.requireApplied(userMapper.updateById(u));
         cacheService.evictUser(userId);
     }
 
@@ -470,7 +564,7 @@ public class UserAdminService {
         assertNotProtectedAdmin(u);
         boolean enabling = status == CommonStatus.ENABLED.code();
         u.setStatus(status);
-        userMapper.updateById(u);
+        ConcurrentEdit.requireApplied(userMapper.updateById(u));
         cacheService.evictUser(userId);
         // All session/Keycloak side-effects of the enabled state live in one place
         // (shared with the platform-user console): disable kicks tokens + disables

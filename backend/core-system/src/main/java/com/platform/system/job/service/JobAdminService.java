@@ -7,6 +7,7 @@ import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.PageResult;
+import com.platform.core.common.time.AppTime;
 import com.platform.core.infrastructure.scheduling.DynamicJobScheduler;
 import com.platform.core.infrastructure.scheduling.entity.CoreJobEntity;
 import com.platform.core.infrastructure.scheduling.entity.CoreJobLogEntity;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 /**
@@ -127,12 +129,38 @@ public class JobAdminService {
         }
     }
 
-    private JobDto.View toView(CoreJobEntity e) {
-        OffsetDateTime next = null;
-        if (Integer.valueOf(1).equals(e.getEnabled()) && e.getCron() != null
-                && CronExpression.isValidExpression(e.getCron())) {
-            next = CronExpression.parse(e.getCron()).next(OffsetDateTime.now());
+    /**
+     * Next fire time for the admin list, interpreted in the BUSINESS timezone
+     * ({@link AppTime#zone()}) — the same clock {@code DynamicJobScheduler}
+     * schedules on ({@code new CronTrigger(cron, AppTime.zone())}).
+     *
+     * <p>This used to be {@code CronExpression.parse(cron).next(OffsetDateTime.now())},
+     * which reads the cron fields against the JVM's DEFAULT zone. On any host whose
+     * OS timezone differs from {@code app.timezone} that silently disagrees with when
+     * the job really runs: {@code core:outbox-retention} is {@code 0 30 3 * * *} and
+     * fires at 03:30 Asia/Tokyo, but on a UTC host the console rendered 03:30 UTC
+     * (= 12:30 JST) — 9 hours off, with nothing to hint the number was wrong.
+     * Prefer the scheduler's own {@code nextFireTime} helper (written for exactly
+     * this display and already zone-explicit) so there is one authority; fall back
+     * to the identical computation when the scheduler bean is absent
+     * ({@code app.scheduler.enabled=false}).
+     */
+    private OffsetDateTime nextFireTimeOf(CoreJobEntity e) {
+        if (!Integer.valueOf(1).equals(e.getEnabled())
+                || e.getCron() == null
+                || !CronExpression.isValidExpression(e.getCron())) {
+            return null;
         }
+        DynamicJobScheduler scheduler = schedulerProvider.getIfAvailable();
+        if (scheduler != null) {
+            return scheduler.nextFireTime(e.getCron());
+        }
+        ZonedDateTime next = CronExpression.parse(e.getCron()).next(ZonedDateTime.now(AppTime.zone()));
+        return next == null ? null : next.toOffsetDateTime();
+    }
+
+    private JobDto.View toView(CoreJobEntity e) {
+        OffsetDateTime next = nextFireTimeOf(e);
         return new JobDto.View(
                 e.getId(), e.getTenantId(), e.getJobCode(), e.getName(),
                 e.getCron(), e.getEnabled(), e.getConcurrent(), e.getMaxRunSeconds(),

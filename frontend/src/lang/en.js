@@ -7,6 +7,7 @@ import permissions from './generated/permissions.en.json'
 
 export default {
   error: {
+    common: { concurrentEdit: 'Someone else updated this record. Reload and try again.' },
     dict: {
       codeExists: 'Dictionary code already exists',
       codeIsBuiltin: 'This code is a built-in (enum) dictionary and is not manageable',
@@ -29,6 +30,7 @@ export default {
       passwordRequired: 'A password is required for direct provisioning',
       emailRequired: 'An email is required for invite provisioning',
       superAdminSingleton: 'The Super Administrator role is reserved for the tenant owner and cannot be granted to another user',
+      roleNotFound: 'One or more selected roles no longer exist in this tenant — reload the page and try again',
       adminProtected: 'This administrator account is protected — no other user can edit, suspend, delete, or force-logout it; the administrator edits their own details on the Profile page',
       noKeycloakLink: 'This user has no linked Keycloak account; the password cannot be reset',
       selfManagementForbidden: 'You cannot manage your own account here — edit your details on the Profile page'
@@ -88,6 +90,9 @@ export default {
     message: { saveSuccess: 'Saved', runStarted: 'Run started', enabled: 'Enabled', disabled: 'Stopped', updateFailed: 'Save failed', runFailed: 'Run failed' }
   },
   common: {
+    // Weekday labels, Sunday-first (matches dayjs .day() 0=Sunday). Comma-joined:
+    // consumers split(',') and index by day number.
+    weekStrings: 'Sun,Mon,Tue,Wed,Thu,Fri,Sat',
     confirm: {
       forceTitle: 'Force delete',
       forceMessage: '{detail}\n\nForce delete will cascade-clean all dependent references. Continue?'
@@ -124,6 +129,7 @@ export default {
     },
     message: {
       saveSuccessful: 'Saved successfully',
+      saveFailed: 'Save failed',
       deleteSuccessful: 'Deleted successfully',
       loading: 'Loading',
       processing: 'Processing...',

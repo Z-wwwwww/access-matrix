@@ -19,11 +19,21 @@ const APP_TITLE = 'Access Matrix'
 /** 免登录白名单 */
 const WHITE_LIST = ['/login', '/sso/callback']
 /**
- * /invite/<token> 也是公开页面，但 token 是动态段，不能写进上面的精确匹配
- * 数组里。下面的守卫额外允许任意以 /invite/ 开头的路径，与 WHITE_LIST 形成
- * "exact match | prefix match" 两路覆盖。
+ * /invite/<token> 和 /reset-password/<token> 也是公开页面，但 token 是动态段，
+ * 不能写进上面的精确匹配数组里。下面的守卫额外允许任意以这些前缀开头的路径，
+ * 与 WHITE_LIST 形成 "exact match | prefix match" 两路覆盖。
+ *
+ * /reset-password/ 是 SSO → password 反向迁移邮件的落地页
+ * （SsoToPasswordMigrationService 发出 baseUrl + "/reset-password/{token}"）：
+ * 收件人按定义就是「还没有密码、未登录」的用户，漏掉这个前缀会把他们直接弹回
+ * /login，而他们恰恰无法登录 —— 整条重置链路走不通。
  */
-const PUBLIC_PREFIXES = ['/invite/']
+const PUBLIC_PREFIXES = ['/invite/', '/reset-password/']
+
+/** 该路径是否无需登录即可访问（守卫与单测共用同一判定）。 */
+export function isPublicPath(path) {
+  return WHITE_LIST.includes(path) || PUBLIC_PREFIXES.some((p) => path.startsWith(p))
+}
 
 /** 登录后可访问但不走后端菜单的静态页面（ヘッダー・ユーザーメニュー等から遷移） */
 const STATIC_LAYOUT_CHILDREN = [
@@ -153,7 +163,7 @@ router.beforeEach(async (to, from, next) => {
       }
       next()
     }
-  } else if (WHITE_LIST.includes(to.path) || PUBLIC_PREFIXES.some((p) => to.path.startsWith(p))) {
+  } else if (isPublicPath(to.path)) {
     next()
   } else {
     next({ path: '/login', query: to.path === '/' ? {} : { from: to.path } })

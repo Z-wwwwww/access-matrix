@@ -61,6 +61,16 @@ spring:
     settings:
       default_encoding: UTF-8
       localized_lookup: false           # false=不按 locale 找 xx_zh.ftl 这类变体 | true=启用本地化查找
+      # HTML 自动转义。模板都是 HTML 邮件，而 .ftl 后缀 + 默认 output_format 下
+      # ${...} 是**原样输出**的。模型里有货真价实的攻击者可控值——
+      # user-break-glass-used 会把这次登录的 User-Agent 和 client IP 渲染进邮件，
+      # 而这封邮件正是发给账号本人、用来告诉他「不是你就赶紧轮换」的。不转义时
+      # 一个构造过的 User-Agent 就能改写/清空整封告警邮件（或把「立即轮换」按钮
+      # 换成钓鱼链接），正好废掉这封邮件存在的意义。
+      # 模板里所有插值都是纯文本或 URL：URL 出现在 href/src 属性里，转义后 &
+      # 变成 &amp; 恰好也是 HTML 属性里正确的写法，所以全局打开是安全的。
+      # 若将来某个模板确实要输出标记，用 ${x?no_esc} 显式声明。
+      output_format: HTML
   threads:
     virtual:
       enabled: true                     # true=用 JDK21 虚拟线程跑请求 | false=平台线程

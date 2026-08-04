@@ -35,20 +35,20 @@ public class OpLogService implements OpLogSink {
         try {
             OpLogEntity e = new OpLogEntity();
             e.setId(IdGenerator.ulid());
-            e.setTenantId(record.tenantId());
+            e.setTenantId(clamp(record.tenantId(), 64));
             e.setUserId(record.userId());
-            e.setUsername(record.username());
-            e.setModule(record.module());
-            e.setAction(record.action());
-            e.setTargetType(record.targetType());
-            e.setTargetId(record.targetId());
-            e.setRequestUri(record.requestUri());
-            e.setMethod(record.method());
-            e.setClientIp(record.clientIp());
-            e.setUserAgent(record.userAgent());
+            e.setUsername(clamp(record.username(), 64));
+            e.setModule(clamp(record.module(), 32));
+            e.setAction(clamp(record.action(), 64));
+            e.setTargetType(clamp(record.targetType(), 32));
+            e.setTargetId(clamp(record.targetId(), 64));
+            e.setRequestUri(clamp(record.requestUri(), 512));
+            e.setMethod(clamp(record.method(), 8));
+            e.setClientIp(clamp(record.clientIp(), 64));
+            e.setUserAgent(clamp(record.userAgent(), 512));
             e.setRequestBody(record.requestBody());
             e.setSuccess(record.success());
-            e.setErrorMsg(record.errorMsg());
+            e.setErrorMsg(clamp(record.errorMsg(), 512));
             e.setErrorCode(record.errorCode());
             e.setCostMs(record.costMs());
             e.setCreateTime(OffsetDateTime.now());
@@ -57,5 +57,23 @@ public class OpLogService implements OpLogSink {
             log.warn("OpLogService: failed to persist audit row action={}: {}",
                      record.action(), ex.getMessage());
         }
+    }
+
+    /**
+     * Clamps a value to its {@code core_oplog} column width. Every producer of an
+     * {@link OpLogRecord} feeds it request-controlled strings, and Postgres rejects
+     * an over-long value outright ({@code value too long for type character
+     * varying(512)}) — which the catch block above then swallows, so the audit row
+     * disappears with only a WARN. {@code OpLogAspect} pre-truncates user-agent and
+     * error message but passed {@code request.getRequestURI()} through raw, and the
+     * pre-auth {@code recordAudit} helpers in InviteController /
+     * PasswordResetController pre-truncate nothing at all. Clamping here — at the
+     * single write point — makes it structurally impossible for any producer to
+     * lose an audit row to a length overflow. A truncated audit row is strictly
+     * better than a missing one.
+     */
+    private static String clamp(String s, int max) {
+        if (s == null || s.length() <= max) return s;
+        return s.substring(0, max);
     }
 }

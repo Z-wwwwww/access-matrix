@@ -41,6 +41,18 @@ const DEPT_PAGE_BUTTONS = [
   { id: 'dept-delete', perm: 'dept:delete' }
 ]
 
+// business-demo's Task page. Worth pinning even though it's a demo module:
+// docs/data-scope-demo.md ships real demo logins whose roles hold a NARROW
+// task permission set (takahashi_shinichi = task:read only; suzuki_misaki =
+// task:create+read; the two 支社 roles have no task:delete), so an ungated
+// button here is immediately visible-but-403 for those accounts. It is also
+// the reference implementation new business modules get copied from.
+const TASK_PAGE_BUTTONS = [
+  { id: 'task-create', perm: 'task:create' },
+  { id: 'task-update', perm: 'task:update' },
+  { id: 'task-delete', perm: 'task:delete' }
+]
+
 function mountPage(buttons, authorities) {
   // Render each button inside a parent div so v-permission can remove them
   // via parentNode.removeChild without losing the test wrapper's root.
@@ -126,5 +138,47 @@ describe('Dept.vue — button permission gating', () => {
     expect(wrapper.find('.dept-create').exists()).toBe(true)
     expect(wrapper.find('.dept-update').exists()).toBe(false)
     expect(wrapper.find('.dept-delete').exists()).toBe(false)
+  })
+})
+
+describe('Task.vue — button permission gating', () => {
+  it('read-only role (task:read) sees no write buttons', () => {
+    // takahashi_shinichi / 京都連絡担当 in the seeded demo tenant.
+    const wrapper = mountPage(TASK_PAGE_BUTTONS, ['task:read'])
+    for (const b of TASK_PAGE_BUTTONS) {
+      expect(wrapper.find(`.${b.id}`).exists()).toBe(false)
+    }
+  })
+
+  it('task:create+read shows only 新規, not edit/delete', () => {
+    // suzuki_misaki / 一般社員 in the seeded demo tenant.
+    const wrapper = mountPage(TASK_PAGE_BUTTONS, ['task:create', 'task:read'])
+    expect(wrapper.find('.task-create').exists()).toBe(true)
+    expect(wrapper.find('.task-update').exists()).toBe(false)
+    expect(wrapper.find('.task-delete').exists()).toBe(false)
+  })
+
+  it('a role without task:delete hides only the delete button', () => {
+    // yamada_hanako / 東京支社長 and sato_ken / 大阪支社課長.
+    const wrapper = mountPage(TASK_PAGE_BUTTONS, ['task:create', 'task:read', 'task:update'])
+    expect(wrapper.find('.task-create').exists()).toBe(true)
+    expect(wrapper.find('.task-update').exists()).toBe(true)
+    expect(wrapper.find('.task-delete').exists()).toBe(false)
+  })
+
+  it('business super (tenant:*) sees every task action', () => {
+    const wrapper = mountPage(TASK_PAGE_BUTTONS, ['tenant:*'])
+    for (const b of TASK_PAGE_BUTTONS) {
+      expect(wrapper.find(`.${b.id}`).exists()).toBe(true)
+    }
+  })
+
+  it('platform super (*:*) does NOT leak into business task actions', () => {
+    // *:* only covers the platform: namespace — a platform admin must not
+    // inherit business-tenant task writes.
+    const wrapper = mountPage(TASK_PAGE_BUTTONS, ['*:*'])
+    for (const b of TASK_PAGE_BUTTONS) {
+      expect(wrapper.find(`.${b.id}`).exists()).toBe(false)
+    }
   })
 })

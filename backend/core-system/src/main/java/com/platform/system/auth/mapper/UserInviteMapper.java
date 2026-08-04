@@ -1,5 +1,6 @@
 package com.platform.system.auth.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.platform.system.auth.entity.UserInviteEntity;
 import org.apache.ibatis.annotations.Mapper;
@@ -9,25 +10,32 @@ import org.apache.ibatis.annotations.Update;
 
 import java.time.OffsetDateTime;
 
+/**
+ * Tenant interceptor: the four token-keyed statements below carry
+ * {@code @InterceptorIgnore(tenantLine = "true")}, and it is REQUIRED, not
+ * decorative. MyBatis-Plus rewrites ALL SQL — including hand-written
+ * {@code @Select} / {@code @Update} — so without it each statement gets
+ * {@code AND tenant_id = <RequestContext.tenantId()>} appended. These run
+ * PRE-AUTH, where the context tenant comes from the {@code X-Tenant-Id} header
+ * that the SPA derives from the SUBDOMAIN — but the email link is built from the
+ * single global {@code app.mail.base-url}, so for a first-time recipient (nothing
+ * in localStorage, apex/reserved host) it resolves to the {@code demo} fallback.
+ * Verified against the real DB: a {@code sozonext} token is found by the intended
+ * SQL and by 0 rows once {@code AND tenant_id = 'demo'} is appended, and the claim
+ * UPDATE likewise affects 0 rows — which callers must read as "already used". Net
+ * effect before these annotations: every invite / password-reset link outside the
+ * {@code demo} tenant reported "invalid or expired".
+ *
+ * <p>Safe because {@code token_hash} is globally unique (partial unique index on
+ * {@code mark = 1}) and the consuming service takes tenant + user FROM the row it
+ * just claimed, never from the request. Same precedent and reasoning as
+ * {@code TenantMapper.findActiveByCode}.
+ */
 @Mapper
 public interface UserInviteMapper extends BaseMapper<UserInviteEntity> {
 
-    /**
-     * Look up an outstanding invite by its hashed token. Returns null when:
-     *   - no row with this token_hash exists, OR
-     *   - the row is soft-deleted (mark=0), OR
-     *   - the row was already consumed (used_at IS NOT NULL).
-     *
-     * <p>Expiry check is intentionally done in Java (so a clean
-     * "expired vs not-found vs already-used" distinction can be surfaced
-     * in the API response — this query just filters out the trivially-dead
-     * cases).
-     *
-     * <p>Hand-written @Select — pre-auth (the user clicks the email link
-     * BEFORE having a session), so we trust the token to scope and don't
-     * have a tenant in {@code RequestContext}. token_hash is globally
-     * unique by V22's index.
-     */
+    // See the class javadoc "Tenant interceptor" note — this annotation is REQUIRED.
+    @InterceptorIgnore(tenantLine = "true")
     @Select("""
             SELECT * FROM core_user_invite
              WHERE mark = 1
@@ -46,6 +54,8 @@ public interface UserInviteMapper extends BaseMapper<UserInviteEntity> {
      * UPDATE definitely executes and its affected-row count is observable (a
      * prior SELECT-then-UpdateWrapper approach silently allowed re-use).
      */
+    // See the class javadoc "Tenant interceptor" note — this annotation is REQUIRED.
+    @InterceptorIgnore(tenantLine = "true")
     @Update("""
             UPDATE core_user_invite
                SET used_at = #{now}, update_user = 'system'

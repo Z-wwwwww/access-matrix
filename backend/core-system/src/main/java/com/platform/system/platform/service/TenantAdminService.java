@@ -18,6 +18,7 @@ import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.auth.service.InviteTokenService;
 import com.platform.system.auth.service.SessionTerminationService;
 import com.platform.system.platform.dto.TenantDto;
+import com.platform.system.rbac.service.BuiltInRoleLookup;
 import com.platform.system.platform.entity.TenantEntity;
 import com.platform.system.platform.mapper.TenantMapper;
 import com.platform.system.rbac.service.RbacSeederService;
@@ -137,6 +138,12 @@ public class TenantAdminService {
     private final ObjectProvider<TenantAdminService> self;
     /** Tenant-wide force-logout on suspend (terminates every active session of the tenant). */
     private final SessionTerminationService sessionTermination;
+    /**
+     * Only used to drop the per-tenant SUPER_ADMIN-role-id cache entry when this
+     * service changes which role that is — see the invalidate() calls in
+     * {@link #create} and {@link #hardDelete}.
+     */
+    private final BuiltInRoleLookup roleLookup;
 
     public TenantAdminService(TenantMapper tenantMapper,
                               ObjectProvider<KeycloakRealmService> realmServiceProvider,
@@ -148,7 +155,8 @@ public class TenantAdminService {
                               AppMailProperties mailProps,
                               JdbcTemplate jdbc,
                               ObjectProvider<TenantAdminService> self,
-                              SessionTerminationService sessionTermination) {
+                              SessionTerminationService sessionTermination,
+                              BuiltInRoleLookup roleLookup) {
         this.tenantMapper = tenantMapper;
         this.realmServiceProvider = realmServiceProvider;
         this.userServiceProvider = userServiceProvider;
@@ -160,6 +168,7 @@ public class TenantAdminService {
         this.jdbc = jdbc;
         this.self = self;
         this.sessionTermination = sessionTermination;
+        this.roleLookup = roleLookup;
     }
 
     public PageResult<TenantDto.View> list(long page, long size, String keyword, Integer status) {
@@ -331,8 +340,15 @@ public class TenantAdminService {
             // the proxy (self) so @Transactional applies — one transaction for
             // the whole unit, so the numbering/RBAC seed is visible to the
             // allocation that immediately follows it.
-            return self.getObject().persistNewTenant(
+            String newTenantId = self.getObject().persistNewTenant(
                     req, adminUsername, adminEmail, adminDisplayName, kcIdFinal);
+            // Drop any cached answer for this code. BuiltInRoleLookup caches the
+            // "not found" result too (its loader wraps in Optional precisely so
+            // Caffeine will), so a code that was probed before its SUPER_ADMIN role
+            // existed — most plausibly a re-create of a code that was just
+            // hard-deleted — would keep answering null/stale for up to 10 min.
+            roleLookup.invalidate(req.tenantCode());
+            return newTenantId;
         } catch (RuntimeException e) {
             // ── Compensation ─────────────────────────────────────────
             // KC user creation or the DB transaction failed after the
@@ -452,17 +468,55 @@ public class TenantAdminService {
         if (row == null || !Integer.valueOf(1).equals(row.getMark())) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Tenant not found: " + tenantId);
         }
+        if (RESERVED_CODES.contains(row.getTenantCode())) {
+            // The UI disables this button for the built-in tenant; the endpoint is the
+            // real boundary. 'system' holds the PLATFORM_ADMIN / PLATFORM_OPERATOR
+            // built-in roles and the ops users' own pending invites, so without this
+            // the query below would happily pick an ops user and re-mail them with the
+            // TENANT-admin wording. Resending an ops invite belongs to
+            // PlatformUserAdminService.resendInvite.
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                    "Built-in tenant '" + row.getTenantCode() + "' has no tenant admin invite — "
+                            + "use the platform-user console to resend an operator invite");
+        }
         String tenantCode = row.getTenantCode();
 
+        // Target the invite of the tenant ADMIN specifically — the holder of the
+        // tenant's built-in SUPER_ADMIN role.
+        //
+        // This used to be "the pending invite with the latest expires_at", which is
+        // wrong the moment the tenant has ANY newer pending invite: ordinary business
+        // users invited through UserAdminService (INVITE mode) land in the very same
+        // core_user_invite table under the very same tenant_id, and both flows share
+        // app.invite.token-ttl — so "latest expires_at" just means "most recently
+        // invited", which is almost never the admin (they were invited at tenant
+        // creation). Verified against the real DB: with an admin invite and one
+        // later business-user invite present, the old query picked the business user.
+        // The operator then got a success toast while: that employee's pending link
+        // was voided and re-mailed to them with the tenant-admin wording, and — when
+        // a correctedEmail was supplied — their address was rewritten in the DB and in
+        // Keycloak AND copied into core_tenant.contact_email, i.e. the tenant's
+        // platform contact silently became a random employee's mailbox. The actual
+        // admin's invite was never touched, so the one thing the operator asked for
+        // did not happen.
+        //
+        // assignRoles refuses to grant SUPER_ADMIN to a second user, so the holder is
+        // unique; is_built_in = 1 identifies it without depending on the role name.
         List<Map<String, Object>> pending = jdbc.queryForList(
-                "SELECT user_id, keycloak_id FROM core_user_invite "
-                        + "WHERE tenant_id = ? AND used_at IS NULL AND mark = 1 "
-                        + "ORDER BY expires_at DESC LIMIT 1",
+                "SELECT i.user_id, i.keycloak_id FROM core_user_invite i "
+                        + "  JOIN core_rbac_user_role ur "
+                        + "    ON ur.user_id = i.user_id AND ur.tenant_id = i.tenant_id AND ur.mark = 1 "
+                        + "  JOIN core_rbac_role r "
+                        + "    ON r.id = ur.role_id AND r.tenant_id = ur.tenant_id "
+                        + "   AND r.mark = 1 AND r.is_built_in = 1 "
+                        + " WHERE i.tenant_id = ? AND i.used_at IS NULL AND i.mark = 1 "
+                        + " ORDER BY i.expires_at DESC LIMIT 1",
                 tenantCode);
         if (pending.isEmpty()) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR,
-                    "No pending invite for tenant '" + tenantCode + "' — the admin may have "
-                            + "already activated their account.");
+                    "No pending admin invite for tenant '" + tenantCode + "' — the admin may have "
+                            + "already activated their account. (Business users' invites are resent "
+                            + "from the tenant's own user console.)");
         }
         String userId = (String) pending.get(0).get("user_id");
         String keycloakId = (String) pending.get(0).get("keycloak_id");
@@ -816,6 +870,17 @@ public class TenantAdminService {
             // already succeeded.
             log.warn("[tenant] registry DELETE for id={} affected {} rows (expected 1)", id, rows);
         }
+
+        // The tenant's SUPER_ADMIN role row is gone, but BuiltInRoleLookup still has
+        // tenantCode -> old role id cached for up to 10 min. Hard-delete then RE-CREATE
+        // with the SAME code is a supported workflow (uk_core_tenant_code is partial on
+        // mark=1, and the recycle-bin flow is documented), and the re-seeded role gets a
+        // FRESH ULID — verified against the DB that the id genuinely changes. A stale
+        // entry then makes isTenantSuperAdmin() miss: the new tenant's super admin is no
+        // longer "protected", so any user:update holder can edit / disable / delete /
+        // re-role them, assignRoles stops refusing a second SUPER_ADMIN holder, and the
+        // break-glass exemption clears their password_hash on first SSO bind.
+        roleLookup.invalidate(tenantCode);
 
         log.warn("[tenant] HARD DELETE complete for '{}' (id={})", tenantCode, id);
     }

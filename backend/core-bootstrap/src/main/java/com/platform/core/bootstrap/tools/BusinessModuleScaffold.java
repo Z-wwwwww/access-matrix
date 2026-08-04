@@ -131,15 +131,18 @@ public final class BusinessModuleScaffold {
             this.moduleJava = repo.resolve("backend/business-demo/src/main/java/com/platform/business/demo");
             this.templateDir = moduleJava.resolve("task");
             this.newResourceDir = moduleJava.resolve(args.resource);
-            // Flyway scans only core-bootstrap/db/migration in legacy mode; new
-            // business modules ship their own migrations alongside their code.
+            // Legacy mode WRITES here; new-module mode writes into the module's own
+            // src/main/resources/db/migration. Flyway itself reads the classpath
+            // (spring.flyway.locations=classpath:db/migration), so every such directory
+            // contributes to ONE shared version space — which is why the version picker
+            // must scan all of them, not just this one. See pickNextFlywayVersion.
             this.migrationsDir = repo.resolve("backend/core-bootstrap/src/main/resources/db/migration");
             this.demoPermissionsFile = moduleJava.resolve("security/DemoPermissions.java");
         }
 
         void run() throws IOException {
             assertWritable();
-            int version = pickNextFlywayVersion(migrationsDir);
+            int version = pickNextFlywayVersion(repo);
             Substitutions sub = legacySubstitutions(args);
 
             List<String> created = new ArrayList<>();
@@ -197,7 +200,7 @@ public final class BusinessModuleScaffold {
 
         void run() throws IOException {
             assertWritable();
-            int version = pickNextFlywayVersion(repo.resolve("backend/core-bootstrap/src/main/resources/db/migration"));
+            int version = pickNextFlywayVersion(repo);
             Substitutions sub = newModuleSubstitutions(args);
 
             List<String> created = new ArrayList<>();
@@ -532,7 +535,52 @@ public final class BusinessModuleScaffold {
         return out;
     }
 
-    static int pickNextFlywayVersion(Path migrations) throws IOException {
+    /**
+     * Every migration directory that ends up on the runtime classpath: core-bootstrap's
+     * plus each backend module's own {@code src/main/resources/db/migration}.
+     *
+     * <p>They share ONE version space. {@code spring.flyway.locations} is
+     * {@code classpath:db/migration}, which Flyway resolves across every jar and
+     * classes directory — so two files carrying the same V-number in different modules
+     * are duplicates and Flyway refuses to start ("Found more than one migration with
+     * version N").
+     */
+    static List<Path> allMigrationDirs(Path repo) throws IOException {
+        List<Path> dirs = new ArrayList<>();
+        dirs.add(repo.resolve("backend/core-bootstrap/src/main/resources/db/migration"));
+        Path backend = repo.resolve("backend");
+        if (Files.isDirectory(backend)) {
+            try (DirectoryStream<Path> mods = Files.newDirectoryStream(backend, Files::isDirectory)) {
+                for (Path mod : mods) {
+                    Path d = mod.resolve("src/main/resources/db/migration");
+                    if (Files.isDirectory(d) && !dirs.contains(d)) dirs.add(d);
+                }
+            }
+        }
+        return dirs;
+    }
+
+    /**
+     * Next free business migration version, considering ALL migration directories.
+     *
+     * <p>Scanning only core-bootstrap's directory became wrong the moment a scaffolded
+     * module started carrying its own {@code db/migration}: the new-module path WRITES
+     * into the module's directory but READ the next version from core-bootstrap's, so
+     * every subsequent scaffold picked the same number again — two modules both getting
+     * {@code V1000}, which Flyway rejects at startup. The shared V1000+ space the
+     * convention below describes only works if the picker sees the whole space.
+     */
+    static int pickNextFlywayVersion(Path repo) throws IOException {
+        int max = 0;
+        for (Path d : allMigrationDirs(repo)) {
+            max = Math.max(max, maxVersionIn(d));
+        }
+        // Convention: business migrations start at V1000+; framework owns V1-V999.
+        return Math.max(max + 1, 1000);
+    }
+
+    /** Highest V-number in ONE migration directory, or 0 if none / not a directory. */
+    static int maxVersionIn(Path migrations) throws IOException {
         int max = 0;
         if (Files.isDirectory(migrations)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(migrations, "V*.sql")) {
@@ -546,8 +594,7 @@ public final class BusinessModuleScaffold {
                 }
             }
         }
-        // Convention: business migrations start at V1000+; framework owns V1-V999.
-        return Math.max(max + 1, 1000);
+        return max;
     }
 
     static String renderMigration(String resource, int version) {
@@ -566,8 +613,16 @@ public final class BusinessModuleScaffold {
                 + "    mark          SMALLINT     NOT NULL DEFAULT 1,\n"
                 + "    create_user   VARCHAR(64),\n"
                 + "    update_user   VARCHAR(64),\n"
-                + "    create_time   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,\n"
-                + "    update_time   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP\n"
+                // TIMESTAMPTZ + now(), NOT timestamp + CURRENT_TIMESTAMP — this has to match
+                // the post-V58 shape. V58 converted every existing time column away from
+                // zone-less timestamp ("meaning depended on the writing JVM's default zone")
+                // and deliberately re-created the defaults as now() rather than
+                // CURRENT_TIMESTAMP, to avoid PostgreSQL re-wrapping the old default in a
+                // session-dependent double cast. A scaffold still emitting the pre-V58 shape
+                // silently undoes that migration for every new module, and pairs a zone-less
+                // column with BaseEntity's OffsetDateTime audit fields.
+                + "    create_time   TIMESTAMPTZ  NOT NULL DEFAULT now(),\n"
+                + "    update_time   TIMESTAMPTZ  NOT NULL DEFAULT now()\n"
                 + ");\n"
                 + "\n"
                 + "-- Unique indexes lead with tenant_id so two tenants can each have the same 'code':\n"

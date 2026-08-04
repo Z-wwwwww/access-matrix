@@ -36,4 +36,32 @@ class KeycloakRealmTemplateTest {
         assertThat(out).doesNotContain("/realms/demo/");
         assertThat(out).doesNotContain("/admin/demo/");
     }
+
+    /**
+     * Every cloned business realm MUST have Keycloak's brute-force detection on.
+     *
+     * <p>This is the only failed-login throttle that covers the path business
+     * users actually authenticate through. In oidc mode the login form is
+     * Keycloak's, so neither app-side defence applies: {@code AccountLockoutService}
+     * only fires from {@code AuthService.login} (i.e. the {@code POST /auth/login}
+     * break-glass path) and {@code AuthRateLimitFilter} only filters URIs
+     * containing {@code /auth/} on our own server — never KC's token endpoint.
+     * With the switch off, a tenant's passwords face unlimited online guessing.
+     *
+     * <p>The template is demo's realm export, so this asserts on the rendered
+     * clone — the exact JSON {@code kc.realms().create()} receives.
+     */
+    @Test
+    void renderRealmJson_keepsBruteForceProtectionOn() throws Exception {
+        KeycloakRealmService svc = new KeycloakRealmService(null, null);
+        Method m = KeycloakRealmService.class.getDeclaredMethod(
+                "renderRealmJson", String.class, String.class);
+        m.setAccessible(true);
+
+        String out = (String) m.invoke(svc, "acme", "Acme Inc");
+
+        assertThat(out.replaceAll("\\s+", ""))
+                .as("cloned realms must not ship with brute-force detection disabled")
+                .contains("\"bruteForceProtected\":true");
+    }
 }

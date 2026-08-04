@@ -40,10 +40,16 @@ import java.util.Map;
  *
  * <p><b>Create</b> mirrors the user half of {@code TenantAdminService}: provision
  * a Keycloak user in the {@code system} realm, persist the {@code core_auth_user}
- * row (no local password — KC owns the credential), and bind PLATFORM_ADMIN. The
- * KC user gets a one-time temporary password (forced change on first login)
- * returned once to the operator. If the DB half fails, the KC user is deleted
- * (compensation) so no orphan remains.
+ * row (no local password — KC owns the credential), and bind PLATFORM_OPERATOR.
+ * The user then sets their own password via a single-use {@code /invite/{token}}
+ * link (plan B — no temp password is ever handed out).
+ *
+ * <p>Consistency: the two DB writes live in {@link #persistNewOpsUser}, a
+ * {@code @Transactional} method invoked through the Spring proxy, so they commit
+ * or roll back as ONE unit; {@link #create} itself stays outside any transaction
+ * so its Keycloak call isn't trapped in one. If the DB unit fails, the KC user is
+ * deleted (compensation) — so a failure leaves the operator in neither system and
+ * a retry can reuse the username.
  */
 @Service
 public class PlatformUserAdminService {
@@ -66,6 +72,16 @@ public class PlatformUserAdminService {
     private final InviteTokenService inviteTokenService;
     /** Shared owner of enable/disable session + Keycloak side-effects (see setEnabled). */
     private final SessionTerminationService sessionTermination;
+    /**
+     * Self-reference (through the Spring proxy) used to invoke the
+     * {@code @Transactional} {@link #persistNewOpsUser} from the NON-transactional
+     * {@link #create}. A plain {@code this.persistNewOpsUser(...)} self-call would
+     * bypass the proxy and the advice, leaving the two INSERTs as independent
+     * autocommits. Same pattern (and same reason) as
+     * {@code TenantAdminService.persistNewTenant}: create() itself must stay
+     * outside any transaction so its Keycloak call isn't trapped in one.
+     */
+    private final ObjectProvider<PlatformUserAdminService> self;
 
     public PlatformUserAdminService(JdbcTemplate jdbc,
                                     ObjectProvider<KeycloakUserService> userServiceProvider,
@@ -73,7 +89,8 @@ public class PlatformUserAdminService {
                                     ObjectProvider<MailService> mailProvider,
                                     AppMailProperties mailProps,
                                     InviteTokenService inviteTokenService,
-                                    SessionTerminationService sessionTermination) {
+                                    SessionTerminationService sessionTermination,
+                                    ObjectProvider<PlatformUserAdminService> self) {
         this.jdbc = jdbc;
         this.userServiceProvider = userServiceProvider;
         this.forceLogoutService = forceLogoutService;
@@ -81,9 +98,29 @@ public class PlatformUserAdminService {
         this.mailProps = mailProps;
         this.inviteTokenService = inviteTokenService;
         this.sessionTermination = sessionTermination;
+        this.self = self;
     }
 
+    /**
+     * Upper bound on {@code size}, mirroring
+     * {@code MybatisPlusConfig}'s {@code PaginationInnerInterceptor.setMaxLimit(500)}.
+     * This is the ONLY hand-rolled paginator in the codebase — every other list goes
+     * through MyBatis-Plus, which normalises {@code page < 1} and caps {@code size}
+     * for free. Without the same clamping here the endpoint diverged from all the
+     * others in two ways, both reachable from an unvalidated query param
+     * (the controller only declares {@code @RequestParam(defaultValue = ...)}):
+     * <ul>
+     *   <li>{@code ?page=0} → {@code offset = (0-1)*20 = -20} → Postgres rejects a
+     *       negative OFFSET → 500 "Unhandled exception" (with the stack detail
+     *       exposed in dev). {@code ?size=-5} → negative LIMIT, same outcome.</li>
+     *   <li>{@code ?size=1000000} → no cap at all, unlike every MyBatis list.</li>
+     * </ul>
+     */
+    private static final long MAX_PAGE_SIZE = 500;
+
     public PageResult<PlatformUserDto.View> list(long page, long size, String keyword) {
+        page = Math.max(1, page);
+        size = Math.min(MAX_PAGE_SIZE, Math.max(1, size));
         StringBuilder where = new StringBuilder(
                 "FROM core_auth_user u WHERE u.tenant_id = ? AND u.mark = 1");
         if (keyword != null && !keyword.isBlank()) {
@@ -143,29 +180,20 @@ public class PlatformUserAdminService {
         // the DB half fails.
         String kcId = kc.createUser(SYSTEM_REALM, req.username(), req.email(), req.displayName(), null);
         try {
-            String userId = IdGenerator.ulid();
-            String userNo = nextSystemUserNo();
-            OffsetDateTime now = OffsetDateTime.now();
-            jdbc.update(
-                    "INSERT INTO core_auth_user "
-                            + "  (id, tenant_id, username, email, user_no, display_name, "
-                            + "   password_hash, keycloak_id, status, mark, "
-                            + "   create_user, update_user, create_time, update_time) "
-                            + "VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 1, 1, "
-                            + "        'platform-admin', 'platform-admin', ?, ?)",
-                    userId, SYSTEM_TENANT, req.username(), req.email(), userNo,
-                    req.displayName(), kcId, now, now);
-            jdbc.update(
-                    "INSERT INTO core_rbac_user_role "
-                            + "  (id, tenant_id, user_id, role_id, mark, create_user, update_user) "
-                            + "VALUES (?, ?, ?, ?, 1, 'platform-admin', 'platform-admin')",
-                    IdGenerator.ulid(), SYSTEM_TENANT, userId, BuiltInRoles.PLATFORM_OPERATOR_ID);
+            // Both DB writes as ONE unit, through the proxy so @Transactional
+            // applies. Previously they were two independent autocommits: if the
+            // user_role INSERT failed, the core_auth_user row stayed committed
+            // while the catch below deleted the KC user — leaving a roleless row
+            // whose keycloak_id pointed at a deleted KC user, and whose username
+            // then tripped the usernameDup pre-check on every retry.
+            String userId = self.getObject().persistNewOpsUser(req, kcId);
 
             // Send the invite link (plan B) — the SAME path as resend: mint a
             // single-use /invite/{token} and email it; the user sets their own
             // password on the landing page. No temp password is set or returned.
             // Best-effort: a mail failure must NOT fail creation (operator can use
-            // "resend" to retry).
+            // "resend" to retry). Deliberately AFTER the transaction commits so the
+            // invite row can never reference an uncommitted user.
             boolean emailSent = sendInviteMail(userId, kcId, req.username(), req.email(), req.displayName());
             log.info("[platform-user] provisioned ops user '{}' (id={}, kcId={}) with PLATFORM_OPERATOR, inviteSent={}",
                     req.username(), userId, kcId, emailSent);
@@ -182,6 +210,36 @@ public class PlatformUserAdminService {
             }
             throw e;
         }
+    }
+
+    /**
+     * Pure-DB half of {@link #create}: the {@code core_auth_user} row plus its
+     * PLATFORM_OPERATOR binding, committed or rolled back as one unit. Contains
+     * NO external (Keycloak / SMTP) calls — the invite email is sent by the
+     * caller after this commits.
+     *
+     * @return the new user's id (ULID)
+     */
+    @Transactional
+    public String persistNewOpsUser(PlatformUserDto.CreateRequest req, String kcId) {
+        String userId = IdGenerator.ulid();
+        String userNo = nextSystemUserNo();
+        OffsetDateTime now = OffsetDateTime.now();
+        jdbc.update(
+                "INSERT INTO core_auth_user "
+                        + "  (id, tenant_id, username, email, user_no, display_name, "
+                        + "   password_hash, keycloak_id, status, mark, "
+                        + "   create_user, update_user, create_time, update_time) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 1, 1, "
+                        + "        'platform-admin', 'platform-admin', ?, ?)",
+                userId, SYSTEM_TENANT, req.username(), req.email(), userNo,
+                req.displayName(), kcId, now, now);
+        jdbc.update(
+                "INSERT INTO core_rbac_user_role "
+                        + "  (id, tenant_id, user_id, role_id, mark, create_user, update_user) "
+                        + "VALUES (?, ?, ?, ?, 1, 'platform-admin', 'platform-admin')",
+                IdGenerator.ulid(), SYSTEM_TENANT, userId, BuiltInRoles.PLATFORM_OPERATOR_ID);
+        return userId;
     }
 
     /** Enable or disable a platform operator. KC first (stronger gate), then DB status. */

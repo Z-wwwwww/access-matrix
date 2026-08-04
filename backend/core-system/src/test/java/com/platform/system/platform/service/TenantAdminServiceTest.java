@@ -68,6 +68,7 @@ class TenantAdminServiceTest {
     @Mock AppMailProperties mailProps;
     @Mock JdbcTemplate jdbc;
     @Mock com.platform.system.auth.service.SessionTerminationService sessionTermination;
+    @Mock com.platform.system.rbac.service.BuiltInRoleLookup roleLookup;
 
     private ObjectProvider<KeycloakRealmService> realmServiceProvider;
     private ObjectProvider<KeycloakUserService> userServiceProvider;
@@ -98,7 +99,7 @@ class TenantAdminServiceTest {
 
         service = new TenantAdminService(tenantMapper, realmServiceProvider, userServiceProvider,
                 numberingService, rbacSeederService, inviteTokenService,
-                mailProvider, mailProps, jdbc, selfProvider, sessionTermination);
+                mailProvider, mailProps, jdbc, selfProvider, sessionTermination, roleLookup);
         // In-process self-proxy: persistNewTenant runs directly on the same
         // instance (no real transaction in a unit test — interactions still verify).
         when(selfProvider.getObject()).thenReturn(service);
@@ -357,9 +358,78 @@ class TenantAdminServiceTest {
 
         assertThatThrownBy(() -> service.resendAdminInvite("id-acme", null))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("No pending invite");
+                .hasMessageContaining("No pending admin invite");
 
         verify(inviteTokenService, never()).mint(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void resendInvite_selectsTheAdminByBuiltInRole_notTheNewestInvite() {
+        // The pick must be scoped to the holder of the tenant's built-in SUPER_ADMIN
+        // role. Ordinary business users invited via UserAdminService (INVITE mode)
+        // land in the SAME core_user_invite table under the SAME tenant_id and share
+        // app.invite.token-ttl, so the old "ORDER BY expires_at DESC LIMIT 1" simply
+        // returned the most recently invited person — verified against the real DB
+        // that this was a business user, not the admin. Assert the SQL carries the
+        // role join; without it the statement cannot be discriminating.
+        stubPendingInvite("acme", "u-admin", "kc-admin", "admin", "Acme Admin", "admin@acme.example");
+
+        service.resendAdminInvite("id-acme", null);
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForList(sql.capture(), org.mockito.ArgumentMatchers.<Object[]>any());
+        assertThat(sql.getValue())
+                .contains("core_rbac_user_role")
+                .contains("is_built_in = 1")
+                .doesNotContain("SELECT user_id, keycloak_id FROM core_user_invite WHERE");
+    }
+
+    @Test
+    void resendInvite_refusedForTheBuiltInSystemTenant() {
+        // The UI disables the button for the built-in tenant; the endpoint is the real
+        // boundary. 'system' carries the PLATFORM_ADMIN / PLATFORM_OPERATOR built-in
+        // roles plus the ops users' own pending invites, so the role join alone would
+        // still match an ops user and re-mail them with TENANT-admin wording.
+        when(tenantMapper.selectById("id-system")).thenReturn(row("id-system", "system"));
+
+        assertThatThrownBy(() -> service.resendAdminInvite("id-system", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Built-in tenant");
+
+        verify(inviteTokenService, never()).mint(anyString(), anyString(), anyString());
+        verify(jdbc, never()).queryForList(anyString(), org.mockito.ArgumentMatchers.<Object[]>any());
+    }
+
+    // ─── SUPER_ADMIN-role-id cache invalidation ───────────────────────
+    //
+    // BuiltInRoleLookup caches tenantCode -> SUPER_ADMIN role id for 10 minutes, and
+    // caches the "not found" answer too (its loader wraps in Optional so Caffeine
+    // will). This service is the only thing that changes that mapping, and
+    // invalidate() had ZERO callers. Hard-delete + RE-CREATE of the same code is a
+    // supported workflow (uk_core_tenant_code is partial on mark = 1) and the
+    // re-seeded role gets a FRESH ULID — verified against the real DB that the id
+    // changes and that existsActiveLink() with the old id returns 0 rows, i.e.
+    // isTenantSuperAdmin() stops recognising the new tenant's super admin.
+
+    @Test
+    void hardDelete_invalidatesTheCachedSuperAdminRoleId() {
+        TenantEntity row = row("id-acme", "acme");
+        row.setStatus(0);   // must be suspended first
+        when(tenantMapper.selectById("id-acme")).thenReturn(row);
+
+        service.hardDelete("id-acme", "acme");
+
+        verify(roleLookup).invalidate("acme");
+    }
+
+    @Test
+    void create_invalidatesTheCachedSuperAdminRoleId() {
+        // Covers the negative-caching half: a code probed before its role existed
+        // (e.g. right after the previous tenant of the same code was hard-deleted)
+        // would otherwise keep answering null for up to 10 minutes.
+        service.create(new TenantDto.CreateRequest("acme", "Acme", "admin@acme.example", null));
+
+        verify(roleLookup).invalidate("acme");
     }
 
     // ─── deriveUsernameFromEmail unit tests ───────────────────────────

@@ -1,6 +1,5 @@
 package com.platform.system.auth.service;
 
-import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
@@ -60,6 +59,20 @@ public class PasswordResetTokenService {
         this.mapper = mapper;
     }
 
+    /**
+     * Effective token lifetime in whole days — what reset emails must quote as
+     * the validity period, so the number stays in sync with the configured
+     * {@code app.password-reset.token-ttl} instead of a hardcoded literal.
+     * Mirror of {@link InviteTokenService#ttlDays()} (same fallback to 7, same
+     * floor of 1 so a sub-day TTL never renders as "0 days"). Added because the
+     * reset email was quoting a literal "7" while this TTL is configurable —
+     * exactly the drift the invite side calls out in its own comment.
+     */
+    public long ttlDays() {
+        Duration d = ttl != null ? ttl : Duration.ofDays(7);
+        return Math.max(1, d.toDays());
+    }
+
     @Transactional
     public String mint(String tenantId, String userId, String keycloakId) {
         if (ttl == null) ttl = Duration.ofDays(7);
@@ -105,13 +118,17 @@ public class PasswordResetTokenService {
         if (row.getExpiresAt() == null || row.getExpiresAt().isBefore(OffsetDateTime.now())) {
             throw new BusinessException(ErrorCode.BUSINESS_ERROR, "Reset token has expired");
         }
+        // Atomic single-use claim: only the FIRST caller flips used_at NULL → now.
+        // markUsed returns the affected-row count — 0 means it was already consumed
+        // (or lost a concurrent race), so we reject. The previous UpdateWrapper
+        // version discarded the count, so two concurrent POSTs of the same reset
+        // link both got past here and each wrote a password hash — defeating the
+        // single-use guarantee PasswordResetController.accept explicitly relies on.
+        // Same fix (and same shape) as InviteTokenService.consume.
         OffsetDateTime now = OffsetDateTime.now();
-        mapper.update(null,
-                new UpdateWrapper<PasswordResetTokenEntity>()
-                        .eq("id", row.getId())
-                        .isNull("used_at")
-                        .set("used_at", now)
-                        .set("update_user", "system"));
+        if (mapper.markUsed(row.getId(), now) == 0) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "Reset token not found or already used");
+        }
         row.setUsedAt(now);
         log.info("[reset] consumed token for user {} (tenant {})", row.getUserId(), row.getTenantId());
         return row;

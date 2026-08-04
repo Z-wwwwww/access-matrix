@@ -46,6 +46,7 @@ class OidcJitUserServiceTest {
     @Mock RoleMapper roleMapper;
     @Mock com.platform.system.rbac.service.BuiltInRoleLookup roleLookup;
     @Mock com.platform.core.infrastructure.numbering.NumberingService numberingService;
+    @Mock com.platform.system.auth.mapper.PasswordResetTokenMapper resetTokenMapper;
     @InjectMocks OidcJitUserService service;
 
     @BeforeEach
@@ -293,6 +294,202 @@ class OidcJitUserServiceTest {
         verify(userMapper, never()).findByKeycloakIdAndTenant(any(), any());
         verify(userMapper, never()).insert(any(UserEntity.class));
         verify(userMapper, never()).updateById(any(UserEntity.class));
+    }
+
+    // ── an account that left SSO must not be dragged back onto it ───────────
+    //
+    // PasswordResetController's reverse migration writes a local password, clears
+    // keycloak_id, and disables the Keycloak user — but that last step is
+    // BEST-EFFORT ("if KC is unreachable the local password is already written...
+    // we just log the orphan KC user for the operator to clean up later"). A
+    // surviving (or later re-enabled) KC account can therefore still complete an SSO
+    // login, and then: the fast path misses (keycloak_id is NULL), the deleted-user
+    // probe misses (mark=1), and the legacy-bind branch matches the SAME user by
+    // username and re-writes keycloak_id while NULLING the password_hash they just
+    // set. Net effect: a flow the docs call irreversible is silently undone and the
+    // user can log in neither way — the reset token is single-use and already spent.
+    // core_password_reset_token rows are minted by exactly one caller
+    // (SsoToPasswordMigrationService), so a consumed row is an unambiguous marker.
+
+    @Test
+    void bindPath_userThatCompletedTheReverseMigration_isRefused() {
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-orphan",
+                "tid", "demo",
+                "preferred_username", "dave"));
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-orphan", "demo")).thenReturn(null);
+        UserEntity migrated = row("ULID-DAVE-26", "dave");
+        when(userMapper.findByIdentifier("demo", "dave")).thenReturn(migrated);
+        when(resetTokenMapper.countConsumedByUser("demo", "ULID-DAVE-26")).thenReturn(1L);
+
+        assertThat(service.resolveBusinessUserId(token)).isNull();
+        // Crucially: no bind UPDATE, so password_hash survives.
+        verify(userMapper, never()).update(any(), any());
+        verify(userMapper, never()).insert(any(UserEntity.class));
+    }
+
+    @Test
+    void bindPath_ordinaryLegacyUser_withNoConsumedResetToken_stillBinds() {
+        // The guard must not break the normal password->SSO migration it shares a
+        // branch with: that user has no consumed reverse-migration token.
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-plain",
+                "tid", "demo",
+                "preferred_username", "erin"));
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-plain", "demo")).thenReturn(null);
+        UserEntity legacy = row("ULID-ERIN-26", "erin");
+        when(userMapper.findByIdentifier("demo", "erin")).thenReturn(legacy);
+        when(resetTokenMapper.countConsumedByUser("demo", "ULID-ERIN-26")).thenReturn(0L);
+        when(roleMapper.findRoleIdsByUserId("ULID-ERIN-26", "demo")).thenReturn(java.util.List.of());
+
+        assertThat(service.resolveBusinessUserId(token)).isEqualTo("ULID-ERIN-26");
+        verify(userMapper).update(org.mockito.ArgumentMatchers.isNull(), any());
+    }
+
+    // ── disabled user must not resolve on the OIDC path ─────────────────────
+    //
+    // Disabling is a two-sided write (DB status=0 + Keycloak setEnabled(false)), and
+    // only the Keycloak half stops a FRESH sso login. SessionTerminationService
+    // applies that half BEST-EFFORT — it logs and swallows a failure so "a KC hiccup
+    // must not block the local kick". So with KC briefly unreachable during a
+    // disable: status=0 commits, the Redis kick kills the current tokens, then the
+    // user signs in again (KC still has them enabled), the fresh token's iat clears
+    // ForceLogoutFilter, and this resolver used to return the business id with no
+    // status check whatsoever — console says disabled, user keeps working. That is
+    // the sozo-admin2 incident, which was fixed only on the Keycloak side.
+
+    @Test
+    void fastPath_disabledUser_isRefused() {
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-disabled",
+                "tid", "demo",
+                "preferred_username", "bob"));
+        UserEntity bound = row("ULID-BOB-26", "bob");
+        bound.setKeycloakId("kc-uuid-disabled");
+        bound.setStatus(0);
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-disabled", "demo")).thenReturn(bound);
+
+        assertThat(service.resolveBusinessUserId(token)).isNull();
+        verify(userMapper, never()).insert(any(UserEntity.class));
+    }
+
+    @Test
+    void fastPath_enabledUser_stillResolves() {
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-ok",
+                "tid", "demo",
+                "preferred_username", "bob"));
+        UserEntity bound = row("ULID-BOB-26", "bob");
+        bound.setKeycloakId("kc-uuid-ok");
+        bound.setStatus(1);
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-ok", "demo")).thenReturn(bound);
+
+        assertThat(service.resolveBusinessUserId(token)).isEqualTo("ULID-BOB-26");
+    }
+
+    @Test
+    void fastPath_nullStatus_isTreatedAsEnabled() {
+        // Legacy rows predating the column's default must not be locked out.
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-null",
+                "tid", "demo",
+                "preferred_username", "bob"));
+        UserEntity bound = row("ULID-BOB-26", "bob");
+        bound.setKeycloakId("kc-uuid-null");
+        bound.setStatus(null);
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-null", "demo")).thenReturn(bound);
+
+        assertThat(service.resolveBusinessUserId(token)).isEqualTo("ULID-BOB-26");
+    }
+
+    @Test
+    void bindPath_disabledLegacyUser_isRefusedWithoutClearingItsPasswordHash() {
+        // Order matters: refuse BEFORE the bind UPDATE, or a rejected login would
+        // strip the user's break-glass credential as a side effect.
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-legacy-off",
+                "tid", "demo",
+                "preferred_username", "carol"));
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-legacy-off", "demo")).thenReturn(null);
+        UserEntity legacy = row("ULID-CAROL-26", "carol");
+        legacy.setStatus(0);
+        when(userMapper.findByIdentifier("demo", "carol")).thenReturn(legacy);
+
+        assertThat(service.resolveBusinessUserId(token)).isNull();
+        verify(userMapper, never()).update(any(), any());
+        verify(userMapper, never()).insert(any(UserEntity.class));
+    }
+
+    // ── claim length vs column width ────────────────────────────────────────
+    //
+    // These three strings come from the IdP, not from one of our @Size-validated
+    // DTOs, so nothing upstream bounds them. Keycloak's default user profile
+    // allows a username up to 255 while core_auth_user.username is VARCHAR(64)
+    // and display_name is VARCHAR(128) — verified against the real DB that a
+    // 70-char username INSERT is rejected with "value too long for type character
+    // varying(64)". That exception escapes resolveBusinessUserId out through
+    // CoreRequestContextFilter, so an ops person who creates a long-username user
+    // in the KC admin console produces an account that logs in at Keycloak and
+    // then 500s on EVERY API call with an opaque "Unhandled exception".
+
+    @Test
+    void provisionPath_overlongUsername_refusesInsteadOfBlowingUpOnInsert() {
+        String tooLong = "u".repeat(65);   // one over VARCHAR(64)
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-long",
+                "tid", "demo",
+                "preferred_username", tooLong));
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-long", "demo")).thenReturn(null);
+        when(userMapper.findByIdentifier("demo", tooLong)).thenReturn(null);
+
+        String businessId = service.resolveBusinessUserId(token);
+
+        // Same graceful shape as the deleted-user branch: null, no insert.
+        assertThat(businessId).isNull();
+        verify(userMapper, never()).insert(any(UserEntity.class));
+    }
+
+    @Test
+    void provisionPath_maxLengthUsername_isStillProvisioned() {
+        // The guard must reject only what the column cannot hold — exactly 64 fits.
+        String exact = "u".repeat(64);
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-64",
+                "tid", "demo",
+                "preferred_username", exact));
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-64", "demo")).thenReturn(null);
+        when(userMapper.findByIdentifier("demo", exact)).thenReturn(null);
+
+        String businessId = service.resolveBusinessUserId(token);
+
+        assertThat(businessId).isNotNull();
+        ArgumentCaptor<UserEntity> cap = ArgumentCaptor.forClass(UserEntity.class);
+        verify(userMapper).insert(cap.capture());
+        assertThat(cap.getValue().getUsername()).hasSize(64);
+    }
+
+    @Test
+    void provisionPath_overlongDisplayName_isTruncatedNotRefused() {
+        // display_name is cosmetic, and given_name + " " + family_name makes it the
+        // easiest of the three to overflow — a login must not fail over it.
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-disp",
+                "tid", "demo",
+                "preferred_username", "hank",
+                "given_name", "G".repeat(100),
+                "family_name", "F".repeat(100)));
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-disp", "demo")).thenReturn(null);
+        when(userMapper.findByIdentifier("demo", "hank")).thenReturn(null);
+
+        String businessId = service.resolveBusinessUserId(token);
+
+        assertThat(businessId).isNotNull();
+        ArgumentCaptor<UserEntity> cap = ArgumentCaptor.forClass(UserEntity.class);
+        verify(userMapper).insert(cap.capture());
+        assertThat(cap.getValue().getDisplayName())
+                .as("clamped to core_auth_user.display_name's VARCHAR(128)")
+                .hasSize(128);
+        assertThat(cap.getValue().getUsername()).isEqualTo("hank");
     }
 
     @Test

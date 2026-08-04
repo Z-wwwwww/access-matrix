@@ -37,10 +37,23 @@ import java.util.Optional;
  *
  * <h3>Cache posture</h3>
  * Caffeine TTL 10 min, max 500 entries (well above any plausible tenant
- * count). The super-admin role id changes only on tenant create (new entry
- * — natural cache miss) or hard delete (stale entry — but no callers
- * remain for that tenant anyway). Built-in roles can't be renamed via UI,
- * so the name → id mapping is durable.
+ * count). Built-in roles can't be renamed via UI, so the name &rarr; id mapping
+ * is durable for a living tenant.
+ *
+ * <p>The mapping DOES change on tenant create and hard delete, and
+ * {@code TenantAdminService} calls {@link #invalidate(String)} on both. This
+ * used to be documented as self-correcting ("create is a natural cache miss;
+ * after hard delete no callers remain for that tenant") — both halves are wrong
+ * when a code is hard-deleted and RE-CREATED, which is a supported workflow
+ * ({@code uk_core_tenant_code} is partial on {@code mark = 1}). The re-seeded
+ * role gets a fresh ULID — verified against the DB that the id changes — and the
+ * loader caches the {@code Optional.empty()} "not found" answer too. A stale or
+ * empty entry makes every caller of {@link #superAdminRoleId} silently wrong for
+ * up to 10 minutes: {@code UserAdminService.assertNotProtectedAdmin} stops
+ * recognising the new tenant's super admin (so any {@code user:update} holder can
+ * edit / disable / delete / re-role them), {@code assignRoles} stops refusing a
+ * second SUPER_ADMIN holder, and the break-glass exemption clears their
+ * {@code password_hash} on first SSO bind.
  *
  * <h3>What this does NOT replace</h3>
  * {@link com.platform.core.common.security.BuiltInRoles#SUPER_ADMIN_ID}

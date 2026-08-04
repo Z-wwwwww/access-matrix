@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.platform.core.common.dict.DictGuards;
 import com.platform.core.common.dict.DictRegistry;
 import com.platform.core.common.error.BusinessException;
+import com.platform.core.common.error.ConcurrentEdit;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.system.dict.dto.DictAdminDto;
@@ -77,7 +78,7 @@ public class DictAdminService {
         DictEntity d = requireType(id);
         if (req.nameI18n() != null) d.setNameI18n(codec.serialize(req.nameI18n()));
         if (req.remark() != null) d.setRemark(req.remark());
-        dictMapper.updateById(d);
+        ConcurrentEdit.requireApplied(dictMapper.updateById(d));
     }
 
     @Transactional
@@ -138,7 +139,7 @@ public class DictAdminService {
         if (req.sortNo() != null) it.setSortNo(req.sortNo());
         if (req.cssClass() != null) it.setCssClass(req.cssClass());
         if (req.status() != null) it.setStatus(req.status());
-        itemMapper.updateById(it);
+        ConcurrentEdit.requireApplied(itemMapper.updateById(it));
         queryService.evict(it.getDictCode());
     }
 

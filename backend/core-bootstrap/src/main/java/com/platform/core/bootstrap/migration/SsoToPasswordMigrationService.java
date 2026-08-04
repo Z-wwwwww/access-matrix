@@ -158,7 +158,11 @@ public class SsoToPasswordMigrationService {
         model.put("tenantId",     tenantId);
         model.put("supportEmail", mailProps.from());
         model.put("resetUrl",     mailProps.baseUrl() + "/reset-password/" + cleartextToken);
-        model.put("expiresIn",    "7");
+        // Derived from the configured app.password-reset.token-ttl, never a literal —
+        // a hardcoded "7" tells the recipient the link lasts a week even when the
+        // TTL was shortened, and they act on that deadline. (Same reasoning the
+        // invite emails in TenantAdminService / PlatformUserAdminService state.)
+        model.put("expiresIn",    String.valueOf(tokens.ttlDays()));
         Object[] subjectArgs = new Object[] { "[" + mailProps.fromName() + "]" };
         // Recipient locale is hard to know at migration time (the user has
         // never logged in to set one); take JP as the conservative default,

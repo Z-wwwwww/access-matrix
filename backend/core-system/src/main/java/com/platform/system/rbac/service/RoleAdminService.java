@@ -7,6 +7,7 @@ import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.dict.CommonStatus;
 import com.platform.core.common.dict.DictEnum;
 import com.platform.core.common.error.BusinessException;
+import com.platform.core.common.error.ConcurrentEdit;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.system.dict.builtin.DataScopeDict;
@@ -128,7 +129,7 @@ public class RoleAdminService {
             DictEnum.requireValid(CommonStatus.class, req.status(), "status");
             r.setStatus(req.status());
         }
-        roleMapper.updateById(r);
+        ConcurrentEdit.requireApplied(roleMapper.updateById(r));
         cacheService.evictRole(id);
     }
 

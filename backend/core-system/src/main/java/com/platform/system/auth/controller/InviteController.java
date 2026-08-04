@@ -3,14 +3,20 @@ package com.platform.system.auth.controller;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
+import com.platform.core.infrastructure.audit.OpLogRecord;
+import com.platform.core.infrastructure.audit.OpLogSink;
 import com.platform.core.infrastructure.config.properties.AppMailProperties;
+import com.platform.core.infrastructure.security.ClientIpResolver;
 import com.platform.core.infrastructure.security.PasswordPolicyService;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
 import com.platform.system.auth.entity.UserInviteEntity;
 import com.platform.system.auth.service.InviteTokenService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,19 +40,28 @@ import java.util.Map;
 @ConditionalOnProperty(name = "app.security.mode", havingValue = "oidc")
 public class InviteController {
 
+    private static final Logger log = LoggerFactory.getLogger(InviteController.class);
+
     private final InviteTokenService inviteTokenService;
     private final KeycloakUserService keycloakUserService;
     private final PasswordPolicyService passwordPolicy;
     private final AppMailProperties mailProps;
+    /** Async best-effort audit sink — see recordAudit (this endpoint is pre-auth). */
+    private final OpLogSink opLogSink;
+    private final ClientIpResolver clientIpResolver;
 
     public InviteController(InviteTokenService inviteTokenService,
                             KeycloakUserService keycloakUserService,
                             PasswordPolicyService passwordPolicy,
-                            AppMailProperties mailProps) {
+                            AppMailProperties mailProps,
+                            OpLogSink opLogSink,
+                            ClientIpResolver clientIpResolver) {
         this.inviteTokenService = inviteTokenService;
         this.keycloakUserService = keycloakUserService;
         this.passwordPolicy = passwordPolicy;
         this.mailProps = mailProps;
+        this.opLogSink = opLogSink;
+        this.clientIpResolver = clientIpResolver;
     }
 
     /**
@@ -78,7 +93,8 @@ public class InviteController {
      */
     @PostMapping("/{token}")
     public JsonResult<Map<String, Object>> accept(@PathVariable String token,
-                                                  @Valid @RequestBody AcceptInviteRequest req) {
+                                                  @Valid @RequestBody AcceptInviteRequest req,
+                                                  HttpServletRequest http) {
         passwordPolicy.validate(req.password());
 
         // Consume FIRST so a slow / retried HTTP request can't double-spend.
@@ -91,9 +107,42 @@ public class InviteController {
         keycloakUserService.setPassword(row.getTenantId(), row.getKeycloakId(),
                 req.password(), /* temporary = */ false);
 
+        recordAudit(row.getTenantId(), row.getUserId(), http);
+
         return JsonResult.ok(Map.of(
                 "loginUrl", mailProps.baseUrl() + "/login"
         ));
+    }
+
+    /**
+     * Audit the accepted invite into {@code core_oplog}.
+     *
+     * <p>Why not just {@code @OpLog}: this endpoint is PRE-AUTH, so the aspect's
+     * {@code RequestContext} carries no user and only whatever {@code X-Tenant-Id}
+     * the caller happened to send — the row would be misattributed, which for a
+     * security audit is worse than no row. Built explicitly from the consumed
+     * token instead, exactly like {@code AuthService.recordBreakGlassUse}.
+     *
+     * <p>This was previously not audited at all: every other credential-changing
+     * endpoint writes an oplog row ({@code auth.breakGlassSet}, both
+     * {@code reset-password} consoles, {@code auth.unlock},
+     * {@code auth.forceLogout}), while the two pre-auth token endpoints that set a
+     * user's PERMANENT password left no trace. Best-effort — audit must never fail
+     * the user's onboarding.
+     */
+    private void recordAudit(String tenantId, String userId, HttpServletRequest http) {
+        try {
+            opLogSink.record(new OpLogRecord(
+                    tenantId, userId, null,
+                    "system", "auth.inviteAccept", "user", userId,
+                    http == null ? null : http.getRequestURI(),
+                    http == null ? null : http.getMethod(),
+                    clientIpResolver.resolve(http),
+                    http == null ? null : http.getHeader("User-Agent"),
+                    null, true, null, null, 0));
+        } catch (Exception e) {
+            log.warn("[invite] could not record audit oplog for user {}: {}", userId, e.toString());
+        }
     }
 
     public record AcceptInviteRequest(

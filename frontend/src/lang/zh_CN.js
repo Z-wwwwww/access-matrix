@@ -7,6 +7,7 @@ import permissions from './generated/permissions.zh_CN.json'
 
 export default {
   error: {
+    common: { concurrentEdit: '该记录已被他人修改，请刷新后重试。' },
     dict: {
       codeExists: '字典编码已存在',
       codeIsBuiltin: '该编码是内置（枚举）字典，不可管理',
@@ -29,6 +30,7 @@ export default {
       passwordRequired: '直接设密方式需要填写密码',
       emailRequired: '邀请邮件方式需要填写邮箱',
       superAdminSingleton: '超级管理员角色为租户所有者保留，不能授予其他用户',
+      roleNotFound: '所选角色中有的已不存在于本租户，请刷新页面后重试',
       adminProtected: '该管理员账号受保护，其他用户不能修改、停用、删除或强制登出；管理员本人可在「个人资料」页修改自己的信息',
       noKeycloakLink: '该用户未关联 Keycloak 账号，无法重置密码',
       selfManagementForbidden: '不能在此管理自己的账号，请在「个人资料」页修改自己的信息'
@@ -88,6 +90,9 @@ export default {
     message: { saveSuccess: '已保存', runStarted: '已开始执行', enabled: '已启用', disabled: '已停止', updateFailed: '保存失败', runFailed: '执行失败' }
   },
   common: {
+    // 星期标签，周日开头（与 dayjs .day() 的 0=周日一致）。逗号分隔，
+    // 调用方 split(',') 后按星期序号取值。
+    weekStrings: '周日,周一,周二,周三,周四,周五,周六',
     button: {
       search: '搜索',
       reset: '重置',
@@ -124,6 +129,7 @@ export default {
     },
     message: {
       saveSuccessful: '保存成功',
+      saveFailed: '保存失败',
       deleteSuccessful: '删除成功',
       loading: '加载中',
       processing: '处理中...',

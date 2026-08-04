@@ -7,6 +7,7 @@ import permissions from './generated/permissions.zh_TW.json'
 
 export default {
   error: {
+    common: { concurrentEdit: '該記錄已被他人修改，請重新載入後再試。' },
     dict: {
       codeExists: '字典編碼已存在',
       codeIsBuiltin: '該編碼是內建（列舉）字典，不可管理',
@@ -29,6 +30,7 @@ export default {
       passwordRequired: '直接設密方式需要填寫密碼',
       emailRequired: '邀請信件方式需要填寫信箱',
       superAdminSingleton: '超級管理員角色為租戶擁有者保留，不能授予其他使用者',
+      roleNotFound: '所選角色中有的已不存在於本租戶，請重新載入頁面後重試',
       adminProtected: '該管理員帳號受保護，其他使用者不能修改、停用、刪除或強制登出；管理員本人可在「個人資料」頁修改自己的資訊',
       noKeycloakLink: '該使用者未關聯 Keycloak 帳號，無法重設密碼',
       selfManagementForbidden: '不能在此管理自己的帳號，請在「個人資料」頁修改自己的資訊'
@@ -88,6 +90,9 @@ export default {
     message: { saveSuccess: '已儲存', runStarted: '已開始執行', enabled: '已啟用', disabled: '已停止', updateFailed: '儲存失敗', runFailed: '執行失敗' }
   },
   common: {
+    // 星期標籤，週日開頭（與 dayjs .day() 的 0=週日一致）。逗號分隔，
+    // 呼叫方 split(',') 後按星期序號取值。
+    weekStrings: '週日,週一,週二,週三,週四,週五,週六',
     confirm: {
       forceTitle: '強制刪除',
       forceMessage: '{detail}\n\n強制刪除將清除所有關聯引用並使其失效。是否繼續？'
@@ -124,6 +129,7 @@ export default {
     },
     message: {
       saveSuccessful: '儲存成功',
+      saveFailed: '儲存失敗',
       deleteSuccessful: '刪除成功',
       loading: '載入中',
       processing: '處理中...',

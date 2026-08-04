@@ -162,7 +162,7 @@ core-bootstrap/
 1. **NO business code in core-system** — `core-system` is system-domain only. New businesses must open a new module.
 2. **NO system code leaks into business modules** — `business-pms` may not define user / role / permission tables; reuse the existing `core_*` tables.
 3. **NO cross-business deps** — business modules may not import one another.
-4. **NO raw SQL outside `@Select` / `@Update` / `@Delete` annotations OR `V*__*.sql` migrations** — temporary debugging aside.
+4. **NO raw SQL outside `@Select` / `@Update` / `@Delete` annotations, `V*__*.sql` migrations, or a justified `JdbcTemplate`** — MyBatis (+ the tenant interceptor) is the default for anything tenant-scoped. `JdbcTemplate` is the *sanctioned* escape hatch, not "temporary debugging": it is what 12 main-code classes already use for the cases MyBatis actively gets in the way of — platform-ops **cross-tenant** reads/writes (`PlatformDashboardService`, `PlatformUserAdminService`, `TenantAdminService`, `TenantImpersonationService`, `SessionTerminationService`, `RbacSeederService`, `TenantPermissionCatalogReconciler`), boot-time DDL/schema guards (`AuthSchemaBootstrap`, `TenantSchemaGuard`), and counters/retention that must not join a business tx (`NumberingService`, `OutboxRetentionJob`). Note the alternative is worse: `@InterceptorIgnore` is *mechanically blocked* in business code by `ArchitectureTest.business_code_must_not_use_interceptor_ignore`. When you reach for `JdbcTemplate`, the bar is: either an explicit `tenant_id = ?` predicate, or a comment saying why the query is deliberately cross-tenant (see Hard Rule 5).
 5. **NO new tenant-bypassing query without justification** — by default all queries go through the MyBatis-Plus tenant interceptor; hand-written `@Select` must explicitly include a `tenant_id` predicate (see `UserMapper.findByIdentifier`).
 6. **NO `@PreAuthorize`** — endpoint authorization uses `@RequiresPermission` uniformly (custom AOP, readable, supports wildcards).
 7. **NO inline permission checks in controllers** — use the permission aspect + `RequestContext` user identity; do not write `if (currentUser.isAdmin())` in controllers.
@@ -281,7 +281,7 @@ If you prefer (or need) to do it by hand, the DO / DON'T below is the spec.
 | force-logout | Redis key `core:auth:logout:{userId}` → epoch sec, TTL 8d (> refresh 7d) | `ForceLogoutService` |
 | force-logout global | `ForceLogoutFilter` (OncePerRequestFilter, order = HIGHEST + 30) checks `iat <= kickOutAt` on every JWT-bearing request | `ForceLogoutFilter` + `SecurityConfig` |
 | Account lockout | Redis key `auth:fail:{tenant}:{id}` + `auth:lock:{tenant}:{id}`, **tenant-isolated** | `AccountLockoutService` |
-| Password policy | Length / character class + HIBP remote check (degrades fail-open) | `PasswordPolicyService` |
+| Password policy | Length / character class + HIBP remote check. **HIBP degrades fail-CLOSED by default** (`app.security.password-policy.fail-open-on-hibp-error: false`): when api.pwnedpasswords.com is unreachable — outage, 3s timeout, or an intranet install with no egress — `HibpClient.isCompromised` returns `true` and **every** password-setting flow is refused (invite accept, SSO→password reset, break-glass rotation). Point `hibp-base-url` at a self-hosted mirror, or flip the flag to `true`, for deployments that can't reach it | `PasswordPolicyService` / `HibpClient` |
 | Rate limit | bucket4j; positioned in front of the login path | `AuthRateLimitFilter` |
 
 ## API conventions

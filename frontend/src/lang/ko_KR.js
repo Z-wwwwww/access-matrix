@@ -7,6 +7,7 @@ import permissions from './generated/permissions.ko_KR.json'
 
 export default {
   error: {
+    common: { concurrentEdit: '다른 사용자가 이 항목을 먼저 수정했습니다. 새로 고침 후 다시 시도하세요.' },
     dict: {
       codeExists: '사전 코드가 이미 존재합니다',
       codeIsBuiltin: '이 코드는 내장(enum) 사전이라 관리할 수 없습니다',
@@ -29,6 +30,7 @@ export default {
       passwordRequired: '직접 설정 방식은 비밀번호가 필요합니다',
       emailRequired: '초대 메일 방식은 이메일이 필요합니다',
       superAdminSingleton: '슈퍼 관리자 역할은 테넌트 소유자 전용이며 다른 사용자에게 부여할 수 없습니다',
+      roleNotFound: '선택한 역할 중 일부가 이 테넌트에 존재하지 않습니다. 페이지를 새로고침한 뒤 다시 시도하세요',
       adminProtected: '이 관리자 계정은 보호되어 다른 사용자가 수정·정지·삭제·강제 로그아웃할 수 없습니다. 관리자 본인이 프로필 페이지에서 자신의 정보를 수정하세요',
       noKeycloakLink: '이 사용자는 Keycloak 계정과 연동되어 있지 않아 비밀번호를 재설정할 수 없습니다',
       selfManagementForbidden: '여기서는 본인 계정을 관리할 수 없습니다. 본인 정보는 프로필 페이지에서 수정하세요'
@@ -88,6 +90,9 @@ export default {
     message: { saveSuccess: '저장했습니다', runStarted: '실행을 시작했습니다', enabled: '활성화했습니다', disabled: '중지했습니다', updateFailed: '저장 실패', runFailed: '실행 실패' }
   },
   common: {
+    // 요일 라벨, 일요일 시작(dayjs .day()의 0=일요일과 일치). 쉼표 구분이며
+    // 사용처에서 split(',')으로 요일 번호에 맞춰 사용한다.
+    weekStrings: '일,월,화,수,목,금,토',
     confirm: {
       forceTitle: '강제 삭제',
       forceMessage: '{detail}\n\n강제 삭제하면 관련된 모든 링크가 해제됩니다. 계속하시겠습니까?'
@@ -124,6 +129,7 @@ export default {
     },
     message: {
       saveSuccessful: '저장되었습니다',
+      saveFailed: '저장에 실패했습니다',
       deleteSuccessful: '삭제되었습니다',
       loading: '로딩 중',
       processing: '처리 중...',

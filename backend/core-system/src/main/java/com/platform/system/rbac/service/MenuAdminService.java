@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.platform.core.common.dict.CommonStatus;
 import com.platform.core.common.dict.DictEnum;
 import com.platform.core.common.error.BusinessException;
+import com.platform.core.common.error.ConcurrentEdit;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.system.dict.builtin.MenuType;
@@ -58,6 +59,12 @@ public class MenuAdminService {
         }
         MenuEntity m = new MenuEntity();
         m.setId(IdGenerator.ulid());
+        // A brand-new id can't be its own ancestor, so only the existence check
+        // applies here (a dangling parentId would silently promote the node to a
+        // root in MenuQueryService.assembleTree).
+        if (req.parentId() != null && !req.parentId().isBlank()) {
+            require(req.parentId());
+        }
         m.setParentId(req.parentId());
         m.setCode(req.code());
         m.setTitle(req.title());
@@ -86,7 +93,10 @@ public class MenuAdminService {
     @Transactional
     public void update(String id, MenuAdminDto.UpdateRequest req) {
         MenuEntity m = require(id);
-        if (req.parentId() != null) m.setParentId(req.parentId());
+        if (req.parentId() != null) {
+            assertReparentable(id, req.parentId());
+            m.setParentId(req.parentId());
+        }
         if (req.title() != null) m.setTitle(req.title());
         if (req.titleI18n() != null) m.setTitleI18n(serializeI18n(req.titleI18n()));
         if (req.menuType() != null) {
@@ -108,7 +118,7 @@ public class MenuAdminService {
             DictEnum.requireValid(CommonStatus.class, req.status(), "status");
             m.setStatus(req.status());
         }
-        menuMapper.updateById(m);
+        ConcurrentEdit.requireApplied(menuMapper.updateById(m));
         cacheService.evictAllMenus();
     }
 
@@ -136,6 +146,47 @@ public class MenuAdminService {
             throw new BusinessException(ErrorCode.NOT_FOUND, "Menu not found: " + id);
         }
         return m;
+    }
+
+    /**
+     * Reject a re-parent that would make {@code id} its own ancestor. The frontend's
+     * parent picker already excludes self + descendants, but the endpoint is the real
+     * boundary and a cycle here is expensive: {@code MenuQueryService.assembleTree}
+     * attaches every node to its parent and only collects parent-less nodes as roots,
+     * so a node inside a cycle is reachable from no root — the whole branch silently
+     * disappears from {@code /menu/me} for EVERY user (menus are a single global set
+     * since V41), with nothing in the response to say why. Mirrors the equivalent
+     * guards in {@code DeptAdminService.update}.
+     *
+     * <p>Blank parentId means "make it a root" — always allowed.
+     */
+    private void assertReparentable(String id, String newParentId) {
+        if (newParentId.isBlank()) return;
+        if (newParentId.equals(id)) {
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "A menu cannot be its own parent");
+        }
+        // Walk up from the proposed parent. Hitting `id` means the proposed parent is
+        // one of our own descendants → cycle. The visited set keeps the walk finite
+        // even if the table already contains a cycle from before this guard existed.
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        String cursor = newParentId;
+        while (cursor != null && !cursor.isBlank() && seen.add(cursor)) {
+            if (cursor.equals(id)) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                        "New parent is a descendant — would create a cycle");
+            }
+            MenuEntity ancestor = menuMapper.selectById(cursor);
+            if (ancestor == null || ancestor.getMark() == null || ancestor.getMark() != 1) {
+                // The chain leaves the live tree. If it broke on the very first hop the
+                // caller pointed at a non-existent parent; deeper up it's pre-existing
+                // dirty data that this edit doesn't make worse.
+                if (cursor.equals(newParentId)) {
+                    throw new BusinessException(ErrorCode.NOT_FOUND, "Menu not found: " + newParentId);
+                }
+                return;
+            }
+            cursor = ancestor.getParentId();
+        }
     }
 
     private MenuAdminDto.View toView(MenuEntity m) {

@@ -53,6 +53,36 @@ public class DictQueryService {
                 .anyMatch(i -> String.valueOf(i.value()).equals(v));
     }
 
+    /**
+     * Is {@code value} an option a client may still CHOOSE — i.e. a live item that
+     * is also {@code enabled} (status=1)?
+     *
+     * <p>Distinct from {@link #isValidValue}, which answers the weaker "is this a
+     * legal value of this dict at all" and must keep saying yes for retired values
+     * so historical rows still resolve a label. The two questions need different
+     * filters and both are needed:
+     *
+     * <ul>
+     *   <li>{@code DictAdminService.deleteItem} refuses to hard-delete any value the
+     *       code branches on or that business data still references, and its own
+     *       comment directs the operator to "disable it (status=0) instead" — so
+     *       {@code status=0} is THE retirement mechanism for a managed dict item.</li>
+     *   <li>The read API ships an {@code enabled} flag per item precisely so the two
+     *       uses can diverge, and {@code useDict} does diverge: {@code items} (all,
+     *       for labels) vs {@code options} (enabled only, for {@code <Select>}).</li>
+     * </ul>
+     *
+     * Without this method the server had no enabled-aware validator at all, so
+     * retiring an option only hid it in fresh UI — any client (including a browser
+     * tab holding a pre-disable dict cache) could still write the retired value.
+     */
+    public boolean isSelectableValue(String code, Object value) {
+        if (value == null) return false;
+        String v = String.valueOf(value);
+        return read(code).items().stream()
+                .anyMatch(i -> String.valueOf(i.value()).equals(v) && i.enabled());
+    }
+
     void evict(String code) {
         cache.remove(code);
     }
