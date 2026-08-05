@@ -1,15 +1,16 @@
 package com.platform.system.dict.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.platform.core.common.dict.DictRegistry;
 import com.platform.system.dict.dto.DictReadDto;
 import com.platform.system.dict.entity.DictItemEntity;
 import com.platform.system.dict.mapper.DictItemMapper;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Read side of the dictionary feature ({@code GET /dict/{code}}). Resolves a code
@@ -28,9 +29,37 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class DictQueryService {
 
+    /**
+     * Cache ceiling. The real dict-code population is ~10 built-in + however many
+     * managed types ops create, so a few hundred is generous; the bound exists
+     * because the key is caller-supplied (see {@link #cache}).
+     */
+    static final int MAX_CACHED_CODES = 512;
+
     private final DictItemMapper itemMapper;
     private final DictJsonCodec codec;
-    private final Map<String, DictReadDto.View> cache = new ConcurrentHashMap<>();
+
+    /**
+     * Code → resolved options.
+     *
+     * <p><b>Must stay bounded.</b> The key comes straight from the
+     * {@code GET /dict/{code}} path variable, and that endpoint is authenticated
+     * but deliberately not permission-gated, with an equally deliberate
+     * delete-tolerant read path (an unknown code resolves to an empty item list
+     * rather than a 404). With a plain {@code ConcurrentHashMap} those two choices
+     * combined into an unbounded, caller-driven allocation: any logged-in user
+     * walking {@code /dict/aaa}, {@code /dict/aab}, … added one permanent entry
+     * per request for the life of the JVM. Caffeine with a {@code maximumSize}
+     * keeps the hit-rate for the handful of real codes while capping the damage,
+     * and matches how every other cache in this project is built
+     * ({@code CacheConfig} / {@code app.cache.specs}). The write TTL is a
+     * belt-and-braces backstop only — {@link DictAdminService} still evicts
+     * explicitly so an ops edit is visible immediately.
+     */
+    private final Cache<String, DictReadDto.View> cache = Caffeine.newBuilder()
+            .maximumSize(MAX_CACHED_CODES)
+            .expireAfterWrite(Duration.ofMinutes(30))
+            .build();
 
     public DictQueryService(DictItemMapper itemMapper, DictJsonCodec codec) {
         this.itemMapper = itemMapper;
@@ -38,7 +67,7 @@ public class DictQueryService {
     }
 
     public DictReadDto.View read(String code) {
-        return cache.computeIfAbsent(code, this::load);
+        return cache.get(code, this::load);
     }
 
     /**
@@ -84,7 +113,13 @@ public class DictQueryService {
     }
 
     void evict(String code) {
-        cache.remove(code);
+        cache.invalidate(code);
+    }
+
+    /** Entries currently cached. Package-private — test observability only. */
+    int cachedCodes() {
+        cache.cleanUp();   // settle pending evictions so the count is exact
+        return (int) cache.estimatedSize();
     }
 
     private DictReadDto.View load(String code) {

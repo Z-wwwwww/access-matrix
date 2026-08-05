@@ -100,10 +100,19 @@ public class JobExecutionWrapper {
         RequestContext.set(SYSTEM_TENANT, triggeredBy, "job:" + jobCode, Locale.ROOT, "job-" + IdGenerator.ulid());
 
         OffsetDateTime start = OffsetDateTime.now();
-        String logId = insertRunning(jobCode, triggerType, start, triggeredBy);
+        // The RUNNING insert is INSIDE the try on purpose. It is a DB write, so it
+        // can fail for the same reasons the job body can — and if it threw from
+        // outside, the finally never ran: the distributed lock stayed held until its
+        // lock_until lease expired (max_run_seconds, 300s default), silently skipping
+        // the job on every node meanwhile, and the system-tenant RequestContext — the
+        // scoping-BYPASS signal MybatisPlusConfig.ignoreTable keys off — leaked onto a
+        // pooled scheduler thread that runNow() also borrows. A null logId simply means
+        // "no RUNNING row to finalize"; core_job.last_status still records the failure.
+        String logId = null;
         int finalStatus = STATUS_SUCCESS;
         String error = null;
         try {
+            logId = insertRunning(jobCode, triggerType, start, triggeredBy);
             job.execute(new JobContext(jobCode, tenantId, triggerType, start));
         } catch (Throwable t) {
             finalStatus = STATUS_FAIL;
@@ -112,12 +121,29 @@ public class JobExecutionWrapper {
         } finally {
             OffsetDateTime end = OffsetDateTime.now();
             long durationMs = Duration.between(start, end).toMillis();
-            finalizeLog(logId, finalStatus, end, durationMs, error);
-            updateLastResult(jobCode, tenantId, end, finalStatus, durationMs);
+            String runLogId = logId;
+            int status = finalStatus;
+            String err = error;
+            // Each bookkeeping write is guarded separately: whatever broke the run is
+            // usually still broken here, and a throw out of the finally would take the
+            // lock release and the context cleanup down with it.
+            if (runLogId != null) {
+                safely("finalize log", () -> finalizeLog(runLogId, status, end, durationMs, err));
+            }
+            safely("update last result", () -> updateLastResult(jobCode, tenantId, end, status, durationMs));
             if (acquired) {
-                lockService.release(lockName);
+                lockService.release(lockName);   // already swallows its own errors
             }
             RequestContext.clear();
+        }
+    }
+
+    /** Run one bookkeeping write, logging (never propagating) its failure. */
+    private void safely(String what, Runnable action) {
+        try {
+            action.run();
+        } catch (Exception e) {
+            log.warn("[scheduler] could not {}: {}", what, e.toString());
         }
     }
 
