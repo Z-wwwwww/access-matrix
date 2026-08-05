@@ -10,6 +10,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import { toast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useDict } from '@/composables/useDict'
+import { usePermission } from '@/composables/usePermission'
 import { toJSTDateTimeFullDisp } from '@/lib/date'
 import { Search, RotateCcw, Pencil, Play, ScrollText, HelpCircle } from 'lucide-vue-next'
 import {
@@ -19,6 +20,11 @@ import {
 
 const { t } = useI18n()
 const { confirm } = useConfirm()
+// The enable/disable Switch can't just be v-permission'd away — removing it
+// would also remove the only place the enabled state is shown. Probe the
+// permission instead and fall back to a read-only label.
+const { hasPermission } = usePermission()
+const canToggle = computed(() => hasPermission('platform:job:toggle'))
 
 // ── list state ──────────────────────────────────────────────
 const loading = ref(false)
@@ -145,6 +151,9 @@ const logColumns = computed(() => [
 // 触发类型 / 运行状态走字典（内置枚举 job_trigger_type / job_run_status）
 const jobTriggerType = useDict('job_trigger_type')
 const jobRunStatus = useDict('job_run_status')
+// Read-only rendering of core_job.enabled (1/0) for callers without
+// platform:job:toggle — same dict the rest of the console uses for on/off.
+const commonStatus = useDict('common_status')
 const triggerLabel = (v) => jobTriggerType.label(v)
 const runStatusLabel = (v) => (v ? jobRunStatus.label(v) : t('job.runStatus.none'))
 const runStatusClass = (v) => jobRunStatus.cssClass(v) || 'text-muted-foreground'
@@ -212,8 +221,11 @@ onMounted(fetchData)
           <code class="text-xs">{{ row.cron }}</code>
         </template>
         <template #cell-status="{ row }">
-          <Switch :model-value="row.enabled" :checked-value="1" :unchecked-value="0"
+          <Switch v-if="canToggle" :model-value="row.enabled" :checked-value="1" :unchecked-value="0"
                   @change="(v) => toggle(row, v)" />
+          <Badge v-else :variant="commonStatus.cssClass(row.enabled) || 'outline'">
+            {{ commonStatus.label(row.enabled) }}
+          </Badge>
         </template>
         <template #cell-nextFireTime="{ row }">
           <span class="text-xs text-muted-foreground">{{ fmtTime(row.nextFireTime) }}</span>
@@ -228,11 +240,13 @@ onMounted(fetchData)
         </template>
         <template #cell-actions="{ row }">
           <div class="inline-flex items-center gap-1">
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
+            <button v-permission="'platform:job:config'"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
                     :title="t('job.action.edit')" @click="openEdit(row)">
               <Pencil class="size-3.5" />
             </button>
-            <button class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
+            <button v-permission="'platform:job:run'"
+                    class="h-7 px-2 rounded hover:bg-muted text-xs inline-flex items-center gap-1"
                     :title="t('job.action.run')" @click="runNow(row)">
               <Play class="size-3.5" />
             </button>

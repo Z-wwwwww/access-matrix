@@ -178,7 +178,21 @@ public class OidcJitUserService implements OidcUserResolver {
         // continuously rather than as a one-shot.
         String username = jwt.getClaimAsString(usernameClaim);
         if (username != null && !username.isBlank()) {
-            UserEntity legacy = userMapper.findByIdentifier(tid, username);
+            // findByUsernameAndTenant, NOT findByIdentifier. The latter is the
+            // LOGIN matcher (username OR email OR user_no) — right for a human
+            // typing into a login box, wrong for binding an IdP identity to a
+            // row. Keycloak's registrationEmailAsUsername makes email-shaped
+            // preferred_username values ordinary, so the identifier matcher
+            // could land on a DIFFERENT user whose email equals this KC
+            // username: the bind below would stamp this token's keycloak_id
+            // onto that victim's row, after which the fast path above resolves
+            // every request from the SSO user to the VICTIM's business user id
+            // (their roles, their dept, their data scope) — and, unless the
+            // victim is SUPER_ADMIN, the same UPDATE nulls their password_hash,
+            // destroying the break-glass credential. See UserMapper for the
+            // full note; (tenant_id, username) is uniquely indexed, so the exact
+            // match is also what this branch's javadoc already claims to do.
+            UserEntity legacy = userMapper.findByUsernameAndTenant(tid, username);
             if (legacy != null) {
                 // Same status gate as the fast path — see refuseDisabled(). Checked
                 // BEFORE the bind so a disabled legacy user doesn't get their

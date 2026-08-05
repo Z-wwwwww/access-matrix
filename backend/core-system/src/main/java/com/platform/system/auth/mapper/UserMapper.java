@@ -81,4 +81,41 @@ public interface UserMapper extends BaseMapper<UserEntity> {
             """)
     long countDeletedByKeycloakIdAndTenant(@Param("keycloakId") String keycloakId,
                                            @Param("tenantId") String tenantId);
+
+    /**
+     * Exact username lookup inside a tenant — deliberately NOT
+     * {@link #findByIdentifier}.
+     *
+     * <p>{@code findByIdentifier} is the <em>login</em> matcher: it accepts
+     * {@code username OR email OR user_no}, because a human typing into a login
+     * box may use any of the three. That is wrong for machine-to-row binding.
+     * The OIDC JIT resolver's legacy-bind branch feeds it the IdP's
+     * {@code preferred_username} claim, so a Keycloak username that happens to
+     * equal a DIFFERENT business user's {@code email} (entirely ordinary —
+     * Keycloak's {@code registrationEmailAsUsername} makes email-shaped
+     * usernames the norm) or {@code user_no} matched that other user's row.
+     * The bind then wrote the SSO user's {@code keycloak_id} onto the victim's
+     * row, so from the next request on the fast path resolved the SSO user to
+     * the VICTIM's business user id — inheriting their roles, department and
+     * data scope — and, unless the victim held SUPER_ADMIN, nulled their
+     * {@code password_hash}, destroying their break-glass credential. With
+     * {@code LIMIT 1} and no ORDER BY, which row won was unspecified.
+     *
+     * <p>{@code (tenant_id, username)} carries a partial unique index
+     * ({@code uk_core_auth_user_tenant_username}, {@code WHERE mark = 1}), so
+     * this lookup is exact — which is precisely what the bind branch's own
+     * javadoc says it wants ("a row exists with the same (tenant_id, username)").
+     *
+     * <p>Hand-written {@code @Select} with an explicit {@code tenant_id} for the
+     * same interceptor reason as the lookups above.
+     */
+    @Select("""
+            SELECT * FROM core_auth_user
+             WHERE mark = 1
+               AND tenant_id = #{tenantId}
+               AND username = #{username}
+             LIMIT 1
+            """)
+    UserEntity findByUsernameAndTenant(@Param("tenantId") String tenantId,
+                                       @Param("username") String username);
 }

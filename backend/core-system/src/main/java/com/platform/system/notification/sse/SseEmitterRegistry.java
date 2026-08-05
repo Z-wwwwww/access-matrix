@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -67,7 +66,10 @@ public class SseEmitterRegistry {
                 try {
                     em.send(SseEmitter.event().comment("ping"));
                 } catch (Exception e) {
-                    list.remove(em);
+                    // Route through remove() so a key whose last emitter just
+                    // died is unmapped too — a bare list.remove leaves an empty
+                    // list stranded in `conns` forever.
+                    remove(key, em);
                 }
             }
         });
@@ -78,14 +80,57 @@ public class SseEmitterRegistry {
     }
 
     public SseEmitter register(String tenant, String user) {
-        SseEmitter emitter = new SseEmitter(TIMEOUT_MS);
+        return register(tenant, user, new SseEmitter(TIMEOUT_MS));
+    }
+
+    /**
+     * Register a caller-supplied emitter. Package-private seam so tests can
+     * observe delivery; production always goes through {@link #register(String, String)}.
+     *
+     * <p>The add happens <b>inside</b> {@code compute} on purpose. With
+     * {@code computeIfAbsent(...)} followed by a bare {@code list.add(...)}, the
+     * add lands outside the map's bin lock, so {@link #remove} could empty and
+     * unmap the very list this call just obtained — leaving a live connection in
+     * a list no longer reachable from {@code conns}. That emitter then matched no
+     * {@link #sendUnread} lookup and the user's unread badge silently froze until
+     * the 30-minute timeout forced a reconnect. Doing the add under the same lock
+     * {@code remove}'s {@code computeIfPresent} takes makes the two mutually
+     * exclusive.
+     *
+     * <p>Callbacks are wired before the add so a connection that dies during
+     * registration still removes itself.
+     */
+    SseEmitter register(String tenant, String user, SseEmitter emitter) {
         String k = key(tenant, user);
-        CopyOnWriteArrayList<SseEmitter> list = conns.computeIfAbsent(k, x -> new CopyOnWriteArrayList<>());
-        list.add(emitter);
         emitter.onCompletion(() -> remove(k, emitter));
         emitter.onTimeout(() -> remove(k, emitter));
         emitter.onError(e -> remove(k, emitter));
+        conns.compute(k, (ignored, list) -> {
+            CopyOnWriteArrayList<SseEmitter> l = (list == null) ? new CopyOnWriteArrayList<>() : list;
+            l.add(emitter);
+            return l;
+        });
         return emitter;
+    }
+
+    /**
+     * Tear down one connection — what the emitter's completion / timeout / error
+     * callbacks do. Package-private seam so tests can drive teardown without a
+     * servlet container to fire those callbacks.
+     */
+    void unregister(String tenant, String user, SseEmitter emitter) {
+        remove(key(tenant, user), emitter);
+    }
+
+    /** Open connections for one user. Package-private — test observability only. */
+    int connectionCount(String tenant, String user) {
+        CopyOnWriteArrayList<SseEmitter> list = conns.get(key(tenant, user));
+        return list == null ? 0 : list.size();
+    }
+
+    /** Keys currently held. Package-private — test observability only. */
+    int trackedKeys() {
+        return conns.size();
     }
 
     /** Push the current unread count to every open connection of this user. */
@@ -98,17 +143,36 @@ public class SseEmitterRegistry {
             } catch (IOException | IllegalStateException e) {
                 // Client gone / already closed — drop it. completion/error
                 // callbacks usually already removed it; this is belt-and-braces.
-                list.remove(em);
+                remove(key(tenant, user), em);
                 log.debug("[notif-sse] dropped dead emitter for {}: {}", key(tenant, user), e.toString());
             }
         }
     }
 
+    /**
+     * Drop one emitter, and the whole key once it holds none.
+     *
+     * <p>Must go through {@code computeIfPresent} rather than
+     * {@code get} + {@code conns.remove(key)}: the latter raced with
+     * {@link #register}. Interleaving was
+     * {@code register.computeIfAbsent} → (this method empties the list and
+     * unmaps the key) → {@code list.add(newEmitter)}, which parked the new
+     * connection in a list no longer reachable from {@code conns}. That
+     * emitter then never matched a {@link #sendUnread} lookup, so the user's
+     * unread badge silently stopped updating until the SSE timeout (30 min)
+     * forced a reconnect — the exact "badge looks frozen" symptom the
+     * heartbeat above exists to prevent. Concretely triggered by a browser
+     * reconnect landing while the previous connection is being torn down,
+     * which is the normal shape of a tab refresh.
+     *
+     * <p>{@code computeIfPresent} and {@code computeIfAbsent} lock the same
+     * bin of the {@link ConcurrentHashMap}, so the unmap and the add can no
+     * longer interleave.
+     */
     private void remove(String key, SseEmitter emitter) {
-        List<SseEmitter> list = conns.get(key);
-        if (list != null) {
+        conns.computeIfPresent(key, (k, list) -> {
             list.remove(emitter);
-            if (list.isEmpty()) conns.remove(key);
-        }
+            return list.isEmpty() ? null : list;   // null → unmap the key atomically
+        });
     }
 }

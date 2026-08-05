@@ -108,6 +108,42 @@ public class TenantAdminService {
     /** Used by NumberingService.next when allocating the new admin's user_no. */
     private static final String USER_NO_KBN = "USER";
 
+    /**
+     * Every per-tenant table {@link #hardDelete} purges, in FK-safe order.
+     *
+     * <p>Extracted as a named inventory because it is the one place that has to
+     * stay in step with the schema: a table that carries {@code tenant_id} but is
+     * missing here keeps its rows after the tenant is gone.
+     * {@link TenantPurgeCoverageGuard} cross-checks this list against
+     * {@code information_schema} at boot so a newly-added per-tenant table can't
+     * be forgotten silently.
+     *
+     * <p>Order matters — junction tables before the parents they reference (the
+     * FKs are {@code ON DELETE RESTRICT}), users after {@code user_role}, and the
+     * {@code core_tenant} registry row is NOT here: it is deleted last, by id,
+     * after the Keycloak realm.
+     */
+    static final List<String> TENANT_PURGE_TABLES = List.of(
+            "core_rbac_role_dept",
+            "core_rbac_role_menu",
+            "core_rbac_role_permission",
+            "core_rbac_user_role",
+            "core_rbac_role",
+            "core_rbac_permission",
+            "core_rbac_dept",
+            "core_auth_user",
+            "core_auth_login_log",
+            "core_oplog",
+            "core_password_reset_token",
+            "core_user_invite",
+            "core_numbering_key",
+            "core_numbering_management",
+            "core_domain_event",
+            "core_notification",
+            "core_job_log",
+            "core_job",
+            "demo_task");
+
     private final TenantMapper tenantMapper;
     /**
      * Keycloak realm operations are only available when
@@ -815,33 +851,17 @@ public class TenantAdminService {
         log.warn("[tenant] HARD DELETE starting for '{}' (id={}) — irreversible", tenantCode, id);
 
         // ── 1. Per-tenant business rows ─────────────────────────────
-        // FK-safe ordering. The four junction tables (role_dept,
-        // role_menu, role_permission, user_role) reference role/dept/
-        // menu/permission/user with ON DELETE RESTRICT, so they must
-        // empty first.
-        deleteByTenant("core_rbac_role_dept", tenantCode);
-        deleteByTenant("core_rbac_role_menu", tenantCode);
-        deleteByTenant("core_rbac_role_permission", tenantCode);
-        deleteByTenant("core_rbac_user_role", tenantCode);
-        // Then the "parents" the junctions referenced. Menus are a single global
-        // set since V41 (no tenant_id column) — NOT per-tenant — so core_rbac_menu
-        // is intentionally not deleted here; the role_menu bindings removed above
-        // are the only tenant-owned menu link.
-        deleteByTenant("core_rbac_role", tenantCode);
-        deleteByTenant("core_rbac_permission", tenantCode);
-        deleteByTenant("core_rbac_dept", tenantCode);
-        // Users after user_role.
-        deleteByTenant("core_auth_user", tenantCode);
-        // Standalone per-tenant tables (no FKs to / from each other).
-        deleteByTenant("core_auth_login_log", tenantCode);
-        deleteByTenant("core_oplog", tenantCode);
-        deleteByTenant("core_password_reset_token", tenantCode);
-        deleteByTenant("core_user_invite", tenantCode);
-        deleteByTenant("core_numbering_key", tenantCode);
-        deleteByTenant("core_numbering_management", tenantCode);
-        // Business modules. Add new modules' tables here as they ship,
-        // or migrate to information_schema-driven discovery later.
-        deleteByTenant("demo_task", tenantCode);
+        // Inventory + ordering live in TENANT_PURGE_TABLES; see its javadoc.
+        // Menus are a single GLOBAL set since V41 (no tenant_id column), so
+        // core_rbac_menu is deliberately absent — the role_menu bindings purged
+        // via the inventory are the only tenant-owned menu link. Likewise
+        // core_support_session: its tenant_id is always 'system' (a record of what
+        // platform-OPS did, not tenant data), the target tenant lives in
+        // tenant_code, and the dashboard already LEFT JOINs core_tenant so a
+        // deleted tenant just shows a null display name.
+        for (String table : TENANT_PURGE_TABLES) {
+            deleteByTenant(table, tenantCode);
+        }
 
         // ── 2. Keycloak realm ───────────────────────────────────────
         // Done before the registry row so a KC failure leaves the

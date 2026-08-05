@@ -8,6 +8,7 @@ import com.platform.core.common.result.PageResult;
 import com.platform.core.common.security.BuiltInRoles;
 import com.platform.core.infrastructure.config.properties.AppMailProperties;
 import com.platform.core.infrastructure.mail.MailService;
+import com.platform.core.infrastructure.numbering.NumberingService;
 import com.platform.core.infrastructure.security.ForceLogoutService;
 import com.platform.core.infrastructure.security.TempPasswords;
 import com.platform.core.infrastructure.security.keycloak.KeycloakUserService;
@@ -58,6 +59,8 @@ public class PlatformUserAdminService {
 
     private static final String SYSTEM_TENANT = "system";
     private static final String SYSTEM_REALM  = "system";
+    /** Numbering category for user_no — the same one every other creation path uses. */
+    private static final String USER_NO_KBN = "USER";
 
     private final JdbcTemplate jdbc;
     /** KC is only present in oidc mode; ObjectProvider keeps this bootable otherwise. */
@@ -72,6 +75,8 @@ public class PlatformUserAdminService {
     private final InviteTokenService inviteTokenService;
     /** Shared owner of enable/disable session + Keycloak side-effects (see setEnabled). */
     private final SessionTerminationService sessionTermination;
+    /** Per-tenant user_no allocation — see {@link #nextSystemUserNo()}. */
+    private final NumberingService numberingService;
     /**
      * Self-reference (through the Spring proxy) used to invoke the
      * {@code @Transactional} {@link #persistNewOpsUser} from the NON-transactional
@@ -90,6 +95,7 @@ public class PlatformUserAdminService {
                                     AppMailProperties mailProps,
                                     InviteTokenService inviteTokenService,
                                     SessionTerminationService sessionTermination,
+                                    NumberingService numberingService,
                                     ObjectProvider<PlatformUserAdminService> self) {
         this.jdbc = jdbc;
         this.userServiceProvider = userServiceProvider;
@@ -98,6 +104,7 @@ public class PlatformUserAdminService {
         this.mailProps = mailProps;
         this.inviteTokenService = inviteTokenService;
         this.sessionTermination = sessionTermination;
+        this.numberingService = numberingService;
         this.self = self;
     }
 
@@ -499,13 +506,43 @@ public class PlatformUserAdminService {
 
     private record Target(String id, String username, String email, String displayName, String keycloakId) {}
 
-    /** Next per-tenant user_no for the system tenant: U%08d after the current max. */
+    /**
+     * Next {@code user_no} for the system tenant — through the shared
+     * {@link NumberingService}, exactly like every other creation path
+     * ({@code UserAdminService.create}, {@code TenantAdminService.persistNewTenant},
+     * {@code OidcJitUserService}).
+     *
+     * <p>This used to hand-roll {@code MAX(CAST(SUBSTRING(user_no FROM 2)))+1},
+     * which advanced nothing: the {@code core_numbering_management} counter for
+     * {@code system} never learned about the numbers this console handed out. The
+     * two allocators then drifted apart and eventually hand out the SAME value —
+     * verified on the live dev DB, where the counter's next value {@code U00000002}
+     * is already held by an operator this console created:
+     *
+     * <pre>
+     *  tenant_id | counter_now | next_from_counter | max_in_use | next_already_taken
+     *  system    |           1 | U00000002         | U00000002  | t
+     * </pre>
+     *
+     * <p>{@code (tenant_id, user_no)} is uniquely indexed
+     * ({@code uk_core_auth_user_tenant_user_no}, partial on {@code mark = 1 AND
+     * user_no IS NOT NULL}), so the colliding allocation is a hard insert failure.
+     * The victim is whichever path allocates NEXT from the counter — most
+     * plausibly {@code OidcJitUserService}, when an operator created straight in the
+     * Keycloak {@code system} realm first signs in: that class guards the numbering
+     * call itself with try/catch but NOT the {@code insert}, so the duplicate key
+     * escapes as a 500 on every request that user makes.
+     *
+     * <p>The hand-rolled version was racy on its own terms too — two concurrent
+     * creates read the same MAX and format the same number, while
+     * {@code NumberingService} increments atomically in one
+     * {@code UPDATE ... RETURNING}.
+     *
+     * <p>V59 re-syncs the counters that already drifted; without it the first
+     * allocation after this change would still land on a taken number.
+     */
     private String nextSystemUserNo() {
-        Integer max = jdbc.queryForObject(
-                "SELECT COALESCE(MAX(CAST(SUBSTRING(user_no FROM 2) AS INTEGER)), 0) "
-                        + "FROM core_auth_user WHERE tenant_id = ? AND user_no ~ '^U[0-9]+$'",
-                Integer.class, SYSTEM_TENANT);
-        return String.format("U%08d", (max == null ? 0 : max) + 1);
+        return numberingService.next(USER_NO_KBN, SYSTEM_TENANT);
     }
 
     private static String like(String kw) {

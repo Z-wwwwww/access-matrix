@@ -37,9 +37,24 @@ public class OpLogAspect {
     private static final Logger log = LoggerFactory.getLogger(OpLogAspect.class);
     private static final int MAX_BODY_BYTES = 4096;
 
-    /** Mask string fields whose name (case-insensitive) matches these. */
+    /**
+     * Mask string fields whose name (case-insensitive) matches these.
+     *
+     * <p>The value alternation is {@code (?:\\.|[^"\\])*} — "an escape sequence,
+     * or any character that is neither a quote nor a backslash" — NOT the naive
+     * {@code [^"]*}. A JSON string may legally contain an <em>escaped</em> quote,
+     * and {@code [^"]*} stops dead at the backslash-quote pair, so the match ends
+     * in the MIDDLE of the value: everything after the first {@code "} in the
+     * password survives into {@code core_oplog.request_body} in cleartext, and
+     * the row's JSON is left syntactically broken as a bonus. This is not
+     * theoretical — {@code app.security.password-policy.require-symbol} is on by
+     * default, so {@code "} is a perfectly ordinary character for a user to pick,
+     * and both {@code POST /user} (DIRECT mode, admin types the password) and
+     * {@code POST /me/break-glass-password} are {@code @OpLog}-audited with the
+     * password sitting in the request body.
+     */
     private static final Pattern PASSWORD_FIELD_PATTERN =
-            Pattern.compile("(?i)\"(password|passwordHash|newPassword|oldPassword|passwd|pwd)\"\\s*:\\s*\"[^\"]*\"");
+            Pattern.compile("(?i)\"(password|passwordHash|newPassword|oldPassword|passwd|pwd)\"\\s*:\\s*\"(?:\\\\.|[^\"\\\\])*\"");
 
     private final ObjectProvider<OpLogSink> sinkProvider;
     private final JsonMapper jsonMapper;
@@ -125,7 +140,8 @@ public class OpLogAspect {
         );
     }
 
-    private String serialiseArgs(Object[] args) {
+    /** Package-private so a test can drive the real serialise + mask path. */
+    String serialiseArgs(Object[] args) {
         if (args == null || args.length == 0) return null;
         Object payload = args.length == 1 ? args[0] : args;
         String json;

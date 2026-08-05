@@ -63,6 +63,7 @@ class PlatformUserAdminServiceTest {
     @Mock AppMailProperties mailProps;
     @Mock InviteTokenService inviteTokenService;
     @Mock SessionTerminationService sessionTermination;
+    @Mock com.platform.core.infrastructure.numbering.NumberingService numberingService;
 
     private ObjectProvider<KeycloakUserService> userServiceProvider;
     private ObjectProvider<MailService> mailProvider;
@@ -91,7 +92,8 @@ class PlatformUserAdminServiceTest {
         when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(0);
 
         service = new PlatformUserAdminService(jdbc, userServiceProvider, forceLogoutService,
-                mailProvider, mailProps, inviteTokenService, sessionTermination, selfProvider);
+                mailProvider, mailProps, inviteTokenService, sessionTermination,
+                numberingService, selfProvider);
         // In-process self-proxy: persistNewOpsUser runs directly on the same
         // instance (no real transaction in a unit test — interactions still verify).
         when(selfProvider.getObject()).thenReturn(service);
@@ -249,4 +251,48 @@ class PlatformUserAdminServiceTest {
 
         verify(sessionTermination, never()).applyEnabled(anyString(), org.mockito.ArgumentMatchers.anyBoolean());
     }
+
+    // ── user_no allocation ──────────────────────────────────────────────────
+    // The console used to compute the number itself —
+    // MAX(CAST(SUBSTRING(user_no FROM 2) AS INTEGER)) + 1 — which advances
+    // nothing, so core_numbering_management's counter never learned about the
+    // numbers handed out here. The two allocators then drift until they produce
+    // the SAME value; verified on a live DB, where the counter's next value for
+    // `system` (U00000002) was already held by an operator this console created.
+    // (tenant_id, user_no) is uniquely indexed, so the collision is a hard insert
+    // failure for whoever allocates next from the counter — most plausibly
+    // OidcJitUserService, which guards the numbering call but not the insert.
+
+    @Test
+    void create_allocatesUserNoThroughNumberingService() {
+        when(numberingService.next("USER", "system")).thenReturn("U00000042");
+        when(kcUserService.createUser(eq("system"), any(), any(), any(), org.mockito.ArgumentMatchers.isNull()))
+                .thenReturn("kc-new");
+
+        service.create(req());
+
+        verify(numberingService).next("USER", "system");
+        // The value the allocator returned is what actually gets inserted.
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc, org.mockito.Mockito.atLeastOnce())
+                .update(org.mockito.ArgumentMatchers.contains("INSERT INTO core_auth_user"), args.capture());
+        assertThat(args.getAllValues().stream().flatMap(java.util.Arrays::stream))
+                .contains("U00000042");
+    }
+
+    @Test
+    void create_neverDerivesTheNumberFromTheBusinessColumn() {
+        when(numberingService.next("USER", "system")).thenReturn("U00000042");
+        when(kcUserService.createUser(eq("system"), any(), any(), any(), org.mockito.ArgumentMatchers.isNull()))
+                .thenReturn("kc-new");
+
+        service.create(req());
+
+        // No MAX(...)/SUBSTRING(user_no ...) probe may remain — that query IS the bug.
+        verify(jdbc, never()).queryForObject(
+                org.mockito.ArgumentMatchers.contains("SUBSTRING(user_no"),
+                org.mockito.ArgumentMatchers.<Class<Integer>>any(),
+                org.mockito.ArgumentMatchers.<Object[]>any());
+    }
+
 }

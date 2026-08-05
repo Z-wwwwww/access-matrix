@@ -194,7 +194,8 @@ onMounted(loadTypes)
           <h1 class="text-lg font-semibold">{{ t('dict.title') }}</h1>
           <p class="text-xs text-muted-foreground mt-0.5">{{ t('dict.description') }}</p>
         </div>
-        <button class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
+        <button v-permission="'platform:dict:create'"
+                class="h-9 px-3 rounded bg-primary text-primary-foreground text-sm inline-flex items-center gap-1"
                 @click="openCreateType">
           <Plus class="size-4" /> {{ t('dict.type.new') }}
         </button>
@@ -216,10 +217,11 @@ onMounted(loadTypes)
           <template #cell-name="{ row }">{{ i18nLabel(row.nameI18n) || '-' }}</template>
           <template #cell-actions="{ row }">
             <div class="inline-flex gap-1">
-              <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEditType(row)" :title="t('common.button.edit')">
+              <button v-permission="'platform:dict:update'"
+                      class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEditType(row)" :title="t('common.button.edit')">
                 <Pencil class="size-3.5" />
               </button>
-              <button v-if="row.builtin !== 1"
+              <button v-if="row.builtin !== 1" v-permission="'platform:dict:delete'"
                       class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs"
                       @click="deleteType(row)" :title="t('common.button.delete')">
                 <Trash2 class="size-3.5" />
@@ -237,7 +239,7 @@ onMounted(loadTypes)
         <template v-else>
           <div class="flex items-center justify-between p-3 border-b border-border">
             <span class="text-sm font-medium">{{ selected }}</span>
-            <button v-if="selectedType && selectedType.builtin !== 1"
+            <button v-if="selectedType && selectedType.builtin !== 1" v-permission="'platform:dict:create'"
                     class="h-8 px-2.5 rounded bg-primary text-primary-foreground text-xs inline-flex items-center gap-1"
                     @click="openCreateItem">
               <Plus class="size-3.5" /> {{ t('dict.item.new') }}
@@ -253,10 +255,12 @@ onMounted(loadTypes)
             </template>
             <template #cell-actions="{ row }">
               <div class="inline-flex gap-1">
-                <button class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEditItem(row)" :title="t('common.button.edit')">
+                <button v-permission="'platform:dict:update'"
+                        class="h-7 px-2 rounded hover:bg-muted text-xs" @click="openEditItem(row)" :title="t('common.button.edit')">
                   <Pencil class="size-3.5" />
                 </button>
-                <button class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs"
+                <button v-permission="'platform:dict:delete'"
+                        class="h-7 px-2 rounded hover:bg-destructive/10 text-destructive text-xs"
                         @click="deleteItem(row)" :title="t('common.button.delete')">
                   <Trash2 class="size-3.5" />
                 </button>

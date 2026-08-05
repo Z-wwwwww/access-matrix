@@ -9,6 +9,29 @@ import org.springframework.stereotype.Component;
 /**
  * PG-native idempotent DDL safety net.
  * Flyway runs first; this only adds missing tables/columns on a dirty schema_history.
+ *
+ * <p><b>This file must track the migrations.</b> Every statement here is
+ * {@code IF NOT EXISTS}, so on a healthy database it is a pure no-op — which is
+ * exactly why drift in it is invisible until the one moment it matters. When it
+ * DOES fire, the table it creates is the final word: the migrations that would
+ * have shaped it are already recorded as applied, so nothing will ever correct
+ * it. Two drifts had accumulated and are fixed here:
+ * <ul>
+ *   <li>All 21 audit/time columns were {@code TIMESTAMP ... DEFAULT
+ *       CURRENT_TIMESTAMP} — no time zone. V58 exists specifically to convert
+ *       every such column to {@code timestamptz} with a {@code now()} default
+ *       (its own words: the old meaning "depended on the writing JVM's default
+ *       zone"), and {@code BaseEntity} models these as {@code OffsetDateTime}
+ *       ({@code LocalDateTime} is banned by ArchUnit). Verified against the live
+ *       schema that every one of these columns is {@code timestamp with time
+ *       zone} / {@code now()} today. Same drift the scaffold template had, which
+ *       {@code BusinessModuleScaffoldMigrationTest} now pins.</li>
+ *   <li>{@code core_numbering_management} was still the pre-V31 GLOBAL shape (no
+ *       {@code tenant_id}, PK on {@code code_kbn}); live schema has
+ *       {@code tenant_id} NOT NULL and PK {@code (tenant_id, code_kbn)}.</li>
+ * </ul>
+ * {@code AuthSchemaBootstrapDdlTest} pins both so the next migration that
+ * reshapes a table here can't leave this net behind again.
  */
 @Component
 public class AuthSchemaBootstrap {
@@ -29,7 +52,7 @@ public class AuthSchemaBootstrap {
                         id CHAR(26) PRIMARY KEY,
                         meta_key VARCHAR(64) UNIQUE NOT NULL,
                         meta_value TEXT,
-                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        create_time TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """);
 
@@ -48,8 +71,8 @@ public class AuthSchemaBootstrap {
                         mark SMALLINT NOT NULL DEFAULT 1,
                         create_user VARCHAR(64),
                         update_user VARCHAR(64),
-                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        update_time TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """);
 
@@ -77,15 +100,25 @@ public class AuthSchemaBootstrap {
                         user_agent VARCHAR(512),
                         success BOOLEAN NOT NULL,
                         failure_reason VARCHAR(128),
-                        login_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        login_time TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """);
             jdbc.execute("CREATE INDEX IF NOT EXISTS idx_core_auth_login_log_user_id ON core_auth_login_log (user_id)");
             jdbc.execute("CREATE INDEX IF NOT EXISTS idx_core_auth_login_log_login_time ON core_auth_login_log (login_time)");
 
+            // V31 split this table per tenant: it gained `tenant_id` and its PK became
+            // (tenant_id, code_kbn). This net still created the V4-era GLOBAL shape —
+            // no tenant_id, PK on code_kbn alone. Mirror the post-V31 layout, same as
+            // the post-V18 / post-V19 / post-V33 mirroring above, including the
+            // constraint NAME V31 uses so a from-scratch build is indistinguishable
+            // from a Flyway-built one. Had the old shape ever been created, every
+            // NumberingService query (`WHERE tenant_id = ? AND code_kbn = ?`) would
+            // fail on a missing column, and TenantSchemaGuard would refuse the boot —
+            // correctly, but only after the damage was baked into the schema.
             jdbc.execute("""
                     CREATE TABLE IF NOT EXISTS core_numbering_management (
-                        code_kbn VARCHAR(64) PRIMARY KEY,
+                        tenant_id VARCHAR(64) NOT NULL DEFAULT 'demo',
+                        code_kbn VARCHAR(64) NOT NULL,
                         format_sentence VARCHAR(255) NOT NULL,
                         recycle_division SMALLINT NOT NULL DEFAULT 0,
                         zero_insert VARCHAR(8) DEFAULT '0',
@@ -95,7 +128,8 @@ public class AuthSchemaBootstrap {
                         max_value BIGINT NOT NULL DEFAULT 999999,
                         step_value BIGINT NOT NULL DEFAULT 1,
                         seq_id BIGINT NOT NULL DEFAULT 0,
-                        description VARCHAR(255)
+                        description VARCHAR(255),
+                        CONSTRAINT core_numbering_management_pkey PRIMARY KEY (tenant_id, code_kbn)
                     )
                     """);
 
@@ -126,8 +160,8 @@ public class AuthSchemaBootstrap {
                         mark SMALLINT NOT NULL DEFAULT 1,
                         create_user VARCHAR(64),
                         update_user VARCHAR(64),
-                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        update_time TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """);
             jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_role_name ON core_rbac_role (tenant_id, name) WHERE mark = 1");
@@ -146,8 +180,8 @@ public class AuthSchemaBootstrap {
                         mark SMALLINT NOT NULL DEFAULT 1,
                         create_user VARCHAR(64),
                         update_user VARCHAR(64),
-                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        update_time TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """);
             jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_perm_code ON core_rbac_permission (tenant_id, code) WHERE mark = 1");
@@ -161,8 +195,8 @@ public class AuthSchemaBootstrap {
                         mark SMALLINT NOT NULL DEFAULT 1,
                         create_user VARCHAR(64),
                         update_user VARCHAR(64),
-                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        update_time TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """);
             jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_user_role ON core_rbac_user_role (tenant_id, user_id, role_id) WHERE mark = 1");
@@ -176,8 +210,8 @@ public class AuthSchemaBootstrap {
                         mark SMALLINT NOT NULL DEFAULT 1,
                         create_user VARCHAR(64),
                         update_user VARCHAR(64),
-                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        update_time TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """);
             jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_role_perm ON core_rbac_role_permission (tenant_id, role_id, permission_id) WHERE mark = 1");
@@ -227,8 +261,8 @@ public class AuthSchemaBootstrap {
                         mark SMALLINT NOT NULL DEFAULT 1,
                         create_user VARCHAR(64),
                         update_user VARCHAR(64),
-                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        update_time TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """);
             jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_menu_code ON core_rbac_menu (code) WHERE mark = 1");
@@ -243,8 +277,8 @@ public class AuthSchemaBootstrap {
                         mark SMALLINT NOT NULL DEFAULT 1,
                         create_user VARCHAR(64),
                         update_user VARCHAR(64),
-                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        update_time TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """);
             jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_role_menu ON core_rbac_role_menu (tenant_id, role_id, menu_id) WHERE mark = 1");
@@ -265,8 +299,8 @@ public class AuthSchemaBootstrap {
                         mark SMALLINT NOT NULL DEFAULT 1,
                         create_user VARCHAR(64),
                         update_user VARCHAR(64),
-                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        update_time TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """);
             jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_dept_code ON core_rbac_dept (tenant_id, code) WHERE mark = 1");
@@ -282,8 +316,8 @@ public class AuthSchemaBootstrap {
                         mark SMALLINT NOT NULL DEFAULT 1,
                         create_user VARCHAR(64),
                         update_user VARCHAR(64),
-                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        create_time TIMESTAMPTZ NOT NULL DEFAULT now(),
+                        update_time TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """);
             jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_core_rbac_role_dept ON core_rbac_role_dept (tenant_id, role_id, dept_id) WHERE mark = 1");
@@ -307,7 +341,7 @@ public class AuthSchemaBootstrap {
                         success BOOLEAN NOT NULL,
                         error_msg VARCHAR(512),
                         cost_ms INTEGER,
-                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        create_time TIMESTAMPTZ NOT NULL DEFAULT now()
                     )
                     """);
             jdbc.execute("CREATE INDEX IF NOT EXISTS idx_core_oplog_user_time ON core_oplog (user_id, create_time DESC)");

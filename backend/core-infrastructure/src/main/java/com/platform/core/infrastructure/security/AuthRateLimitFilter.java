@@ -1,5 +1,7 @@
 package com.platform.core.infrastructure.security;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
 import com.platform.core.infrastructure.config.properties.AppSecurityProperties;
@@ -22,16 +24,41 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class AuthRateLimitFilter extends OncePerRequestFilter {
 
+    /**
+     * Upper bound on tracked client IPs. Beyond this Caffeine evicts the
+     * least-recently-used entry — the evicted client simply starts with a
+     * fresh (full) bucket, which is the same state it would have had if it
+     * had never been seen. Sized so a realistic peak of distinct clients
+     * fits comfortably while the map can never grow without limit.
+     */
+    private static final long MAX_TRACKED_IPS = 100_000L;
+
     private final AppSecurityProperties.RateLimit cfg;
     private final JsonMapper mapper;
     private final ClientIpResolver clientIpResolver;
-    private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+
+    /**
+     * Per-IP token buckets. Caffeine rather than a plain {@code ConcurrentHashMap}
+     * because nothing ever removed entries from that map: every distinct client IP
+     * that touched an {@code /auth/} path left a {@link Bucket} behind for the life
+     * of the JVM. On a public-facing deployment that grows unboundedly with normal
+     * traffic, and an attacker rotating source addresses (or spoofed
+     * {@code X-Forwarded-For} values when {@code trust-forwarded-headers=true})
+     * turns it into a cheap memory-exhaustion vector against the very filter that
+     * is supposed to be the throttle.
+     *
+     * <p>Eviction is safe for the security property this filter provides: a bucket
+     * only ever holds <em>consumed</em> tokens, so dropping it can never make an
+     * IP <em>more</em> throttled — and entries are kept for at least a full refill
+     * period after their last use, by which point the bucket would have refilled to
+     * full anyway. Idle-expiry therefore discards nothing that was still limiting.
+     */
+    private final LoadingCache<String, Bucket> buckets;
 
     @Autowired
     public AuthRateLimitFilter(AppSecurityProperties props, JsonMapper mapper,
@@ -39,6 +66,11 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         this.cfg = props.rateLimit();
         this.mapper = mapper;
         this.clientIpResolver = clientIpResolver;
+        Duration idleTtl = cfg.refillPeriod() == null ? Duration.ofMinutes(1) : cfg.refillPeriod();
+        this.buckets = Caffeine.newBuilder()
+                .maximumSize(MAX_TRACKED_IPS)
+                .expireAfterAccess(idleTtl)
+                .build(k -> newBucket());
     }
 
     @Override
@@ -51,7 +83,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse resp, FilterChain chain)
             throws ServletException, IOException {
         String ip = clientIpResolver.resolve(req);
-        Bucket bucket = buckets.computeIfAbsent(ip, k -> newBucket());
+        // Servlet containers may hand back a null peer for an already-closed
+        // connection; bucket them together rather than NPE inside the cache.
+        Bucket bucket = buckets.get(ip == null || ip.isBlank() ? "unknown" : ip);
         ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1L);
 
         if (probe.isConsumed()) {
@@ -66,6 +100,15 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             resp.setCharacterEncoding("UTF-8");
             resp.getWriter().write(mapper.writeValueAsString(JsonResult.error(ErrorCode.TOO_MANY_REQUESTS)));
         }
+    }
+
+    /**
+     * How many client IPs are currently tracked. Package-private — lets a test
+     * assert the store stays bounded, which is the whole point of the cache.
+     */
+    long trackedIpCount() {
+        buckets.cleanUp();
+        return buckets.estimatedSize();
     }
 
     private Bucket newBucket() {

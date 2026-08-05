@@ -110,7 +110,7 @@ class OidcJitUserServiceTest {
                 "preferred_username", "bob"));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2", "demo")).thenReturn(null);
         UserEntity legacy = row("ULID-BOB-26", "bob");
-        when(userMapper.findByIdentifier("demo", "bob")).thenReturn(legacy);
+        when(userMapper.findByUsernameAndTenant("demo", "bob")).thenReturn(legacy);
         // Bob is NOT a super-admin — role lookup returns an empty list.
         when(roleMapper.findRoleIdsByUserId("ULID-BOB-26", "demo")).thenReturn(java.util.List.of());
 
@@ -143,7 +143,7 @@ class OidcJitUserServiceTest {
                 "preferred_username", "demo-admin"));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2b", "demo")).thenReturn(null);
         UserEntity legacy = row("ULID-ADMIN-26", "demo-admin");
-        when(userMapper.findByIdentifier("demo", "demo-admin")).thenReturn(legacy);
+        when(userMapper.findByUsernameAndTenant("demo", "demo-admin")).thenReturn(legacy);
         when(roleMapper.findRoleIdsByUserId("ULID-ADMIN-26", "demo"))
                 .thenReturn(java.util.List.of(BuiltInRoles.SUPER_ADMIN_ID));
 
@@ -174,7 +174,7 @@ class OidcJitUserServiceTest {
                 "preferred_username", "carol"));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-2c", "demo")).thenReturn(null);
         UserEntity legacy = row("ULID-CAROL-26", "carol");
-        when(userMapper.findByIdentifier("demo", "carol")).thenReturn(legacy);
+        when(userMapper.findByUsernameAndTenant("demo", "carol")).thenReturn(legacy);
         when(roleMapper.findRoleIdsByUserId("ULID-CAROL-26", "demo"))
                 .thenThrow(new RuntimeException("transient DB blip"));
 
@@ -200,7 +200,7 @@ class OidcJitUserServiceTest {
                 "email", "carol@acme.example",
                 "name", "Carol Carolsdottir"));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-3", "acme")).thenReturn(null);
-        when(userMapper.findByIdentifier("acme", "carol")).thenReturn(null);
+        when(userMapper.findByUsernameAndTenant("acme", "carol")).thenReturn(null);
         when(numberingService.next("USER", "acme")).thenReturn("U00000007");
 
         String businessId = service.resolveBusinessUserId(token);
@@ -241,7 +241,7 @@ class OidcJitUserServiceTest {
 
         assertThat(businessId).isNull();
         verify(userMapper, never()).insert(any(UserEntity.class));     // no ghost
-        verify(userMapper, never()).findByIdentifier(any(), any());    // refused before legacy-bind
+        verify(userMapper, never()).findByUsernameAndTenant(any(), any());    // refused before legacy-bind
     }
 
     @Test
@@ -253,7 +253,7 @@ class OidcJitUserServiceTest {
                 "given_name", "Dave",
                 "family_name", "Smith"));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-4", "demo")).thenReturn(null);
-        when(userMapper.findByIdentifier("demo", "dave")).thenReturn(null);
+        when(userMapper.findByUsernameAndTenant("demo", "dave")).thenReturn(null);
 
         service.resolveBusinessUserId(token);
 
@@ -269,7 +269,7 @@ class OidcJitUserServiceTest {
                 "tid", "demo",
                 "preferred_username", "eve"));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-5", "demo")).thenReturn(null);
-        when(userMapper.findByIdentifier("demo", "eve")).thenReturn(null);
+        when(userMapper.findByUsernameAndTenant("demo", "eve")).thenReturn(null);
 
         service.resolveBusinessUserId(token);
 
@@ -319,7 +319,7 @@ class OidcJitUserServiceTest {
                 "preferred_username", "dave"));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-orphan", "demo")).thenReturn(null);
         UserEntity migrated = row("ULID-DAVE-26", "dave");
-        when(userMapper.findByIdentifier("demo", "dave")).thenReturn(migrated);
+        when(userMapper.findByUsernameAndTenant("demo", "dave")).thenReturn(migrated);
         when(resetTokenMapper.countConsumedByUser("demo", "ULID-DAVE-26")).thenReturn(1L);
 
         assertThat(service.resolveBusinessUserId(token)).isNull();
@@ -338,7 +338,7 @@ class OidcJitUserServiceTest {
                 "preferred_username", "erin"));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-plain", "demo")).thenReturn(null);
         UserEntity legacy = row("ULID-ERIN-26", "erin");
-        when(userMapper.findByIdentifier("demo", "erin")).thenReturn(legacy);
+        when(userMapper.findByUsernameAndTenant("demo", "erin")).thenReturn(legacy);
         when(resetTokenMapper.countConsumedByUser("demo", "ULID-ERIN-26")).thenReturn(0L);
         when(roleMapper.findRoleIdsByUserId("ULID-ERIN-26", "demo")).thenReturn(java.util.List.of());
 
@@ -413,7 +413,7 @@ class OidcJitUserServiceTest {
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-legacy-off", "demo")).thenReturn(null);
         UserEntity legacy = row("ULID-CAROL-26", "carol");
         legacy.setStatus(0);
-        when(userMapper.findByIdentifier("demo", "carol")).thenReturn(legacy);
+        when(userMapper.findByUsernameAndTenant("demo", "carol")).thenReturn(legacy);
 
         assertThat(service.resolveBusinessUserId(token)).isNull();
         verify(userMapper, never()).update(any(), any());
@@ -440,7 +440,7 @@ class OidcJitUserServiceTest {
                 "tid", "demo",
                 "preferred_username", tooLong));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-long", "demo")).thenReturn(null);
-        when(userMapper.findByIdentifier("demo", tooLong)).thenReturn(null);
+        when(userMapper.findByUsernameAndTenant("demo", tooLong)).thenReturn(null);
 
         String businessId = service.resolveBusinessUserId(token);
 
@@ -458,7 +458,7 @@ class OidcJitUserServiceTest {
                 "tid", "demo",
                 "preferred_username", exact));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-64", "demo")).thenReturn(null);
-        when(userMapper.findByIdentifier("demo", exact)).thenReturn(null);
+        when(userMapper.findByUsernameAndTenant("demo", exact)).thenReturn(null);
 
         String businessId = service.resolveBusinessUserId(token);
 
@@ -479,7 +479,7 @@ class OidcJitUserServiceTest {
                 "given_name", "G".repeat(100),
                 "family_name", "F".repeat(100)));
         when(userMapper.findByKeycloakIdAndTenant("kc-uuid-disp", "demo")).thenReturn(null);
-        when(userMapper.findByIdentifier("demo", "hank")).thenReturn(null);
+        when(userMapper.findByUsernameAndTenant("demo", "hank")).thenReturn(null);
 
         String businessId = service.resolveBusinessUserId(token);
 
@@ -508,6 +508,58 @@ class OidcJitUserServiceTest {
 
         assertThat(businessId).isNull();
         verify(userMapper, never()).insert(any(UserEntity.class));
+    }
+
+
+    // ─── identity confusion on the bind path ─────────────────────────
+    // The legacy-bind branch fed the IdP's preferred_username claim into
+    // findByIdentifier, the LOGIN matcher (username OR email OR user_no).
+    // Keycloak's registrationEmailAsUsername makes email-shaped usernames
+    // ordinary, so that matcher could land on a DIFFERENT business user whose
+    // *email* equals this Keycloak *username* — and the bind would then stamp
+    // this token's keycloak_id onto that victim's row. From the next request on,
+    // the fast path resolves the SSO user to the VICTIM's business user id
+    // (their roles, their department, their data scope), and the same UPDATE
+    // nulls the victim's password_hash unless they hold SUPER_ADMIN, destroying
+    // their break-glass credential. (tenant_id, username) is uniquely indexed,
+    // so an exact username lookup is both correct and unambiguous.
+
+    @Test
+    void bindPath_looksUpTheExactUsername_notTheLoginIdentifier() {
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-confuse",
+                "tid", "demo",
+                "preferred_username", "bob@example.com"));
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-confuse", "demo")).thenReturn(null);
+        when(userMapper.findByUsernameAndTenant("demo", "bob@example.com")).thenReturn(null);
+
+        service.resolveBusinessUserId(token);
+
+        // The login matcher must never be consulted for a machine-to-row bind.
+        verify(userMapper, never()).findByIdentifier(any(), any());
+        verify(userMapper).findByUsernameAndTenant("demo", "bob@example.com");
+    }
+
+    @Test
+    void bindPath_doesNotBindOntoAnotherUserWhoseEmailMatchesThisKeycloakUsername() {
+        // No business user is named "bob@example.com"; only a DIFFERENT user
+        // happens to carry it as their email. Nothing may be bound — the SSO
+        // user is provisioned fresh instead.
+        Jwt token = jwt(Map.of(
+                "sub", "kc-uuid-confuse-2",
+                "tid", "demo",
+                "preferred_username", "bob@example.com"));
+        when(userMapper.findByKeycloakIdAndTenant("kc-uuid-confuse-2", "demo")).thenReturn(null);
+        when(userMapper.findByUsernameAndTenant("demo", "bob@example.com")).thenReturn(null);
+
+        String businessId = service.resolveBusinessUserId(token);
+
+        // No UPDATE at all → the other user's keycloak_id and password_hash are untouched.
+        verify(userMapper, never()).update(any(), any());
+        ArgumentCaptor<UserEntity> cap = ArgumentCaptor.forClass(UserEntity.class);
+        verify(userMapper).insert(cap.capture());
+        assertThat(cap.getValue().getKeycloakId()).isEqualTo("kc-uuid-confuse-2");
+        assertThat(businessId).isEqualTo(cap.getValue().getId());
     }
 
 }

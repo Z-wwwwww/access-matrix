@@ -29,6 +29,11 @@ export function useNotificationStream() {
     if (stopped || !auth.isAuthenticated) return
     try {
       const res = await getSseTicketApi()
+      // 组件可能在这次 await 期间就卸载了(切路由/登出)。onUnmounted 那时看到的
+      // `es` 还是 null,关不掉这条尚未创建的连接;若不在这里重新判一次 stopped,
+      // 下面就会凭空建出一条谁也持有不了的 EventSource ——它不会再被 close,
+      // 后端那侧的 SseEmitter 也要挂到 30 分钟超时才释放。
+      if (stopped) return
       if (res.data.code !== 0) return scheduleReconnect()
       es = new EventSource(`${STREAM_URL}?ticket=${encodeURIComponent(res.data.data)}`)
       es.onopen = () => {

@@ -231,6 +231,13 @@ public class TaskService {
                         .eq("id", id).eq("mark", 1)
                         .set("mark", 0).set("update_user", "system"));
         emit("demo.task.deleted", t);
+        // 削除も「このタスクについてもう対応することはない」— update() が 完了/取消 で
+        // action 通知を既読化しているのと同じ理由で、削除でも既読化する。これが無いと
+        // notifyAssignee() が作った未読の action 通知が永久に残り、担当者のベルには
+        // 「対応が必要」なのに開くと 404 になる項目が居座り続ける（bizId は mark=0 の行を
+        // 指しており、get(id) は loadVisibleOr404 で NOT_FOUND を返す）。
+        publisher.publishEvent(new NotificationResolvedEvent(
+                RequestContext.tenantIdOrDefault(), "demo_task", id));
     }
 
     private TaskDto.View toView(TaskEntity t) {
