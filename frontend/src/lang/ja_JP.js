@@ -867,7 +867,8 @@ export default {
         noDepts: '部署がありません',
         saving: '保存中...',
         updateFailed: '更新失敗',
-        createFailed: '作成失敗'
+        createFailed: '作成失敗',
+        loadSelectionsFailed: 'このロールの現在の権限 / メニュー / 部署を読み込めませんでした。消えてしまうのを防ぐため保存を中止しました。閉じて開き直してください。'
       },
       dept: {
         impliedTag: '（自動）',

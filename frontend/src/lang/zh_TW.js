@@ -857,7 +857,8 @@ export default {
         noDepts: '尚無部門',
         saving: '儲存中...',
         updateFailed: '更新失敗',
-        createFailed: '建立失敗'
+        createFailed: '建立失敗',
+        loadSelectionsFailed: '未能讀取該角色目前的權限 / 選單 / 部門，為避免被清空已阻擋儲存。請關閉後重新開啟重試。'
       },
       dept: {
         impliedTag: '（包含）',

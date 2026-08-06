@@ -857,7 +857,8 @@ export default {
         noDepts: '부서가 없습니다',
         saving: '저장 중...',
         updateFailed: '업데이트 실패',
-        createFailed: '생성 실패'
+        createFailed: '생성 실패',
+        loadSelectionsFailed: '이 역할의 현재 권한 / 메뉴 / 부서를 불러오지 못했습니다. 지워지는 것을 막기 위해 저장을 중단했습니다. 닫았다가 다시 열어 주세요.'
       },
       dept: {
         impliedTag: '(자동)',

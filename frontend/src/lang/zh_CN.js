@@ -857,7 +857,8 @@ export default {
         noDepts: '暂无部门',
         saving: '保存中...',
         updateFailed: '更新失败',
-        createFailed: '创建失败'
+        createFailed: '创建失败',
+        loadSelectionsFailed: '未能读取该角色当前的权限 / 菜单 / 部门，为避免被清空已阻止保存。请关闭后重新打开重试。'
       },
       dept: {
         impliedTag: '（包含）',

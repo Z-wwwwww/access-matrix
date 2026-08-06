@@ -857,7 +857,8 @@ export default {
         noDepts: 'No departments',
         saving: 'Saving...',
         updateFailed: 'Update failed',
-        createFailed: 'Create failed'
+        createFailed: 'Create failed',
+        loadSelectionsFailed: "Could not load this role's current permissions / menus / departments — saving is blocked so they aren't wiped. Close and reopen to retry."
       },
       dept: {
         impliedTag: '(included)',

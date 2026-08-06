@@ -66,6 +66,23 @@ const expandedDeptIds = ref(new Set())
 const selectedDeptIds = ref([])
 
 const saving = ref(false)
+
+/**
+ * True when this drawer could NOT load the role's current selections.
+ *
+ * save() binds `selectedPermIds` / `selectedMenuIds` / `selectedDeptIds` as the
+ * role's complete new set — a full replace, not a diff. Those refs are cleared
+ * to [] on open and only refilled when their GET succeeds, so a transient
+ * failure on `getRolePermissionsApi` (a 500, a dropped connection) is
+ * indistinguishable in the UI from "this role genuinely has no permissions":
+ * allSettled swallows it, nothing is surfaced, every checkbox renders unchecked.
+ * Editing just the description and hitting Save would then bind the EMPTY set
+ * and silently strip every permission the role had.
+ *
+ * So we remember the failure and refuse to save — fail-closed, same instinct as
+ * the HIBP check and the data-scope resolver. Reopening the drawer retries.
+ */
+const selectionLoadFailed = ref(false)
 // 基本情報（name / description / dataScope / status）は tab の外で常に編集可。
 // tab には「割当て系」だけを残す：perms / menus / (dataScope=CUSTOM のとき) depts。
 const tabItems = computed(() => [
@@ -87,6 +104,7 @@ watch(() => props.open, async (open) => {
   selectedPermIds.value = []
   selectedMenuIds.value = []
   selectedDeptIds.value = []
+  selectionLoadFailed.value = false
 
   // Load reference data
   // Promise.allSettled: 3 つの呼び出しの一つが 403/失敗してももう 2 つは生かす。
@@ -136,9 +154,19 @@ watch(() => props.open, async (open) => {
       getRoleMenusApi(props.role.id),
       getRoleDeptsApi(props.role.id)
     ])
-    if (p.status === 'fulfilled' && p.value.data.code === 0) selectedPermIds.value = p.value.data.data || []
-    if (m.status === 'fulfilled' && m.value.data.code === 0) selectedMenuIds.value = m.value.data.data || []
-    if (d.status === 'fulfilled' && d.value.data.code === 0) selectedDeptIds.value = d.value.data.data || []
+    const pOk = p.status === 'fulfilled' && p.value.data.code === 0
+    const mOk = m.status === 'fulfilled' && m.value.data.code === 0
+    const dOk = d.status === 'fulfilled' && d.value.data.code === 0
+    if (pOk) selectedPermIds.value = p.value.data.data || []
+    if (mOk) selectedMenuIds.value = m.value.data.data || []
+    if (dOk) selectedDeptIds.value = d.value.data.data || []
+    // A dimension that failed to load must not be saved back as "empty" —
+    // see selectionLoadFailed. The depts GET only matters when CUSTOM scope
+    // will actually be bound.
+    if (!pOk || !mOk || (form.dataScope === 5 && !dOk)) {
+      selectionLoadFailed.value = true
+      toast.error(t('role.edit.message.loadSelectionsFailed'))
+    }
   }
 })
 
@@ -405,6 +433,13 @@ function toggleMenuExpand(id) {
 }
 
 async function save() {
+  // Refuse rather than persist a selection we never managed to read — the bind
+  // calls below are a full replace, so saving here would strip the role's real
+  // permissions / menus / depts. See selectionLoadFailed.
+  if (selectionLoadFailed.value) {
+    toast.error(t('role.edit.message.loadSelectionsFailed'))
+    return
+  }
   saving.value = true
   try {
     let roleId
