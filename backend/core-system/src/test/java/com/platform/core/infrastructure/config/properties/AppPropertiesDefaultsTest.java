@@ -37,6 +37,17 @@ class AppPropertiesDefaultsTest {
     void securityFallbacksAllPickTheSafeValue() {
         AppSecurityProperties p = new AppSecurityProperties(null, null, null, null, null, null);
 
+        // The single most consequential field in this record, and the one the test
+        // did not cover. SecurityConfig branches on it: "permit-all" wires
+        // `anyRequest().permitAll()` — no authentication anywhere. application.yml
+        // promises the opposite for exactly this case: 「base 默认 oidc（fail-closed：
+        // 即使某 profile 漏配 mode，也默认带鉴权而非放行）」. A blank APP_SECURITY_MODE
+        // (an env var the prod comment tells operators to use) is enough to reach it.
+        assertThat(p.mode())
+                .as("a missing/blank mode must land on an AUTHENTICATED mode, never permit-all")
+                .isNotEqualTo("permit-all");
+        assertThat(p.mode()).isEqualTo("oidc");
+
         assertThat(p.rateLimit().enabled()).as("rate limiting on by default").isTrue();
         assertThat(p.lockout().enabled()).as("account lockout on by default").isTrue();
         assertThat(p.refreshCookie().secure()).as("refresh cookie Secure by default").isTrue();

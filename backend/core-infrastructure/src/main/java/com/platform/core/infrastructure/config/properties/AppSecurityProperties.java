@@ -14,7 +14,16 @@ public record AppSecurityProperties(
         RefreshCookie refreshCookie) {
 
     public AppSecurityProperties {
-        if (mode == null || mode.isBlank()) mode = "permit-all";
+        // FAIL-CLOSED. SecurityConfig reads this: "permit-all" wires
+        // `anyRequest().permitAll()`, i.e. no authentication on any endpoint. This
+        // fallback used to be "permit-all", which inverted the promise
+        // application.yml makes for precisely this case — 「base 默认 oidc（fail-closed：
+        // 即使某 profile 漏配 mode，也默认带鉴权而非放行）」. Reachable via a declared-but-
+        // empty APP_SECURITY_MODE, the env var application-prod.yml tells operators to
+        // use for the legacy fallback. Landing on oidc means a misconfigured deploy
+        // fails to start (no issuer) instead of coming up wide open; permit-all stays
+        // available, but only when a profile asks for it explicitly.
+        if (mode == null || mode.isBlank()) mode = "oidc";
         if (jwt == null) jwt = new Jwt(null, "tid", "sub", "preferred_username", "scope");
         if (rateLimit == null) rateLimit = new RateLimit(true, 30, Duration.ofMinutes(1));
         if (lockout == null) lockout = new Lockout(true, 5, Duration.ofMinutes(15), Duration.ofMinutes(15));
