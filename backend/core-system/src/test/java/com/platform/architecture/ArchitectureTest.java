@@ -19,12 +19,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -231,6 +236,130 @@ public class ArchitectureTest {
         assertThat(offenders)
                 .as("@InterceptorIgnore is reserved for framework-level cross-tenant queries. "
                         + "Business code must not use it — every tenant scope must be enforced.")
+                .isEmpty();
+    }
+
+    // ─── module boundaries ────────────────────────────────────────────
+    //
+    // These two were listed in backend/AGENTS.md as already enforced here
+    // ("forbid reverse deps, forbid business-* from using core_* Mappers")
+    // but no such rule existed — the guard everyone was told to rely on was
+    // never written, so the layering could erode with a green build. They read
+    // SOURCE files rather than loaded classes because an import is exactly what
+    // they are about, and imports do not survive into the class file when the
+    // type is only referenced in a signature the scanner doesn't reach.
+
+    /** Module directories (not their src roots) whose name starts with the prefix. */
+    private static List<Path> moduleDirs(String namePrefix) {
+        Path backend = Path.of("..").toAbsolutePath().normalize();
+        try (var dirs = Files.list(backend)) {
+            return dirs.filter(Files::isDirectory)
+                    .filter(p -> p.getFileName().toString().startsWith(namePrefix))
+                    .filter(p -> Files.isDirectory(p.resolve("src/main/java")))
+                    .toList();
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot list backend modules from " + backend, e);
+        }
+    }
+
+    private static List<Path> moduleSources(String namePrefix) {
+        return moduleDirs(namePrefix).stream().map(p -> p.resolve("src/main/java")).toList();
+    }
+
+    private static List<Path> javaFiles(Path root) {
+        try (var s = Files.walk(root)) {
+            return s.filter(p -> p.getFileName().toString().endsWith(".java")).toList();
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot walk " + root, e);
+        }
+    }
+
+    /** Every import line of a source file. */
+    private static List<String> imports(Path javaFile) {
+        try {
+            return Files.readAllLines(javaFile, StandardCharsets.UTF_8).stream()
+                    .map(String::trim)
+                    .filter(l -> l.startsWith("import "))
+                    .toList();
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read " + javaFile, e);
+        }
+    }
+
+    @Test
+    @DisplayName("Module dependencies only flow downward (no reverse deps between core-*/business-*)")
+    void module_dependencies_only_flow_downward() {
+        // module dir prefix → package prefixes it must never import
+        Map<String, List<String>> forbidden = Map.of(
+                "core-common", List.of("com.platform.core.infrastructure",
+                                       "com.platform.system",
+                                       "com.platform.business"),
+                "core-infrastructure", List.of("com.platform.system",
+                                               "com.platform.business"),
+                "core-system", List.of("com.platform.business")
+        );
+
+        List<String> offenders = new ArrayList<>();
+        int scanned = 0;
+        for (var e : forbidden.entrySet()) {
+            for (Path dir : moduleDirs(e.getKey())) {
+                // moduleDirs matches by prefix; require the exact module name so a
+                // future "core-commons" can't quietly inherit core-common's rules.
+                if (!dir.getFileName().toString().equals(e.getKey())) continue;
+                for (Path f : javaFiles(dir.resolve("src/main/java"))) {
+                    scanned++;
+                    for (String imp : imports(f)) {
+                        for (String bad : e.getValue()) {
+                            if (imp.startsWith("import " + bad + ".")) {
+                                offenders.add(e.getKey() + " → " + imp + "  (" + f.getFileName() + ")");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assertThat(scanned).as("boundary scan found no sources — the module layout moved").isPositive();
+        assertThat(offenders)
+                .as("Dependencies flow one way only: core-bootstrap → core-system & business-* → "
+                        + "core-infrastructure → core-common. A reverse import makes the lower layer "
+                        + "un-reusable and is the first step to a cycle.")
+                .isEmpty();
+    }
+
+    /**
+     * Business modules talk to the platform through its SERVICES, never by reaching
+     * into {@code core_*} tables with core mappers: a core mapper carries the core
+     * module's own tenant/soft-delete assumptions, and business code binding to it
+     * silently couples a business schema change to the platform's.
+     */
+    private static final Set<String> BUSINESS_CORE_MAPPER_OK = Set.of(
+            // Dev-only demo data seeding (@Profile("dev")): it fabricates the five
+            // data-scope demo users + their role links, which by definition live in
+            // core_auth_user / core_rbac_user_role. Not runtime business logic, and
+            // NOT part of what BusinessModuleScaffold clones (it clones task/ only).
+            "DemoSeeder.java"
+    );
+
+    @Test
+    @DisplayName("business-* must not use core_* Mappers (go through core services instead)")
+    void business_modules_must_not_use_core_mappers() {
+        List<String> offenders = new ArrayList<>();
+        int scanned = 0;
+        for (Path root : moduleSources("business-")) {
+            for (Path f : javaFiles(root)) {
+                scanned++;
+                if (BUSINESS_CORE_MAPPER_OK.contains(f.getFileName().toString())) continue;
+                for (String imp : imports(f)) {
+                    if (imp.matches("import com\\.platform\\.system\\..*\\.mapper\\..*;")) {
+                        offenders.add(f.getFileName() + " → " + imp);
+                    }
+                }
+            }
+        }
+        assertThat(scanned).as("no business module sources found — the module layout moved").isPositive();
+        assertThat(offenders)
+                .as("Business code must reach platform data through core SERVICES (e.g. DictQueryService), "
+                        + "not core mappers. Add to BUSINESS_CORE_MAPPER_OK only with a written reason.")
                 .isEmpty();
     }
 
