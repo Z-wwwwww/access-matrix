@@ -12,6 +12,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -117,8 +118,22 @@ public class OpLogAspect {
         // Error classification: a BusinessException is a deliberate, expected
         // rejection (carries its own 4xx/7xx ErrorCode); anything else is an
         // unexpected failure → 500. Lets monitoring count only real errors.
+        //
+        // DuplicateKeyException has to be named explicitly. It is thrown from
+        // INSIDE the service — i.e. inside this advice — so unlike the framework
+        // client errors (which never reach the controller method and so never
+        // reach this aspect) it does get classified here, and as a non-
+        // BusinessException it landed on 500. That is the number
+        // PlatformDashboardService.reliability() actually reads
+        // ("success = false AND error_code = 500"), so mapping it to a business
+        // error at the HTTP layer alone left the "API errors (24h)" KPI polluted
+        // by a caller retyping a name that is already taken — the very thing that
+        // mapping was for. Keep this in step with
+        // GlobalExceptionHandler.handleDuplicateKey.
         Integer errorCode = thrown == null ? null
-                : (thrown instanceof BusinessException be ? be.errorCode().code() : ErrorCode.INTERNAL_ERROR.code());
+                : (thrown instanceof BusinessException be ? be.errorCode().code()
+                : thrown instanceof DuplicateKeyException ? ErrorCode.BUSINESS_ERROR.code()
+                : ErrorCode.INTERNAL_ERROR.code());
 
         return new OpLogRecord(
                 tenantId == null ? "default" : tenantId,
