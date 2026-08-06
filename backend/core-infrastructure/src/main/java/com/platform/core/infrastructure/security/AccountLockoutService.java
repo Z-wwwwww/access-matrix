@@ -12,7 +12,14 @@ public class AccountLockoutService {
 
     private static final String FAIL_PREFIX = "auth:fail:";
     private static final String LOCK_PREFIX = "auth:lock:";
-    private static final String DEFAULT_TENANT = "default";
+    /**
+     * Only reached if a caller hands us a blank tenant; {@code CoreRequestContextFilter}
+     * already substitutes its own fallback, so today nothing gets here through HTTP.
+     * Kept in step with that filter's constant regardless — the tenant literally named
+     * {@code default} stopped existing when V25 renamed it, so the old value would key
+     * lockout counters under a phantom while every other component used {@code demo}.
+     */
+    private static final String DEFAULT_TENANT = "demo";
 
     private final StringRedisTemplate redis;
     private final AppSecurityProperties.Lockout cfg;
@@ -30,7 +37,7 @@ public class AccountLockoutService {
      * Tenant-scoped key. Multi-tenant deployments share the username space —
      * "admin" in tenant A and "admin" in tenant B must not influence each other,
      * otherwise a brute-force attack on one tenant locks every tenant's "admin"
-     * out. Falls back to "default" when no tenant has been resolved.
+     * out. Falls back to {@link #DEFAULT_TENANT} when no tenant has been resolved.
      */
     private static String keyOf(String prefix, String tenantId, String identifier) {
         String tid = (tenantId == null || tenantId.isBlank()) ? DEFAULT_TENANT : tenantId;

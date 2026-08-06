@@ -85,7 +85,10 @@ class LoginAuditServiceTest {
 
         LoginLogEntity e = captured();
         // The pre-existing blank-tenant fallback must not be broken by clamping.
-        assertThat(e.getTenantId()).isEqualTo("default");
+        // The value tracks CoreRequestContextFilter's DEFAULT_TENANT: it used to be
+        // "default", a tenant that stopped existing when V25 renamed it to "demo",
+        // which would have filed the row where no tenant-scoped query can see it.
+        assertThat(e.getTenantId()).isEqualTo("demo");
         assertThat(e.getIdentifier()).isNull();
         assertThat(e.getUserAgent()).isNull();
         assertThat(e.getFailureReason()).isNull();

@@ -14,7 +14,14 @@ import java.time.OffsetDateTime;
 public class LoginAuditService {
 
     private static final Logger log = LoggerFactory.getLogger(LoginAuditService.class);
-    private static final String DEFAULT_TENANT = "default";
+    /**
+     * Same defensive fallback as {@code AccountLockoutService}; unreachable through
+     * HTTP because {@code CoreRequestContextFilter} resolves a tenant first. Kept in
+     * step with it: {@code default} is not a tenant any more (V25 renamed it to
+     * {@code demo}), so the old value would have filed audit rows under a tenant no
+     * scoped query can see.
+     */
+    private static final String DEFAULT_TENANT = "demo";
 
     private final LoginLogMapper mapper;
 
