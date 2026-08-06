@@ -591,6 +591,7 @@
                         "frontchannelLogout":  false,
                         "protocol":  "openid-connect",
                         "attributes":  {
+                                           "pkce.code.challenge.method":  "S256",
                                            "realm_client":  "false",
                                            "backchannel.logout.session.required":  "true",
                                            "backchannel.logout.revoke.offline.tokens":  "false"
