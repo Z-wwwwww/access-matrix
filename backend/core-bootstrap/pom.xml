@@ -75,9 +75,10 @@
 
     <build>
         <finalName>core-service</finalName>
-        <!-- Make infra/keycloak/realms/default-realm.json available on the
-             test classpath so OidcJitProvisioningIT (testcontainers-keycloak)
-             can mount it into the Keycloak container's data/import dir. -->
+        <!-- Make infra/keycloak/realms/demo-realm.json available on the test
+             classpath so the testcontainers-keycloak ITs (OidcJitProvisioningIT,
+             PasswordToSsoMigrationIT) can mount it into the Keycloak container's
+             data/import dir. -->
         <testResources>
             <testResource>
                 <directory>src/test/resources</directory>

@@ -68,7 +68,10 @@ class PasswordToSsoMigrationIT {
     @Container
     @SuppressWarnings("resource")
     static final KeycloakContainer KEYCLOAK = new KeycloakContainer("quay.io/keycloak/keycloak:26.0")
-            .withRealmImportFile("/default-realm.json");
+            // Must match the file core-bootstrap/pom.xml copies onto the test
+            // classpath from infra/keycloak/realms/ — see RealmImportFixtureTest,
+            // which checks every withRealmImportFile(...) in this source tree.
+            .withRealmImportFile("/demo-realm.json");
 
     @DynamicPropertySource
     static void wireContainers(DynamicPropertyRegistry r) {

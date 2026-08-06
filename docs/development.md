@@ -515,7 +515,7 @@ scope：`backend` / `frontend` / `infra` / `docs` / `repo`
 2. Client scopes tab → 找 dedicated scope 或建一个新 scope
 3. Add mapper → "User Attribute" 类型
 4. User Attribute 选 `dept_id`，Token Claim Name 写 `dept_id`，勾选 "Add to access token"
-5. 导出 realm → 替换 `infra/keycloak/realms/default-realm.json`
+5. 导出 realm → 替换 `infra/keycloak/realms/demo-realm.json`（业务租户模板；平台运维那份是 `system-realm.json`）。**注意**该文件同时被后端构建引用:`core-infrastructure` 把它编进主 classpath 当新租户 realm 克隆模板,`core-bootstrap` 把它拷进测试 classpath 供 testcontainers ITs 导入 —— 所以文件名不能随手改
 6. commit
 
 前端读：`useAuthStore().claims.dept_id`（已经通过 `decodeJwt` 拆开）。
