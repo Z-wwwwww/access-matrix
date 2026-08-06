@@ -488,7 +488,7 @@ Resolution: `DictQueryService.read()` checks `DictRegistry` first (→ ②), els
 Conventions:
 - Unit: `{Module}ServiceTest` in that module's `src/test/java/`, covering core services
 - Integration: `@SpringBootTest` against the `test` profile + Testcontainers PostgreSQL/Redis, gated by `@Testcontainers(disabledWithoutDocker = true)` — no Docker → auto-skip, build stays green
-- ArchUnit: module boundary guards live in `core-system/src/test/.../architecture/ArchitectureTest.java` (forbid reverse deps, forbid `business-*` from using `core_*` Mappers, forbid `@InterceptorIgnore` in business code, etc.)
+- ArchUnit: module boundary guards live in `core-bootstrap/src/test/.../architecture/ArchitectureTest.java` (forbid reverse deps, forbid `business-*` from using `core_*` Mappers, forbid `@InterceptorIgnore` in business code, etc.). **It must stay in `core-bootstrap`** — that is the only module depending on every other one, so it is the only place whose classpath scan can see `business-*`. It used to sit in `core-system`, where `TaskController` / `TaskEntity` were invisible to every rule; `scan_corpus_covers_every_module` now fails if the corpus ever falls short of the source tree again.
 
 **JVM flags** — the Spring Boot Maven plugin wires these into `mvn spring-boot:run`; keep them for prod `java -jar`:
 

@@ -257,7 +257,7 @@ CREATE INDEX IF NOT EXISTS idx_core_dict_tenant ON core_dict (tenant_id) WHERE m
 
 ## 加一个新业务模块（端到端 checklist）
 
-"加订单模块 / 库存模块 / 计费模块" 的标准配方。完全跟 `TenantSchemaGuard` / `PermissionConsistencyGuard` / `core-system` 里 ArchitectureTest 的约定一致。参考实现：[`backend/business-demo/`](../backend/business-demo/)。
+"加订单模块 / 库存模块 / 计费模块" 的标准配方。完全跟 `TenantSchemaGuard` / `PermissionConsistencyGuard` / `core-bootstrap` 里 ArchitectureTest 的约定一致。参考实现：[`backend/business-demo/`](../backend/business-demo/)。
 
 ### 0. 推荐：用 scaffold 工具自动生成
 

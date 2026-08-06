@@ -8,10 +8,13 @@ import com.platform.core.infrastructure.persistence.BaseEntity;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.core.type.filter.AssignableTypeFilter;
+import org.springframework.core.type.filter.TypeFilter;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -27,10 +30,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -66,19 +71,55 @@ public class ArchitectureTest {
             "DictItemEntity"             // dict items, same GLOBAL shape as DictEntity
     );
 
-    /** Controllers where every HTTP method is a public/pre-auth endpoint by design. */
-    private static final Set<String> PUBLIC_CONTROLLERS = Set.of(
-            "AuthController",            // login / refresh / logout
-            "AdminAuthController",       // break-glass HS256 login
-            "HealthController",          // readiness probe
-            "InviteController",          // token-URL invite accept
-            "PasswordResetController",   // token-URL password reset
-            "MeMenuController",          // /me/menus — JWT IS the auth
-            "MePermissionController",    // /me/permissions — same
-            "UserController",            // /user/me — same
-            "ScopeMeController",         // /scope/me — same
-            "NotificationController",    // /notification/* — personal inbox, JWT-is-auth like /menu/me
-            "DictController"             // /dict/{code} — dropdown data for any logged-in user, JWT-is-auth like /menu/me
+    /**
+     * Endpoints that carry no {@code @RequiresPermission} by design — listed
+     * <b>one method at a time</b>, as {@code SimpleClassName#methodName}.
+     *
+     * <p>This used to be a set of controller <em>class</em> names, which made
+     * the exemption inheritable: once a class was listed, every method it would
+     * ever grow was silently exempt too. {@code AdminAuthController} was on that
+     * list for a break-glass HS256 login endpoint that has since been deleted —
+     * so the platform's most privileged controller ({@code /admin/auth/unlock},
+     * {@code /admin/auth/force-logout} — the latter gated on {@code *:*}) sat
+     * under a blanket exemption, and a new unannotated method there would have
+     * been reachable by <em>any authenticated user of any tenant</em>
+     * ({@code SecurityConfig} authenticates everything off {@code PERMIT_PATHS},
+     * but authorization comes only from {@code @RequiresPermission}).
+     * Verified before the change by adding an unannotated
+     * {@code POST /admin/auth/__probe}: the rule stayed green.
+     *
+     * <p>Method granularity means adding an endpoint to a controller that
+     * happens to host a public one is a deliberate, reviewable line here.
+     * {@link #public_endpoint_allowlist_must_not_rot()} keeps the list honest
+     * in the other direction.
+     */
+    private static final Set<String> PUBLIC_ENDPOINTS = Set.of(
+            // pre-auth: no JWT yet
+            "AuthController#login",
+            "AuthController#refresh",
+            "AuthController#logout",
+            "HealthController#health",
+            // token-URL flows — the single-use token IS the credential
+            "InviteController#probe",
+            "InviteController#accept",
+            "PasswordResetController#probe",
+            "PasswordResetController#accept",
+            // "about me" reads: the JWT IS the authorization, the response is
+            // scoped to the caller and carries no other user's data
+            "MeMenuController#me",
+            "MePermissionController#me",
+            "UserController#me",
+            "UserController#updateMyProfile",
+            "ScopeMeController#me",
+            // personal notification inbox — every handler is caller-scoped
+            "NotificationController#sseTicket",
+            "NotificationController#stream",
+            "NotificationController#unreadCount",
+            "NotificationController#list",
+            "NotificationController#read",
+            "NotificationController#readAll",
+            // dropdown data for any logged-in user
+            "DictController#get"
     );
 
     private static List<Class<?>> entities;
@@ -102,6 +143,85 @@ public class ArchitectureTest {
         assertThat(entities).isNotEmpty();
         assertThat(controllers).isNotEmpty();
         assertThat(mappers).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("smoke: the corpus covers EVERY module's main sources (classpath scan vs source scan)")
+    void scan_corpus_covers_every_module() {
+        Set<String> scannedControllers = simpleNames(controllers);
+        Set<String> scannedEntities = simpleNames(entities);
+
+        List<String> missing = new ArrayList<>();
+        for (Map.Entry<String, String> e : declaredInSources().entrySet()) {
+            String simpleName = e.getKey();
+            String kind = e.getValue();
+            boolean found = "controller".equals(kind)
+                    ? scannedControllers.contains(simpleName)
+                    : scannedEntities.contains(simpleName);
+            if (!found) missing.add(kind + " " + simpleName);
+        }
+
+        // Everything above this line is only as good as the corpus it runs over,
+        // and the corpus is a CLASSPATH scan — so it silently shrinks for reasons
+        // that have nothing to do with the rules:
+        //
+        //   1. This test used to live in core-system, which does NOT depend on
+        //      business-demo (only core-bootstrap does). TaskController and
+        //      TaskEntity — the reference pair BusinessModuleScaffold clones for
+        //      every new module, i.e. exactly the population the javadoc above
+        //      says these rules exist to protect — were invisible to all of them.
+        //      Measured: 24 controllers / 20 entities scanned, zero from business-*.
+        //   2. Spring's stock scanner evaluates @Conditional*, which dropped 15
+        //      more classes (see FullCorpusScanner).
+        //
+        // smoke_scanFindsSomething can't see either: the corpus was never empty,
+        // just short. Comparing against the SOURCE TREE is what makes "short"
+        // detectable, and it fails on the next business module too — no edit here.
+        assertThat(missing)
+                .as("Types declared in a module's main sources that the classpath scan never saw. "
+                        + "The rules in this class silently skip them. Usual cause: this test's module "
+                        + "doesn't depend on the module that declares them — it must sit at the TOP of "
+                        + "the dependency graph (core-bootstrap), not beside the code it checks.")
+                .isEmpty();
+    }
+
+    private static Set<String> simpleNames(List<Class<?>> classes) {
+        Set<String> out = new LinkedHashSet<>();
+        for (Class<?> c : classes) out.add(c.getSimpleName());
+        return out;
+    }
+
+    /** simple class name → "controller" | "entity", read from every module's {@code src/main/java}. */
+    private static Map<String, String> declaredInSources() {
+        // ^\s*@ anchors to a real type annotation: those sit alone on a line,
+        // while a javadoc mention is always preceded by the block's '*'
+        // (PermissionConsistencyGuard's "{@code @RestController}" was matched by
+        // the first version of this and reported as a missing controller).
+        // The negative lookahead keeps @RestControllerAdvice
+        // (GlobalExceptionHandler) from counting as a controller.
+        Pattern controller = Pattern.compile("(?m)^\\s*@RestController(?![A-Za-z0-9_])");
+        Pattern entity = Pattern.compile("(?m)^\\s*@TableName(?![A-Za-z0-9_])");
+
+        Path backend = Path.of("..").toAbsolutePath().normalize();
+        Map<String, String> out = new LinkedHashMap<>();
+        try (var modules = Files.list(backend)) {
+            for (Path module : modules.filter(Files::isDirectory).toList()) {
+                Path main = module.resolve("src/main/java");
+                if (!Files.isDirectory(main)) continue;
+                try (var files = Files.walk(main)) {
+                    for (Path f : files.filter(p -> p.getFileName().toString().endsWith(".java")).toList()) {
+                        String src = Files.readString(f, StandardCharsets.UTF_8);
+                        String simpleName = f.getFileName().toString().replace(".java", "");
+                        if (controller.matcher(src).find()) out.put(simpleName, "controller");
+                        else if (entity.matcher(src).find()) out.put(simpleName, "entity");
+                    }
+                }
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot scan module sources under " + backend, e);
+        }
+        assertThat(out).as("source scan found nothing — did the module layout change?").isNotEmpty();
+        return out;
     }
 
     // ─── entities ─────────────────────────────────────────────────────
@@ -132,26 +252,68 @@ public class ArchitectureTest {
         Class<? extends Annotation>[] mappingAnnotations = mappingAnnotations();
 
         List<String> offenders = new ArrayList<>();
-        for (Class<?> c : controllers) {
-            if (PUBLIC_CONTROLLERS.contains(c.getSimpleName())) continue;
-            for (Method m : c.getDeclaredMethods()) {
-                if (!Modifier.isPublic(m.getModifiers())) continue;
-                boolean isEndpoint = false;
-                for (Class<? extends Annotation> a : mappingAnnotations) {
-                    if (m.isAnnotationPresent(a)) { isEndpoint = true; break; }
-                }
-                if (!isEndpoint) continue;
-                if (!m.isAnnotationPresent(RequiresPermission.class)) {
-                    offenders.add(c.getSimpleName() + "#" + m.getName());
-                }
+        for (Map.Entry<String, Method> e : httpEndpoints(mappingAnnotations).entrySet()) {
+            if (PUBLIC_ENDPOINTS.contains(e.getKey())) continue;
+            if (!e.getValue().isAnnotationPresent(RequiresPermission.class)) {
+                offenders.add(e.getKey());
             }
         }
         assertThat(offenders)
-                .as("Public HTTP endpoints without @RequiresPermission. Either annotate the method with "
+                .as("HTTP endpoints without @RequiresPermission. Everything outside SecurityConfig's "
+                        + "PERMIT_PATHS is authenticated but NOT authorized — an unannotated endpoint is "
+                        + "callable by any logged-in user of any tenant. Either annotate the method with "
                         + "@RequiresPermission(SomePermissions.X) using a constant from a *Permissions class, "
-                        + "or — if the endpoint is genuinely pre-auth / token-URL / readiness — add the "
-                        + "controller's simple name to PUBLIC_CONTROLLERS in ArchitectureTest.")
+                        + "or — if the endpoint is genuinely pre-auth / token-URL / readiness / caller-scoped "
+                        + "— add THAT METHOD (not its controller) to PUBLIC_ENDPOINTS in ArchitectureTest.")
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("The public-endpoint allowlist must not rot (no entries for methods that are gone or now gated)")
+    void public_endpoint_allowlist_must_not_rot() {
+        Map<String, Method> endpoints = httpEndpoints(mappingAnnotations());
+
+        List<String> vanished = new ArrayList<>();
+        List<String> nowGated = new ArrayList<>();
+        for (String entry : PUBLIC_ENDPOINTS) {
+            Method m = endpoints.get(entry);
+            if (m == null) {
+                vanished.add(entry);
+            } else if (m.isAnnotationPresent(RequiresPermission.class)) {
+                nowGated.add(entry);
+            }
+        }
+
+        // This is the half that was missing. The old class-level allowlist had
+        // no way to notice that AdminAuthController's only public endpoint had
+        // been deleted, so the exemption outlived the reason for it and stayed
+        // pointed at a controller where every remaining method is admin-only.
+        assertThat(vanished)
+                .as("PUBLIC_ENDPOINTS entries that match no HTTP endpoint any more — the method was "
+                        + "renamed or deleted. Drop the entry; leaving it means the allowlist is "
+                        + "documenting an exemption nobody needs.")
+                .isEmpty();
+        assertThat(nowGated)
+                .as("PUBLIC_ENDPOINTS entries whose method now HAS @RequiresPermission. The exemption is "
+                        + "dead weight — drop the entry so the list keeps meaning 'deliberately ungated'.")
+                .isEmpty();
+    }
+
+    /** Every {@code SimpleClassName#methodName} → method that is HTTP-mapped on a {@code @RestController}. */
+    private static Map<String, Method> httpEndpoints(Class<? extends Annotation>[] mappingAnnotations) {
+        Map<String, Method> out = new LinkedHashMap<>();
+        for (Class<?> c : controllers) {
+            for (Method m : c.getDeclaredMethods()) {
+                if (!Modifier.isPublic(m.getModifiers())) continue;
+                for (Class<? extends Annotation> a : mappingAnnotations) {
+                    if (m.isAnnotationPresent(a)) {
+                        out.put(c.getSimpleName() + "#" + m.getName(), m);
+                        break;
+                    }
+                }
+            }
+        }
+        return out;
     }
 
     @Test
@@ -401,23 +563,78 @@ public class ArchitectureTest {
 
     // ─── helpers ──────────────────────────────────────────────────────
 
+    /**
+     * Scanner that deliberately ignores {@code @Conditional*}.
+     *
+     * <p>Spring's stock provider runs a {@code ConditionEvaluator} over every
+     * candidate, so a class carrying {@code @ConditionalOnProperty} /
+     * {@code @ConditionalOnBean} is dropped when the condition doesn't hold —
+     * and in this bare test JVM (no Spring context, no application properties)
+     * essentially none of them hold. That silently shrank the corpus every rule
+     * in this file runs over, by 15 classes: {@code InviteController} (a
+     * <b>pre-auth</b> {@code @RestController}, gated on
+     * {@code app.security.mode=oidc}), {@code UserAdminService},
+     * {@code OidcJitUserService}, {@code KeycloakRealmService},
+     * {@code KeycloakUserService}, {@code OutboxDispatcher},
+     * {@code DynamicJobScheduler} and the rest of the Keycloak admin surface.
+     * The rules didn't pass on those classes — they never saw them.
+     *
+     * <p>{@link #smoke_scanFindsSomething()} cannot catch this: the corpus was
+     * non-empty, just incomplete. Conditions are a <em>runtime wiring</em>
+     * concern; an architecture rule is about the code as written, so the right
+     * answer is to evaluate none of them.
+     */
+    private static class FullCorpusScanner extends ClassPathScanningCandidateComponentProvider {
+        private final Boolean allowInterfaces;
+        /** Our own copy of the include filters — see {@link #isCandidateComponent(MetadataReader)}. */
+        private final List<TypeFilter> includes = new ArrayList<>();
+
+        /** @param allowInterfaces null → keep Spring's default candidate test. */
+        FullCorpusScanner(Boolean allowInterfaces) {
+            super(false);
+            this.allowInterfaces = allowInterfaces;
+        }
+
+        @Override
+        public void addIncludeFilter(TypeFilter includeFilter) {
+            super.addIncludeFilter(includeFilter);
+            includes.add(includeFilter);
+        }
+
+        /**
+         * Reimplements the include-filter match and stops there.
+         *
+         * <p>Spring's version ends with {@code return isConditionMatch(metadataReader)},
+         * and {@code isConditionMatch} is {@code private} (Spring 7), so there is
+         * no narrower seam than this one. Skipping it is the entire point — see
+         * the class javadoc. We keep {@code super.addIncludeFilter} in sync so
+         * nothing else in the provider sees an empty filter list.
+         */
+        @Override
+        protected boolean isCandidateComponent(MetadataReader metadataReader) throws IOException {
+            for (TypeFilter f : includes) {
+                if (f.match(metadataReader, getMetadataReaderFactory())) return true;
+            }
+            return false;
+        }
+
+        @Override
+        protected boolean isCandidateComponent(AnnotatedBeanDefinition beanDefinition) {
+            if (allowInterfaces == null) return super.isCandidateComponent(beanDefinition);
+            return beanDefinition.getMetadata().isIndependent()
+                    && (allowInterfaces || !beanDefinition.getMetadata().isInterface());
+        }
+    }
+
     private static List<Class<?>> findByAnnotation(Class<? extends Annotation> ann) {
-        ClassPathScanningCandidateComponentProvider scanner =
-                new ClassPathScanningCandidateComponentProvider(false);
+        ClassPathScanningCandidateComponentProvider scanner = new FullCorpusScanner(null);
         scanner.addIncludeFilter(new AnnotationTypeFilter(ann));
         return load(scanner.findCandidateComponents(ROOT_PACKAGE));
     }
 
     private static List<Class<?>> findByAssignable(Class<?> type) {
-        ClassPathScanningCandidateComponentProvider scanner =
-                new ClassPathScanningCandidateComponentProvider(false) {
-                    // Default scanner skips interfaces; mappers ARE interfaces, so override.
-                    @Override
-                    protected boolean isCandidateComponent(
-                            org.springframework.beans.factory.annotation.AnnotatedBeanDefinition beanDefinition) {
-                        return beanDefinition.getMetadata().isIndependent();
-                    }
-                };
+        // Default scanner skips interfaces; mappers ARE interfaces, so allow them.
+        ClassPathScanningCandidateComponentProvider scanner = new FullCorpusScanner(true);
         scanner.addIncludeFilter(new AssignableTypeFilter(type));
         return load(scanner.findCandidateComponents(ROOT_PACKAGE)).stream()
                 .filter(c -> !c.equals(type))   // exclude the type itself
@@ -427,15 +644,7 @@ public class ArchitectureTest {
     private static List<Class<?>> findByPackageFragment(String fragment) {
         // Spring's scanner needs an inclusion filter to return anything — use a
         // catch-all "Object" filter and post-filter in Java.
-        ClassPathScanningCandidateComponentProvider scanner =
-                new ClassPathScanningCandidateComponentProvider(false) {
-                    @Override
-                    protected boolean isCandidateComponent(
-                            org.springframework.beans.factory.annotation.AnnotatedBeanDefinition beanDefinition) {
-                        return beanDefinition.getMetadata().isIndependent()
-                                && !beanDefinition.getMetadata().isInterface();
-                    }
-                };
+        ClassPathScanningCandidateComponentProvider scanner = new FullCorpusScanner(false);
         scanner.addIncludeFilter(new AssignableTypeFilter(Object.class));
         List<Class<?>> all = load(scanner.findCandidateComponents(ROOT_PACKAGE));
         return all.stream()
@@ -443,12 +652,31 @@ public class ArchitectureTest {
                 .toList();
     }
 
+    /**
+     * These rules are about <em>production</em> code. The scan sweeps the whole
+     * classpath, which in this module also carries the compiled ITs, so drop
+     * anything that came out of {@code target/test-classes}.
+     */
+    private static boolean isTestClass(BeanDefinition d) {
+        String source = String.valueOf(d.getResourceDescription()).replace('\\', '/');
+        return source.contains("/test-classes/");
+    }
+
     private static List<Class<?>> load(Set<BeanDefinition> defs) {
         List<Class<?>> out = new ArrayList<>(defs.size());
         for (BeanDefinition d : defs) {
+            if (isTestClass(d)) continue;
             try {
-                out.add(Class.forName(d.getBeanClassName()));
-            } catch (ClassNotFoundException e) {
+                // initialize=false on purpose. The catch-all scan in
+                // findByPackageFragment loads every class under com.platform, and
+                // running static initializers means running whatever they do —
+                // OidcJitProvisioningIT's `static final KeycloakContainer` reaches
+                // for Docker and blew up @BeforeAll with an ExceptionInInitializerError.
+                // Nothing here reads a static field; reflection over members works
+                // fine on an uninitialized class.
+                out.add(Class.forName(d.getBeanClassName(), false,
+                        ArchitectureTest.class.getClassLoader()));
+            } catch (ClassNotFoundException | LinkageError e) {
                 // Skip — class was returned by metadata reader but not loadable
                 // (rare; usually a generated proxy). Real source classes always load.
             }
