@@ -81,12 +81,29 @@ request.interceptors.response.use(
     }
     const msg = data.msg
 
-    // 401 returned via JsonResult body (e.g., business-level unauthenticated)
-    if (code === 401) {
+    // 401 returned via JsonResult body (e.g., business-level unauthenticated).
+    //
+    // NOT for the auth endpoints themselves — same exclusion the HTTP-status 401
+    // branch below already makes, and for the same reason. ErrorCode gives
+    // BAD_CREDENTIALS / INVALID_TOKEN / EXPIRED_TOKEN the numeric code 401 and
+    // BusinessException bodies ride on HTTP 200, so a plain "wrong password" on
+    // POST /auth/login arrives here indistinguishable from an expired session.
+    // Bouncing on it re-pushes /login with the CURRENT url as ?from= — which on
+    // the login page is the login page:
+    //   expire on /system/user   → /login?from=/system/user
+    //   one mistyped password    → /login?from=/login%3Ffrom%3D/system/user
+    //   then a successful login  → replace('/login?from=/system/user') → '/'
+    // i.e. the typo silently threw away the deep link the user was headed for.
+    // It also clearAuth()s, which on a shared-origin tab wipes a live token.
+    // The caller (login page / authStore.refresh) surfaces the error itself.
+    if (code === 401 && !isAuthEndpoint(res.config?.url)) {
       const authStore = useAuthStore()
       authStore.clearAuth()
       const currentPath = router.currentRoute.value.fullPath
       router.push({ path: '/login', query: { from: currentPath } })
+      return Promise.reject(new Error(msg || 'ログインの有効期限が切れました'))
+    }
+    if (code === 401) {
       return Promise.reject(new Error(msg || 'ログインの有効期限が切れました'))
     }
 
