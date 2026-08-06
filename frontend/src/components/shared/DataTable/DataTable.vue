@@ -222,7 +222,17 @@ function jumpBy(delta) {
   if (target !== props.page) emit('update:page', target)
 }
 
+// 每页条数变化时必须回到第 1 页。调用方一律是
+//   v-model:page + v-model:page-size + @update:page/@update:page-size="fetchData"
+// 的写法，所以不回位就会带着旧 page 去请求：25 条数据、10 条/页时停在第 3 页，
+// 切成 20 条/页后总页数变成 2，请求发出的却是 page=3&size=20 —— 后端翻过了末页，
+// 用户看到空表格，页脚还写着「3 / 2」。各页面里的 page.value = 1 只挂在搜索/重置上，
+// 接不住这条路径。回到第 1 页也与本项目唯一手写分页（Tenant.vue 的
+// watch([statusFilter, pageSize], () => { page.value = 1 })）保持一致。
+// 先发 page 再发 pageSize：v-model 的 setter 是同步的，这样后一次 fetch 一定是
+// (page=1, 新 size) 这个正确组合。
 function changePageSize(val) {
+  if (props.page !== 1) emit('update:page', 1)
   emit('update:pageSize', Number(val))
 }
 

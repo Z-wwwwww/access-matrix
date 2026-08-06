@@ -265,6 +265,7 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 
 **测试点**
 - [ ] 打开多个 tab,再开新 tab:每个接口**只发一次**(无重复请求)。
+- [ ] **改「每页条数」后不会掉进空白页(bug 修复)**:找一个数据量能翻页的列表(用户 / 操作日志 / 任务 / 角色 / 领域事件 / 定时任务 / 运维用户,任意一个走 `DataTable` 的都行),翻到**最后一页**(例如 25 条、10 条/页 → 第 3 页),再把「每页条数」调大到 20 → 应当**自动回到第 1 页并显示数据**,而不是空表格 + 页脚写着「3 / 2」。此前 `DataTable.changePageSize` 只 emit 了 `update:pageSize`;而所有调用方清一色是 `v-model:page` + `v-model:page-size` + `@update:page/@update:page-size="fetchData"` 的接法,于是带着旧 `page` 去请求 `page=3&size=20`,后端翻过末页返回空集。各页面里那句 `page.value = 1` 只挂在搜索/重置按钮上,接不住这条路径。修在共享组件里一处,8 张表一起生效;回到第 1 页也与本项目唯一手写分页(`Tenant.vue` 的 `watch([statusFilter, pageSize], () => { page.value = 1 })`)一致。先 emit `update:page` 再 emit `update:pageSize`,保证后一次 fetch 拿到的是 (page=1, 新 size) 这个正确组合;已经在第 1 页时不多发一次事件。由 `tests/components/dataTablePageSize.test.js` 钉住 3 条,已实测撤掉修复即 2 条失败。
 - [ ] 关闭 tab 不残留 404;双击 tab 刷新该页。
 - [ ] Tab 栏:非激活 tab 间有竖分割线(激活/hover 及其相邻处隐藏);窗口变窄时 tab 均匀缩小并 `…` 截断,不向右溢出;再窄则多出的收进 `+N`,active 始终可见;hover `+N` 弹隐藏列表可点选/关闭;hover 被截断的 tab 在其下方弹完整名 tooltip。
 - [ ] 删除确认:从抽屉/Dialog **内部**触发删除时,确认框浮在最上层可点(不被 Dialog 遮);取消/确认都能正常 resolve。
