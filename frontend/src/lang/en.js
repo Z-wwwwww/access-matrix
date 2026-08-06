@@ -773,7 +773,8 @@ export default {
         saving: 'Saving...',
         updateFailed: 'Update failed',
         createFailed: 'Create failed',
-        assignRolesFailed: 'Role assignment failed'
+        assignRolesFailed: 'Role assignment failed',
+        loadRolesFailed: "Could not load this user's current roles — saving is blocked so they aren't revoked. Close and reopen to retry."
       }
     },
     resetPassword: {

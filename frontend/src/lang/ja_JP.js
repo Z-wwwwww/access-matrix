@@ -783,7 +783,8 @@ export default {
         saving: '保存中...',
         updateFailed: '更新失敗',
         createFailed: '作成失敗',
-        assignRolesFailed: 'ロール割り当て失敗'
+        assignRolesFailed: 'ロール割り当て失敗',
+        loadRolesFailed: 'このユーザーの現在のロールを読み込めませんでした。剥奪されるのを防ぐため保存を中止しました。閉じて開き直してください。'
       }
     },
     resetPassword: {

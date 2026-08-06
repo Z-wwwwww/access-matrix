@@ -32,6 +32,30 @@ const SRC = readFileSync(
   resolve(process.cwd(), 'src/views/system/Role/RoleEdit.vue'),
   'utf8'
 )
+const USER_SRC = readFileSync(
+  resolve(process.cwd(), 'src/views/system/User/UserEdit.vue'),
+  'utf8'
+)
+
+/** Body of a named function, comments stripped — a mention in a comment is not a guard. */
+function functionBody(src, signature) {
+  const start = src.indexOf(signature)
+  expect(start, `${signature} not found — did it get renamed?`).toBeGreaterThan(-1)
+  const open = src.indexOf('{', start)
+  let depth = 0
+  let end = -1
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === '{') depth++
+    else if (src[i] === '}') {
+      depth--
+      if (depth === 0) { end = i; break }
+    }
+  }
+  expect(end, `could not find the end of ${signature}`).toBeGreaterThan(-1)
+  return src.slice(open, end)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '')
+}
 
 describe('RoleEdit — a failed selection load must not be saved as empty', () => {
   it('tracks the failure when any selection GET does not succeed', () => {
@@ -42,28 +66,8 @@ describe('RoleEdit — a failed selection load must not be saved as empty', () =
     expect(SRC).toMatch(/selectionLoadFailed\.value\s*=\s*false/)
   })
 
-  /** Body of `async function save()`, comments stripped — a mention in a comment is not a guard. */
-  function saveBody() {
-    const start = SRC.indexOf('async function save()')
-    expect(start, 'save() not found — did it get renamed?').toBeGreaterThan(-1)
-    const open = SRC.indexOf('{', start)
-    let depth = 0
-    let end = -1
-    for (let i = open; i < SRC.length; i++) {
-      if (SRC[i] === '{') depth++
-      else if (SRC[i] === '}') {
-        depth--
-        if (depth === 0) { end = i; break }
-      }
-    }
-    expect(end, 'could not find the end of save()').toBeGreaterThan(-1)
-    return SRC.slice(open, end)
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/\/\/[^\n]*/g, '')
-  }
-
   it('save() refuses while the flag is set, before any bind call runs', () => {
-    const body = saveBody()
+    const body = functionBody(SRC, 'async function save()')
     // An actual read of the flag followed by an early return — not a comment.
     expect(body, 'save() has no selectionLoadFailed guard')
       .toMatch(/if\s*\(\s*selectionLoadFailed\.value\s*\)[\s\S]{0,200}?return/)
@@ -78,6 +82,49 @@ describe('RoleEdit — a failed selection load must not be saved as empty', () =
     for (const [name, msgs] of Object.entries({ en, ja_JP: ja, ko_KR: ko, zh_CN: zhCN, zh_TW: zhTW })) {
       expect(msgs.role?.edit?.message?.loadSelectionsFailed, `${name} is missing the key`)
         .toBeTruthy()
+    }
+  })
+})
+
+/**
+ * Same invariant, higher stakes: UserEdit's save() calls assignUserRolesApi with
+ * selectedRoleIds as the COMPLETE new set (the backend soft-deletes every link and
+ * re-inserts). A swallowed load therefore doesn't just lose data — it revokes the
+ * user's access. Two distinct failure modes had to be closed:
+ *   - a thrown request → the ref was explicitly set to [] → save strips all roles;
+ *   - a non-zero business code → the assignment simply didn't fire, so the ref kept
+ *     the PREVIOUSLY opened user's roles → save copies user A's roles onto user B.
+ */
+describe('UserEdit — a failed role load must not be saved as the new role set', () => {
+  it('clears the selection before loading, so a stale one cannot survive', () => {
+    const body = functionBody(USER_SRC, 'watch(() => props.open')
+    const clearAt = body.search(/selectedRoleIds\.value\s*=\s*\[\]/)
+    const loadAt = body.indexOf('getUserRolesApi')
+    expect(clearAt, 'selectedRoleIds is never cleared on open').toBeGreaterThan(-1)
+    expect(loadAt, 'getUserRolesApi call not found').toBeGreaterThan(-1)
+    expect(clearAt, 'the clear must happen before the load').toBeLessThan(loadAt)
+  })
+
+  it('flags both a thrown request and a non-zero business code', () => {
+    const body = functionBody(USER_SRC, 'watch(() => props.open')
+    expect(body).toMatch(/else\s+roleLoadFailed\.value\s*=\s*true/)   // code !== 0
+    expect(body).toMatch(/catch\s*\{[\s\S]{0,120}?roleLoadFailed\.value\s*=\s*true/) // threw
+  })
+
+  it('save() refuses while the flag is set, before assignUserRolesApi runs', () => {
+    const body = functionBody(USER_SRC, 'async function save()')
+    expect(body, 'save() has no roleLoadFailed guard')
+      .toMatch(/if\s*\(\s*roleLoadFailed\.value\s*\)[\s\S]{0,200}?return/)
+
+    const guardAt = body.search(/if\s*\(\s*roleLoadFailed\.value\s*\)/)
+    const assignAt = body.indexOf('assignUserRolesApi')
+    expect(assignAt, 'assignUserRolesApi not found in save()').toBeGreaterThan(-1)
+    expect(guardAt, 'the guard must run before the role assignment').toBeLessThan(assignAt)
+  })
+
+  it('the user-facing message exists in all five locales', () => {
+    for (const [name, msgs] of Object.entries({ en, ja_JP: ja, ko_KR: ko, zh_CN: zhCN, zh_TW: zhTW })) {
+      expect(msgs.user?.edit?.message?.loadRolesFailed, `${name} is missing the key`).toBeTruthy()
     }
   })
 })

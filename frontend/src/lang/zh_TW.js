@@ -773,7 +773,8 @@ export default {
         saving: '儲存中...',
         updateFailed: '更新失敗',
         createFailed: '建立失敗',
-        assignRolesFailed: '角色指派失敗'
+        assignRolesFailed: '角色指派失敗',
+        loadRolesFailed: '未能讀取該使用者目前的角色，為避免被收回已阻擋儲存。請關閉後重新開啟重試。'
       }
     },
     resetPassword: {

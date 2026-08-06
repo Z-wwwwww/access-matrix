@@ -43,6 +43,22 @@ const allRoles = ref([])
 const selectedRoleIds = ref([])
 const saving = ref(false)
 
+/**
+ * True when this drawer could NOT read the user's current roles.
+ *
+ * save() calls assignUserRolesApi with `selectedRoleIds` as the COMPLETE new set
+ * — the backend soft-deletes every existing link and re-inserts, it does not
+ * merge. So an unread selection must never reach it: a failed load renders as
+ * "no roles checked", indistinguishable from a user who genuinely has none, and
+ * an admin editing only the email would strip every role the user had — i.e.
+ * revoke their access entirely.
+ *
+ * Fail-closed, matching RoleEdit's selectionLoadFailed and the backend's own
+ * instincts (HIBP unreachable refuses the write; an empty data scope resolves
+ * to 1=0). Reopening the drawer retries.
+ */
+const roleLoadFailed = ref(false)
+
 // The built-in Super Administrator role is singular & locked to the tenant
 // owner (the user invited at tenant creation). Hide it from the picker for
 // anyone who doesn't already hold it, and render it non-toggleable for the
@@ -67,6 +83,11 @@ watch(() => props.open, async (open) => {
     status: props.user?.status ?? 1,
     mode: 'INVITE'
   })
+  // Clear BEFORE loading: on a business-code failure the assignment below simply
+  // doesn't fire, and without this the ref would still hold the PREVIOUSLY opened
+  // user's roles — saving would then copy that user's roles onto this one.
+  selectedRoleIds.value = []
+  roleLoadFailed.value = false
   try {
     const r = await getRoleListApi({ page: 1, size: 100 })
     if (r.data.code === 0) allRoles.value = r.data.data.records || []
@@ -75,9 +96,11 @@ watch(() => props.open, async (open) => {
     try {
       const r = await getUserRolesApi(props.user.id)
       if (r.data.code === 0) selectedRoleIds.value = r.data.data || []
-    } catch { selectedRoleIds.value = [] }
-  } else {
-    selectedRoleIds.value = []
+      else roleLoadFailed.value = true
+    } catch {
+      roleLoadFailed.value = true
+    }
+    if (roleLoadFailed.value) toast.error(t('user.edit.message.loadRolesFailed'))
   }
 })
 
@@ -95,6 +118,12 @@ function isRoleSelected(id) {
 async function save() {
   if (!isValidEmail(form.email)) {
     toast.error(t('common.message.invalidEmail'))
+    return
+  }
+  // Never persist a role set we failed to read — assignUserRolesApi replaces,
+  // so saving here would revoke the user's roles. See roleLoadFailed.
+  if (roleLoadFailed.value) {
+    toast.error(t('user.edit.message.loadRolesFailed'))
     return
   }
   saving.value = true

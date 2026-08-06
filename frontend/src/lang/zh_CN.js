@@ -773,7 +773,8 @@ export default {
         saving: '保存中...',
         updateFailed: '更新失败',
         createFailed: '创建失败',
-        assignRolesFailed: '角色分配失败'
+        assignRolesFailed: '角色分配失败',
+        loadRolesFailed: '未能读取该用户当前的角色，为避免被回收已阻止保存。请关闭后重新打开重试。'
       }
     },
     resetPassword: {

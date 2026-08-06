@@ -773,7 +773,8 @@ export default {
         saving: '저장 중...',
         updateFailed: '업데이트 실패',
         createFailed: '생성 실패',
-        assignRolesFailed: '역할 할당 실패'
+        assignRolesFailed: '역할 할당 실패',
+        loadRolesFailed: '이 사용자의 현재 역할을 불러오지 못했습니다. 회수되는 것을 막기 위해 저장을 중단했습니다. 닫았다가 다시 열어 주세요.'
       }
     },
     resetPassword: {
