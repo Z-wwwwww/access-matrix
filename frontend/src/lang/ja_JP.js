@@ -14,7 +14,10 @@ import permissions from './generated/permissions.ja_JP.json'
 
 export default {
   error: {
-    common: { concurrentEdit: '同時に他の人が更新しました。画面を再読み込みしてからやり直してください。' },
+    common: {
+      concurrentEdit: '同時に他の人が更新しました。画面を再読み込みしてからやり直してください。',
+      duplicateKey: 'その名称またはコードは既に使われています。再読み込みして別の値でお試しください。'
+    },
     dict: {
       codeExists: '辞書コードは既に存在します',
       codeIsBuiltin: 'このコードは内蔵（enum）辞書のため管理できません',

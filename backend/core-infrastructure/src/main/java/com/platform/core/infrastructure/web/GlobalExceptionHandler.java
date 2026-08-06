@@ -9,6 +9,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -112,6 +113,35 @@ public class GlobalExceptionHandler {
         log.warn("Keycloak operation rejected: {}", ex.getMessage());
         return ResponseEntity.ok(new JsonResult<>(
                 ErrorCode.BUSINESS_ERROR.code(), "error.keycloak.operationFailed", null));
+    }
+
+    /**
+     * A unique-constraint violation is a CALLER error — the name / code / email is
+     * taken — not a server bug.
+     *
+     * <p>Every create in this codebase is check-then-insert
+     * ({@code RoleAdminService.assertNameUnique}, {@code MenuAdminService.create}'s
+     * code probe, {@code DictAdminService.createType} / {@code createItem},
+     * {@code DeptAdminService.create}), so there is a TOCTOU window between the
+     * SELECT and the INSERT and the unique index is the real guard. Without this
+     * handler the loser of that race fell into {@link #handleGeneric}: HTTP 500,
+     * an "Unhandled exception" ERROR line, and a tick on the dashboard's
+     * "API errors (24h)" KPI — which is defined to count only UNEXPECTED server
+     * errors. Same reasoning as the {@link NoResourceFoundException} and
+     * {@code KeycloakOperationException} handlers above.
+     *
+     * <p>Bound to {@link DuplicateKeyException} specifically, NOT its parent
+     * {@code DataIntegrityViolationException}: a NOT-NULL or foreign-key violation
+     * really is a server bug and must keep its loud 500.
+     *
+     * <p>The driver's message names the constraint; it is logged for ops but never
+     * returned, so the response can't leak schema internals.
+     */
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<JsonResult<Object>> handleDuplicateKey(DuplicateKeyException ex) {
+        log.warn("Unique-constraint violation (concurrent create or retry): {}", ex.getMessage());
+        return ResponseEntity.ok(new JsonResult<>(
+                ErrorCode.BUSINESS_ERROR.code(), "error.common.duplicateKey", null));
     }
 
     /**

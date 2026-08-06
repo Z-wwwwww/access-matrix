@@ -7,7 +7,10 @@ import permissions from './generated/permissions.en.json'
 
 export default {
   error: {
-    common: { concurrentEdit: 'Someone else updated this record. Reload and try again.' },
+    common: {
+      concurrentEdit: 'Someone else updated this record. Reload and try again.',
+      duplicateKey: 'This name or code is already taken. Reload and try a different one.'
+    },
     dict: {
       codeExists: 'Dictionary code already exists',
       codeIsBuiltin: 'This code is a built-in (enum) dictionary and is not manageable',

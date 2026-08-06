@@ -7,7 +7,10 @@ import permissions from './generated/permissions.zh_CN.json'
 
 export default {
   error: {
-    common: { concurrentEdit: '该记录已被他人修改，请刷新后重试。' },
+    common: {
+      concurrentEdit: '该记录已被他人修改，请刷新后重试。',
+      duplicateKey: '该名称或编码已被占用，请刷新后换一个值重试。'
+    },
     dict: {
       codeExists: '字典编码已存在',
       codeIsBuiltin: '该编码是内置（枚举）字典，不可管理',

@@ -7,7 +7,10 @@ import permissions from './generated/permissions.ko_KR.json'
 
 export default {
   error: {
-    common: { concurrentEdit: '다른 사용자가 이 항목을 먼저 수정했습니다. 새로 고침 후 다시 시도하세요.' },
+    common: {
+      concurrentEdit: '다른 사용자가 이 항목을 먼저 수정했습니다. 새로 고침 후 다시 시도하세요.',
+      duplicateKey: '해당 이름 또는 코드는 이미 사용 중입니다. 새로고침 후 다른 값으로 시도해 주세요.'
+    },
     dict: {
       codeExists: '사전 코드가 이미 존재합니다',
       codeIsBuiltin: '이 코드는 내장(enum) 사전이라 관리할 수 없습니다',
