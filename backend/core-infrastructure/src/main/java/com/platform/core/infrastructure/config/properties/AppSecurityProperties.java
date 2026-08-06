@@ -18,9 +18,16 @@ public record AppSecurityProperties(
         if (jwt == null) jwt = new Jwt(null, "tid", "sub", "preferred_username", "scope");
         if (rateLimit == null) rateLimit = new RateLimit(true, 30, Duration.ofMinutes(1));
         if (lockout == null) lockout = new Lockout(true, 5, Duration.ofMinutes(15), Duration.ofMinutes(15));
+        // Last arg is failOpenOnHibpError and it must be FALSE: when the breach
+        // check can't be reached we refuse the password change rather than let a
+        // possibly-breached one through. application.yml documents exactly that
+        // ("false = fail-closed(本默认)"); this fallback used to say true, so a
+        // deployment that omitted app.security.password-policy silently ran the
+        // opposite posture — the same trap as AppMybatisProperties' old
+        // `new Tenant(false)`.
         if (passwordPolicy == null) passwordPolicy = new PasswordPolicy(
                 8, 128, true, true, true, true,
-                true, "https://api.pwnedpasswords.com", Duration.ofSeconds(3), true);
+                true, "https://api.pwnedpasswords.com", Duration.ofSeconds(3), false);
         if (refreshCookie == null) refreshCookie = new RefreshCookie("core_refresh", "/api/auth", true, "Strict");
     }
 

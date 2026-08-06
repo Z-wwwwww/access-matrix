@@ -46,6 +46,17 @@ class AppPropertiesDefaultsTest {
         assertThat(p.passwordPolicy().requireUpper()).isTrue();
         assertThat(p.passwordPolicy().requireLower()).isTrue();
         assertThat(p.passwordPolicy().requireSymbol()).isTrue();
+        // The one policy flag whose SAFE value is false, and the only one this test
+        // did not pin — every other assertion above happens to be safe-when-true.
+        // application.yml documents `false = fail-closed(本默认)`: when HIBP is
+        // unreachable, refuse the password change rather than let a breached password
+        // through. The record's fallback passed `true`, so a deployment that omits
+        // app.security.password-policy silently got the opposite posture, which is the
+        // same shape as the AppMybatisProperties `new Tenant(false)` fallback.
+        assertThat(p.passwordPolicy().failOpenOnHibpError())
+                .as("HIBP unreachable must fail CLOSED by default — matching the "
+                        + "documented application.yml value, not the reverse")
+                .isFalse();
     }
 
     @Test
