@@ -219,9 +219,15 @@ public class PlatformDashboardService {
                 "SELECT COUNT(*) FROM core_oplog WHERE success = false AND error_code = 500 "
                         + "AND create_time >= now() - INTERVAL '24 hours'");
 
+        // Drill-down for the "Job failures (24h)" KPI — same 24h window as the count
+        // above, so the tile and the list it opens can never disagree. Without the
+        // bound a failure from three days ago showed up under a tile reading 0
+        // (verified on the real DB in a rolled-back transaction). Older runs stay
+        // available in the scheduled-job console's own log view.
         List<PlatformDashboardDto.JobFailure> recent = jdbc.query(
                 "SELECT job_code, start_time, duration_ms, error FROM core_job_log "
-                        + "WHERE status = 3 ORDER BY start_time DESC LIMIT " + LIST_CAP,
+                        + "WHERE status = 3 AND start_time >= now() - INTERVAL '24 hours' "
+                        + "ORDER BY start_time DESC LIMIT " + LIST_CAP,
                 (rs, n) -> new PlatformDashboardDto.JobFailure(
                         rs.getString("job_code"), ts(rs.getObject("start_time")),
                         (Long) rs.getObject("duration_ms"), rs.getString("error")));
@@ -274,12 +280,17 @@ public class PlatformDashboardService {
                         + "WHERE create_time >= now() - INTERVAL '7 days'");
 
         // Recent sessions (newest first), incl. ended/expired — the "active" flag
-        // marks the ones still live so the list and the KPI agree.
+        // marks the ones still live so the list and the KPI agree. Bounded to the
+        // SAME 7 days as the support7d KPI, which is the tile that opens this list
+        // unfiltered; the "Support live" tile filters the same rows on `active`, and
+        // a live session can never be older than its 30-minute TTL, so the bound
+        // cannot hide one.
         List<PlatformDashboardDto.SupportSession> recent = jdbc.query(
                 "SELECT s.operator, s.tenant_code, t.display_name, s.started_at, s.reason, "
                         + "       (s.ended_at IS NULL AND s.expires_at > now()) AS active "
                         + "FROM core_support_session s "
                         + "LEFT JOIN core_tenant t ON t.tenant_code = s.tenant_code "
+                        + "WHERE s.started_at >= now() - INTERVAL '7 days' "
                         + "ORDER BY s.started_at DESC LIMIT " + LIST_CAP,
                 (rs, n) -> new PlatformDashboardDto.SupportSession(
                         rs.getString("operator"), rs.getString("tenant_code"),
@@ -287,9 +298,13 @@ public class PlatformDashboardService {
                         rs.getString("reason"), rs.getBoolean("active")));
 
         // Break-glass logins (oplog.tenant_id IS the tenant code for these rows).
+        // Same 7d window as the breakGlass7d KPI whose tile opens this list; the
+        // full history stays queryable in the op-log console
+        // (module=system / action=auth.breakGlass).
         List<PlatformDashboardDto.BreakGlassUse> breakGlass = jdbc.query(
                 "SELECT username, tenant_id, create_time, client_ip FROM core_oplog "
                         + "WHERE module = 'system' AND action = 'auth.breakGlass' "
+                        + "AND create_time >= now() - INTERVAL '7 days' "
                         + "ORDER BY create_time DESC LIMIT " + LIST_CAP,
                 (rs, n) -> new PlatformDashboardDto.BreakGlassUse(
                         rs.getString("username"), rs.getString("tenant_id"),
