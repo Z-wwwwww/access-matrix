@@ -333,6 +333,33 @@ class TenantAdminServiceTest {
     }
 
     @Test
+    void resendInvite_correctedEmailAlreadyTaken_saysSoPrecisely() {
+        // The fourth email-edit path. UserAdminService.update / .updateOwnProfile go
+        // through assertEmailAvailable, and PlatformUserAdminService.create / .update
+        // run their own dup counts, all so the operator is told WHICH field clashed --
+        // that was the point of "duplicate-email pre-check on all email-edit paths".
+        // This one had no check, so the clash surfaced only as the unique index
+        // firing: a DuplicateKeyException mapped to the generic 700
+        // "error.common.duplicateKey" ("this name or code is already taken"), which
+        // does not tell the operator the EMAIL is the problem.
+        stubPendingInvite("acme", "u-admin", "kc-admin", "admin", "Acme Admin", "old@wrong.example");
+        when(jdbc.queryForObject(org.mockito.ArgumentMatchers.contains("COUNT(*)"),
+                eq(Long.class), any(), any(), any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.resendAdminInvite("id-acme", "taken@acme.example"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("error.user.emailExists");
+
+        // Nothing may have been touched: not the row, not the tenant contact, not KC,
+        // and above all no invite mail to an address we just refused.
+        verify(jdbc, never()).update(org.mockito.ArgumentMatchers.contains("UPDATE core_auth_user SET email"),
+                any(Object[].class));
+        verify(kcUserService, never()).updateEmail(anyString(), anyString(), anyString());
+        verify(mailService, never()).sendHtmlAsync(anyString(), any(), anyString(),
+                any(Object[].class), anyString(), any());
+    }
+
+    @Test
     void resendInvite_withCorrectedEmail_fixesEverywhereThenResends() {
         stubPendingInvite("acme", "u-admin", "kc-admin", "admin", "Acme Admin", "old@wrong.example");
 

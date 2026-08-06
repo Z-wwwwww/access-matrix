@@ -573,6 +573,19 @@ public class TenantAdminService {
 
         // Correct the email everywhere if a new one was given.
         if (correcting && !targetEmail.equals(currentEmail)) {
+            // Precise duplicate pre-check, like every other email-edit path
+            // (UserAdminService.assertEmailAvailable, PlatformUserAdminService's
+            // create/update counts). Without it the clash surfaces only when
+            // uk_core_auth_user_tenant_email fires, and DuplicateKeyException maps
+            // to the generic 700 "this name or code is already taken" — which never
+            // tells the operator that the EMAIL is what collided.
+            Long dup = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM core_auth_user "
+                            + "WHERE tenant_id = ? AND email = ? AND mark = 1 AND id <> ?",
+                    Long.class, tenantCode, targetEmail, userId);
+            if (dup != null && dup > 0) {
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR, "error.user.emailExists");
+            }
             OffsetDateTime now = OffsetDateTime.now();
             jdbc.update("UPDATE core_auth_user SET email = ?, update_time = ? WHERE id = ?",
                     targetEmail, now, userId);
