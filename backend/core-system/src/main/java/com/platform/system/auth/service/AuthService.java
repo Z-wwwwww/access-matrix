@@ -132,17 +132,29 @@ public class AuthService {
         String tenantId = currentTenantOrDefault();
 
         UserEntity user = userMapper.findByIdentifier(tenantId, identifier);
-        if (user == null) {
-            encoder.matches(password, DUMMY_BCRYPT); // timing-safe dummy compare
-            auditService.record(tenantId, null, identifier, clientIp, userAgent, false, "user-not-found");
-            throw new BusinessException(ErrorCode.BAD_CREDENTIALS, "Bad credentials");
-        }
 
+        // Lockout is evaluated on the IDENTIFIER, BEFORE branching on existence.
+        // The dummy-BCrypt compare below already equalises timing between the two
+        // branches; the lockout state has to be equalised too, or it becomes the
+        // oracle instead: with the check (and the recordFailure) reachable only
+        // for a resolved user, a real username started answering ACCOUNT_LOCKED
+        // after maxFailures attempts while a made-up one answered BAD_CREDENTIALS
+        // forever — send maxFailures+1 wrong passwords per candidate and read off
+        // which accounts exist. It also let existence-probing traffic bypass the
+        // throttle that exists for exactly that.
         long remaining = lockoutService.remainingLockSeconds(tenantId, identifier);
         if (remaining > 0) {
-            auditService.record(tenantId, user.getId(), identifier, clientIp, userAgent, false, "account-locked");
+            auditService.record(tenantId, user == null ? null : user.getId(), identifier,
+                    clientIp, userAgent, false, "account-locked");
             throw new BusinessException(ErrorCode.ACCOUNT_LOCKED,
                     "Account locked. Try again in " + remaining + " seconds.");
+        }
+
+        if (user == null) {
+            encoder.matches(password, DUMMY_BCRYPT); // timing-safe dummy compare
+            lockoutService.recordFailure(tenantId, identifier);   // same budget as a real account
+            auditService.record(tenantId, null, identifier, clientIp, userAgent, false, "user-not-found");
+            throw new BusinessException(ErrorCode.BAD_CREDENTIALS, "Bad credentials");
         }
 
         if (!encoder.matches(password, user.getPasswordHash())) {
