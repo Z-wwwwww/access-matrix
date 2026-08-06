@@ -17,7 +17,12 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
@@ -113,6 +118,69 @@ public class GlobalExceptionHandler {
         log.warn("Keycloak operation rejected: {}", ex.getMessage());
         return ResponseEntity.ok(new JsonResult<>(
                 ErrorCode.BUSINESS_ERROR.code(), "error.keycloak.operationFailed", null));
+    }
+
+    // ── Spring MVC framework client errors ──────────────────────────────
+    //
+    // This advice is a plain @RestControllerAdvice (it does NOT extend
+    // ResponseEntityExceptionHandler), and ExceptionHandlerExceptionResolver runs
+    // BEFORE DefaultHandlerExceptionResolver — so any framework exception not
+    // named here is swallowed by handleGeneric below and becomes a 500 with an
+    // "Unhandled exception" ERROR line plus a tick on the dashboard's
+    // "API errors (24h)" KPI, which counts only UNEXPECTED server errors.
+    // NoResourceFoundException already had to be rescued from exactly that; these
+    // are the rest of the same family. All are plain caller mistakes.
+
+    /** Malformed / unparseable request body — e.g. {@code {"status":"abc"}} into an Integer. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<JsonResult<Object>> handleUnreadable(HttpMessageNotReadableException ex) {
+        // Message can carry Jackson internals / snippets of the payload — log it,
+        // never return it.
+        log.warn("Unreadable request body: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(JsonResult.error(ErrorCode.VALIDATION_FAILED));
+    }
+
+    /** A path / query value that can't convert — e.g. {@code ?page=abc} where the method takes a long. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<JsonResult<Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        log.warn("Parameter type mismatch on '{}': {}", ex.getName(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new JsonResult<>(ErrorCode.VALIDATION_FAILED.code(),
+                        "Invalid value for parameter '" + ex.getName() + "'", null));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<JsonResult<Object>> handleMissingParam(MissingServletRequestParameterException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new JsonResult<>(ErrorCode.VALIDATION_FAILED.code(),
+                        "Missing required parameter '" + ex.getParameterName() + "'", null));
+    }
+
+    /**
+     * Taking these two over from {@code DefaultHandlerExceptionResolver} means we
+     * are also responsible for the headers it used to set: {@code Allow} is
+     * REQUIRED on a 405 (RFC 9110 §15.5.6) and {@code Accept} is what tells a
+     * client what a 415 would have accepted. Without them the status code is
+     * right but the response is less useful than Spring's default was.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<JsonResult<Object>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        ResponseEntity.BodyBuilder b = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        if (ex.getSupportedHttpMethods() != null && !ex.getSupportedHttpMethods().isEmpty()) {
+            b.allow(ex.getSupportedHttpMethods().toArray(new org.springframework.http.HttpMethod[0]));
+        }
+        return b.body(JsonResult.error(ErrorCode.BAD_REQUEST));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<JsonResult<Object>> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
+        ResponseEntity.BodyBuilder b = ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        if (!ex.getSupportedMediaTypes().isEmpty()) {
+            b.header(org.springframework.http.HttpHeaders.ACCEPT,
+                    org.springframework.http.MediaType.toString(ex.getSupportedMediaTypes()));
+        }
+        return b.body(JsonResult.error(ErrorCode.BAD_REQUEST));
     }
 
     /**
