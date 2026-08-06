@@ -85,7 +85,13 @@
             <testResource>
                 <directory>${project.basedir}/../../infra/keycloak/realms</directory>
                 <includes>
-                    <include>default-realm.json</include>
+                    <!-- Must match a real file in infra/keycloak/realms/ AND the path
+                         OidcJitProvisioningIT passes to withRealmImportFile("/demo-realm.json"),
+                         which resolves against the TEST CLASSPATH. This said
+                         default-realm.json — a name that stopped existing when the realm was
+                         renamed to "demo" — so Maven copied nothing ("Copying 0 resource")
+                         and the IT would boot an empty realm. Pinned by RealmImportFixtureTest. -->
+                    <include>demo-realm.json</include>
                 </includes>
                 <targetPath>.</targetPath>
             </testResource>

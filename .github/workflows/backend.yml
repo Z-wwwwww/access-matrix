@@ -5,10 +5,19 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      # The backend BUILD reaches outside backend/: core-infrastructure's pom
+      # puts infra/keycloak/realms/demo-realm.json on the main classpath (the
+      # new-tenant realm-clone template) and core-bootstrap's puts it on the test
+      # classpath. KeycloakRealmTemplateTest asserts on its contents — brute-force
+      # detection, PKCE enforcement. Without this path, editing only that JSON runs
+      # NO backend job, so those security guards can be removed with a green CI.
+      # e2e.yml already watches infra/keycloak/**; this is the same dependency.
+      - 'infra/keycloak/**'
       - '.github/workflows/backend.yml'
   pull_request:
     paths:
       - 'backend/**'
+      - 'infra/keycloak/**'
       - '.github/workflows/backend.yml'
 
 defaults:
