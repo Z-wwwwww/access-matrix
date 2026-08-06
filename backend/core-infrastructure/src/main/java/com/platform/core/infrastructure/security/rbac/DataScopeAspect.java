@@ -20,8 +20,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>Strict vs lenient is decided by the active Spring profile:
  * <ul>
- *   <li>{@code local} / {@code dev} / {@code test} → strict: throw 500.
- *       Developers see the missed filter immediately.</li>
+ *   <li>{@code dev} / {@code test} → strict: throw 500. Developers see the
+ *       missed filter immediately. (These are the two profiles
+ *       {@link #isStrict()} actually checks; this repo ships
+ *       {@code application{,-dev,-prod,-test}.yml} and has no {@code local}.)</li>
  *   <li>Anything else (prod) → lenient: log {@code WARN}. We don't want a
  *       single mis-wired Mapper to take down a production request, but the
  *       warning surfaces in the log pipeline and ops triage will pick it up.</li>

@@ -30,8 +30,8 @@ import java.util.Locale;
 /**
  * Seeds 5 demo users (one per data_scope mode), their role bindings, and a
  * small fleet of {@code demo_task} rows that the data-scope walkthrough
- * filters against. Runs once at startup on the {@code local} profile —
- * production / dev / test never see these rows.
+ * filters against. Runs once at startup on the {@code dev} profile (see
+ * {@code @Profile} below) — production never sees these rows.
  *
  * <p>Why this lives in Java rather than V10 SQL:
  * <ul>
@@ -302,7 +302,7 @@ public class DemoSeeder {
 
         // The seeder runs outside any HTTP request — there's no caller-side
         // DataScopeHelper.apply, so the @DataScope guard on TaskMapper would
-        // throw in dev/local. Tag this thread's request marker as if apply()
+        // throw under the dev/test profiles. Tag this thread's marker as if apply()
         // had been called: insertions don't get filtered anyway.
         DataScopeContext.markApplied(t);
         try {

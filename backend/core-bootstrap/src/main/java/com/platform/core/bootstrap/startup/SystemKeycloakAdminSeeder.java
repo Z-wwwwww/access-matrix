@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>Conditional on:
  * <ul>
- *   <li>{@code local} profile — the platform-ops realm in prod is
+ *   <li>{@code dev} profile — the platform-ops realm in prod is
  *       provisioned out-of-band, not by an application startup hook.</li>
  *   <li>{@code app.security.mode=oidc} — without OIDC the Keycloak admin
  *       client beans aren't even loaded; this seeder would NPE.</li>

@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Ensures Keycloak's {@code default} realm always has an {@code admin} user
- * with password {@code admin} on local-profile boot. Pairs with
+ * with password {@code admin} on a {@code dev}-profile boot. Pairs with
  * {@link LocalAdminSeeder}, which guarantees the corresponding business
  * {@code core_auth_user} row + SUPER_ADMIN binding exist on the application
  * side.
