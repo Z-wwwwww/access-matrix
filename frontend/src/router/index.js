@@ -166,7 +166,11 @@ router.beforeEach(async (to, from, next) => {
   } else if (isPublicPath(to.path)) {
     next()
   } else {
-    next({ path: '/login', query: to.path === '/' ? {} : { from: to.path } })
+    // fullPath, not path: login/index.vue redirects to `route.query.from`
+    // verbatim, so `path` alone silently drops ?query and #hash — the same trap
+    // the re-navigation above documents. Shared deep links are exactly the case
+    // that lands here (the recipient is logged out by definition).
+    next({ path: '/login', query: to.path === '/' ? {} : { from: to.fullPath } })
   }
 })
 
