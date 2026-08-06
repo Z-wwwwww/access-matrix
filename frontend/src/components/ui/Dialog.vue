@@ -1,7 +1,8 @@
 <script setup>
-import { watch, computed, provide } from 'vue'
+import { watch, computed, provide, onUnmounted } from 'vue'
 import { X } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
+import { lockBodyScroll, unlockBodyScroll } from '@/composables/useBodyScrollLock'
 
 const props = defineProps({
   open: {
@@ -55,13 +56,17 @@ function onOverlayClick() {
   if (props.closeOnOverlay) close()
 }
 
-watch(() => props.open, (val) => {
-  if (val) {
-    document.body.style.overflow = 'hidden'
-  } else {
-    document.body.style.overflow = ''
-  }
-})
+// Refcounted so a nested modal (ConfirmDialog inside a Drawer) can't release the
+// outer one's lock, `immediate` so a dialog rendered open from the start locks
+// too, and released on unmount so navigating away mid-modal doesn't strand the
+// page. See composables/useBodyScrollLock.
+let holdsScrollLock = false
+function syncScrollLock(open) {
+  if (open && !holdsScrollLock) { lockBodyScroll(); holdsScrollLock = true }
+  else if (!open && holdsScrollLock) { unlockBodyScroll(); holdsScrollLock = false }
+}
+watch(() => props.open, syncScrollLock, { immediate: true })
+onUnmounted(() => syncScrollLock(false))
 
 // 子孫 popup (DatePicker/Select 等) が自分より上に出るための z-index 起点を provide
 const popupZIndex = computed(() => {

@@ -1,7 +1,8 @@
 <script setup>
-import { watch, computed, provide } from 'vue'
+import { watch, computed, provide, onUnmounted } from 'vue'
 import { X } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
+import { lockBodyScroll, unlockBodyScroll } from '@/composables/useBodyScrollLock'
 
 const props = defineProps({
   open: {
@@ -49,13 +50,16 @@ function onOverlayClick() {
   if (props.closeOnOverlay) close()
 }
 
-watch(() => props.open, (val) => {
-  if (val) {
-    document.body.style.overflow = 'hidden'
-  } else {
-    document.body.style.overflow = ''
-  }
-})
+// See Dialog.vue / composables/useBodyScrollLock — refcounted for nesting,
+// immediate for mounted-already-open, released on unmount so navigating away
+// mid-drawer doesn't leave the page unscrollable.
+let holdsScrollLock = false
+function syncScrollLock(open) {
+  if (open && !holdsScrollLock) { lockBodyScroll(); holdsScrollLock = true }
+  else if (!open && holdsScrollLock) { unlockBodyScroll(); holdsScrollLock = false }
+}
+watch(() => props.open, syncScrollLock, { immediate: true })
+onUnmounted(() => syncScrollLock(false))
 
 // 子孫 popup (DatePicker/Select 等) が自分より上に出るための z-index 起点を provide
 // 'z-[90]' / 'z-50' 等の Tailwind class から数値を抽出して + 10
