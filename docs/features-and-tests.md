@@ -16,7 +16,7 @@
 | **OIDC SSO** | 主路径。各租户对应一个 Keycloak realm;平台运维用 `system` realm。登录后 JWT 带 `tid`(租户)。 |
 | **Break-glass 密码登录** | SSO 不可用时的应急通道(`AdminAuthController` HS256)。`mode=oidc` 下 `/auth/login` 成功即视为 break-glass,会写审计 `system/auth.breakGlass` + 给本人发告警邮件。仅 super-admin 的 `password_hash` 被保留。 |
 | **安全模式** | `app.security.mode` = `oidc`(默认) / `jwt`(legacy 密码) / `permit-all`(裸跑无 IdP)。 |
-| **租户解析** | `utils/tenant.js`:子域名 → `?tenant=` → localStorage → `default` 的优先级。 |
+| **租户解析** | `utils/tenant.js` 的 `resolve()` 优先级:`?tenant=`(命中即写入 localStorage 粘住)→ 子域名(生产;命中也粘住)→ localStorage 里的既有值 → `DEFAULT_TENANT`。**兜底值是 `demo` 不是 `default`** —— 租户 `default` 自 V25 改名后就不存在了,别按这个名字去排查。注意查询串**优先于**子域名:URL 上残留一个 `?tenant=xxx` 会盖掉子域名解析结果。 |
 | **会话维持** | 双模式。SSO 模式:KC access token(30 min)+ KC refresh_token(SPA 持有,`kc_refresh_token`),到期前 ~2 min 主动续期(`stores/auth.js` 定时器,直打 KC token endpoint,同时重置 KC SSO 空闲计时——开着的标签页不再 30 分钟被踢回 KC 登录页,直到 `ssoSessionMaxLifespan` 才需重登);密码/break-glass 模式:refresh token HttpOnly cookie 走后端 `/auth/refresh`。两条路都受 401 单飞刷新 + 原请求重放兜底;刷新失败(KC 会话真正结束 / 被踢)踢回登录。支持会话(impersonation)期间不续期(避免覆盖 support token)。依赖 realm `revokeRefreshToken=false`(多标签页并发续期不互踢)。 |
 | **入驻** | 业务租户管理员:邀请邮件 + 落地页设密;平台运维用户:一次性临时密码(KC 强制首登改密)。 |
 
