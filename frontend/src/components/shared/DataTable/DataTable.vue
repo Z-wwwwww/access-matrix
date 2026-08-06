@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { cn } from '@/lib/utils'
 import Select from '@/components/ui/Select.vue'
@@ -235,6 +235,18 @@ function changePageSize(val) {
   if (props.page !== 1) emit('update:page', 1)
   emit('update:pageSize', Number(val))
 }
+
+// 上面那条只挡住了「改每页条数」这一个入口，同样的死角还能从另一条路进：
+// 删掉末页最后一行。各页面的删除处理最后都是一句 `fetchData()`，page 原样带出去，
+// 而 `page.value = 1` 只挂在搜索/重置上；后端也不兜底 —— MybatisPlusConfig 里是
+// `pagination.setOverflow(false)`，翻过末页返回的是空列表而不是最后一页。
+// 于是 total 41→40 后 totalPages 变成 2、page 还停在 3：空表格 + 页脚「3 / 2」，
+// 而且「下一页」因为 page >= totalPages 是禁用的，只能靠用户自己点回去。
+// 夹在这里而不是各个页面里，理由与 changePageSize 相同：一处覆盖全部列表页。
+watch(totalPages, (pages) => {
+  // total 为 0 时 totalPages 仍是 1（Math.max），所以首屏加载中 page=1 不会误触发。
+  if (props.page > pages) emit('update:page', pages)
+})
 
 function onFilterUpdate(colKey, val) {
   emit('update:filter', { [colKey]: val })
