@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.platform.core.common.context.RequestContext;
 import com.platform.core.infrastructure.event.entity.DomainEventEntity;
 import com.platform.core.infrastructure.event.mapper.DomainEventMapper;
+import com.platform.core.infrastructure.scheduling.JobLockService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -33,6 +34,25 @@ import java.util.List;
  * outbox is at-least-once, so a crash mid-batch simply reprocesses whatever
  * is still pending.
  *
+ * <p><b>One pod at a time.</b> The poll holds the {@code core_job_lock} row
+ * {@value #LOCK_NAME} for its duration. Without it, the production topology in
+ * {@code docs/deployment.md} (「Backend pod×2~N … 後端無状態 → 水平扩」) makes every
+ * pod select the same {@code dispatch_state = 0} rows in the same window and
+ * dispatch all of them: the row is only written back <em>after</em> the sink
+ * returns, so nothing else stops a second pod from picking it up. That would turn
+ * the at-least-once contract {@link EventDispatchSink} documents — a duplicate
+ * means a crash landed between "downstream accepted" and "row marked dispatched"
+ * — into N-fold delivery of every event on the happy path. This is the same
+ * {@code JobLockService} every {@link com.platform.core.common.scheduling.ScheduledJob}
+ * gets via {@code JobExecutionWrapper}; the dispatcher stays a plain
+ * {@code @Scheduled} only because its cadence is finer than the cron job model,
+ * which was never a reason to run it on every pod at once.
+ *
+ * <p>The lease ({@code app.outbox.lock-lease-seconds}, default 60) bounds how long
+ * a pod that dies mid-batch can keep the lock: after it expires another pod takes
+ * over and re-processes whatever is still pending — at-least-once, unchanged.
+ * Acquisition failure is not an error; it just means another pod is draining.
+ *
  * <p>Disable with {@code app.outbox.enabled=false}.
  */
 @Component
@@ -44,19 +64,28 @@ public class OutboxDispatcher {
     /** Must match {@code MybatisPlusConfig.PLATFORM_TENANT_ID} — the scoping-bypass signal. */
     private static final String PLATFORM_TENANT = "system";
 
+    /** {@code core_job_lock} row name. Shape matches JobExecutionWrapper's "{code}::{tenant}". */
+    static final String LOCK_NAME = "outbox-dispatcher::system";
+
     private final DomainEventMapper mapper;
     private final EventDispatchSink sink;
+    private final JobLockService lockService;
     private final int batchSize;
     private final int maxAttempts;
+    private final int lockLeaseSeconds;
 
     public OutboxDispatcher(DomainEventMapper mapper,
                             ObjectProvider<EventDispatchSink> sinkProvider,
+                            JobLockService lockService,
                             @Value("${app.outbox.batch-size:200}") int batchSize,
-                            @Value("${app.outbox.max-attempts:5}") int maxAttempts) {
+                            @Value("${app.outbox.max-attempts:5}") int maxAttempts,
+                            @Value("${app.outbox.lock-lease-seconds:60}") int lockLeaseSeconds) {
         this.mapper = mapper;
         this.sink = sinkProvider.getIfAvailable(LoggingEventDispatchSink::new);
+        this.lockService = lockService;
         this.batchSize = batchSize;
         this.maxAttempts = maxAttempts;
+        this.lockLeaseSeconds = lockLeaseSeconds;
         if (this.sink instanceof LoggingEventDispatchSink) {
             log.info("[OutboxDispatcher] no EventDispatchSink bean configured — using logging fallback; "
                     + "domain events are persisted but not forwarded downstream until a real sink is registered.");
@@ -65,6 +94,11 @@ public class OutboxDispatcher {
 
     @Scheduled(fixedDelayString = "${app.outbox.poll-interval-ms:5000}")
     public void dispatchPending() {
+        if (!lockService.tryAcquire(LOCK_NAME, lockLeaseSeconds)) {
+            // Another pod is draining this batch. Not a failure — the next tick
+            // on whichever pod wins the lock picks up whatever is still pending.
+            return;
+        }
         RequestContext.set(PLATFORM_TENANT, null, "outbox-dispatcher", null, null);
         try {
             Page<DomainEventEntity> page = Page.of(1, batchSize);
@@ -94,6 +128,10 @@ public class OutboxDispatcher {
             // Never let a poll failure kill the scheduler; next tick retries.
             log.warn("[OutboxDispatcher] poll failed: {}", ex.getMessage());
         } finally {
+            // Release before clearing the context: both must happen even if the
+            // batch above threw, or the lease would pin the lock for its full
+            // duration and stall every pod, not just this one.
+            lockService.release(LOCK_NAME);
             RequestContext.clear();
         }
     }
