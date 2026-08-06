@@ -42,6 +42,7 @@ export default {
       superPermissionReserved: '租户级超级权限为内置超级管理员角色保留，不能分配给自定义角色'
     },
     auth: {
+      sessionTerminated: '会话已被管理员终止，请重新登录',
       tenantSuspended: '租户已被停用，无法登录'
     },
     keycloak: {

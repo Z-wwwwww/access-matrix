@@ -42,6 +42,7 @@ export default {
       superPermissionReserved: 'The tenant-wide super permission is reserved for the built-in Super Administrator role and cannot be assigned to a custom role'
     },
     auth: {
+      sessionTerminated: 'Your session was ended by an administrator. Please sign in again.',
       tenantSuspended: 'This tenant is suspended; sign-in is disabled'
     },
     keycloak: {

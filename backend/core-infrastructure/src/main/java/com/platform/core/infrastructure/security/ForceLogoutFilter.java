@@ -1,8 +1,8 @@
 package com.platform.core.infrastructure.security;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.platform.core.common.context.RequestContext;
+import com.platform.core.common.error.ErrorCode;
+import com.platform.core.common.result.JsonResult;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -18,11 +19,10 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * Cross-cuts every authenticated request and enforces administrative
@@ -53,11 +53,14 @@ public class ForceLogoutFilter extends OncePerRequestFilter {
 
     private final ForceLogoutService forceLogoutService;
     private final JwtDecoder jwtDecoder;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    /** Jackson 3, injected — the app registers no Jackson 2 bean. */
+    private final JsonMapper mapper;
 
-    public ForceLogoutFilter(ForceLogoutService forceLogoutService, JwtDecoder jwtDecoder) {
+    public ForceLogoutFilter(ForceLogoutService forceLogoutService, JwtDecoder jwtDecoder,
+                             JsonMapper mapper) {
         this.forceLogoutService = forceLogoutService;
         this.jwtDecoder = jwtDecoder;
+        this.mapper = mapper;
     }
 
     @Override
@@ -118,17 +121,25 @@ public class ForceLogoutFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * Same shape as every other response in the app: the {@link JsonResult}
+     * envelope, an {@code int} code from {@link ErrorCode}, and an i18n key in
+     * {@code msg} for the frontend's {@code localizeError} to resolve.
+     *
+     * <p>This used to hand-build {@code {"code":"UNAUTHORIZED","message":…}} — a
+     * String where the contract says int, and {@code message} where every client
+     * reads {@code msg}. {@code AuthRateLimitFilter}, the only other filter that
+     * short-circuits with a body, already did it the contract way; this one was
+     * the outlier. The visible cost: {@code request.js} surfaces
+     * {@code error.response.data?.msg}, so the administrator's reason for the kick
+     * resolved to {@code undefined} and the user got the generic
+     * "リクエストに失敗しました" instead.
+     */
     private void writeUnauthorized(HttpServletResponse resp) throws IOException {
         resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        resp.setContentType("application/json;charset=UTF-8");
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("code", "UNAUTHORIZED");
-        body.put("message", "Session terminated by administrator");
-        try {
-            objectMapper.writeValue(resp.getWriter(), body);
-        } catch (JsonProcessingException e) {
-            // last-ditch: write a plaintext fallback rather than swallow.
-            resp.getWriter().write("{\"code\":\"UNAUTHORIZED\",\"message\":\"Session terminated\"}");
-        }
+        resp.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        resp.setCharacterEncoding("UTF-8");
+        resp.getWriter().write(mapper.writeValueAsString(
+                JsonResult.error(ErrorCode.UNAUTHORIZED.code(), "error.auth.sessionTerminated")));
     }
 }

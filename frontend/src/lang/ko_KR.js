@@ -42,6 +42,7 @@ export default {
       superPermissionReserved: '테넌트 전체 슈퍼 권한은 내장 슈퍼 관리자 역할 전용이며 사용자 정의 역할에 할당할 수 없습니다'
     },
     auth: {
+      sessionTerminated: '관리자에 의해 세션이 종료되었습니다. 다시 로그인해 주세요',
       tenantSuspended: '테넌트가 정지되어 로그인할 수 없습니다'
     },
     keycloak: {

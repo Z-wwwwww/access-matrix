@@ -49,6 +49,7 @@ export default {
       superPermissionReserved: 'テナント全体のスーパー権限は組み込みのスーパー管理者ロール専用で、カスタムロールには割り当てできません'
     },
     auth: {
+      sessionTerminated: '管理者によりセッションが終了されました。再度ログインしてください',
       tenantSuspended: 'テナントが停止されているためログインできません'
     },
     keycloak: {
