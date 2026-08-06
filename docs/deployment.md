@@ -19,7 +19,7 @@
                                 ▼  HTTPS
                        ┌──────────────────┐
                        │  Nginx / ALB     │  TLS termination
-                       │  Reverse Proxy   │  /api  → backend
+                       │  Reverse Proxy   │  /proxy_url → backend /api
                        │                  │  /sso  → keycloak
                        └────────┬─────────┘
                                 │
@@ -86,8 +86,16 @@
 
 构建前端时通过 `.env.production` 设置：
 
+> **`VITE_API_BASE_URL` does NOT set the API base of a build.** It is read only by
+> `vite.config.js` inside `server.proxy`, i.e. by the **dev server**. A production
+> bundle always calls `/proxy_url/...` (hardcoded in `services/request.js` and
+> `composables/useNotificationStream.js`) — verify with
+> `grep -o 'baseURL:"[^"]*"' dist/assets/*.js`. Routing that prefix to the backend
+> is nginx's job; see the `location /proxy_url/` block in §5.
+
 ```dotenv
 # frontend/.env.production
+# Dev-proxy target only — kept for parity with .env.development; a build ignores it.
 VITE_API_BASE_URL=https://app.example.com/api
 
 VITE_OIDC_ENABLED=true
@@ -283,8 +291,14 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # Backend API
-    location /api/ {
+    # Backend API — MUST be /proxy_url/, not /api/.
+    # The SPA bundle hardcodes axios baseURL '/proxy_url' (services/request.js)
+    # and the SSE stream path (composables/useNotificationStream.js). Vite's dev
+    # server rewrites that prefix away; `vite build` does not — `server.proxy` is
+    # dev-only config. So the deployed SPA calls /proxy_url/... and without this
+    # block those requests fall through to `location /` and get index.html back,
+    # i.e. every API call returns HTML and the app is dead on arrival.
+    location /proxy_url/ {
         proxy_pass http://access_matrix_backend/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
