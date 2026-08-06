@@ -501,7 +501,13 @@ public class UserAdminService {
             keycloak.setPassword(RequestContext.tenantIdOrDefault(), u.getKeycloakId(), tempPassword, true);
         } else {
             u.setPasswordHash(encoder.encode(tempPassword));
-            userMapper.updateById(u);
+            // Legacy mode is the only reset path that writes through MyBatis-Plus,
+            // so it is the only one carrying @Version on update_time. Unchecked, a
+            // concurrent edit made this match no row while the method still returned
+            // and emailed the temp password — the admin hands over a credential that
+            // was never stored, and the old one keeps working. Every other
+            // updateById in this service is already guarded the same way.
+            ConcurrentEdit.requireApplied(userMapper.updateById(u));
         }
         // The reset must evict the (possibly hijacked) current holder: kick
         // already-issued tokens AND end the KC SSO session, otherwise a login

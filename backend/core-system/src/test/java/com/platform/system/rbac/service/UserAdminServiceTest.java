@@ -495,6 +495,31 @@ class UserAdminServiceTest {
     }
 
     @Test
+    void resetPassword_legacyMode_reportsAConflictInsteadOfHandingOutADeadPassword() {
+        // Legacy mode is the ONE reset path that writes through MyBatis-Plus, so it
+        // is the one carrying @Version on update_time. `require(id)` loads the row,
+        // then updateById re-checks that version; a concurrent edit in between makes
+        // it match nothing. Unchecked, the method still returned the generated temp
+        // password and emailed it — the admin hands the user a credential that was
+        // never persisted, and the old one still works. Every other updateById in
+        // this service already goes through ConcurrentEdit.requireApplied.
+        UserEntity u = user("u1", "alice");
+        when(userMapper.selectById("u1")).thenReturn(u);
+        when(userRoleMapper.existsActiveLink("u1", BuiltInRoles.SUPER_ADMIN_ID, "acme")).thenReturn(null);
+        when(encoder.encode(anyString())).thenReturn("HASHED");
+        when(userMapper.updateById(any(UserEntity.class))).thenReturn(0);   // version moved
+
+        assertThatThrownBy(() -> service.resetPassword("u1"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).errorCode())
+                .isEqualTo(ErrorCode.OPTIMISTIC_LOCK_CONFLICT);
+
+        // And the side-effects must not have happened: kicking the user's sessions
+        // while leaving the old hash in place would lock them out for nothing.
+        verify(sessionTermination, never()).terminateUser(anyString());
+    }
+
+    @Test
     void resetPassword_refusesProtectedAdmin() {
         when(userMapper.selectById("u1")).thenReturn(user("u1", "demo-admin"));
 
