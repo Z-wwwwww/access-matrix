@@ -137,9 +137,21 @@ request.interceptors.response.use(
       }
     }
 
-    if (status === 500) {
-      const msg = localizeError(error.response?.data?.msg)
-      return Promise.reject(new Error(msg || 'サーバーエラー'))
+    // Every error status — not just 500 — carries a JsonResult body with a usable
+    // `msg`. This used to read it for 500 ONLY, so a 400/403/404/405/415/429 was
+    // rejected as the raw AxiosError and callers (`catch (e) => toast.error(e.message)`)
+    // showed the user "Request failed with status code 400" while the server had
+    // sent a perfectly good localized reason. That got worse once the Spring MVC
+    // client errors (malformed JSON / bad param / wrong verb) were mapped off 500:
+    // those responses moved out of the one branch that surfaced `msg`.
+    //
+    // The message is written ONTO the AxiosError rather than replacing it with a
+    // bare Error: ExportFileButton recovers a failed download's real message via
+    // `e.response.data instanceof Blob`, which `new Error(msg)` would destroy —
+    // as the old 500 branch in fact did.
+    if (error.response) {
+      const msg = localizeError(error.response.data?.msg)
+      error.message = msg || (status === 500 ? 'サーバーエラー' : 'リクエストに失敗しました')
     }
     return Promise.reject(error)
   }
