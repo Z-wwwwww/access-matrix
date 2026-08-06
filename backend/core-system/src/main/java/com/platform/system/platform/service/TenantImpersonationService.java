@@ -56,10 +56,16 @@ import java.util.UUID;
  * <ul>
  *   <li>FULL mode only — no READ_ONLY enforcement yet. Audit is the
  *       sole protection. Tracked as a follow-up.</li>
- *   <li>No server-side session list / revoke. Tokens expire naturally
- *       in 30 min; clients terminate by discarding the token.</li>
- *   <li>Built-in tenants (system, demo) refused — there's no operational
- *       reason to impersonate them and accidents here cost more.</li>
+ *   <li>No server-side <em>revoke</em>. {@code core_support_session} (V52) does
+ *       give a server-side session list — the ops dashboard reads it and
+ *       {@link #endSession} stamps {@code ended_at} when the operator exits —
+ *       but the token itself is a stateless short-lived JWT that simply
+ *       expires. "Exited" in the console means the bookkeeping row is closed,
+ *       not that the credential stopped working; it stays valid for the
+ *       remainder of its 30 minutes.</li>
+ *   <li>Built-in tenants refused — {@code system} only. It has no business
+ *       SUPER_ADMIN to assume; {@code demo} is an ordinary sample tenant and
+ *       IS impersonable (see {@link #RESERVED_CODES}).</li>
  * </ul>
  */
 @Service
