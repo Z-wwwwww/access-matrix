@@ -221,7 +221,11 @@ app:
     #   sso-to-password        = 反向：给 keycloak_id 非空的用户发我方重置链接，设密后与 KC 解绑
     # 正常运行留空；用时设值→重启→看报告→清空→再重启。详见 docs/migration-password-to-sso.md。
     run-on-startup: ${CORE_MIGRATION_RUN_ON_STARTUP:}   # 留空=不迁移；拼错会被静默忽略
-    tenants:        ${CORE_MIGRATION_TENANTS:default}   # 逗号分隔的租户 id(==realm 名)，顺序迁移
+    # 逗号分隔的租户 id(==realm 名)，顺序迁移。默认**留空**：迁移开着却没指定租户时，
+    # runner 打一条 "nothing to do" WARN 并退出，而不是去动某个猜出来的租户。
+    # 曾经默认 `default` —— 那个租户在 V25 改名成 demo 后就不存在了，于是
+    # 「开了迁移但忘了设本项」会静默地对一个不存在的租户跑一遍、报告 0 个用户成功。
+    tenants:        ${CORE_MIGRATION_TENANTS:}
     report-dir:     ${CORE_MIGRATION_REPORT_DIR:logs}   # 每次运行的逐用户 JSON 报告输出目录
   mybatis:
     tenant:

@@ -31,7 +31,7 @@ import java.util.function.Function;
  *     mode: oidc                                # required — migration only makes sense in oidc mode
  *   migration:
  *     run-on-startup: password-to-sso           # | password-to-sso-resend | sso-to-password
- *     tenants: default,acme,beta                # one realm/tenant id per item
+ *     tenants: demo,acme,beta                   # one realm/tenant id per item; no default
  * </pre>
  *
  * <h3>Three modes</h3>
@@ -104,7 +104,14 @@ public class PasswordToSsoMigrationRunner implements ApplicationRunner {
     @Value("${app.migration.run-on-startup:}")
     private String mode;
 
-    @Value("${app.migration.tenants:default}")
+    /**
+     * Empty by default on purpose. This used to fall back to {@code default} — a
+     * tenant that stopped existing when V25 renamed it to {@code demo} — so
+     * enabling the migration without naming tenants ran it against a phantom and
+     * reported "0 users, success". Empty makes the {@code tenants.isEmpty()}
+     * branch below log "nothing to do" instead of silently doing nothing.
+     */
+    @Value("${app.migration.tenants:}")
     private String tenantsCsv;
 
     @Value("${app.migration.report-dir:logs}")
