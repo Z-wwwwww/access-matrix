@@ -149,6 +149,7 @@ export default {
       networkError: 'ネットワークエラー',
       sessionExpired: 'セッションが切れました',
       operationSuccessful: '操作が完了しました',
+      operationFailed: '操作に失敗しました',
       iframeLoadFailed: '外部ページを読み込めません',
       invalidEmail: 'メールアドレスの形式が正しくありません'
     },

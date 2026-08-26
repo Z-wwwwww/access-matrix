@@ -142,6 +142,7 @@ export default {
       networkError: '網路錯誤',
       sessionExpired: '工作階段已過期',
       operationSuccessful: '操作成功',
+      operationFailed: '操作失敗',
       iframeLoadFailed: '無法載入外部頁面',
       invalidEmail: '電子郵件格式不正確'
     },

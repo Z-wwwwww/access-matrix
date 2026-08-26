@@ -142,6 +142,7 @@ export default {
       networkError: '网络错误',
       sessionExpired: '会话已过期',
       operationSuccessful: '操作成功',
+      operationFailed: '操作失败',
       iframeLoadFailed: '无法加载外部页面',
       invalidEmail: '邮箱格式不正确'
     },

@@ -142,6 +142,7 @@ export default {
       networkError: '네트워크 오류',
       sessionExpired: '세션이 만료되었습니다',
       operationSuccessful: '작업이 완료되었습니다',
+      operationFailed: '작업에 실패했습니다',
       iframeLoadFailed: '외부 페이지를 불러올 수 없습니다',
       invalidEmail: '이메일 형식이 올바르지 않습니다'
     },

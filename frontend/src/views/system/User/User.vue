@@ -196,6 +196,14 @@ async function toggleStatus(row) {
     if (res.data.code === 0) {
       toast.success(t('common.message.operationSuccessful'))
       fetchData()
+    } else {
+      // request.js only REJECTS on code 401 / 700 — every other business code
+      // resolves, so without this branch a NOT_FOUND (404, the row was deleted
+      // in another tab) or an OPTIMISTIC_LOCK_CONFLICT (702, from
+      // ConcurrentEdit.requireApplied in UserAdminService.changeStatus) produced
+      // total silence: no toast, and no fetchData(), so the row kept showing the
+      // old status. Every sibling handler in this file already has this branch.
+      toast.error(res.data.msg || t('common.message.operationFailed'))
     }
   } catch (e) { toast.error(e.message) }
 }

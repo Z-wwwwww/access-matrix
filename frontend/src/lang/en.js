@@ -142,6 +142,7 @@ export default {
       networkError: 'Network error',
       sessionExpired: 'Session expired',
       operationSuccessful: 'Operation successful',
+      operationFailed: 'Operation failed',
       iframeLoadFailed: 'Failed to load the external page',
       invalidEmail: 'Invalid email format'
     },
