@@ -232,7 +232,37 @@ kc.sh start --optimized --import-realm
 
 import 文件名要确保跟 deploy 进 `$KEYCLOAK_HOME/data/import/` 的一致。
 
-### 4.5 SMTP 配置（让 Keycloak 自己发邮件）
+### 4.5 登录主题（`access-matrix`）必须一起部署
+
+**§4.4 灌进去的 realm JSON 里写死了 `"loginTheme": "access-matrix"`** —— 两个模板
+（`demo-realm.json` / `system-realm.json`）都有这一行，而 `KeycloakRealmService.createRealm`
+是**克隆 `demo-realm.json`** 来建新租户 realm 的，所以**每一个**租户 realm 都会要求这个主题。
+主题本身在 `infra/keycloak/themes/access-matrix/`，Keycloak 只认自己的 `themes` 目录，
+所以要跟 realm 一样单独部署一份：
+
+```bash
+# 与 realm 导入同批发布；目录结构原样拷过去即可
+cp -R infra/keycloak/themes/access-matrix "$KEYCLOAK_HOME/themes/"
+```
+
+容器部署则挂进去（官方镜像的主题目录是 `/opt/keycloak/themes`）：
+
+```bash
+-v /path/to/infra/keycloak/themes/access-matrix:/opt/keycloak/themes/access-matrix:ro
+```
+
+**漏了不会报错，只会静默降级**：Keycloak 找不到该主题时打一条 WARN 然后回退到内置
+登录页，登录功能照常 —— 于是生产上所有租户的登录页都失去品牌样式，而且前端
+`utils/oidc.js` 的 `currentUiMode()`（把 app 当前的明暗模式作为 `ui_mode` 参数传给 KC，
+让登录页跟着切）会彻底失效，因为读这个参数的正是该主题的 `login.js`。本地
+`start-keycloak.sh` 一直在做这件事（把 `infra/keycloak/themes/` rsync 进
+`$KEYCLOAK_HOME/themes/`），生产手册此前从头到尾没提过。
+
+主题是纯样式扩展（`theme.properties` 里 `parent=keycloak.v2`，没有自己的 `.ftl`），
+所以 `kc.sh build --optimized` **不需要**为它重新构建；但生产模式默认开启主题缓存，
+改完主题要重启 KC 才生效。
+
+### 4.6 SMTP 配置（让 Keycloak 自己发邮件）
 
 到 Realm settings → Email：
 - Host, Port, From, Username, Password
@@ -371,6 +401,7 @@ readinessProbe:
 - [ ] DB 用专用业务 user，密码强（不用 `postgres` 超管）
 - [ ] Keycloak 用 PG 后端，不用内置 H2
 - [ ] Keycloak 用 service account（client_credentials），不用 admin/admin
+- [ ] `access-matrix` 登录主题已随 realm 一起部署到 `$KEYCLOAK_HOME/themes/`（§4.5）—— realm 模板写死了 `loginTheme`，漏了只会 WARN + 静默回退成内置登录页
 - [ ] Keycloak Realm settings → Brute Force Detection 启用
 - [ ] CORS `CORE_CORS_ALLOWED_ORIGINS` 严格列举（不要用 `*`）
 - [ ] 反代加 `X-Frame-Options: SAMEORIGIN`、`Content-Security-Policy`、HSTS

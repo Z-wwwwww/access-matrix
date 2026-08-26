@@ -66,6 +66,13 @@ jobs:
       # localhost:5432 and exposes 8180 on the host for the backend + SPA.
       # --import-realm loads infra/keycloak/realms/*.json (demo + system) on
       # first boot — same mechanism as infra/keycloak/start-keycloak.*.
+      #
+      # The themes mount is part of mirroring that recipe: both realm templates
+      # set "loginTheme": "access-matrix", and start-keycloak.* syncs the theme
+      # into $KEYCLOAK_HOME/themes for exactly that reason. Without it Keycloak
+      # warns and falls back to the built-in login page — login still works (the
+      # spec selectors are base-theme compatible), so the gap stayed invisible
+      # while leaving the theme with no CI coverage at all.
       - name: Start Keycloak (import realms)
         run: |
           docker run -d --name keycloak --network host \
@@ -78,6 +85,7 @@ jobs:
             -e KC_HTTP_PORT=8180 \
             -e KC_HOSTNAME_STRICT=false \
             -v "$PWD/infra/keycloak/realms:/opt/keycloak/data/import:ro" \
+            -v "$PWD/infra/keycloak/themes/access-matrix:/opt/keycloak/themes/access-matrix:ro" \
             quay.io/keycloak/keycloak:26.6.2 \
             start-dev --import-realm --http-port=8180
 
