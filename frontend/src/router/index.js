@@ -16,8 +16,27 @@ NProgress.configure({ showSpinner: false })
 
 const APP_TITLE = 'Access Matrix'
 
-/** 免登录白名单 */
-const WHITE_LIST = ['/login', '/sso/callback']
+/**
+ * 免登录白名单。
+ *
+ * {@code /signout} belongs here even though you normally arrive with a session:
+ * it is one of the static, session-independent pages (alongside /login,
+ * /sso/callback and the two token landing pages), and SignOut.vue's whole job is
+ * to END the session — by the time it finishes there is nothing to authenticate.
+ * Leaving it out made the guard bounce a session-less hit to
+ * {@code /login?from=/signout}, and login/index.vue replays `from` verbatim: the
+ * next successful sign-in landed straight back on /signout and signed the user
+ * out again, with no visible reason and no way out but editing the URL. Reaching
+ * it without a session is ordinary — the browser Back button after an OIDC
+ * sign-out (which leaves /signout in history, unlike the password path's
+ * `router.replace`), a bookmark, or a stale tab whose token was already cleared
+ * by request.js's 401 handler.
+ *
+ * A session-less visit is harmless: logoutApi() 401s into its own catch,
+ * clearAuth() is idempotent, and keycloakLogoutUrl() falls back to client_id
+ * when there is no id_token — so the page still terminates at /login.
+ */
+const WHITE_LIST = ['/login', '/sso/callback', '/signout']
 /**
  * /invite/<token> 和 /reset-password/<token> 也是公开页面，但 token 是动态段，
  * 不能写进上面的精确匹配数组里。下面的守卫额外允许任意以这些前缀开头的路径，

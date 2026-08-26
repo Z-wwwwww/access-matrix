@@ -35,11 +35,17 @@ const { isPublicPath } = await import('@/router')
  *   /reset-password/{token} — SSO → password reverse migration
  *                             (SsoToPasswordMigrationService builds
  *                              baseUrl + "/reset-password/" + token)
+ *
+ * /signout is public for the opposite reason — its job is to end the session, so
+ * a session-less hit must render rather than bounce. It used to bounce, and the
+ * bounce carried `from=/signout`, which login/index.vue replays verbatim: the
+ * next successful sign-in landed back on /signout and signed the user out again.
  */
 describe('router public paths', () => {
   it.each([
     '/login',
     '/sso/callback',
+    '/signout',
     '/invite/01HZX9ABCDEF',
     '/reset-password/01HZX9ABCDEF'
   ])('%s is reachable without a session', (path) => {
