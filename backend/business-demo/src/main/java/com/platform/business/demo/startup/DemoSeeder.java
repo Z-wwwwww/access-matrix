@@ -322,16 +322,12 @@ public class DemoSeeder {
             t.setAssigneeUserId(adminId);
         }
 
-        // The seeder runs outside any HTTP request — there's no caller-side
-        // DataScopeHelper.apply, so the @DataScope guard on TaskMapper would
-        // throw under the dev/test profiles. Tag this thread's marker as if apply()
-        // had been called: insertions don't get filtered anyway.
-        DataScopeContext.markApplied(t);
-        try {
-            taskMapper.insert(t);
-        } finally {
-            DataScopeContext.clear();
-        }
+        // No DataScopeContext dance here any more. DataScopeAspect used to demand a
+        // marked argument on EVERY method of a @DataScope mapper, so this insert had
+        // to mark the ENTITY — an object that is not a wrapper and was never going to
+        // be scoped. The aspect now only gates methods that actually take a query
+        // wrapper, which is the only thing a caller can forget to scope.
+        taskMapper.insert(t);
     }
 
     private String resolveAdminUserId() {
