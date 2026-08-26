@@ -306,17 +306,45 @@ public class AuthService {
         // whatever X-Tenant-Id the refresh request happens to carry — otherwise
         // a missing/mismatched header would silently invalidate a legitimate
         // (already-rotated) token under the MyBatis-Plus tenant interceptor.
-        UserEntity user = userMapper.findByIdAndTenant(userId, holder.tenantId());
-        if (user == null) {
-            throw new BusinessException(ErrorCode.INVALID_TOKEN, "User not found");
+        //
+        // Passing holder.tenantId() to findByIdAndTenant is NOT enough on its own:
+        // MyBatis-Plus rewrites ALL SQL, hand-written @Select included (that is why
+        // PasswordResetTokenMapper / UserInviteMapper / TenantMapper carry
+        // @InterceptorIgnore), so the lookup also gets
+        // `AND tenant_id = <RequestContext.tenantId()>` — the header — appended, and
+        // two disagreeing predicates match nothing. rotate() has already GETDEL'd the
+        // token by this point, so the user is logged out for good: exactly the failure
+        // the comment above says it prevents. The permission / role loads inside
+        // issueTokens are scoped the same way and would otherwise mint a token with an
+        // empty scope claim. Re-establish the context on the token's tenant for the
+        // rest of the method, then restore (same shape as
+        // DynamicJobScheduler.loadEnabled).
+        RequestContext caller = RequestContext.current();
+        RequestContext.set(holder.tenantId(),
+                caller == null ? null : caller.getUserId(),
+                caller == null ? null : caller.getUsername(),
+                caller == null ? null : caller.getLocale(),
+                caller == null ? null : caller.getTraceId());
+        try {
+            UserEntity user = userMapper.findByIdAndTenant(userId, holder.tenantId());
+            if (user == null) {
+                throw new BusinessException(ErrorCode.INVALID_TOKEN, "User not found");
+            }
+            if (user.getStatus() == null || user.getStatus() != 1) {
+                throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "Account is disabled");
+            }
+            // Block refresh into a suspended tenant — otherwise a still-valid refresh
+            // token would keep minting access tokens after the tenant was suspended.
+            assertTenantActive(holder.tenantId());
+            return issueTokens(user);
+        } finally {
+            if (caller == null) {
+                RequestContext.clear();
+            } else {
+                RequestContext.set(caller.getTenantId(), caller.getUserId(), caller.getUsername(),
+                        caller.getLocale(), caller.getTraceId());
+            }
         }
-        if (user.getStatus() == null || user.getStatus() != 1) {
-            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "Account is disabled");
-        }
-        // Block refresh into a suspended tenant — otherwise a still-valid refresh
-        // token would keep minting access tokens after the tenant was suspended.
-        assertTenantActive(holder.tenantId());
-        return issueTokens(user);
     }
 
     public void logout(String refreshToken) {

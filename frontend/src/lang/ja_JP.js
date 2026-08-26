@@ -30,6 +30,9 @@ export default {
       notFound: '辞書または辞書項目が見つかりません',
       invalidValue: '不正な辞書値です'
     },
+    passwordReset: {
+      notApplied: 'パスワードを保存できませんでした。このリセットリンクは使用済みです。管理者に再発行を依頼してください。'
+    },
     opsuser: {
       usernameExists: 'ユーザー名は既に使われています',
       emailExists: 'このメールアドレスは既に使われています'

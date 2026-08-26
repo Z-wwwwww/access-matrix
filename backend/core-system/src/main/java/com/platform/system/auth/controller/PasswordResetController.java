@@ -1,6 +1,7 @@
 package com.platform.system.auth.controller;
 
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.error.BusinessException;
 import com.platform.core.common.error.ErrorCode;
 import com.platform.core.common.result.JsonResult;
@@ -130,54 +131,104 @@ public class PasswordResetController {
         //    the token across the bcrypt + KC.disableUser legs below.
         PasswordResetTokenEntity row = tokens.consume(token);
 
-        UserEntity user = userMapper.findByIdAndTenant(row.getUserId(), row.getTenantId());
-        if (user == null) {
-            // Shouldn't normally happen — the token references the user by id —
-            // but if it does (user was hard-deleted between mint and consume)
-            // we surface a generic NOT_FOUND rather than papering over it.
-            throw new BusinessException(ErrorCode.NOT_FOUND, "User no longer exists");
-        }
+        // 2. Everything after this point is tenant-scoped DB work, and the tenant it
+        //    must run under is the one the TOKEN names — never the one the request
+        //    header happens to carry.
+        //
+        //    MyBatis-Plus rewrites ALL SQL, hand-written @Select included, so every
+        //    statement below picks up `AND tenant_id = <RequestContext.tenantId()>`.
+        //    On this PRE-AUTH endpoint that value is the X-Tenant-Id header, which the
+        //    SPA derives from the subdomain — but the reset link is built from the
+        //    single global app.mail.base-url, so a first-time recipient (nothing in
+        //    localStorage, apex / reserved host) resolves it to the `demo` fallback.
+        //    That is the exact scenario PasswordResetTokenMapper's javadoc documents
+        //    and verified against the real DB. Its @InterceptorIgnore annotations got
+        //    the token lookup out of the way, but the next statements in the same
+        //    request were left scoped to the header:
+        //      - findByIdAndTenant(<user>, 'sozonext') plus an injected
+        //        tenant_id = 'demo' contradicts and returns null, so NOT_FOUND is
+        //        thrown AFTER the single-use token was already burned — the link is
+        //        dead and only an operator can mint another;
+        //      - and had it found the user, the UPDATE below would have matched 0 rows
+        //        while this method still returned 200, disabled the Keycloak user and
+        //        wrote a success audit row: no password anywhere, locked out of both.
+        //    Scoping to row.getTenantId() makes the injected predicate agree with the
+        //    explicit one. Snapshot + restore rather than clear(), same shape as
+        //    DynamicJobScheduler.loadEnabled.
+        RequestContext caller = RequestContext.current();
+        RequestContext.set(row.getTenantId(),
+                caller == null ? null : caller.getUserId(),
+                caller == null ? null : caller.getUsername(),
+                caller == null ? null : caller.getLocale(),
+                caller == null ? null : caller.getTraceId());
+        try {
+            UserEntity user = userMapper.findByIdAndTenant(row.getUserId(), row.getTenantId());
+            if (user == null) {
+                // Shouldn't normally happen — the token references the user by id —
+                // but if it does (user was hard-deleted between mint and consume)
+                // we surface a generic NOT_FOUND rather than papering over it.
+                throw new BusinessException(ErrorCode.NOT_FOUND, "User no longer exists");
+            }
 
-        // 2. Stamp the new bcrypt hash AND detach from Keycloak in one UPDATE.
-        //    UpdateWrapper for two reasons:
-        //      - setting fields to NULL via the entity setter loses to MP's
-        //        NOT_NULL field strategy (the SET column gets omitted from
-        //        the UPDATE statement entirely).
-        //      - keeps password_hash + keycloak_id atomic; if either alone
-        //        landed the row would be in a half-migrated state.
-        String newHash = encoder.encode(req.password());
-        userMapper.update(null,
-                new UpdateWrapper<UserEntity>()
-                        .eq("id", user.getId())
-                        .eq("tenant_id", user.getTenantId())
-                        .set("password_hash", newHash)
-                        .set("keycloak_id",   null)
-                        .set("update_user",   "password-reset")
-                        .set("update_time",   OffsetDateTime.now()));
+            // 3. Stamp the new bcrypt hash AND detach from Keycloak in one UPDATE.
+            //    UpdateWrapper for two reasons:
+            //      - setting fields to NULL via the entity setter loses to MP's
+            //        NOT_NULL field strategy (the SET column gets omitted from
+            //        the UPDATE statement entirely).
+            //      - keeps password_hash + keycloak_id atomic; if either alone
+            //        landed the row would be in a half-migrated state.
+            String newHash = encoder.encode(req.password());
+            int applied = userMapper.update(null,
+                    new UpdateWrapper<UserEntity>()
+                            .eq("id", user.getId())
+                            .eq("tenant_id", user.getTenantId())
+                            .set("password_hash", newHash)
+                            .set("keycloak_id",   null)
+                            .set("update_user",   "password-reset")
+                            .set("update_time",   OffsetDateTime.now()));
+            if (applied == 0) {
+                // The row was read one statement ago, so 0 means the write was scoped
+                // away or the user vanished mid-request. Never fall through: step 4
+                // disables the Keycloak identity, and reporting success for a password
+                // that was not written leaves the user with no way in at all.
+                log.error("[reset] password write matched no row for user {} (tenant {}) — "
+                                + "Keycloak identity left intact, token is spent",
+                        user.getId(), row.getTenantId());
+                throw new BusinessException(ErrorCode.BUSINESS_ERROR,
+                        "error.passwordReset.notApplied");
+            }
 
-        // 3. Disable the KC user so the IdP side can no longer issue
-        //    tokens for this identity. Best-effort: if KC is unreachable
-        //    the local password is already written and the user can log
-        //    in; we just log the orphan KC user for the operator to clean
-        //    up later.
-        KeycloakUserService kc = keycloakProvider.getIfAvailable();
-        if (kc != null && row.getKeycloakId() != null && !row.getKeycloakId().isBlank()) {
-            try {
-                kc.disableUser(row.getTenantId(), row.getKeycloakId());
-            } catch (Exception e) {
-                log.warn("[reset] could not disable orphan KC user {} in realm {} ({})",
-                        row.getKeycloakId(), row.getTenantId(), e.toString());
+            // 4. Disable the KC user so the IdP side can no longer issue
+            //    tokens for this identity. Best-effort: if KC is unreachable
+            //    the local password is already written and the user can log
+            //    in; we just log the orphan KC user for the operator to clean
+            //    up later.
+            KeycloakUserService kc = keycloakProvider.getIfAvailable();
+            if (kc != null && row.getKeycloakId() != null && !row.getKeycloakId().isBlank()) {
+                try {
+                    kc.disableUser(row.getTenantId(), row.getKeycloakId());
+                } catch (Exception e) {
+                    log.warn("[reset] could not disable orphan KC user {} in realm {} ({})",
+                            row.getKeycloakId(), row.getTenantId(), e.toString());
+                }
+            }
+
+            recordAudit(row.getTenantId(), user.getId(), user.getUsername(), req0);
+
+            log.info("[reset] user {} (tenant {}) completed SSO → password reset",
+                    user.getId(), row.getTenantId());
+
+            return JsonResult.ok(Map.of(
+                    "loginUrl", mailProps.baseUrl() + "/login"
+            ));
+        } finally {
+            if (caller == null) {
+                RequestContext.clear();
+            } else {
+                RequestContext.set(caller.getTenantId(), caller.getUserId(), caller.getUsername(),
+                        caller.getLocale(), caller.getTraceId());
             }
         }
-
-        recordAudit(row.getTenantId(), user.getId(), user.getUsername(), req0);
-
-        log.info("[reset] user {} (tenant {}) completed SSO → password reset",
-                user.getId(), row.getTenantId());
-
-        return JsonResult.ok(Map.of(
-                "loginUrl", mailProps.baseUrl() + "/login"
-        ));
     }
 
     /**

@@ -23,6 +23,9 @@ export default {
       notFound: '사전 또는 항목을 찾을 수 없습니다',
       invalidValue: '잘못된 사전 값입니다'
     },
+    passwordReset: {
+      notApplied: '비밀번호를 저장하지 못했습니다. 이 재설정 링크는 이미 사용되었습니다. 관리자에게 재발급을 요청하세요.'
+    },
     opsuser: {
       usernameExists: '이미 사용 중인 사용자명입니다',
       emailExists: '이미 사용 중인 이메일입니다'

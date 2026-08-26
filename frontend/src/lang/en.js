@@ -23,6 +23,9 @@ export default {
       notFound: 'Dictionary or item not found',
       invalidValue: 'Invalid dictionary value'
     },
+    passwordReset: {
+      notApplied: 'The password could not be saved. Your reset link has been used up — ask an administrator for a new one.'
+    },
     opsuser: {
       usernameExists: 'That username is already taken',
       emailExists: 'That email is already in use'

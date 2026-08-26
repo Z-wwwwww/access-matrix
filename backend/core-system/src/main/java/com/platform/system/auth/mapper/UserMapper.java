@@ -10,10 +10,17 @@ import org.apache.ibatis.annotations.Select;
 public interface UserMapper extends BaseMapper<UserEntity> {
 
     /**
-     * Login identifier lookup. The MyBatis-Plus tenant interceptor only rewrites
-     * generated SQL — this is a hand-written {@code @Select}, so we filter
-     * {@code tenant_id} explicitly. Caller (AuthService) reads the active
-     * tenant from {@code RequestContext} (X-Tenant-Id header pre-auth).
+     * Login identifier lookup. {@code tenant_id} is filtered explicitly so the SQL
+     * reads correctly on its own; the caller (AuthService) passes the active tenant
+     * from {@code RequestContext} (X-Tenant-Id header pre-auth).
+     *
+     * <p>Note that the explicit predicate is NOT what keeps the interceptor out:
+     * MyBatis-Plus rewrites ALL SQL, hand-written {@code @Select} included, so this
+     * statement also gets {@code AND tenant_id = <RequestContext.tenantId()>}
+     * appended. It is harmless here only because both predicates carry the same
+     * value. Any lookup that must run under a tenant OTHER than the request's needs
+     * {@code @InterceptorIgnore(tenantLine = "true")} or a re-established context —
+     * see {@link #findByIdAndTenant} and {@code PasswordResetTokenMapper}.
      */
     @Select("""
             SELECT * FROM core_auth_user
@@ -31,9 +38,15 @@ public interface UserMapper extends BaseMapper<UserEntity> {
      * payload, not the request's {@code X-Tenant-Id} header — otherwise a
      * mismatched / missing header would burn a freshly-rotated refresh token.
      *
-     * <p>Hand-written {@code @Select} so the MyBatis-Plus tenant interceptor
-     * does NOT rewrite the {@code tenant_id} predicate from the request's
-     * context.
+     * <p><b>Hand-written {@code @Select} does NOT keep the tenant interceptor out.</b>
+     * MyBatis-Plus rewrites every statement it can parse, so this one also receives
+     * {@code AND tenant_id = <RequestContext.tenantId()>}. This is the one lookup in
+     * the file whose tenant argument deliberately differs from the request's, so both
+     * of its callers re-establish {@code RequestContext} on the authoritative tenant
+     * first ({@code AuthService.refresh} from the refresh-token payload,
+     * {@code PasswordResetController.accept} from the consumed reset token). Without
+     * that the two predicates contradict, the lookup returns null, and a single-use
+     * credential that was already spent one statement earlier is lost.
      */
     @Select("""
             SELECT * FROM core_auth_user
@@ -50,10 +63,12 @@ public interface UserMapper extends BaseMapper<UserEntity> {
      * The (tenant_id, keycloak_id) pair has a partial unique index (see V21),
      * so this should return at most one row.
      *
-     * <p>Hand-written {@code @Select} — tenant_id is filtered explicitly so
-     * the MyBatis-Plus tenant interceptor doesn't rewrite the predicate from
-     * the request context (the caller is the auth filter, which runs BEFORE
-     * the request context is finalised).
+     * <p>{@code tenant_id} is filtered explicitly; the interceptor appends its own
+     * predicate on top (it rewrites hand-written SQL too — see
+     * {@link #findByIdAndTenant}). The two agree because
+     * {@code CoreRequestContextFilter} sets the context from the JWT {@code tid}
+     * BEFORE invoking the OIDC resolver, which is exactly why that ordering is
+     * load-bearing.
      */
     @Select("""
             SELECT * FROM core_auth_user

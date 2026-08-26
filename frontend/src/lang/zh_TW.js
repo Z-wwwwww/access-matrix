@@ -23,6 +23,9 @@ export default {
       notFound: '字典或字典項不存在',
       invalidValue: '無效的字典值'
     },
+    passwordReset: {
+      notApplied: '密碼未能儲存。此重設連結已被使用，請聯絡管理員重新發送。'
+    },
     opsuser: {
       usernameExists: '使用者名稱已被佔用',
       emailExists: '該信箱已被佔用'

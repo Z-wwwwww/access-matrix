@@ -122,6 +122,11 @@ class PreAuthCredentialAuditTest {
         user.setUsername("alice");
         user.setMark(1);
         when(userMapper.findByIdAndTenant("ULID-USER", "acme")).thenReturn(user);
+        // accept() now refuses (skipping the audit + the Keycloak disable) when the
+        // password UPDATE matches no row, instead of reporting success for a password
+        // it never stored — so the write has to report a row here. See
+        // PasswordResetTenantScopeTest.
+        when(userMapper.update(any(), any())).thenReturn(1);
 
         new PasswordResetController(tokens, userMapper, encoder, passwordPolicy,
                 kcProvider, mailProps, opLogSink, clientIpResolver)
@@ -164,6 +169,11 @@ class PreAuthCredentialAuditTest {
         user.setTenantId("acme");
         user.setUsername("alice");
         when(userMapper.findByIdAndTenant("ULID-USER", "acme")).thenReturn(user);
+        // accept() now refuses (skipping the audit + the Keycloak disable) when the
+        // password UPDATE matches no row, instead of reporting success for a password
+        // it never stored — so the write has to report a row here. See
+        // PasswordResetTenantScopeTest.
+        when(userMapper.update(any(), any())).thenReturn(1);
 
         var resp = new PasswordResetController(tokens, userMapper, encoder, passwordPolicy,
                 kcProvider, mailProps, opLogSink, clientIpResolver)
