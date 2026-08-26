@@ -11,7 +11,7 @@
  * 首次 ensureInit 整体 reassign 场景下偶发的下游 computed 不重算问题
  * （症状：点击收藏后需刷新页面才能置顶 / 取消后星星状态不刷新）。
  */
-import { reactive, watch } from 'vue'
+import { effectScope, reactive, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 
 const STORAGE_PREFIX = 'menu-favorites:'
@@ -19,6 +19,27 @@ const STORAGE_PREFIX = 'menu-favorites:'
 const favoriteSet = reactive(new Set())
 let currentUserId = null
 let initialized = false
+
+/**
+ * DETACHED scope for the account watcher — deliberately not the component's.
+ *
+ * `ensureInit()` runs from whichever component calls `useFavoriteMenus()` first
+ * (AppSidebar), i.e. inside that component's `setup()`. A bare `watch()` there
+ * is owned by THAT component's effect scope and Vue stops it on unmount — while
+ * `initialized` stays true forever, so it is never re-created. AppSidebar does
+ * unmount in normal use: `AppLayout` renders it behind
+ * `v-if="!hideSidebar"` (any route with `meta.hideSidebar`), and signing out is
+ * a client-side `router.replace('/login')` in password mode, which tears the
+ * whole layout down without a page load.
+ *
+ * With the watcher gone, the next account switch on the same page load was
+ * missed entirely: the new user saw the PREVIOUS user's starred menus, and
+ * their first star toggle wrote that set to `menu-favorites:<previous user id>`
+ * — silently overwriting someone else's saved favorites. A detached scope is
+ * never collected by a parent, so the watcher lives as long as the module state
+ * it maintains.
+ */
+const accountScope = effectScope(true)
 
 function storageKey(userId) {
   return userId ? `${STORAGE_PREFIX}${userId}` : null
@@ -62,13 +83,16 @@ function ensureInit() {
   currentUserId = auth.userId || null
   loadFavorites(currentUserId)
 
-  watch(
-    () => auth.userId,
-    (uid) => {
-      currentUserId = uid || null
-      loadFavorites(currentUserId)
-    }
-  )
+  // See accountScope — this must NOT be owned by the calling component.
+  accountScope.run(() => {
+    watch(
+      () => auth.userId,
+      (uid) => {
+        currentUserId = uid || null
+        loadFavorites(currentUserId)
+      }
+    )
+  })
 }
 
 export function useFavoriteMenus() {
