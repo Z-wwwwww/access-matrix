@@ -69,6 +69,7 @@ class TenantAdminServiceTest {
     @Mock JdbcTemplate jdbc;
     @Mock com.platform.system.auth.service.SessionTerminationService sessionTermination;
     @Mock com.platform.system.rbac.service.BuiltInRoleLookup roleLookup;
+    @Mock com.platform.system.rbac.service.PermissionCacheService permissionCacheService;
 
     private ObjectProvider<KeycloakRealmService> realmServiceProvider;
     private ObjectProvider<KeycloakUserService> userServiceProvider;
@@ -99,7 +100,8 @@ class TenantAdminServiceTest {
 
         service = new TenantAdminService(tenantMapper, realmServiceProvider, userServiceProvider,
                 numberingService, rbacSeederService, inviteTokenService,
-                mailProvider, mailProps, jdbc, selfProvider, sessionTermination, roleLookup);
+                mailProvider, mailProps, jdbc, selfProvider, sessionTermination, roleLookup,
+                permissionCacheService);
         // In-process self-proxy: persistNewTenant runs directly on the same
         // instance (no real transaction in a unit test — interactions still verify).
         when(selfProvider.getObject()).thenReturn(service);
@@ -447,6 +449,26 @@ class TenantAdminServiceTest {
         service.hardDelete("id-acme", "acme");
 
         verify(roleLookup).invalidate("acme");
+    }
+
+    // The second cache keyed by TENANT CODE, and the one that was missed.
+    // deptTree is @Cacheable(key = "#tenantId") with a 30-minute TTL
+    // (app.cache.specs), so after a hard-delete its rows are gone from
+    // core_rbac_dept while the cached tree survives — and a re-create of the
+    // same code (the supported workflow the test above exists for) serves the
+    // DELETED tenant's departments to the NEW tenant's admin, in /dept/tree and
+    // in every picker built on it. Picking one writes a dept_id matching no row,
+    // and DataScopeQueryService then resolves a null path and falls back to that
+    // dangling id, so the user silently sees nothing.
+    @Test
+    void hardDelete_invalidatesTheTenantKeyedDeptCaches() {
+        TenantEntity row = row("id-acme", "acme");
+        row.setStatus(0);
+        when(tenantMapper.selectById("id-acme")).thenReturn(row);
+
+        service.hardDelete("id-acme", "acme");
+
+        verify(permissionCacheService).evictAllDepts();
     }
 
     @Test

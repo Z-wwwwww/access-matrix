@@ -19,6 +19,7 @@ import com.platform.system.auth.service.InviteTokenService;
 import com.platform.system.auth.service.SessionTerminationService;
 import com.platform.system.platform.dto.TenantDto;
 import com.platform.system.rbac.service.BuiltInRoleLookup;
+import com.platform.system.rbac.service.PermissionCacheService;
 import com.platform.system.platform.entity.TenantEntity;
 import com.platform.system.platform.mapper.TenantMapper;
 import com.platform.system.rbac.service.RbacSeederService;
@@ -180,6 +181,8 @@ public class TenantAdminService {
      * {@link #create} and {@link #hardDelete}.
      */
     private final BuiltInRoleLookup roleLookup;
+    /** Dept caches are keyed by TENANT CODE, so a hard-delete has to clear them — see hardDelete. */
+    private final PermissionCacheService permissionCacheService;
 
     public TenantAdminService(TenantMapper tenantMapper,
                               ObjectProvider<KeycloakRealmService> realmServiceProvider,
@@ -192,7 +195,8 @@ public class TenantAdminService {
                               JdbcTemplate jdbc,
                               ObjectProvider<TenantAdminService> self,
                               SessionTerminationService sessionTermination,
-                              BuiltInRoleLookup roleLookup) {
+                              BuiltInRoleLookup roleLookup,
+                              PermissionCacheService permissionCacheService) {
         this.tenantMapper = tenantMapper;
         this.realmServiceProvider = realmServiceProvider;
         this.userServiceProvider = userServiceProvider;
@@ -205,6 +209,7 @@ public class TenantAdminService {
         this.self = self;
         this.sessionTermination = sessionTermination;
         this.roleLookup = roleLookup;
+        this.permissionCacheService = permissionCacheService;
     }
 
     public PageResult<TenantDto.View> list(long page, long size, String keyword, Integer status) {
@@ -914,6 +919,20 @@ public class TenantAdminService {
         // re-role them, assignRoles stops refusing a second SUPER_ADMIN holder, and the
         // break-glass exemption clears their password_hash on first SSO bind.
         roleLookup.invalidate(tenantCode);
+        // Same reasoning, second cache: deptTree is @Cacheable(key = "#tenantId")
+        // — keyed by the tenant CODE, which the re-create reuses — and it holds
+        // for 30 minutes (app.cache.specs). Its rows are gone from
+        // core_rbac_dept by now, but the cached tree survives, so the NEW
+        // tenant's admin is served the DELETED tenant's departments in
+        // /dept/tree and in every picker built on it (DeptPicker,
+        // DeptTreeDialog, the user editor). Worse than cosmetic: picking one
+        // writes a dept_id that matches no row, and DataScopeQueryService then
+        // resolves a null path and falls back to that dangling id — the user
+        // silently sees nothing. evictAllDepts is the same hammer
+        // DeptAdminService swings on any dept write; a tenant hard-delete is at
+        // least as structural, and rare enough that the re-resolve cost is
+        // irrelevant.
+        permissionCacheService.evictAllDepts();
 
         log.warn("[tenant] HARD DELETE complete for '{}' (id={})", tenantCode, id);
     }
