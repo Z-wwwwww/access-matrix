@@ -401,6 +401,154 @@ public class ArchitectureTest {
                 .isEmpty();
     }
 
+    /**
+     * Mapper statements that carry their OWN {@code tenant_id = #{...}} predicate
+     * and are known to be safe because the ambient {@code RequestContext} names the
+     * same tenant. Listed one method at a time, as
+     * {@code SimpleClassName#methodName}.
+     *
+     * <p>The rule below exists because "hand-written SQL is not rewritten by the
+     * tenant interceptor" is FALSE and was written into several javadocs as though
+     * it were true. MyBatis-Plus rewrites every statement it can parse, so a
+     * hand-written {@code @Select} gets {@code AND tenant_id =
+     * <RequestContext.tenantId()>} appended ON TOP of its own predicate. Two
+     * predicates that name different tenants match nothing — and a thread with no
+     * context at all is worse than unscoped, because the handler falls back to
+     * {@code demo} and the statement silently reads the WRONG tenant.
+     *
+     * <p>It has bitten three times: the invite / password-reset token lookups (fixed
+     * with {@code @InterceptorIgnore}), the user lookup that the reset flow and
+     * {@code AuthService.refresh} drive off a token's tenant (fixed by
+     * re-establishing the context), and the notification unread count that the
+     * header-less SSE stream reads (fixed with {@code @InterceptorIgnore}). So every
+     * new statement of this shape must make a deliberate choice: annotate it, or add
+     * it here with the reason its two predicates agree.
+     */
+    private static final Set<String> TENANT_PREDICATE_MATCHES_CONTEXT = Set.of(
+            // Login / OIDC-JIT lookups. CoreRequestContextFilter sets the context from
+            // the JWT `tid` (or the X-Tenant-Id header pre-auth) BEFORE these run, and
+            // the callers pass that same value — which is exactly why that ordering in
+            // the filter is load-bearing.
+            "UserMapper#findByIdentifier",
+            "UserMapper#findByKeycloakIdAndTenant",
+            "UserMapper#countDeletedByKeycloakIdAndTenant",
+            "UserMapper#findByUsernameAndTenant",
+            "PasswordResetTokenMapper#countConsumedByUser",
+            // The one lookup whose tenant argument deliberately differs from the
+            // request's. Both callers (AuthService.refresh, from the refresh-token
+            // payload; PasswordResetController.accept, from the consumed reset token)
+            // re-establish RequestContext on that tenant first, so the injected
+            // predicate agrees. See the method's own javadoc.
+            "UserMapper#findByIdAndTenant",
+            // RBAC reads, all driven from a request already scoped to that tenant.
+            "DeptMapper#findSubtreeIds",
+            "DeptMapper#findSubtreeIdsAnyStatus",
+            "DeptMapper#findAllForTenant",
+            "DeptMapper#reRootDescendants",
+            "MenuMapper#findMenusByUserId",
+            "PermissionMapper#findPermissionCodesByUserId",
+            "RoleDeptMapper#findDeptIdsByRoleId",
+            "RoleDeptMapper#findActiveDeptIdsByRoleId",
+            "RoleMapper#findRoleIdsByUserId",
+            "RoleMapper#findRolesByUserId",
+            "RoleMenuMapper#findActiveMenuIdsByRoleId",
+            "RolePermissionMapper#findActivePermissionIdsByRoleId",
+            "UserRoleMapper#findUserIdsByRoleId",
+            "UserRoleMapper#findActiveRoleIdsByUserId",
+            "UserRoleMapper#existsActiveLink",
+            "UserRoleMapper#countActiveHoldersByRoleId",
+            "UserRoleMapper#countLiveRoles",
+            // Scheduler config, read/written only under the 'system' tenant, for which
+            // MybatisPlusConfig.ignoreTable bypasses injection on every table.
+            "CoreJobMapper#findAnyByCode",
+            "CoreJobMapper#revive"
+    );
+
+    /** The SQL a MyBatis statement annotation carries, or "" when there is none. */
+    private static String statementSql(Method m) {
+        StringBuilder sb = new StringBuilder();
+        for (Annotation a : m.getAnnotations()) {
+            String n = a.annotationType().getName();
+            if (!n.startsWith("org.apache.ibatis.annotations.")) continue;
+            String simple = a.annotationType().getSimpleName();
+            if (!simple.equals("Select") && !simple.equals("Update")
+                    && !simple.equals("Insert") && !simple.equals("Delete")) continue;
+            try {
+                for (String part : (String[]) a.annotationType().getMethod("value").invoke(a)) {
+                    sb.append(part).append('\n');
+                }
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException("cannot read SQL off " + m, e);
+            }
+        }
+        return sb.toString();
+    }
+
+    /** Names bound with {@code @Param} on this method. */
+    private static Set<String> paramNames(Method m) {
+        Set<String> out = new LinkedHashSet<>();
+        for (Annotation[] anns : m.getParameterAnnotations()) {
+            for (Annotation a : anns) {
+                if (!(a instanceof org.apache.ibatis.annotations.Param p)) continue;
+                out.add(p.value());
+            }
+        }
+        return out;
+    }
+
+    @Test
+    @DisplayName("Hand-written tenant-scoped mapper statements declare how they survive the tenant interceptor")
+    void handwritten_tenant_scoped_statements_declare_their_stance() {
+        List<String> undeclared = new ArrayList<>();
+        int inspected = 0;
+        for (Class<?> mapper : mappers) {
+            for (Method m : mapper.getDeclaredMethods()) {
+                String sql = statementSql(m);
+                if (sql.isEmpty()) continue;
+                Set<String> params = paramNames(m);
+                boolean scopesItself = params.stream()
+                        .filter(n -> n.equals("tenantId") || n.equals("tenantCode"))
+                        .anyMatch(n -> sql.contains("tenant_id = #{" + n + "}"));
+                if (!scopesItself) continue;
+                inspected++;
+                String key = mapper.getSimpleName() + "#" + m.getName();
+                boolean ignores = m.isAnnotationPresent(InterceptorIgnore.class)
+                        && "true".equals(m.getAnnotation(InterceptorIgnore.class).tenantLine());
+                if (!ignores && !TENANT_PREDICATE_MATCHES_CONTEXT.contains(key)) {
+                    undeclared.add(key);
+                }
+            }
+        }
+        assertThat(inspected)
+                .as("the detector must actually find statements — a rename of the @Param "
+                        + "convention would make this rule silently vacuous")
+                .isGreaterThan(10);
+        assertThat(undeclared)
+                .as("These statements carry their own tenant_id predicate, and the tenant "
+                        + "interceptor appends a SECOND one from RequestContext (it rewrites "
+                        + "hand-written SQL too). Either add @InterceptorIgnore(tenantLine=\"true\") "
+                        + "when the argument is authoritative, or list the method in "
+                        + "TENANT_PREDICATE_MATCHES_CONTEXT with the reason the two agree.")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("The tenant-predicate allowlist does not rot")
+    void tenant_predicate_allowlist_must_not_rot() {
+        Set<String> live = new LinkedHashSet<>();
+        for (Class<?> mapper : mappers) {
+            for (Method m : mapper.getDeclaredMethods()) {
+                live.add(mapper.getSimpleName() + "#" + m.getName());
+            }
+        }
+        List<String> stale = TENANT_PREDICATE_MATCHES_CONTEXT.stream()
+                .filter(k -> !live.contains(k)).sorted().toList();
+        assertThat(stale)
+                .as("allowlist entries for methods that no longer exist — delete them so the "
+                        + "list keeps meaning what it says")
+                .isEmpty();
+    }
+
     // ─── module boundaries ────────────────────────────────────────────
     //
     // These two were listed in backend/AGENTS.md as already enforced here
