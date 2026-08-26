@@ -180,6 +180,7 @@ ops 以目标租户 SUPER_ADMIN 身份操作 30 分钟(`tenant.impersonate.start
 **测试点**
 - [ ] 发起支持会话 → 顶部红色横幅 + 倒计时;能以租户身份操作。
 - [ ] 安全面板「支持会话进行中」= 真正在线数;退出后立刻归零(不再卡 30 分钟)。
+- [ ] **支持会话「过期」结束后不会留下幽灵会话(bug 修复)**:发起一次支持会话,然后**不点「退出」**,等 30 分钟 token 过期(或直接让后端踢掉它)→ 下一次请求 401 会把人弹回 `/login`;**重新以 ops 身份登录后**,应当:① 顶部**没有**红色支持会话横幅;② 能正常发起新的支持会话;③ token 到期能自动续期(不会每次都被踢去重登);④ `localStorage.tenant_id` 是 `system` 而不是刚才被模拟的租户。此前 `clearAuth()` 清了 `access_token` / `id_token` / `kc_refresh_token` 和标签页,却**没清 4 个 `support_*` key**,而这条路正是支持会话「自然到期」的必经之路 —— 会话 token 过期 → 401 → `doRefresh()` 按设计直接 `throw new Error('support session expired')`(它必须拒绝,否则会把支持 token 换回 ops 身份)→ `request.js` `clearAuth()` + 跳登录。于是下次登录**继承了一个幽灵会话**:`isSupportSession` 直接读 `localStorage.support_orig_access_token`,依然为 true —— 横幅带着已过期的倒计时回来、`doRefresh()` 从此**永远**拒绝续期(每次 token 到期都被迫重登)、`scheduleKcRefresh()` 直接 return 不再预约、`enterSupportSession()` 抛「already in a support session」拒绝再开一个,而且 `tenant_id` 还停在被模拟的租户上(连 realm URL 和 `X-Tenant-Id` 都是错的)。触发条件不过是「运维发起支持会话后走开」。修法:抽出 `clearSupportSession()`(把 `tenant_id` 还原成 ops 的值 + 删掉 4 个 key + bump 响应式计数),`terminateSupportSession()`(还额外还原两个 token)与 `clearAuth()` 共用它。由 `stores/auth.test.js` 新增 5 条钉住(进入时正确暂存、正常退出还原、**clearAuth 也要拆干净**、拆完之后续期与再次发起都恢复正常、非支持会话下 clearAuth 不动 `tenant_id`),已实测把 `clearAuth` 里那一行拿掉即 2 条变红,其中一条的报错就是 `promise rejected "Error: support session expired" instead of resolving`。
 - [ ] 最近会话列表:在线绿点 / 已结束灰点。
 - [ ] **仅** `system` 不可被模拟(无业务 SUPER_ADMIN);`demo` 作为普通租户可被模拟。
 

@@ -194,3 +194,88 @@ describe('proactive KC refresh timer', () => {
     expect(refreshTokens).not.toHaveBeenCalled()
   })
 })
+
+describe('support session teardown', () => {
+  /** Put the store into an active support session on tenant "acme". */
+  function enterAcmeSupportSession() {
+    localStorageStub.setItem('access_token', makeJwt({ exp: expIn(600), tid: 'system' }))
+    localStorageStub.setItem('id_token', 'ops-id-token')
+    localStorageStub.setItem('tenant_id', 'system')
+    const store = useAuthStore()
+    store.enterSupportSession(makeJwt({ exp: expIn(1800), tid: 'acme' }), {
+      sessionId: 'S1', tenantCode: 'acme', displayName: 'ACME', expiresAt: '2099-01-01T00:00:00Z'
+    })
+    return store
+  }
+
+  it('entering stashes the ops identity and switches tenant', () => {
+    const store = enterAcmeSupportSession()
+
+    expect(store.isSupportSession).toBe(true)
+    expect(localStorageStub.getItem('support_orig_tenant_id')).toBe('system')
+    expect(localStorageStub.getItem('tenant_id')).toBe('acme')
+  })
+
+  it('terminating restores the ops token and tenant', () => {
+    const store = enterAcmeSupportSession()
+    const opsToken = localStorageStub.getItem('support_orig_access_token')
+
+    expect(store.terminateSupportSession()).toBe(true)
+
+    expect(store.isSupportSession).toBe(false)
+    expect(localStorageStub.getItem('access_token')).toBe(opsToken)
+    expect(localStorageStub.getItem('tenant_id')).toBe('system')
+    expect(localStorageStub.getItem('support_session_info')).toBeNull()
+  })
+
+  // The bug: a support session that ends by EXPIRY rather than by clicking
+  // "exit" goes through clearAuth (its 401 → doRefresh refuses by design →
+  // request.js clears auth and bounces to /login). clearAuth left every
+  // support_* key in place, so the next login inherited a phantom session.
+  it('clearAuth tears the session down too — the expiry path, not just "exit"', () => {
+    const store = enterAcmeSupportSession()
+
+    store.clearAuth()
+
+    expect(store.isSupportSession)
+      .toBe(false)
+    expect(store.supportSessionInfo).toBeNull()
+    for (const key of ['support_orig_access_token', 'support_orig_id_token',
+                       'support_orig_tenant_id', 'support_session_info']) {
+      expect(localStorageStub.getItem(key), key).toBeNull()
+    }
+    // tenant_id must go back to the ops value, or the next login resolves its
+    // realm URL and X-Tenant-Id against the tenant that was impersonated.
+    expect(localStorageStub.getItem('tenant_id')).toBe('system')
+  })
+
+  it('after clearAuth the store is usable again — refresh works and a new session can start', async () => {
+    const store = enterAcmeSupportSession()
+    store.clearAuth()
+
+    // Log back in as ops.
+    localStorageStub.setItem('kc_refresh_token', 'rt1')
+    refreshTokens.mockResolvedValue({ accessToken: 'a2', refreshToken: 'rt2' })
+    const fresh = useAuthStore()
+    fresh.setAccessToken?.(makeJwt({ exp: expIn(600), tid: 'system' }))
+
+    // doRefresh refuses outright while isSupportSession is true — the phantom
+    // session made every refresh fail for the life of the browser profile.
+    await expect(fresh.refresh()).resolves.toBeUndefined()
+
+    // And a second support session must be startable.
+    expect(() => fresh.enterSupportSession(makeJwt({ exp: expIn(1800) }), {
+      sessionId: 'S2', tenantCode: 'beta', displayName: 'BETA', expiresAt: '2099-01-01T00:00:00Z'
+    })).not.toThrow()
+  })
+
+  it('clearAuth on a plain (non-support) session is a no-op for tenant_id', () => {
+    localStorageStub.setItem('access_token', makeJwt({ exp: expIn(600) }))
+    localStorageStub.setItem('tenant_id', 'acme')
+    const store = useAuthStore()
+
+    store.clearAuth()
+
+    expect(localStorageStub.getItem('tenant_id')).toBe('acme')
+  })
+})

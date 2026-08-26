@@ -80,6 +80,17 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function clearAuth() {
+    // A support session that ends by EXPIRY rather than by clicking "exit"
+    // lands here: its 401 reaches doRefresh, which refuses by design, so
+    // request.js clears auth and bounces to /login. That is the ordinary way a
+    // session ends when the operator walks away — and leaving the support_*
+    // keys behind made the NEXT login inherit a phantom one. isSupportSession
+    // reads support_orig_access_token straight out of localStorage, so it stayed
+    // true: the banner came back with a dead countdown, doRefresh refused every
+    // refresh from then on, scheduleKcRefresh never armed, enterSupportSession
+    // refused to start another session at all, and tenant_id still pointed at
+    // the impersonated tenant so even the realm URL was wrong.
+    clearSupportSession()
     accessToken.value = ''
     idToken.value     = ''
     userInfo.value    = null
@@ -302,26 +313,39 @@ export const useAuthStore = defineStore('auth', () => {
   function terminateSupportSession() {
     const origAccess = localStorage.getItem(SUPPORT_ORIG_ACCESS_KEY)
     if (origAccess == null) return false   // not in a support session
-    const origId     = localStorage.getItem(SUPPORT_ORIG_ID_KEY) || ''
-    const origTenant = localStorage.getItem(SUPPORT_ORIG_TENANT_KEY) || ''
+    const origId = localStorage.getItem(SUPPORT_ORIG_ID_KEY) || ''
 
     setAccessToken(origAccess)
     setIdToken(origId)
-    if (origTenant) localStorage.setItem(TENANT_LS_KEY, origTenant)
-    else            localStorage.removeItem(TENANT_LS_KEY)
-    clearTenantCache()
     userInfo.value = null
-
-    localStorage.removeItem(SUPPORT_ORIG_ACCESS_KEY)
-    localStorage.removeItem(SUPPORT_ORIG_ID_KEY)
-    localStorage.removeItem(SUPPORT_ORIG_TENANT_KEY)
-    localStorage.removeItem(SUPPORT_SESSION_KEY)
+    clearSupportSession()   // tenant_id back to ops + drop the support_* keys
     // Drop the support identity's open tabs for the same reason as on entry:
     // tenant pages opened during the session would otherwise linger as 404
     // tabs once we're back on the ops menu. Rebuilt from the ops landing route.
     sessionStorage.removeItem('access_matrix_tabs')
-    supportSessionBump.value++
     scheduleKcRefresh()   // ops token restored — re-arm the proactive refresh
+    return true
+  }
+
+  /**
+   * Put {@code tenant_id} back to the ops value and drop the support-session
+   * bookkeeping. Shared by {@link terminateSupportSession} — which additionally
+   * restores the stashed tokens — and by {@link clearAuth}, which is discarding
+   * every token anyway but must not leave the flags behind.
+   *
+   * @returns true if a support session was actually torn down
+   */
+  function clearSupportSession() {
+    if (localStorage.getItem(SUPPORT_ORIG_ACCESS_KEY) === null) return false
+    const origTenant = localStorage.getItem(SUPPORT_ORIG_TENANT_KEY) || ''
+    if (origTenant) localStorage.setItem(TENANT_LS_KEY, origTenant)
+    else            localStorage.removeItem(TENANT_LS_KEY)
+    clearTenantCache()
+    localStorage.removeItem(SUPPORT_ORIG_ACCESS_KEY)
+    localStorage.removeItem(SUPPORT_ORIG_ID_KEY)
+    localStorage.removeItem(SUPPORT_ORIG_TENANT_KEY)
+    localStorage.removeItem(SUPPORT_SESSION_KEY)
+    supportSessionBump.value++
     return true
   }
 
