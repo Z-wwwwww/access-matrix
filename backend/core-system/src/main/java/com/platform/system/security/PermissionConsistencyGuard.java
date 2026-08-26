@@ -180,14 +180,20 @@ public class PermissionConsistencyGuard {
     }
 
     private void upsert(String code) {
-        // 念のため soft-deleted (mark=0) 行が同 code で残っていれば復活させる。
-        // 過去に手動で SET mark=0 した残骸、または孤児追従で消したものを再度宣言した場合への対応。
+        // 同 code の <b>生きている</b> 行があれば built-in へ昇格させる（手動で作られた
+        // is_built_in=0 の行を回収するのが主用途）。
+        //
+        // 注意：mark は @TableLogic なので MyBatis-Plus が wrapper SELECT に必ず
+        // AND mark = 1 を足す。よって soft-deleted 行はここからは<b>見えない</b>——
+        // 孤児追従で消した code を再宣言した場合、復活ではなく新しい id の行が挿入される。
+        // 一意索引 uk_core_rbac_perm_code が WHERE mark = 1 の部分索引なので衝突はせず、
+        // 残った mark=0 行は無害だが、旧 id に紐付いていた role_permission は
+        // softDeleteOrphan が既に失効させているので付与し直しが要る。
         List<PermissionEntity> existing = mapper.selectList(
                 new QueryWrapper<PermissionEntity>().eq("code", code));
         PermissionRegistry.Entry entry = PermissionRegistry.get(code);
         if (!existing.isEmpty()) {
-            PermissionEntity e = existing.get(0);
-            e.setMark(1);
+            PermissionEntity e = existing.get(0);   // 上の理由で必ず mark=1
             e.setIsBuiltIn(1);
             e.setResource(entry.resource());
             e.setAction(entry.action());
@@ -212,9 +218,12 @@ public class PermissionConsistencyGuard {
      * 孤児 permission 行（および紐づく role-permission 関係）を soft delete。
      * 戻り値は失効した role-permission 行数。
      *
-     * <p>mark=0 の permission 行に対しても級联清掃を回す：過去バージョンの Guard / 手動 SQL /
-     * V13 cleanup 系 migration が permission のみ mark=0 にして role_permission を取り残した
-     * 場合への self-heal。1 startup で残骸を全部回収する。
+     * <p>対象は同 code の <b>生きている</b> 行だけ：mark は @TableLogic なので
+     * MyBatis-Plus が wrapper SELECT に AND mark = 1 を足すし、そもそも孤児集合は
+     * {@link #loadBuiltInCodesFromDb()}（mark=1 かつ is_built_in=1）由来なので、
+     * 既に mark=0 の permission 行にはこのメソッド自体が到達しない。
+     * permission だけ mark=0 で role_permission が生き残った残骸（旧 Guard / 手動 SQL /
+     * V13 系 migration の産物）は起動時には回収されないので、手動 SQL で片付ける。
      */
     private int softDeleteOrphan(String code) {
         // mark=1 / mark=0 を問わず同じ code の行を全部対象にする。
@@ -232,8 +241,7 @@ public class PermissionConsistencyGuard {
                                 .eq("id", e.getId()).eq("mark", 1)
                                 .set("mark", 0).set("update_time", now));
             }
-            // 既に mark=0 の permission に対しても、紐付く active な role_permission が
-            // あれば回収する（NO-OP の場合は UPDATE 0 行で安価）。
+            // 紐付く active な role_permission を失効させる（NO-OP なら UPDATE 0 行で安価）。
             Integer affected = rolePermissionMapper.update(null,
                     new UpdateWrapper<RolePermissionEntity>()
                             .eq("permission_id", e.getId())

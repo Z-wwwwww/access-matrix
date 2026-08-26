@@ -1,7 +1,5 @@
 package com.platform.system.job.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.platform.core.common.context.RequestContext;
 import com.platform.core.common.id.IdGenerator;
 import com.platform.core.common.scheduling.ScheduledJob;
@@ -12,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.OffsetDateTime;
 import java.util.Locale;
 
 /**
@@ -55,17 +54,21 @@ public class JobSeeder {
 
     /** ジョブの設定行を upsert。挿入したら 1、既存更新/no-op なら 0。 */
     private int upsert(ScheduledJob job) {
-        CoreJobEntity existing = jobMapper.selectOne(new QueryWrapper<CoreJobEntity>()
-                .eq("job_code", job.code())
-                .eq("tenant_id", SYSTEM_TENANT)
-                .last("LIMIT 1"));
+        // soft-deleted (mark=0) 行も見える手書き SQL を使う。BaseMapper の wrapper
+        // SELECT だと @TableLogic の mark に対して MyBatis-Plus が AND mark = 1 を
+        // 足すので、孤児追従 (JobRegistrySyncGuard.removeOrphans) が消した行は
+        // 決して見つからず、下の INSERT が既定 cron の新規行を作って管理者の設定を
+        // 黙って捨てていた（消えた mark=0 行もそのまま残り続ける）。
+        CoreJobEntity existing = jobMapper.findAnyByCode(SYSTEM_TENANT, job.code());
 
         if (existing != null) {
             // 管理者が変えうる値は保持：cron/enabled/concurrent/max_run_seconds に加え、
             // name も管理画面で編集可になったので上書きしない。soft-deleted のみ復活。
-            jobMapper.update(null, new UpdateWrapper<CoreJobEntity>()
-                    .eq("id", existing.getId())
-                    .set("mark", 1));
+            if (Integer.valueOf(0).equals(existing.getMark())
+                    && jobMapper.revive(existing.getId(), OffsetDateTime.now()) > 0) {
+                log.info("[JobSeeder] revived soft-deleted job config '{}' (cron='{}' preserved)",
+                        job.code(), existing.getCron());
+            }
             return 0;
         }
 
