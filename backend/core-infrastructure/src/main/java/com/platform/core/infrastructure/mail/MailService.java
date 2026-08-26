@@ -19,6 +19,7 @@ import org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -95,10 +96,10 @@ public class MailService {
                          Map<String, Object> model) {
         if (!props.enabled()) {
             log.info("[mail][disabled] would have sent template={} locale={} to {}",
-                    templateBase, localeTag(locale), to);
+                    templateBase, localeTag(normalise(locale)), to);
             return;
         }
-        Locale loc = locale == null ? FALLBACK_LOCALE : locale;
+        Locale loc = normalise(locale);
         String subject = resolveSubject(subjectKey, subjectArgs, loc);
         // Brand logo for the email header — external PNG under the app's base URL
         // (SVG is rendered by the SPA but not by Gmail/Outlook). Caller may override
@@ -194,9 +195,57 @@ public class MailService {
     }
 
     /**
+     * The locales this project actually ships subjects and templates for, in
+     * within-language preference order (so a region-less {@code zh} lands on
+     * Simplified rather than Traditional).
+     */
+    private static final List<Locale> SUPPORTED = List.of(
+            Locale.JAPAN,                // ja_JP — also FALLBACK_LOCALE
+            Locale.ENGLISH,              // en
+            Locale.SIMPLIFIED_CHINESE,   // zh_CN
+            Locale.TRADITIONAL_CHINESE,  // zh_TW
+            Locale.of("ko", "KR"));      // ko_KR
+
+    /**
+     * Map whatever locale the request carried onto one of {@link #SUPPORTED}.
+     *
+     * <p>Without this the recipient's language was decided by an exact filename
+     * match, and the tags the SPA sends do not line up with the tags the files
+     * use. {@code request.js} sends {@code Accept-language: en-US} for English
+     * and {@code ko} for Korean, so {@link #localeTag} produced {@code en_US}
+     * and {@code ko} — neither of which names a template
+     * ({@code user-invite.en.ftl} / {@code user-invite.ko_KR.ftl}), so
+     * {@link #renderTemplate} fell through to the Japanese body. The SUBJECT did
+     * not fall through the same way — {@code MessageSource} resolves
+     * {@code en_US → en} on its own — so an English recipient got an English
+     * subject line on a Japanese email, and a Korean recipient got Japanese on
+     * both ({@code mail_ko.properties} does not exist either). Only {@code ja_JP}
+     * and {@code zh_CN} happened to line up.
+     *
+     * <p>Resolving once, here, also keeps the two halves from disagreeing again:
+     * {@link #sendHtml} normalises before it touches either.
+     *
+     * <p>Order: exact match wins; then any locale of the same language (so
+     * {@code en_US → en}, {@code ko → ko_KR}, {@code zh_HK → zh_CN}); then the
+     * project fallback.
+     */
+    static Locale normalise(Locale requested) {
+        if (requested == null) return FALLBACK_LOCALE;
+        for (Locale s : SUPPORTED) {
+            if (s.equals(requested)) return s;
+        }
+        for (Locale s : SUPPORTED) {
+            if (s.getLanguage().equals(requested.getLanguage())) return s;
+        }
+        return FALLBACK_LOCALE;
+    }
+
+    /**
      * Normalises a {@link Locale} to the {@code lang_REGION} string we use as
      * filename suffix. Examples: {@code Locale.JAPAN -> "ja_JP"},
      * {@code Locale.ENGLISH -> "en"}, {@code Locale.SIMPLIFIED_CHINESE -> "zh_CN"}.
+     * Callers feed it a {@link #normalise}d locale — a raw request locale would
+     * produce a tag no template file carries.
      */
     static String localeTag(Locale locale) {
         if (locale == null) return FALLBACK_TAG;

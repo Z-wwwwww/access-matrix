@@ -34,9 +34,16 @@ const request = axios.create({
   paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'repeat' })
 })
 
+// Locale id (the src/lang/*.js file names, which is what `i18n-lang` stores)
+// -> the BCP-47 tag the backend's Accept-Language parsing understands. Must
+// cover EVERY locale the switcher offers: an unmapped one falls through to the
+// 'ja-JP' default below, so those users get Japanese from every locale-aware
+// backend path — including the invite / password-reset / break-glass emails,
+// which pick their template and subject off this header. zh_TW was missing.
 const LANG_MAP = {
   ja_JP: 'ja-JP',
   zh_CN: 'zh-CN',
+  zh_TW: 'zh-TW',
   en: 'en-US',
   ko_KR: 'ko'
 }
