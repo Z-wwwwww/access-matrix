@@ -24,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 
@@ -158,8 +159,17 @@ public class DemoSeeder {
 
     private void ensureUser(String userId, String username, String displayName,
                             String email, String userNo, String deptId) {
-        UserEntity existing = userMapper.selectById(userId);
-        if (existing != null && existing.getMark() != null && existing.getMark() == 1) {
+        // Probe with findMarkById, NOT selectById: `mark` is @TableLogic, so
+        // MyBatis-Plus appends `AND mark = 1` and a row someone soft-deleted from
+        // the user console reads as null — indistinguishable from "never seeded".
+        // These rows carry FIXED ids, so acting on that null means re-inserting an
+        // id the table still holds and the PRIMARY KEY rejects it; seed() catches
+        // that as a plain WARN and abandons everything after it. Revive instead.
+        Integer mark = userMapper.findMarkById(userId);
+        if (mark != null) {
+            if (mark != 1 && userMapper.reviveById(userId, OffsetDateTime.now()) > 0) {
+                log.info("DemoSeeder: revived soft-deleted user {} (id={})", username, userId);
+            }
             return;
         }
         UserEntity u = new UserEntity();
@@ -272,7 +282,19 @@ public class DemoSeeder {
         String taskId = "DEMOTASK0000000000" + paddedShort;   // 18 + 8 = 26 chars
 
         // 個別 task 単位の idempotency。既に入っていれば skip。
-        if (taskMapper.selectById(taskId) != null) return;
+        // selectById ではなく findMarkById で見る:mark は @TableLogic なので
+        // MyBatis-Plus が `AND mark = 1` を足し、デモ画面から削除された(mark=0)行は
+        // null に見える —— 「まだ播種していない」と区別が付かない。この行の id は
+        // 固定なので、その null を信じて INSERT すると主キーが衝突し、seed() は
+        // それを WARN 一行に潰したうえで以降(残りのタスクと syncUsersToKeycloak)を
+        // まるごと諦める。削除済みなら復活させる。
+        Integer mark = taskMapper.findMarkById(taskId);
+        if (mark != null) {
+            if (mark != 1 && taskMapper.reviveById(taskId, OffsetDateTime.now()) > 0) {
+                log.info("DemoSeeder: revived soft-deleted task {} (id={})", title, taskId);
+            }
+            return;
+        }
 
         TaskEntity t = new TaskEntity();
         t.setId(taskId);

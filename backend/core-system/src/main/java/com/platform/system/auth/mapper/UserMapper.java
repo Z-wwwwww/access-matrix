@@ -5,6 +5,9 @@ import com.platform.system.auth.entity.UserEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+
+import java.time.OffsetDateTime;
 
 @Mapper
 public interface UserMapper extends BaseMapper<UserEntity> {
@@ -133,4 +136,30 @@ public interface UserMapper extends BaseMapper<UserEntity> {
             """)
     UserEntity findByUsernameAndTenant(@Param("tenantId") String tenantId,
                                        @Param("username") String username);
+
+    /**
+     * The row's {@code mark} for a given id, or null when no row exists at all —
+     * an existence probe that can tell "soft-deleted" apart from "absent".
+     *
+     * <p>{@code selectById} cannot: {@code mark} is {@code @TableLogic}, so
+     * MyBatis-Plus appends {@code AND mark = 1} and a soft-deleted row reads as
+     * null. Callers that seed rows under a FIXED id ({@code DemoSeeder}) would
+     * then re-insert an id the table still holds, and the primary key rejects it.
+     * Hand-written SQL is not rewritten by the logic-delete handler.
+     *
+     * <p>No tenant predicate: the id is a globally unique primary key, and the
+     * tenant interceptor still scopes the statement to the caller's tenant.
+     */
+    @Select("SELECT mark FROM core_auth_user WHERE id = #{id}")
+    Integer findMarkById(@Param("id") String id);
+
+    /**
+     * Bring a soft-deleted row back. An {@code UpdateWrapper} cannot: it carries
+     * the same {@code AND mark = 1} guard, so it never matches a {@code mark = 0}
+     * row.
+     *
+     * @return rows updated — 1 when a soft-deleted row was revived, 0 otherwise
+     */
+    @Update("UPDATE core_auth_user SET mark = 1, update_time = #{now} WHERE id = #{id} AND mark = 0")
+    int reviveById(@Param("id") String id, @Param("now") OffsetDateTime now);
 }
